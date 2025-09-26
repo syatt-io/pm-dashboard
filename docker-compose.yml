@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # Jira MCP Server
+  jira-mcp:
+    image: ghcr.io/modelcontextprotocol/mcp-atlassian:latest
+    container_name: jira-mcp-server
+    ports:
+      - "3000:3000"
+    environment:
+      - JIRA_URL=${JIRA_URL}
+      - JIRA_USERNAME=${JIRA_USERNAME}
+      - JIRA_API_TOKEN=${JIRA_API_TOKEN}
+      - MCP_SERVER_PORT=3000
+      - LOG_LEVEL=info
+    volumes:
+      - ./config/mcp:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Fireflies MCP Wrapper (custom service)
+  fireflies-mcp:
+    build:
+      context: ./src/mcp
+      dockerfile: Dockerfile.fireflies
+    container_name: fireflies-mcp-server
+    ports:
+      - "3001:3001"
+    environment:
+      - FIREFLIES_API_KEY=${FIREFLIES_API_KEY}
+      - MCP_SERVER_PORT=3001
+      - LOG_LEVEL=info
+    volumes:
+      - ./config/mcp:/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL Database (optional, for production)
+  postgres:
+    image: postgres:15-alpine
+    container_name: pm-agent-db
+    environment:
+      - POSTGRES_DB=pm_agent
+      - POSTGRES_USER=pm_agent
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Redis Cache (optional, for task scheduling)
+  redis:
+    image: redis:7-alpine
+    container_name: pm-agent-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: pm-agent-network

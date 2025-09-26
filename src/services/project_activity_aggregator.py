@@ -1,0 +1,1045 @@
+"""Project Activity Aggregator for generating client meeting agendas."""
+
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, asdict
+import json
+
+from config.settings import settings
+from src.integrations.fireflies import FirefliesClient
+from src.integrations.jira_mcp import JiraMCPClient
+from src.processors.transcript_analyzer import TranscriptAnalyzer
+from src.managers.slack_bot import SlackTodoBot
+
+# MCP Tempo function should be available globally in Claude Code environment
+# If not available, define a fallback
+if 'mcp__Jira_Tempo__retrieveWorklogs' not in globals():
+    def mcp__Jira_Tempo__retrieveWorklogs(startDate: str, endDate: str):
+        """Fallback function when MCP Tempo is not available."""
+        return "No worklogs found for the specified date range."
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProjectActivity:
+    """Container for aggregated project activity data."""
+    project_key: str
+    project_name: str
+    start_date: str
+    end_date: str
+
+    # Meeting data
+    meetings: List[Dict[str, Any]]
+    meeting_summaries: List[str]
+
+    # Jira ticket activity
+    ticket_activity: List[Dict[str, Any]]
+    completed_tickets: List[Dict[str, Any]]
+    new_tickets: List[Dict[str, Any]]
+    jira_ticket_changes: List[Dict[str, Any]]
+
+    # Slack activity (if available)
+    slack_messages: List[Dict[str, Any]]
+    key_discussions: List[str]
+
+    # Time tracking
+    time_entries: List[Dict[str, Any]]
+    total_hours: float
+
+    # AI-generated insights (legacy format)
+    progress_summary: Optional[str] = None
+    key_achievements: Optional[List[str]] = None
+    blockers_risks: Optional[List[str]] = None
+    next_steps: Optional[List[str]] = None
+
+    # New structured digest format
+    noteworthy_discussions: Optional[str] = None
+    work_completed: Optional[str] = None
+    topics_for_discussion: Optional[str] = None
+
+    # Raw meeting insights
+    meeting_action_items: Optional[List[Dict[str, Any]]] = None
+    meeting_blockers: Optional[List[str]] = None
+
+
+class ProjectActivityAggregator:
+    """Aggregates project activity from multiple sources for agenda generation."""
+
+    def __init__(self):
+        """Initialize the aggregator with required clients."""
+        from sqlalchemy import create_engine, text
+        from sqlalchemy.orm import sessionmaker
+
+        # Store text function for later use
+        self.text = text
+
+        self.fireflies_client = FirefliesClient(
+            api_key=settings.fireflies.api_key,
+            base_url=settings.fireflies.base_url
+        )
+
+        self.jira_client = JiraMCPClient(
+            jira_url=settings.jira.url,
+            username=settings.jira.username,
+            api_token=settings.jira.api_token
+        )
+
+        self.analyzer = TranscriptAnalyzer()
+
+        # Initialize Slack bot
+        try:
+            # Initialize Slack bot with credentials from settings
+            if settings.notifications.slack_bot_token and settings.notifications.slack_signing_secret:
+                self.slack_bot = SlackTodoBot(
+                    bot_token=settings.notifications.slack_bot_token,
+                    signing_secret=settings.notifications.slack_signing_secret
+                )
+            else:
+                logger.warning("Slack credentials not configured, Slack integration disabled")
+                self.slack_bot = None
+        except Exception as e:
+            logger.warning(f"Could not initialize Slack bot: {e}")
+            self.slack_bot = None
+
+        # Setup database session for accessing stored meetings
+        db_path = "pm_agent.db"
+        engine = create_engine(f"sqlite:///{db_path}")
+        Session = sessionmaker(bind=engine)
+        self.session = Session()
+
+    async def aggregate_project_activity(
+        self,
+        project_key: str,
+        project_name: str,
+        days_back: int = 7
+    ) -> ProjectActivity:
+        """
+        Aggregate activity for a specific project over the specified time period.
+
+        Args:
+            project_key: Jira project key (e.g., 'PROJ')
+            project_name: Human-readable project name
+            days_back: Number of days to look back (default: 7)
+
+        Returns:
+            ProjectActivity containing all aggregated data
+        """
+        logger.info(f"Aggregating activity for project {project_key} ({days_back} days)")
+
+        end_date = datetime.now()
+        # Set start_date to beginning of the day N days ago to include full days
+        start_date = (end_date - timedelta(days=days_back)).replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Initialize activity container
+        activity = ProjectActivity(
+            project_key=project_key,
+            project_name=project_name,
+            start_date=start_date.isoformat(),
+            end_date=end_date.isoformat(),
+            meetings=[],
+            meeting_summaries=[],
+            ticket_activity=[],
+            completed_tickets=[],
+            new_tickets=[],
+            jira_ticket_changes=[],
+            slack_messages=[],
+            key_discussions=[],
+            time_entries=[],
+            total_hours=0.0
+        )
+
+        try:
+            # Collect data from all sources
+            await self._collect_meeting_data(activity, start_date, end_date)
+            await self._collect_jira_activity(activity, start_date, end_date)
+            await self._collect_slack_messages(activity, start_date, end_date)
+            await self._collect_time_tracking_data(activity, start_date, end_date)
+
+            # Generate AI insights
+            await self._generate_insights(activity)
+
+            logger.info(f"Successfully aggregated activity for {project_key}")
+            return activity
+
+        except Exception as e:
+            logger.error(f"Error aggregating project activity: {e}")
+            raise
+
+    async def _collect_meeting_data(
+        self,
+        activity: ProjectActivity,
+        start_date: datetime,
+        end_date: datetime
+    ):
+        """Collect and analyze meeting data for the project."""
+        logger.info(f"Starting meeting data collection for {activity.project_key}")
+        try:
+            # Import the database models
+            from main import ProcessedMeeting, MeetingProjectConnection
+
+            # Get meetings that are relevant to this project from the database
+            logger.info(f"Searching meetings for {activity.project_key} between {start_date} and {end_date}")
+            relevant_meetings_query = self.session.query(ProcessedMeeting).join(
+                MeetingProjectConnection,
+                ProcessedMeeting.meeting_id == MeetingProjectConnection.meeting_id
+            ).filter(
+                MeetingProjectConnection.project_key == activity.project_key,
+                ProcessedMeeting.date >= start_date,
+                ProcessedMeeting.date <= end_date,
+                ProcessedMeeting.analyzed_at.is_not(None)  # Only include analyzed meetings
+            ).all()
+            logger.info(f"Database query found {len(relevant_meetings_query)} meetings for {activity.project_key}")
+
+            # Convert database meetings to activity format
+            relevant_meetings = []
+            for db_meeting in relevant_meetings_query:
+                meeting_data = {
+                    'id': db_meeting.meeting_id,
+                    'title': db_meeting.title,
+                    'date': db_meeting.date.isoformat() if db_meeting.date else '',
+                    'summary': db_meeting.summary,
+                    'processed_at': db_meeting.processed_at.isoformat() if db_meeting.processed_at else '',
+                    'analyzed_at': db_meeting.analyzed_at.isoformat() if db_meeting.analyzed_at else ''
+                }
+                relevant_meetings.append(meeting_data)
+
+                # Add the summary to meeting summaries
+                if db_meeting.summary:
+                    activity.meeting_summaries.append(db_meeting.summary)
+
+            # ALSO check for live Fireflies meetings that match this project
+            try:
+                from src.integrations.fireflies import FirefliesClient
+                from src.utils.project_matcher import get_project_search_keywords, check_project_match
+                import os
+
+                fireflies_client = FirefliesClient(os.getenv('FIREFLIES_API_KEY'))
+
+                # Calculate days back from start_date to now
+                days_back = (datetime.now() - start_date).days + 1
+
+                # Get live meetings from Fireflies
+                meetings = fireflies_client.get_recent_meetings(days_back=days_back)
+
+                # Check each meeting against this project
+                keywords = get_project_search_keywords(activity.project_key)
+                for meeting in meetings:
+                    if check_project_match(meeting, [activity.project_key]):
+                        # Check if meeting date is in our range
+                        if hasattr(meeting, 'date') and meeting.date:
+                            meeting_date = meeting.date
+                            if isinstance(meeting_date, str):
+                                try:
+                                    meeting_date = datetime.fromisoformat(meeting_date.replace('Z', '+00:00')).replace(tzinfo=None)
+                                except:
+                                    continue
+
+                            if start_date <= meeting_date <= end_date:
+                                # Check if this meeting is already in our database results
+                                already_included = any(db_meeting['id'] == meeting.id for db_meeting in relevant_meetings)
+                                if not already_included:
+                                    meeting_data = {
+                                        'id': meeting.id,
+                                        'title': meeting.title or 'Untitled Meeting',
+                                        'date': meeting_date.isoformat() if meeting_date else '',
+                                        'summary': getattr(meeting, 'summary', '') or 'Live meeting - summary pending analysis',
+                                        'processed_at': datetime.now().isoformat(),
+                                        'analyzed_at': None  # Live meeting not yet analyzed
+                                    }
+                                    relevant_meetings.append(meeting_data)
+
+                                    # Add summary if available
+                                    if getattr(meeting, 'summary', ''):
+                                        activity.meeting_summaries.append(meeting.summary)
+
+                logger.info(f"Added {len([m for m in relevant_meetings if not m['analyzed_at']])} live Fireflies meetings to digest")
+
+            except Exception as fireflies_error:
+                logger.debug(f"Could not fetch live Fireflies meetings: {fireflies_error}")
+
+            activity.meetings = relevant_meetings
+            logger.info(f"Found {len(relevant_meetings)} relevant meetings for {activity.project_key}")
+
+        except Exception as e:
+            logger.error(f"Error collecting meeting data: {e}")
+
+    async def _collect_jira_activity(
+        self,
+        activity: ProjectActivity,
+        start_date: datetime,
+        end_date: datetime
+    ):
+        """Collect Jira ticket activity for the project."""
+        try:
+            # Search for tickets updated in the time period
+            days_back = (datetime.now() - start_date).days
+            search_jql = f'project = {activity.project_key} AND updated >= -{days_back}d ORDER BY updated DESC'
+
+            try:
+                # Use the existing JiraMCPClient
+                tickets = await self.jira_client.search_tickets(
+                    jql=search_jql,
+                    max_results=50
+                )
+
+                for ticket in tickets:
+                    # Parse dates from ticket fields
+                    fields = ticket.get('fields', {})
+                    created_str = fields.get('created', '')
+                    updated_str = fields.get('updated', '')
+
+                    if created_str:
+                        created_date = datetime.fromisoformat(created_str.replace('Z', '+00:00'))
+                        # Make timezone-naive for comparison
+                        created_date = created_date.replace(tzinfo=None)
+                    else:
+                        created_date = start_date
+
+                    if updated_str:
+                        updated_date = datetime.fromisoformat(updated_str.replace('Z', '+00:00'))
+                        # Make timezone-naive for comparison
+                        updated_date = updated_date.replace(tzinfo=None)
+                    else:
+                        updated_date = start_date
+
+                    # Process changelog to find recent changes
+                    recent_changes = []
+                    changelog = ticket.get('changelog', {})
+                    if changelog and changelog.get('histories'):
+                        for history in changelog.get('histories', []):
+                            change_date_str = history.get('created', '')
+                            if change_date_str:
+                                change_date = datetime.fromisoformat(change_date_str.replace('Z', '+00:00'))
+                                change_date = change_date.replace(tzinfo=None)
+
+                                # Only include changes in our date range
+                                if start_date <= change_date <= end_date:
+                                    for item in history.get('items', []):
+                                        change_info = {
+                                            'field': item.get('field', ''),
+                                            'fieldtype': item.get('fieldtype', ''),
+                                            'from_value': item.get('fromString', ''),
+                                            'to_value': item.get('toString', ''),
+                                            'changed_by': history.get('author', {}).get('displayName', 'Unknown'),
+                                            'changed_at': change_date.isoformat()
+                                        }
+                                        recent_changes.append(change_info)
+
+                    ticket_data = {
+                        'key': ticket.get('key', ''),
+                        'summary': fields.get('summary', ''),
+                        'status': fields.get('status', {}).get('name', 'Unknown'),
+                        'assignee': fields.get('assignee', {}).get('displayName', 'Unassigned') if fields.get('assignee') else 'Unassigned',
+                        'priority': fields.get('priority', {}).get('name', 'Medium') if fields.get('priority') else 'Medium',
+                        'created': created_date.isoformat(),
+                        'updated': updated_date.isoformat(),
+                        'recent_changes': recent_changes
+                    }
+
+                    activity.ticket_activity.append(ticket_data)
+
+                    # Categorize by activity type
+                    if created_date >= start_date:
+                        activity.new_tickets.append(ticket_data)
+
+                    if fields.get('resolution') and updated_date >= start_date:
+                        activity.completed_tickets.append(ticket_data)
+
+            except Exception as e:
+                logger.error(f"Error searching Jira tickets: {e}")
+
+        except Exception as e:
+            logger.error(f"Error collecting Jira activity: {e}")
+
+    async def _collect_slack_messages(
+        self,
+        activity: ProjectActivity,
+        start_date: datetime,
+        end_date: datetime
+    ):
+        """Collect Slack messages from the project's designated channel."""
+        try:
+            if not self.slack_bot:
+                logger.info(f"Slack bot not available, skipping Slack collection for {activity.project_key}")
+                return
+
+            # Query the database for the project's slack_channel
+            result = self.session.execute(
+                self.text("SELECT slack_channel FROM projects WHERE key = :key"),
+                {"key": activity.project_key}
+            ).fetchone()
+
+            if not result or not result[0]:
+                logger.info(f"No Slack channel configured for project {activity.project_key}")
+                return
+
+            slack_channel = result[0]
+            logger.info(f"Found Slack channel '{slack_channel}' for project {activity.project_key}")
+
+            # Calculate how many messages to fetch based on the time period
+            days_back = (end_date - start_date).days
+            message_limit = min(50, max(10, days_back * 5))  # 5 messages per day, with bounds
+
+            # Remove # prefix from channel name for Slack API compatibility
+            channel_name = slack_channel.lstrip('#')
+
+            # Fetch messages from the channel
+            messages = await self.slack_bot.read_channel_history(channel_name, limit=message_limit)
+
+            # Filter messages by date range
+            filtered_messages = []
+            for message in messages:
+                message_timestamp = float(message.get('timestamp', 0))
+                message_date = datetime.fromtimestamp(message_timestamp)
+
+                if start_date <= message_date <= end_date:
+                    # Filter out bot messages and empty messages
+                    if (not message.get('bot_id') and
+                        message.get('text') and
+                        len(message.get('text', '').strip()) > 10):
+                        filtered_messages.append({
+                            'text': message.get('text', ''),
+                            'user': message.get('user', 'unknown'),
+                            'timestamp': message_date.isoformat(),
+                            'ts': message.get('timestamp')
+                        })
+
+            activity.slack_messages = filtered_messages
+            logger.info(f"Collected {len(filtered_messages)} Slack messages from {slack_channel}")
+
+            # Extract key discussions using AI if we have messages
+            if filtered_messages:
+                await self._extract_key_discussions(activity, filtered_messages)
+
+        except Exception as e:
+            logger.error(f"Error collecting Slack messages: {e}")
+            activity.slack_messages = []
+            activity.key_discussions = []
+
+    async def _extract_key_discussions(self, activity: ProjectActivity, messages: List[Dict[str, Any]]):
+        """Extract key discussions and decisions from Slack messages using AI."""
+        try:
+            # Combine all message text for analysis
+            combined_text = "\n".join([f"{msg['text']}" for msg in messages])
+
+            if len(combined_text.strip()) < 50:
+                return
+
+            discussions_prompt = f"""
+            Analyze the following Slack channel discussions for project {activity.project_name} ({activity.project_key}).
+            Extract key discussions, decisions, and project-relevant information.
+
+            Slack Messages:
+            {combined_text[:3000]}  # Limit to avoid token issues
+
+            Please identify:
+            1. Important decisions or agreements made
+            2. Technical discussions or solutions
+            3. Project updates or status changes
+            4. Blockers or issues mentioned
+            5. Action items or next steps discussed
+
+            Return a JSON array of strings, each representing a key discussion point or decision.
+            Focus on business-relevant content, ignore casual conversation.
+            """
+
+            from langchain_core.messages import HumanMessage, SystemMessage
+
+            messages_for_ai = [
+                SystemMessage(content="You are a project manager analyzing team communications. Extract key business and technical discussions from Slack messages."),
+                HumanMessage(content=discussions_prompt)
+            ]
+
+            # Use the LLM to extract key discussions
+            try:
+                response = await self.analyzer.llm.ainvoke(messages_for_ai)
+            except AttributeError:
+                response = self.analyzer.llm.invoke(messages_for_ai)
+
+            # Parse the response
+            discussions = json.loads(response.content) if response.content.startswith('[') else [response.content]
+            activity.key_discussions = discussions[:10]  # Limit to top 10 discussions
+
+        except Exception as e:
+            logger.error(f"Error extracting key discussions: {e}")
+            # Fallback: use first few messages as basic discussions
+            activity.key_discussions = [msg['text'][:100] + "..." for msg in messages[:3]]
+
+    async def _collect_time_tracking_data(
+        self,
+        activity: ProjectActivity,
+        start_date: datetime,
+        end_date: datetime
+    ):
+        """Collect time tracking data using accurate Tempo v4 API with issue ID resolution."""
+        try:
+            import requests
+            import base64
+            import re
+            from config.settings import settings
+
+            logger.info(f"Getting time tracking data via Tempo v4 API for {activity.project_key} ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})")
+
+            # Get Tempo API token
+            tempo_token = settings.jira.api_token  # Fallback if no specific Tempo token
+            try:
+                import os
+                tempo_token = os.getenv('TEMPO_API_TOKEN') or tempo_token
+            except:
+                pass
+
+            # Helper function to get issue key from Jira using issue ID
+            issue_cache = {}
+            def get_issue_key_from_jira(issue_id):
+                if issue_id in issue_cache:
+                    return issue_cache[issue_id]
+
+                try:
+                    credentials = f"{settings.jira.username}:{settings.jira.api_token}"
+                    encoded_credentials = base64.b64encode(credentials.encode()).decode()
+
+                    headers = {
+                        "Authorization": f"Basic {encoded_credentials}",
+                        "Accept": "application/json"
+                    }
+
+                    url = f"{settings.jira.url}/rest/api/3/issue/{issue_id}"
+                    response = requests.get(url, headers=headers)
+                    response.raise_for_status()
+                    issue_data = response.json()
+                    issue_key = issue_data.get("key")
+                    issue_cache[issue_id] = issue_key
+                    return issue_key
+                except Exception as e:
+                    logger.debug(f"Error getting issue key for ID {issue_id}: {e}")
+                    issue_cache[issue_id] = None
+                    return None
+
+            # Get Tempo worklogs using v4 API
+            headers = {
+                "Authorization": f"Bearer {tempo_token}",
+                "Accept": "application/json"
+            }
+
+            url = "https://api.tempo.io/4/worklogs"
+            params = {
+                "from": start_date.strftime('%Y-%m-%d'),
+                "to": end_date.strftime('%Y-%m-%d'),
+                "limit": 5000
+            }
+
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+
+            data = response.json()
+            worklogs = data.get("results", [])
+
+            # Handle pagination
+            page_count = 1
+            while data.get("metadata", {}).get("next"):
+                next_url = data["metadata"]["next"]
+                response = requests.get(next_url, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                page_worklogs = data.get("results", [])
+                worklogs.extend(page_worklogs)
+                page_count += 1
+
+            logger.info(f"Retrieved {len(worklogs)} worklogs from Tempo API across {page_count} pages")
+
+            # Process worklogs with dual-stage approach
+            total_hours = 0.0
+            time_entries = []
+            processed_count = 0
+            skipped_count = 0
+
+            for worklog in worklogs:
+                description = worklog.get("description", "")
+                issue_key = None
+
+                # First try extracting project key from description (faster)
+                issue_match = re.search(r'([A-Z]+-\d+)', description)
+                if issue_match:
+                    issue_key = issue_match.group(1)
+                else:
+                    # If not found in description, look up via issue ID
+                    issue_id = worklog.get("issue", {}).get("id")
+                    if issue_id:
+                        issue_key = get_issue_key_from_jira(issue_id)
+
+                if not issue_key:
+                    skipped_count += 1
+                    continue
+
+                project_key = issue_key.split("-")[0]
+
+                # Only include worklogs for the target project
+                if project_key != activity.project_key:
+                    continue
+
+                processed_count += 1
+
+                # Get hours (timeSpentSeconds / 3600)
+                seconds = worklog.get("timeSpentSeconds", 0)
+                hours = seconds / 3600
+
+                total_hours += hours
+
+                # Create time entry
+                entry = {
+                    'issue_key': issue_key,
+                    'hours': round(hours, 2),
+                    'date': worklog.get("startDate", ""),
+                    'description': description,
+                    'author': worklog.get("author", {}).get("displayName", "Unknown")
+                }
+                time_entries.append(entry)
+
+            activity.total_hours = round(total_hours, 2)
+            activity.time_entries = time_entries
+
+            logger.info(f"Accurate Tempo v4 API: Found {activity.total_hours}h logged for {activity.project_key} with {len(time_entries)} entries")
+            logger.info(f"Processed {processed_count} relevant worklogs, skipped {skipped_count}")
+            logger.info(f"Made {len(issue_cache)} Jira API calls for issue key lookups")
+
+        except Exception as e:
+            logger.error(f"Error collecting time tracking data via Tempo v4 API: {e}")
+            activity.time_entries = []
+            activity.total_hours = 0.0
+
+    async def _fetch_tempo_direct(self, project_key: str, start_date: str, end_date: str) -> tuple[float, list]:
+        """Direct Tempo API call as fallback when MCP fails."""
+        try:
+            import requests
+            from config.settings import settings
+
+            # Use the same credentials that would be used for Jira
+            tempo_url = f"{settings.jira.url.rstrip('/')}/rest/tempo-timesheets/4/worklogs"
+
+            # Try to get Tempo API token from environment, fallback to Jira token
+            import os
+            tempo_token = os.getenv('TEMPO_API_TOKEN') or settings.jira.api_token
+
+            headers = {
+                'Authorization': f'Bearer {tempo_token}',
+                'Content-Type': 'application/json'
+            }
+
+            params = {
+                'dateFrom': start_date,
+                'dateTo': end_date,
+                'project': project_key
+            }
+
+            logger.info(f"Attempting direct Tempo API call for {project_key} from {start_date} to {end_date}")
+
+            response = requests.get(tempo_url, headers=headers, params=params, timeout=30)
+
+            if response.status_code == 200:
+                data = response.json()
+                worklogs = data.get('worklogs', [])
+
+                total_hours = 0.0
+                time_entries = []
+
+                for worklog in worklogs:
+                    issue_key = worklog.get('issue', {}).get('key', '')
+                    if issue_key.startswith(f"{project_key}-"):
+                        hours = float(worklog.get('timeSpentSeconds', 0)) / 3600.0
+                        entry = {
+                            'issue_key': issue_key,
+                            'hours': hours,
+                            'date': worklog.get('started', '').split('T')[0],
+                            'description': worklog.get('comment', ''),
+                            'author': worklog.get('author', {}).get('displayName', 'Unknown')
+                        }
+                        time_entries.append(entry)
+                        total_hours += hours
+
+                logger.info(f"Direct Tempo API found {len(time_entries)} worklogs totaling {total_hours:.2f}h")
+                return total_hours, time_entries
+            else:
+                logger.warning(f"Direct Tempo API returned {response.status_code}: {response.text}")
+                return 0.0, []
+
+        except ImportError:
+            logger.warning("requests library not available for direct Tempo API call")
+            return 0.0, []
+        except Exception as e:
+            logger.error(f"Error in direct Tempo API call: {e}")
+            return 0.0, []
+
+    def _parse_tempo_response(self, tempo_response, project_key: str) -> tuple[float, list]:
+        """Parse Tempo MCP response format for a specific project."""
+        total_hours = 0.0
+        time_entries = []
+
+        try:
+            # Handle different response formats
+            if isinstance(tempo_response, str):
+                if "No worklogs found" in tempo_response or not tempo_response.strip():
+                    return 0.0, []
+                # Try parsing as the old string format
+                return self._parse_tempo_worklogs(tempo_response, project_key)
+
+            # Handle structured response (list or dict format)
+            worklogs = []
+            if isinstance(tempo_response, dict):
+                worklogs = tempo_response.get('worklogs', [])
+            elif isinstance(tempo_response, list):
+                worklogs = tempo_response
+
+            for worklog in worklogs:
+                issue_key = worklog.get('issue', {}).get('key', '') if isinstance(worklog.get('issue'), dict) else worklog.get('issueKey', '')
+
+                # Only process worklogs for our project
+                if issue_key.startswith(f"{project_key}-"):
+                    hours = float(worklog.get('timeSpentSeconds', 0)) / 3600.0  # Convert seconds to hours
+                    if hours > 0:
+                        entry = {
+                            'issue_key': issue_key,
+                            'hours': hours,
+                            'date': worklog.get('started', '').split('T')[0],  # Extract date part
+                            'description': worklog.get('description', ''),
+                            'author': worklog.get('author', {}).get('displayName', 'Unknown') if isinstance(worklog.get('author'), dict) else 'Unknown'
+                        }
+                        time_entries.append(entry)
+                        total_hours += hours
+
+            logger.info(f"Parsed {len(time_entries)} worklogs totaling {total_hours:.2f}h for project {project_key}")
+            return total_hours, time_entries
+
+        except Exception as e:
+            logger.error(f"Error parsing Tempo response: {e}")
+            return 0.0, []
+
+    def _parse_tempo_worklogs(self, worklogs_data: str, project_key: str) -> tuple[float, list]:
+        """Parse Tempo worklogs data for a specific project - handles both line and concatenated formats."""
+        total_hours = 0.0
+        worklog_count = 0
+        time_entries = []
+
+        if not worklogs_data or worklogs_data.strip() == "No worklogs found for the specified date range.":
+            return 0.0, []
+
+        # Handle both formats: newline-separated OR concatenated
+        if '\n' in worklogs_data:
+            # Line-separated format (like sync-hours endpoint)
+            lines = worklogs_data.strip().split('\n')
+            entries_to_process = lines
+        else:
+            # Concatenated format - split on "IssueKey: "
+            entries_to_process = worklogs_data.split('IssueKey: ')[1:]  # Skip first empty element
+            # Add back the "IssueKey: " prefix we split on
+            entries_to_process = [f"IssueKey: {entry}" for entry in entries_to_process]
+
+        for entry in entries_to_process:
+            if f"IssueKey: {project_key}-" in entry:
+                try:
+                    # Parse the entry: "IssueKey: SUBS-607 | IssueId: 34966 | Date: 2025-09-03 | Hours: 0.25 | Description: Activity: Jira"
+                    parts = entry.split(' | ')
+                    entry_data = {}
+
+                    for part in parts:
+                        if part.startswith('IssueKey: '):
+                            entry_data['issue_key'] = part.replace('IssueKey: ', '')
+                        elif part.startswith('Date: '):
+                            entry_data['date'] = part.replace('Date: ', '')
+                        elif part.startswith('Hours: '):
+                            hours = float(part.replace('Hours: ', ''))
+                            entry_data['hours'] = hours
+                            total_hours += hours
+                            worklog_count += 1
+                        elif part.startswith('Description: '):
+                            entry_data['description'] = part.replace('Description: ', '')
+
+                    # Only add entry if we have the required fields
+                    if 'issue_key' in entry_data and 'hours' in entry_data:
+                        time_entries.append(entry_data)
+
+                    # Log first few worklogs for debugging
+                    if worklog_count <= 5:
+                        logger.info(f"Sample Tempo worklog: {entry.strip()[:100]}...")
+
+                except (ValueError, IndexError) as e:
+                    logger.warning(f"Error parsing Tempo entry: {e}")
+                    continue
+
+        logger.info(f"Tempo MCP for {project_key}: found {worklog_count} worklogs totaling {total_hours} hours")
+        return total_hours, time_entries
+
+    async def _generate_insights(self, activity: ProjectActivity):
+        """Generate AI-powered insights from the aggregated data."""
+        try:
+            # Extract insights from available meeting and ticket data
+            # Skip database queries and use existing data directly
+            all_action_items = []
+            all_blockers = []
+            all_decisions = []
+
+            # Process meeting data from direct API calls (not database)
+            for meeting in activity.meetings:
+                # Extract basic insights from meeting title and summary
+                title = meeting.get('title', '')
+                summary = meeting.get('summary', '')
+
+                # Simple keyword extraction for action items and blockers
+                if 'action' in title.lower() or 'todo' in title.lower() or 'next steps' in summary.lower():
+                    all_action_items.append(f"Follow up on {title}")
+
+                if 'blocker' in title.lower() or 'issue' in title.lower() or 'problem' in summary.lower():
+                    all_blockers.append(f"Address issues from {title}")
+
+                if 'decision' in title.lower() or 'approve' in title.lower():
+                    all_decisions.append(f"Decisions made in {title}")
+
+            # Create detailed Jira ticket change summary
+            ticket_changes_summary = []
+            for ticket in activity.ticket_activity[:10]:  # Limit to top 10 tickets
+                if ticket.get('recent_changes'):
+                    change_details = []
+                    for change in ticket['recent_changes'][:3]:  # Top 3 changes per ticket
+                        if change['field'] in ['status', 'assignee', 'priority', 'resolution']:
+                            from_val = change['from_value'] or 'None'
+                            to_val = change['to_value'] or 'None'
+                            change_details.append(f"{change['field']}: {from_val} → {to_val}")
+
+                    if change_details:
+                        ticket_changes_summary.append(f"• {ticket['key']}: {', '.join(change_details)}")
+
+            # Create time tracking summary
+            time_summary = []
+            if activity.time_entries:
+                # Group by issue for summary
+                issue_hours = {}
+                for entry in activity.time_entries:
+                    key = entry.get('issue_key', 'Unknown')
+                    if key not in issue_hours:
+                        issue_hours[key] = {'hours': 0, 'summary': entry.get('issue_summary', 'No summary')}
+                    issue_hours[key]['hours'] += entry.get('hours', 0)
+
+                for key, data in list(issue_hours.items())[:5]:  # Top 5 issues by time
+                    time_summary.append(f"• {key} ({data['hours']}h): {data['summary'][:50]}...")
+
+            # Generate comprehensive insights combining all context sources
+            insights_prompt = f"""
+            You are a senior project manager creating a concise, focused weekly digest. Avoid duplication and make every word count. Create a strategic summary using these three sections only:
+
+            ## PROJECT CONTEXT
+            Project: {activity.project_name} ({activity.project_key})
+            Time Period: {activity.start_date} to {activity.end_date}
+            Team Activity: {len(activity.meetings)} meetings, {len(activity.slack_messages)} team discussions, {activity.total_hours:.1f} hours logged
+
+            ## MEETING DISCUSSIONS
+            Key meeting outcomes and decisions:
+            {chr(10).join(f'- {summary}' for summary in activity.meeting_summaries[:3]) or '- No recent meetings'}
+
+            Decisions made:
+            {chr(10).join(f'- {decision}' for decision in all_decisions[:3]) or '- No major decisions recorded'}
+
+            ## TEAM DISCUSSIONS (SLACK)
+            Key discussions and decisions from Slack channels:
+            {chr(10).join(f'- {discussion}' for discussion in activity.key_discussions[:5]) if activity.key_discussions else '- No significant Slack discussions'}
+
+            ## WORK COMPLETED
+            Tickets completed with full names:
+            {chr(10).join(f'- {ticket.get("key", "Unknown")}: {ticket.get("summary", "No summary")}' for ticket in activity.completed_tickets[:5]) or '- No tickets completed'}
+
+            Time logged by ticket:
+            {chr(10).join(time_summary) or '- No time tracking data available'}
+
+            ## BLOCKERS & ISSUES
+            Current blockers:
+            {chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified'}
+
+            ## REQUIRED ANALYSIS
+            Create a focused digest with these THREE sections only:
+
+            1. **noteworthy_discussions**: Key discussions, decisions, and insights from meetings AND Slack channels with important context and details
+            2. **work_completed**: Include both COMPLETED tickets AND tickets that had time tracked (even if in progress), with FULL ticket names and meaningful outcomes
+            3. **topics_for_discussion**: Specific issues requiring client input, unresolved blockers, or strategic decisions needed with context
+
+            CRITICAL REQUIREMENTS:
+            - Include sufficient detail for business context - not overly brief
+            - Use proper markdown list format: each point starts with "* " on new line
+            - Include full Jira ticket titles, not just keys (e.g., "SUBS-608: Hero Rotating Banner Mobile Arrows Hidden")
+            - In work_completed section: include ALL tickets that had time logged, not just completed ones
+            - Incorporate noteworthy Slack discussions into the appropriate sections, especially important decisions or technical discussions
+            - Focus on business impact and client-relevant information
+            - Each point should provide specific, actionable information with context
+
+            Format as JSON with the three keys above. Each section should contain markdown-formatted bullet points.
+            """
+
+            # Use the LLM directly instead of the non-existent generate_insights method
+            from langchain_core.messages import HumanMessage, SystemMessage
+
+            messages = [
+                SystemMessage(content="You are a project management assistant. Generate concise, client-ready insights from project activity data."),
+                HumanMessage(content=insights_prompt)
+            ]
+
+            # Check if we have an async invoke method
+            try:
+                response = await self.analyzer.llm.ainvoke(messages)
+            except AttributeError:
+                # Fallback to sync version
+                response = self.analyzer.llm.invoke(messages)
+            insights = response.content
+
+            if insights:
+                try:
+                    parsed_insights = json.loads(insights)
+
+                    # Map new structure fields
+                    activity.noteworthy_discussions = parsed_insights.get('noteworthy_discussions', '')
+                    activity.work_completed = parsed_insights.get('work_completed', '')
+                    activity.topics_for_discussion = parsed_insights.get('topics_for_discussion', '')
+
+                    # Keep backward compatibility with old format for display
+                    activity.progress_summary = f"{activity.work_completed[:100]}..." if activity.work_completed else ""
+
+                    # Extract key achievements and blockers from new format
+                    key_achievements = [activity.work_completed] if activity.work_completed else []
+                    if isinstance(key_achievements, str):
+                        key_achievements = [key_achievements]
+                    activity.key_achievements = key_achievements
+
+                    blockers_risks = [activity.topics_for_discussion] if activity.topics_for_discussion else []
+                    if isinstance(blockers_risks, str):
+                        blockers_risks = [blockers_risks]
+                    activity.blockers_risks = blockers_risks
+
+                    next_steps = parsed_insights.get('next_steps', [])
+                    if isinstance(next_steps, str):
+                        next_steps = [next_steps]
+                    activity.next_steps = next_steps
+
+                    # Also store the raw action items and blockers for additional context
+                    activity.meeting_action_items = all_action_items[:10]  # Store top 10 action items
+                    activity.meeting_blockers = all_blockers[:5]  # Store top 5 blockers
+
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse AI insights as JSON, using raw content")
+                    activity.progress_summary = insights[:500]  # Truncate if too long
+                    # Extract key information from stored meeting data as fallback
+                    activity.key_achievements = [item.get('title', '') for item in all_action_items[:3]]
+                    activity.blockers_risks = all_blockers[:3]
+                    activity.next_steps = ["Follow up on meeting action items", "Address identified blockers"]
+
+        except Exception as e:
+            logger.error(f"Error generating insights: {e}")
+            # Provide basic insights even if AI processing fails
+            activity.progress_summary = f"Project {activity.project_name} had {len(activity.meetings)} meetings and {len(activity.completed_tickets)} completed tickets in the past week."
+            activity.key_achievements = [ticket['summary'] for ticket in activity.completed_tickets[:3]]
+            activity.blockers_risks = ["Review meeting notes for detailed blockers"]
+            activity.next_steps = ["Continue current development", "Address any blockers identified in meetings"]
+
+    def _is_meeting_relevant(self, meeting: Dict[str, Any], project_key: str) -> bool:
+        """Check if a meeting is relevant to the specified project."""
+        # Check title
+        title = meeting.get('title', '').lower()
+        if project_key.lower() in title:
+            return True
+
+        # Check transcript for project mentions
+        transcript = meeting.get('transcript', '')
+        if isinstance(transcript, str) and project_key.lower() in transcript.lower():
+            return True
+
+        # Check if transcript is a list of sentences
+        if isinstance(transcript, list):
+            for sentence in transcript:
+                if isinstance(sentence, dict) and 'text' in sentence:
+                    if project_key.lower() in sentence['text'].lower():
+                        return True
+
+        return False
+
+    def _format_section_content(self, content, default_message: str) -> str:
+        """Format section content, handling both strings and lists."""
+        if not content:
+            return f"* {default_message}"
+
+        # If it's a list, format as bullet points
+        if isinstance(content, list):
+            return '\n'.join(f'* {item}' for item in content)
+
+        # If it's a string, return as-is (assuming it's already formatted)
+        return content
+
+    def format_client_agenda(self, activity: ProjectActivity) -> str:
+        """Format the aggregated activity into a client-ready agenda."""
+        days = (datetime.fromisoformat(activity.end_date) -
+               datetime.fromisoformat(activity.start_date)).days
+
+        # Format detailed Jira ticket changes
+        ticket_changes_section = ""
+        if activity.jira_ticket_changes:
+            changes_by_ticket = {}
+            for change in activity.jira_ticket_changes:
+                ticket_key = change.get('ticket_key', 'Unknown')
+                if ticket_key not in changes_by_ticket:
+                    changes_by_ticket[ticket_key] = {
+                        'summary': change.get('ticket_summary', 'Unknown'),
+                        'changes': []
+                    }
+                change_desc = f"{change['field']}: {change['from_value']} → {change['to_value']} ({change['changed_by']})"
+                changes_by_ticket[ticket_key]['changes'].append(change_desc)
+
+            if changes_by_ticket:
+                ticket_changes_section = "\n## 🔄 Ticket Updates\n"
+                for ticket_key, ticket_info in list(changes_by_ticket.items())[:5]:
+                    ticket_changes_section += f"* **{ticket_key}** - {ticket_info['summary']}\n"
+                    for change in ticket_info['changes'][:3]:
+                        ticket_changes_section += f"  - {change}\n"
+
+        # Format time tracking section with per-ticket details
+        time_section = ""
+        if activity.total_hours > 0:
+            time_section = f"\n## ⏱️ Time Tracking\n* **Total Time Logged:** {activity.total_hours:.1f} hours\n"
+
+            # Group time entries by ticket
+            if activity.time_entries:
+                ticket_hours = {}
+                for entry in activity.time_entries:
+                    ticket_key = entry.get('issue_key', 'Unknown')
+                    hours = entry.get('hours', 0)
+                    if ticket_key not in ticket_hours:
+                        ticket_hours[ticket_key] = 0
+                    ticket_hours[ticket_key] += hours
+
+                # Show top tickets by time logged
+                sorted_tickets = sorted(ticket_hours.items(), key=lambda x: x[1], reverse=True)
+                time_section += "\n**Time by Ticket:**\n"
+                for ticket_key, hours in sorted_tickets[:8]:  # Show top 8 tickets
+                    time_section += f"* **{ticket_key}:** {hours:.1f}h\n"
+
+        agenda = f"""
+# {activity.project_name} - Weekly Status Update
+**Period:** {activity.start_date[:10]} to {activity.end_date[:10]} ({days} days)
+
+## 💬 Noteworthy Discussions
+{self._format_section_content(activity.noteworthy_discussions, "No significant discussions this period")}
+
+## ✅ Work Completed
+{self._format_section_content(activity.work_completed, "No work completed this period")}
+
+## 🔄 Topics for Discussion
+{self._format_section_content(activity.topics_for_discussion, "No discussion topics identified")}
+{ticket_changes_section}
+{time_section}
+## 📈 Activity Summary
+- **Meetings Held:** {len(activity.meetings)}
+- **Tickets Completed:** {len(activity.completed_tickets)}
+- **Tickets Updated:** {len(set(change.get('ticket_key') for change in activity.jira_ticket_changes)) if activity.jira_ticket_changes else 0}
+- **Tickets Worked On:** {len(set(entry.get('issue_key') for entry in activity.time_entries)) if activity.time_entries else 0}
+- **New Tickets Created:** {len(activity.new_tickets)}
+- **Slack Messages Analyzed:** {len(activity.slack_messages)}
+
+---
+*Generated automatically by PM Agent*
+"""
+        return agenda.strip()

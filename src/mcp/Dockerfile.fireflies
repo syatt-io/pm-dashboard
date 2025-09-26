@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements-mcp.txt .
+RUN pip install --no-cache-dir -r requirements-mcp.txt
+
+# Copy MCP wrapper code
+COPY fireflies_mcp_server.py .
+
+# Expose MCP server port
+EXPOSE 3001
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD python -c "import requests; requests.get('http://localhost:3001/health')" || exit 1
+
+# Run the MCP server
+CMD ["python", "fireflies_mcp_server.py"]

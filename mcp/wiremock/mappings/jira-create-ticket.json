@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPattern": "/mcp"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "success": true,
+      "key": "{{randomValue type='ALPHANUMERIC' length=8 uppercase=true}}-{{randomInt lower=100 upper=999}}",
+      "id": "{{randomInt lower=10000 upper=99999}}",
+      "self": "https://test.atlassian.net/rest/api/3/issue/{{randomInt lower=10000 upper=99999}}",
+      "created": "{{now format='yyyy-MM-dd''T''HH:mm:ss.SSSZ'}}"
+    }
+  }
+}
