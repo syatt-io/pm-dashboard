@@ -23,16 +23,77 @@ from src.managers.todo_manager import TodoManager
 from src.managers.slack_bot import SlackTodoBot
 from src.services.scheduler import get_scheduler, start_scheduler, stop_scheduler
 
+# Authentication imports
+from src.services.auth import AuthService, auth_required, admin_required
+from src.routes.auth import create_auth_blueprint
+from src.models.user import UserWatchedProject
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 
 logger = logging.getLogger(__name__)
+
+def get_project_keywords_from_db():
+    """Load project keywords from database as a dictionary."""
+    try:
+        from sqlalchemy import create_engine, text
+        engine = create_engine(settings.agent.database_url)
+
+        project_keywords = {}
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT project_key, keyword FROM project_keywords"))
+            for row in result:
+                project_key, keyword = row
+                if project_key not in project_keywords:
+                    project_keywords[project_key] = []
+                project_keywords[project_key].append(keyword)
+
+        return project_keywords
+    except Exception as e:
+        logger.error(f"Error loading project keywords from database: {e}")
+        # Return empty dict if database query fails
+        return {}
 
 import os
 template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
 app = Flask(__name__, template_folder=template_dir)
-app.secret_key = 'your-secret-key-here'  # Change in production
 
-# Enable CORS for React frontend
-CORS(app, origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"])
+# Production-ready secret key
+app.secret_key = os.getenv('JWT_SECRET_KEY', 'your-secret-key-here')
+
+# Configure CORS for development and production
+# Get frontend port from environment, default to 4001
+frontend_port = int(os.getenv('FRONTEND_PORT', 4001))
+cors_origins = [f"http://localhost:{frontend_port}", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]
+if os.getenv('FLASK_ENV') == 'production':
+    # Add production domain when deployed
+    production_domain = os.getenv('PRODUCTION_DOMAIN')
+    if production_domain:
+        cors_origins.append(f"https://{production_domain}")
+
+CORS(app, origins=cors_origins, supports_credentials=True,
+     allow_headers=['Content-Type', 'Authorization'],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+
+# Set up database and auth
+database_engine = create_engine(settings.agent.database_url)
+db_session_factory = sessionmaker(bind=database_engine)
+
+# Create tables if they don't exist
+try:
+    from src.models.user import Base
+    Base.metadata.create_all(database_engine)
+    logger.info("Database tables created/verified")
+except Exception as e:
+    logger.error(f"Error creating database tables: {e}")
+
+# Initialize auth service
+auth_service = AuthService(db_session_factory())
+app.auth_service = auth_service
+
+# Register auth blueprint
+auth_blueprint = create_auth_blueprint(db_session_factory())
+app.register_blueprint(auth_blueprint)
 
 # Initialize components
 fireflies = FirefliesClient(settings.fireflies.api_key)
@@ -419,7 +480,8 @@ def todo_dashboard():
 
 
 @app.route('/api/todos', methods=['GET'])
-def get_todos():
+@auth_required
+def get_todos(user):
     """Get all TODO items for React Admin."""
     try:
         from main import TodoItem
@@ -439,8 +501,10 @@ def get_todos():
         # Calculate offset
         offset = (page - 1) * per_page
 
-        # Build query
+        # Build query - filter by user_id unless user is admin
         query = db_session.query(TodoItem)
+        if user.role.value != 'admin':
+            query = query.filter(TodoItem.user_id == user.id)
 
         # Apply sorting
         if hasattr(TodoItem, sort_field):
@@ -492,7 +556,8 @@ def get_todos():
 
 
 @app.route('/api/todos', methods=['POST'])
-def create_todo():
+@auth_required
+def create_todo(user):
     """Create a new TODO item."""
     try:
         data = request.json
@@ -511,6 +576,7 @@ def create_todo():
             priority=data.get('priority', 'Medium'),
             status='pending',
             project_key=data.get('project_key'),
+            user_id=user.id,
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
@@ -532,7 +598,8 @@ def create_todo():
 
 
 @app.route('/api/todos/<todo_id>/complete', methods=['POST'])
-def complete_todo_api(todo_id):
+@auth_required
+def complete_todo_api(user, todo_id):
     """Mark a TODO as complete."""
     try:
         data = request.json or {}
@@ -551,7 +618,8 @@ def complete_todo_api(todo_id):
 
 
 @app.route('/api/todos/<todo_id>/snooze', methods=['POST'])
-def snooze_todo_api(todo_id):
+@auth_required
+def snooze_todo_api(user, todo_id):
     """Snooze a TODO by extending its due date."""
     try:
         data = request.json or {}
@@ -569,7 +637,8 @@ def snooze_todo_api(todo_id):
 
 
 @app.route('/api/todos/<todo_id>/update', methods=['POST'])
-def update_todo_api(todo_id):
+@auth_required
+def update_todo_api(user, todo_id):
     """Update a TODO item."""
     try:
         data = request.json or {}
@@ -585,7 +654,8 @@ def update_todo_api(todo_id):
 
 
 @app.route('/api/todos/<todo_id>', methods=['GET'])
-def get_todo_api(todo_id):
+@auth_required
+def get_todo_api(user, todo_id):
     """Get a single TODO item (React Admin compatible)."""
     try:
         todo = todo_manager.get_todo(todo_id)
@@ -614,7 +684,8 @@ def get_todo_api(todo_id):
 
 
 @app.route('/api/todos/<todo_id>', methods=['PUT'])
-def update_todo_put_api(todo_id):
+@auth_required
+def update_todo_put_api(user, todo_id):
     """Update a TODO item (React Admin compatible)."""
     try:
         data = request.json or {}
@@ -649,7 +720,8 @@ def update_todo_put_api(todo_id):
 
 
 @app.route('/api/todos/<todo_id>', methods=['DELETE'])
-def delete_todo_api(todo_id):
+@auth_required
+def delete_todo_api(user, todo_id):
     """Delete a TODO item."""
     try:
         success = todo_manager.delete_todo(todo_id)
@@ -684,6 +756,101 @@ def edit_todo_page(todo_id):
         return render_template('error.html', error=f"Edit TODO Error: {str(e)}")
 
 
+# Watched Projects API Routes
+@app.route('/api/watched-projects', methods=['GET'])
+@auth_required
+def get_watched_projects(user):
+    """Get user's watched projects."""
+    try:
+        from sqlalchemy import create_engine
+
+        engine = create_engine(settings.agent.database_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        watched_projects = session.query(UserWatchedProject)\
+            .filter_by(user_id=user.id)\
+            .order_by(UserWatchedProject.created_at.desc())\
+            .all()
+
+        result = [wp.project_key for wp in watched_projects]
+        session.close()
+
+        return jsonify({
+            'success': True,
+            'watched_projects': result
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get watched projects: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/watched-projects/<project_key>', methods=['POST'])
+@auth_required
+def watch_project(user, project_key):
+    """Add a project to user's watched list."""
+    try:
+        from sqlalchemy import create_engine
+
+        engine = create_engine(settings.agent.database_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        # Check if already watching
+        existing = session.query(UserWatchedProject)\
+            .filter_by(user_id=user.id, project_key=project_key)\
+            .first()
+
+        if existing:
+            session.close()
+            return jsonify({'success': True, 'message': 'Already watching this project'})
+
+        # Add new watched project
+        watched_project = UserWatchedProject(
+            user_id=user.id,
+            project_key=project_key
+        )
+        session.add(watched_project)
+        session.commit()
+        session.close()
+
+        return jsonify({'success': True, 'message': f'Now watching {project_key}'})
+
+    except Exception as e:
+        logger.error(f"Failed to watch project {project_key}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/watched-projects/<project_key>', methods=['DELETE'])
+@auth_required
+def unwatch_project(user, project_key):
+    """Remove a project from user's watched list."""
+    try:
+        from sqlalchemy import create_engine
+
+        engine = create_engine(settings.agent.database_url)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+
+        watched_project = session.query(UserWatchedProject)\
+            .filter_by(user_id=user.id, project_key=project_key)\
+            .first()
+
+        if watched_project:
+            session.delete(watched_project)
+            session.commit()
+            session.close()
+            return jsonify({'success': True, 'message': f'Stopped watching {project_key}'})
+        else:
+            session.close()
+            return jsonify({'success': False, 'message': 'Project not in watched list'})
+
+    except Exception as e:
+        logger.error(f"Failed to unwatch project {project_key}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # Slack Bot Routes
 @app.route("/slack/events", methods=["POST"])
 def slack_events():
@@ -696,6 +863,15 @@ def slack_events():
         return jsonify({"error": "Slack bot not configured"}), 503
 
     # Let Slack Bolt handler process all requests (slash commands, events, etc.)
+    return slack_bot.get_handler().handle(request)
+
+
+@app.route("/slack/commands", methods=["POST"])
+def slack_commands():
+    """Handle Slack slash commands."""
+    if not slack_bot:
+        return jsonify({"error": "Slack bot not configured"}), 503
+
     return slack_bot.get_handler().handle(request)
 
 
@@ -839,7 +1015,8 @@ def trigger_hours_report():
 
 
 @app.route("/api/meetings", methods=["GET"])
-def get_meetings():
+@auth_required
+def get_meetings(user):
     """Get meetings using live Fireflies data with cached analysis overlay."""
     try:
         # Get pagination parameters
@@ -942,13 +1119,8 @@ def get_meetings():
                     if projects:
                         project_list = [p.strip().upper() for p in projects.split(',') if p.strip()]
                         if project_list:
-                            # Create better keyword mapping for projects
-                            project_keywords = {
-                                'BEAU': ['beauchamp', 'beau', 'beauchamps', 'bc'],
-                                'RNWL': ['renewal', 'rnwl', 'renew', 'renewals', 'renwil', 'renwl', 'renwal'],
-                                'SUBS': ['snuggle bugz', 'subs', 'subscription', 'snugglebugz', 'snuggle', 'bugz', 'sb'],
-                                'IRIS': ['iris', 'eye', 'eyes', 'optical', 'vision', 'eyecare'],
-                            }
+                            # Get keyword mapping for projects from database
+                            project_keywords = get_project_keywords_from_db()
 
                             # Get all keywords for the selected projects
                             search_keywords = []
@@ -1008,7 +1180,8 @@ def get_meetings():
 
 
 @app.route("/api/meetings/<meeting_id>", methods=["GET"])
-def get_meeting_detail(meeting_id):
+@auth_required
+def get_meeting_detail(user, meeting_id):
     """Get details for a specific meeting."""
     try:
         # Initialize database session
@@ -2342,6 +2515,219 @@ ANALYSIS_TEMPLATE = """
 </html>
 """
 
+# Learning API endpoints
+@app.route('/api/learnings', methods=['GET'])
+@auth_required
+def get_learnings(user):
+    """Get all learnings with optional filtering."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        category = request.args.get('category')
+        limit = int(request.args.get('limit', 20))
+        offset = int(request.args.get('offset', 0))
+
+        learnings = manager.get_learnings(
+            limit=limit,
+            offset=offset,
+            category=category
+        )
+
+        return jsonify({
+            'success': True,
+            'learnings': [learning.to_dict() for learning in learnings],
+            'total': len(learnings)
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching learnings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/learnings', methods=['POST'])
+@auth_required
+def create_learning(user):
+    """Create a new learning."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        data = request.json
+        content = data.get('content')
+
+        if not content:
+            return jsonify({'success': False, 'error': 'Content is required'}), 400
+
+        learning = manager.create_learning(
+            content=content,
+            submitted_by=user.name,
+            submitted_by_id=str(user.id),
+            category=data.get('category'),
+            source='web'
+        )
+
+        return jsonify({
+            'success': True,
+            'learning': learning.to_dict(),
+            'message': 'Learning saved successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error creating learning: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/learnings/<learning_id>', methods=['GET'])
+@auth_required
+def get_learning(user, learning_id):
+    """Get a single learning by ID."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        learning = manager.get_learning(learning_id)
+
+        if learning:
+            return jsonify({
+                'success': True,
+                'data': learning.to_dict()
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Learning not found'}), 404
+
+    except Exception as e:
+        logger.error(f"Error fetching learning: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/learnings/<learning_id>', methods=['PUT'])
+@auth_required
+def update_learning(user, learning_id):
+    """Update an existing learning."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        data = request.json
+        success = manager.update_learning(
+            learning_id=learning_id,
+            content=data.get('content'),
+            category=data.get('category')
+        )
+
+        if success:
+            return jsonify({'success': True, 'message': 'Learning updated'})
+        else:
+            return jsonify({'success': False, 'error': 'Learning not found'}), 404
+
+    except Exception as e:
+        logger.error(f"Error updating learning: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/learnings/<learning_id>', methods=['DELETE'])
+@auth_required
+def delete_learning(user, learning_id):
+    """Archive (soft delete) a learning."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        success = manager.archive_learning(learning_id)
+
+        if success:
+            return jsonify({'success': True, 'message': 'Learning archived'})
+        else:
+            return jsonify({'success': False, 'error': 'Learning not found'}), 404
+
+    except Exception as e:
+        logger.error(f"Error archiving learning: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/learnings/search', methods=['GET'])
+@auth_required
+def search_learnings(user):
+    """Search learnings by content."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        search_term = request.args.get('q')
+        if not search_term:
+            return jsonify({'success': False, 'error': 'Search term required'}), 400
+
+        learnings = manager.search_learnings(search_term)
+
+        return jsonify({
+            'success': True,
+            'learnings': [learning.to_dict() for learning in learnings],
+            'total': len(learnings)
+        })
+
+    except Exception as e:
+        logger.error(f"Error searching learnings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/learnings/categories', methods=['GET'])
+@auth_required
+def get_learning_categories(user):
+    """Get all learning categories."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        categories = manager.get_categories()
+
+        return jsonify({
+            'success': True,
+            'categories': categories
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching categories: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/learnings/stats', methods=['GET'])
+@auth_required
+def get_learning_stats(user):
+    """Get statistics about learnings."""
+    try:
+        from src.managers.learning_manager import LearningManager
+        manager = LearningManager()
+
+        stats = manager.get_stats()
+
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching stats: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for DigitalOcean App Platform."""
+    try:
+        # Basic health check - can add database check if needed
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
+
+
 if __name__ == '__main__':
     # Create templates directory and files
     import os
@@ -2353,4 +2739,6 @@ if __name__ == '__main__':
     with open('templates/analysis.html', 'w') as f:
         f.write(ANALYSIS_TEMPLATE)
 
-    app.run(debug=True, host='127.0.0.1', port=3030)
+    # Get port from environment variable, default to 4000
+    port = int(os.getenv('BACKEND_PORT', 4000))
+    app.run(debug=True, host='127.0.0.1', port=port)

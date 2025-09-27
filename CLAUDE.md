@@ -74,6 +74,14 @@ colima start
 docker-compose up -d
 ```
 
+## Port Configuration
+
+The application uses the following ports:
+- **Backend (Flask)**: Port 4000 - `http://localhost:4000`
+- **Frontend (React)**: Port 4001 - `http://localhost:4001`
+
+These ports are configured to avoid conflicts with other applications that commonly use ports 3000/3001/5001.
+
 ## Running the Application
 
 ### Web Interface
@@ -81,9 +89,13 @@ docker-compose up -d
 # Install dependencies
 pip install -r requirements.txt
 
-# Run Flask app
+# Run Flask app (backend)
 python src/web_interface.py
-# Access at http://localhost:5001
+# Backend accessible at http://localhost:4000
+
+# Run React app (frontend)
+cd frontend && PORT=4001 npm start
+# Frontend accessible at http://localhost:4001
 ```
 
 ### Interactive CLI Mode

@@ -2,6 +2,7 @@
 
 import logging
 import re
+import random
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from slack_sdk import WebClient
@@ -11,6 +12,7 @@ from slack_bolt.adapter.flask import SlackRequestHandler
 
 from config.settings import settings
 from src.managers.todo_manager import TodoManager
+from src.managers.learning_manager import LearningManager
 from src.managers.notifications import NotificationContent
 
 
@@ -28,6 +30,7 @@ class SlackTodoBot:
         )
         self.client = WebClient(token=bot_token)
         self.todo_manager = TodoManager()
+        self.learning_manager = LearningManager()
         self.handler = SlackRequestHandler(self.app)
 
         self._register_commands()
@@ -141,6 +144,115 @@ class SlackTodoBot:
                 logger.error(f"Error handling /agenda command: {e}")
                 respond(f"❌ Error processing agenda command: {str(e)}")
 
+        @self.app.command("/dadjoke")
+        def handle_dadjoke_command(ack, respond, command):
+            """Handle /dadjoke slash command for generating dad jokes."""
+            ack()
+
+            try:
+                user_id = command.get('user_id')
+                text = command.get('text', '').strip()
+                channel_id = command.get('channel_id')
+                user_name = command.get('user_name', 'someone')
+
+                # Parse parameters from text
+                subject = None
+                person_name = None
+
+                if text:
+                    # Parse "about <subject> for <person>" or variations
+                    parts = text.lower()
+
+                    # Extract subject (after "about")
+                    if 'about ' in parts:
+                        about_idx = parts.index('about ') + 6
+                        for_idx = parts.find(' for ', about_idx)
+                        if for_idx > -1:
+                            subject = text[about_idx:for_idx].strip()
+                        else:
+                            subject = text[about_idx:].strip()
+
+                    # Extract person name (after "for")
+                    if ' for ' in parts:
+                        for_idx = parts.index(' for ') + 5
+                        person_name = text[for_idx:].strip()
+
+                    # If no keywords, treat entire text as subject
+                    if not subject and not person_name and text:
+                        subject = text
+
+                # Generate and post the dad joke
+                joke_response = self._generate_dad_joke(subject, person_name, user_name)
+
+                # Log the joke for debugging
+                logger.info(f"Generated joke text: {joke_response[:100]}...")
+
+                # Ensure we have text before posting
+                if not joke_response:
+                    logger.error("Empty joke response generated")
+                    respond("❌ Failed to generate joke - got empty response")
+                    return
+
+                # Post in channel
+                self.client.chat_postMessage(
+                    channel=channel_id,
+                    text=joke_response
+                )
+
+                # Respond to command (only visible to user)
+                respond("Dad joke delivered! 🎭")
+
+            except Exception as e:
+                logger.error(f"Error handling /dadjoke command: {e}")
+                respond(f"❌ Error generating dad joke: {str(e)}")
+
+        @self.app.command("/learning")
+        def handle_learning_command(ack, respond, command):
+            """Handle /learning slash command for saving team learnings."""
+            ack()
+
+            try:
+                user_id = command.get('user_id')
+                text = command.get('text', '').strip()
+
+                if not text or text == 'help':
+                    respond(self._get_learning_help_message())
+                    return
+
+                # Parse command
+                args = text.split()
+                if not args:
+                    respond("❌ Please provide a learning: `/learning Your insight here`")
+                    return
+
+                subcommand = args[0].lower()
+
+                # Check for subcommands
+                if subcommand == 'list':
+                    category = args[1] if len(args) > 1 else None
+                    respond(self._list_learnings(category))
+
+                elif subcommand == 'search':
+                    if len(args) > 1:
+                        search_term = ' '.join(args[1:])
+                        respond(self._search_learnings(search_term))
+                    else:
+                        respond("❌ Please provide search terms: `/learning search API patterns`")
+
+                elif subcommand == 'stats':
+                    respond(self._get_learning_stats())
+
+                elif subcommand == 'categories':
+                    respond(self._list_categories())
+
+                else:
+                    # No subcommand, treat entire text as a learning
+                    respond(self._create_learning(user_id, text))
+
+            except Exception as e:
+                logger.error(f"Error handling /learning command: {e}")
+                respond(f"❌ Error processing learning command: {str(e)}")
+
     def _register_listeners(self):
         """Register message listeners."""
 
@@ -206,12 +318,17 @@ class SlackTodoBot:
                            "`/todos summary` - Get team summary\n"
                            "`/todos channels` - List available channels\n"
                            "`/todo <title>` - Quick create TODO\n"
-                           "`/agenda <project-key> [days]` - Generate project agenda\n\n"
+                           "`/agenda <project-key> [days]` - Generate project agenda\n"
+                           "`/dadjoke [about <topic>] [for <person>]` - Get a dad joke\n"
+                           "`/learning <text>` - Save a team learning\n\n"
                            "*Examples:*\n"
                            "• `/todos list me` - My TODOs\n"
                            "• `/todo Fix login bug` - Quick create\n"
                            "• `/todos complete abc123` - Complete TODO\n"
-                           "• `/agenda PROJ-123 7` - 7-day project digest"
+                           "• `/agenda PROJ-123 7` - 7-day project digest\n"
+                           "• `/dadjoke` - Random dad joke\n"
+                           "• `/dadjoke about coffee` - Coffee-themed joke\n"
+                           "• `/dadjoke for Mike` - Joke for Mike"
                 }
             },
             {
@@ -765,6 +882,32 @@ class SlackTodoBot:
             logger.error(f"Error listing channels: {e}")
             return []
 
+    async def resolve_channel_name_to_id(self, channel_name: str) -> str:
+        """Resolve a channel name to its ID. Returns the input if it's already an ID."""
+        # Strip # prefix if present
+        clean_name = channel_name.lstrip('#')
+
+        # If it looks like a channel ID (starts with C and is alphanumeric), return as-is
+        if clean_name.startswith('C') and clean_name.replace('C', '').isalnum() and len(clean_name) >= 9:
+            logger.info(f"'{channel_name}' appears to be a channel ID, using as-is")
+            return clean_name
+
+        try:
+            # Get all channels and find the one matching the name
+            channels = await self.list_channels()
+            for channel in channels:
+                if channel['name'] == clean_name:
+                    logger.info(f"Resolved channel name '{clean_name}' to ID '{channel['id']}'")
+                    return channel['id']
+
+            # If not found, log warning and return the original name
+            logger.warning(f"Could not resolve channel name '{clean_name}' to ID. Available channels: {[c['name'] for c in channels[:5]]}")
+            return clean_name
+
+        except Exception as e:
+            logger.error(f"Error resolving channel name '{clean_name}': {e}")
+            return clean_name
+
     async def read_channel_history(self, channel_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Read recent messages from a specific channel, including threaded replies."""
         try:
@@ -989,8 +1132,364 @@ class SlackTodoBot:
             return {
                 "text": "❌ Agenda generation is not available. The project activity aggregator is not properly configured."
             }
+
+    def _generate_dad_joke(self, subject: Optional[str] = None, person_name: Optional[str] = None, requester: str = "someone") -> str:
+        """Generate a dad joke using AI."""
+        import random  # Move import outside try block
+
+        try:
+            # Import OpenAI
+            from langchain_openai import ChatOpenAI
+
+            # Initialize LLM (settings is already imported at the top)
+            llm = ChatOpenAI(
+                model=settings.ai.model,
+                temperature=1.2,  # Higher temperature for more creative jokes
+                max_tokens=200,
+                api_key=settings.ai.api_key
+            )
+
+            # Build the prompt
+            prompt_parts = ["Generate a single dad joke"]
+
+            if subject and person_name:
+                prompt_parts.append(f"about {subject} for {person_name}")
+            elif subject:
+                prompt_parts.append(f"about {subject}")
+            elif person_name:
+                prompt_parts.append(f"for {person_name}")
+
+            prompt = " ".join(prompt_parts) + (
+                ". Make it appropriately funny, punny, and workplace-appropriate. "
+                "Format: Just the joke, no explanations or introductions. "
+                "Include appropriate emoji."
+            )
+
+            # Log the prompt for debugging
+            logger.info(f"Dad joke prompt: {prompt}")
+
+            # Generate the joke
+            response = llm.invoke(prompt)
+
+            # Log the raw response for debugging
+            logger.info(f"OpenAI response type: {type(response)}")
+            logger.info(f"OpenAI response content: {response.content if hasattr(response, 'content') else str(response)}")
+
+            joke_text = response.content.strip() if hasattr(response, 'content') else str(response).strip()
+
+            # Validate we got a response
+            if not joke_text:
+                raise ValueError("AI returned empty response")
+
+            # Add a random dad joke intro occasionally (30% chance)
+            intros = [
+                f"📢 {requester} requested a dad joke!",
+                f"🎭 Dad joke incoming from {requester}!",
+                f"🎪 {requester} thinks you need this:",
+                f"🎯 Special delivery for the team:",
+                f"✨ Fresh from the dad joke factory:",
+            ]
+
+            if random.random() < 0.3:
+                joke_text = f"{random.choice(intros)}\n\n{joke_text}"
+
+            # Ensure we have text
+            if not joke_text:
+                raise ValueError("No joke text generated")
+
+            return joke_text
+
         except Exception as e:
-            logger.error(f"Unexpected error generating agenda: {e}")
-            return {
-                "text": f"❌ Unexpected error: {str(e)}"
+            logger.error(f"Error generating dad joke: {e}")
+            # Fallback to a random hardcoded joke
+            fallback_jokes = [
+                "Why don't scientists trust atoms? Because they make up everything! ⚛️",
+                "I used to hate facial hair, but then it grew on me. 🧔",
+                "Why did the developer go broke? Because he used up all his cache! 💸",
+                "How do you organize a space party? You planet! 🪐",
+                "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
+                "I told my computer I needed a break, and now it won't stop sending me Kit-Kats. 🍫",
+                "Why did the scarecrow win an award? He was outstanding in his field! 🌾",
+                "What did the ocean say to the beach? Nothing, it just waved! 🌊"
+            ]
+            return f"💔 AI couldn't think of a joke, so here's a classic:\n\n{random.choice(fallback_jokes)}"
+
+    def _get_learning_help_message(self) -> Dict[str, Any]:
+        """Get help message for learning command."""
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "💡 Learning Tracker Help"
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Save and Share Team Learnings*\n\n"
+                           "`/learning <text>` - Save a new learning\n"
+                           "`/learning list [category]` - List recent learnings\n"
+                           "`/learning search <term>` - Search learnings\n"
+                           "`/learning stats` - View statistics\n"
+                           "`/learning categories` - List all categories\n"
+                           "`/learning help` - Show this help\n\n"
+                           "*Examples:*\n"
+                           "• `/learning Always test edge cases in production-like environment`\n"
+                           "• `/learning Document API changes in PR description #technical`\n"
+                           "• `/learning list technical` - List technical learnings\n"
+                           "• `/learning search API` - Search for API-related learnings"
+                }
+            },
+            {
+                "type": "context",
+                "elements": [{
+                    "type": "plain_text",
+                    "text": "💡 Pro tip: Add #category to categorize your learning (optional)"
+                }]
             }
+        ]
+
+        return {"blocks": blocks}
+
+    def _create_learning(self, user_id: str, text: str) -> Dict[str, Any]:
+        """Create a new learning from Slack command."""
+        try:
+            # Get user display name
+            user_name = self._get_user_display_name(user_id)
+
+            # Parse category from text if present
+            category = None
+            content = text
+
+            # Check for #category tag
+            import re
+            category_match = re.search(r'#(\w+)', text)
+            if category_match:
+                category = category_match.group(1).lower()
+                content = text.replace(f'#{category_match.group(1)}', '').strip()
+
+            # Create the learning
+            learning = self.learning_manager.create_learning(
+                content=content,
+                submitted_by=user_name,
+                submitted_by_id=user_id,
+                category=category,
+                source='slack'
+            )
+
+            # Format response
+            category_str = f" [{category}]" if category else ""
+            return {
+                "text": f"✅ Learning saved{category_str}!\n\n"
+                       f"💡 *{content}*\n"
+                       f"_ID: {learning.id[:8]}_"
+            }
+
+        except Exception as e:
+            logger.error(f"Error creating learning: {e}")
+            return {"text": f"❌ Error saving learning: {str(e)}"}
+
+    def _list_learnings(self, category: str = None) -> Dict[str, Any]:
+        """List recent learnings."""
+        try:
+            learnings = self.learning_manager.get_learnings(
+                limit=10,
+                category=category
+            )
+
+            if not learnings:
+                if category:
+                    return {"text": f"No learnings found in category: {category}"}
+                else:
+                    return {"text": "No learnings found yet. Start adding some with `/learning`!"}
+
+            title = f"💡 Recent Learnings" + (f" [{category}]" if category else "")
+
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": title
+                    }
+                }
+            ]
+
+            # Add learning sections
+            for learning in learnings:
+                category_str = f" `{learning.category}`" if learning.category else ""
+                date_str = learning.created_at.strftime('%m/%d')
+
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"• *{learning.content}*{category_str}\n"
+                               f"  _by {learning.submitted_by} on {date_str}_"
+                    }
+                })
+
+            # Add action buttons
+            blocks.append({
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🌐 View All"
+                        },
+                        "url": f"{settings.web.base_url}/learnings"
+                    },
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "➕ Add Learning"
+                        },
+                        "action_id": "add_learning_button"
+                    }
+                ]
+            })
+
+            return {"blocks": blocks}
+
+        except Exception as e:
+            logger.error(f"Error listing learnings: {e}")
+            return {"text": f"❌ Error retrieving learnings: {str(e)}"}
+
+    def _search_learnings(self, search_term: str) -> Dict[str, Any]:
+        """Search learnings by content."""
+        try:
+            learnings = self.learning_manager.search_learnings(
+                search_term=search_term,
+                limit=10
+            )
+
+            if not learnings:
+                return {"text": f"No learnings found matching: {search_term}"}
+
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"🔍 Search Results for '{search_term}'"
+                    }
+                }
+            ]
+
+            # Add learning sections
+            for learning in learnings:
+                category_str = f" `{learning.category}`" if learning.category else ""
+                date_str = learning.created_at.strftime('%m/%d')
+
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"• *{learning.content}*{category_str}\n"
+                               f"  _by {learning.submitted_by} on {date_str}_"
+                    }
+                })
+
+            return {"blocks": blocks}
+
+        except Exception as e:
+            logger.error(f"Error searching learnings: {e}")
+            return {"text": f"❌ Error searching learnings: {str(e)}"}
+
+    def _get_learning_stats(self) -> Dict[str, Any]:
+        """Get statistics about learnings."""
+        try:
+            stats = self.learning_manager.get_stats()
+
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "📊 Learning Statistics"
+                    }
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*💡 Total Learnings:*\n{stats['total']}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*📅 Today:*\n{stats['today']}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*📆 This Week:*\n{stats['this_week']}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*🏷️ Categories:*\n{stats['categories_count']}"
+                        }
+                    ]
+                }
+            ]
+
+            # Add top categories if any
+            if stats['categories']:
+                categories_text = ", ".join(stats['categories'][:5])
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Top Categories:* {categories_text}"
+                    }
+                })
+
+            return {"blocks": blocks}
+
+        except Exception as e:
+            logger.error(f"Error getting learning stats: {e}")
+            return {"text": f"❌ Error retrieving statistics: {str(e)}"}
+
+    def _list_categories(self) -> Dict[str, Any]:
+        """List all learning categories."""
+        try:
+            categories = self.learning_manager.get_categories()
+
+            if not categories:
+                return {"text": "No categories found yet. Add categories to learnings with #category"}
+
+            categories_text = "\n".join([f"• `{cat}`" for cat in categories])
+
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "🏷️ Learning Categories"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": categories_text
+                    }
+                },
+                {
+                    "type": "context",
+                    "elements": [{
+                        "type": "plain_text",
+                        "text": f"Total: {len(categories)} categories"
+                    }]
+                }
+            ]
+
+            return {"blocks": blocks}
+
+        except Exception as e:
+            logger.error(f"Error listing categories: {e}")
+            return {"text": f"❌ Error retrieving categories: {str(e)}"}

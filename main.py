@@ -19,6 +19,7 @@ from src.integrations.fireflies import FirefliesClient, MeetingTranscript
 from src.integrations.jira_mcp import JiraMCPClient, JiraTicket
 from src.processors.transcript_analyzer import TranscriptAnalyzer, ActionItem
 from src.managers.notifications import NotificationManager, NotificationContent
+from src.models.learning import Learning
 
 
 # Setup logging

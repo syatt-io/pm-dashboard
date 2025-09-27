@@ -58,6 +58,7 @@ class ProjectActivity:
     noteworthy_discussions: Optional[str] = None
     work_completed: Optional[str] = None
     topics_for_discussion: Optional[str] = None
+    attention_required: Optional[str] = None
 
     # Raw meeting insights
     meeting_action_items: Optional[List[Dict[str, Any]]] = None
@@ -86,7 +87,15 @@ class ProjectActivityAggregator:
             api_token=settings.jira.api_token
         )
 
-        self.analyzer = TranscriptAnalyzer()
+        # Initialize TranscriptAnalyzer with properly configured LLM
+        from langchain_openai import ChatOpenAI
+        llm = ChatOpenAI(
+            model=settings.ai.model,
+            temperature=settings.ai.temperature,
+            max_tokens=settings.ai.max_tokens,
+            api_key=settings.ai.api_key
+        )
+        self.analyzer = TranscriptAnalyzer(llm=llm)
 
         # Initialize Slack bot
         try:
@@ -181,6 +190,13 @@ class ProjectActivityAggregator:
 
             # Get meetings that are relevant to this project from the database
             logger.info(f"Searching meetings for {activity.project_key} between {start_date} and {end_date}")
+
+            # Debug: Check if connection exists first
+            connection_count = self.session.query(MeetingProjectConnection).filter(
+                MeetingProjectConnection.project_key == activity.project_key
+            ).count()
+            logger.info(f"Found {connection_count} meeting connections for {activity.project_key}")
+
             relevant_meetings_query = self.session.query(ProcessedMeeting).join(
                 MeetingProjectConnection,
                 ProcessedMeeting.meeting_id == MeetingProjectConnection.meeting_id
@@ -382,11 +398,16 @@ class ProjectActivityAggregator:
             days_back = (end_date - start_date).days
             message_limit = min(50, max(10, days_back * 5))  # 5 messages per day, with bounds
 
-            # Remove # prefix from channel name for Slack API compatibility
-            channel_name = slack_channel.lstrip('#')
+            # Use channel directly if it's already an ID, otherwise try to resolve
+            if slack_channel.startswith('C') and len(slack_channel) >= 9:
+                channel_id = slack_channel  # Already a channel ID
+                logger.info(f"Using channel ID directly: {channel_id}")
+            else:
+                # Resolve channel name to ID (supports both names and IDs)
+                channel_id = await self.slack_bot.resolve_channel_name_to_id(slack_channel)
 
             # Fetch messages from the channel
-            messages = await self.slack_bot.read_channel_history(channel_name, limit=message_limit)
+            messages = await self.slack_bot.read_channel_history(channel_id, limit=message_limit)
 
             # Filter messages by date range
             filtered_messages = []
@@ -407,7 +428,7 @@ class ProjectActivityAggregator:
                         })
 
             activity.slack_messages = filtered_messages
-            logger.info(f"Collected {len(filtered_messages)} Slack messages from {slack_channel}")
+            logger.info(f"Collected {len(filtered_messages)} Slack messages from {slack_channel} (resolved to {channel_id})")
 
             # Extract key discussions using AI if we have messages
             if filtered_messages:
@@ -855,22 +876,37 @@ class ProjectActivityAggregator:
             {chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified'}
 
             ## REQUIRED ANALYSIS
-            Create a focused digest with these THREE sections only:
+            Create a focused digest with these FOUR sections:
 
             1. **noteworthy_discussions**: Key discussions, decisions, and insights from meetings AND Slack channels with important context and details
             2. **work_completed**: Include both COMPLETED tickets AND tickets that had time tracked (even if in progress), with FULL ticket names and meaningful outcomes
             3. **topics_for_discussion**: Specific issues requiring client input, unresolved blockers, or strategic decisions needed with context
+            4. **attention_required**: ONLY include if there are urgent items, blockers, or issues that need immediate attention - otherwise set to empty string
+
+            ## ATTENTION TRIGGERS (Check for these specific items):
+            - Monthly retainer hours: If this project has monthly retainer limits and current month total is approaching or exceeding them
+            - High-priority tickets that are blocked or overdue
+            - Critical technical issues mentioned in Slack discussions
+            - Client deliverables that are pending review or approval
+            - Resource constraints or capacity issues
+            - Budget concerns for project-based work that is over estimated hours
 
             CRITICAL REQUIREMENTS:
             - Include sufficient detail for business context - not overly brief
-            - Use proper markdown list format: each point starts with "* " on new line
+            - RETURN COMPLETE SENTENCES AND PHRASES: Never break down text character by character
+            - Write normal, coherent bullet points with full words and sentences
+            - Use proper markdown list format: each point starts with "* " on new line (NOT "* * ")
+            - NO DOUBLE ASTERISKS: Use single asterisk for bullet points
             - Include full Jira ticket titles, not just keys (e.g., "SUBS-608: Hero Rotating Banner Mobile Arrows Hidden")
             - In work_completed section: include ALL tickets that had time logged, not just completed ones
             - Incorporate noteworthy Slack discussions into the appropriate sections, especially important decisions or technical discussions
             - Focus on business impact and client-relevant information
+            - Each bullet point should be a complete, readable sentence or phrase - never individual characters
+            - ABSOLUTELY NEVER split words or sentences into individual letters
             - Each point should provide specific, actionable information with context
+            - For attention_required: only populate if there are genuine urgent issues, blockers, time-sensitive matters, or hour tracking concerns
 
-            Format as JSON with the three keys above. Each section should contain markdown-formatted bullet points.
+            Format as JSON with the four keys above. Each section should contain markdown-formatted bullet points.
             """
 
             # Use the LLM directly instead of the non-existent generate_insights method
@@ -889,6 +925,10 @@ class ProjectActivityAggregator:
                 response = self.analyzer.llm.invoke(messages)
             insights = response.content
 
+            logger.info(f"AI insights generated - length: {len(insights) if insights else 0}")
+            if insights:
+                logger.info(f"AI insights content preview: {insights[:200]}...")
+
             if insights:
                 try:
                     parsed_insights = json.loads(insights)
@@ -897,6 +937,7 @@ class ProjectActivityAggregator:
                     activity.noteworthy_discussions = parsed_insights.get('noteworthy_discussions', '')
                     activity.work_completed = parsed_insights.get('work_completed', '')
                     activity.topics_for_discussion = parsed_insights.get('topics_for_discussion', '')
+                    activity.attention_required = parsed_insights.get('attention_required', '')
 
                     # Keep backward compatibility with old format for display
                     activity.progress_summary = f"{activity.work_completed[:100]}..." if activity.work_completed else ""
@@ -921,9 +962,19 @@ class ProjectActivityAggregator:
                     activity.meeting_action_items = all_action_items[:10]  # Store top 10 action items
                     activity.meeting_blockers = all_blockers[:5]  # Store top 5 blockers
 
-                except json.JSONDecodeError:
-                    logger.warning("Failed to parse AI insights as JSON, using raw content")
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse AI insights as JSON: {e}")
+                    logger.warning(f"Raw AI response: {insights[:1000]}...")
+
+                    # Try to extract content manually if it's not proper JSON
                     activity.progress_summary = insights[:500]  # Truncate if too long
+
+                    # Set the new structure fields to fallback content
+                    activity.noteworthy_discussions = "Unable to parse AI insights - see raw progress summary"
+                    activity.work_completed = f"Generated fallback: {len(activity.completed_tickets)} tickets completed"
+                    activity.topics_for_discussion = "Review meeting notes for detailed topics"
+                    activity.attention_required = ""
+
                     # Extract key information from stored meeting data as fallback
                     activity.key_achievements = [item.get('title', '') for item in all_action_items[:3]]
                     activity.blockers_risks = all_blockers[:3]
@@ -933,6 +984,13 @@ class ProjectActivityAggregator:
             logger.error(f"Error generating insights: {e}")
             # Provide basic insights even if AI processing fails
             activity.progress_summary = f"Project {activity.project_name} had {len(activity.meetings)} meetings and {len(activity.completed_tickets)} completed tickets in the past week."
+
+            # Set the new structure fields to fallback content
+            activity.noteworthy_discussions = f"Error generating AI insights - {len(activity.meetings)} meetings were held"
+            activity.work_completed = f"Generated fallback: {len(activity.completed_tickets)} tickets completed this period"
+            activity.topics_for_discussion = "Review meeting notes for detailed discussion topics"
+            activity.attention_required = ""
+
             activity.key_achievements = [ticket['summary'] for ticket in activity.completed_tickets[:3]]
             activity.blockers_risks = ["Review meeting notes for detailed blockers"]
             activity.next_steps = ["Continue current development", "Address any blockers identified in meetings"]
@@ -963,17 +1021,114 @@ class ProjectActivityAggregator:
         if not content:
             return f"* {default_message}"
 
-        # If it's a list, format as bullet points
+        # If it's a list, check for character breakdown issue
         if isinstance(content, list):
-            return '\n'.join(f'* {item}' for item in content)
+            # Check if we have a character breakdown issue (many single-character items)
+            single_char_items = [item for item in content if isinstance(item, str) and len(item.strip()) == 1]
+            if len(single_char_items) > len(content) * 0.3:  # More than 30% single characters (more aggressive)
+                # This appears to be a character breakdown - try to reconstruct
+                logger.warning(f"Detected character breakdown in AI content ({len(single_char_items)}/{len(content)} single chars), attempting to reconstruct")
+                reconstructed = ''.join(str(item).strip() for item in content if str(item).strip())
+                # Try to split into meaningful bullet points
+                if reconstructed and len(reconstructed) > 10:  # Only if we have meaningful content
+                    # Split on common delimiters and clean up
+                    parts = []
+                    for sep in ['. - ', '. ', '- ', '\n']:
+                        if sep in reconstructed:
+                            parts = [p.strip() for p in reconstructed.split(sep) if p.strip() and len(p.strip()) > 3]
+                            break
+                    if not parts:
+                        # Try to find sentences ending with period
+                        import re
+                        sentence_pattern = r'[^.]+\.'
+                        matches = re.findall(sentence_pattern, reconstructed)
+                        if matches:
+                            parts = [m.strip() for m in matches if len(m.strip()) > 10]
+                        else:
+                            parts = [reconstructed]
 
-        # If it's a string, return as-is (assuming it's already formatted)
-        return content
+                    formatted_items = []
+                    for part in parts:
+                        if part and len(part) > 5:  # Only meaningful content
+                            # Clean up any remaining character artifacts
+                            cleaned_part = part.replace('* ', '').replace('- ', '').strip()
+                            if cleaned_part:
+                                formatted_items.append(f'* {cleaned_part}')
+
+                    if formatted_items:
+                        logger.info(f"Successfully reconstructed {len(formatted_items)} items from character breakdown")
+                        return '\n'.join(formatted_items)
+                    else:
+                        logger.warning("Failed to reconstruct meaningful content from character breakdown")
+                        return f"* {default_message}"
+
+            # Normal list processing
+            formatted_items = []
+            for item in content:
+                # Skip single characters unless they're meaningful
+                item_str = str(item).strip()
+                if len(item_str) == 1 and item_str not in ['*', '-', '•']:
+                    continue
+
+                # Clean up ONLY the specific pattern "* *" which is incorrect bullet formatting
+                clean_item = item_str.replace('* *', '*').strip()
+                if not clean_item:
+                    continue
+
+                # Ensure it starts with a single asterisk for bullet points
+                if not clean_item.startswith('*'):
+                    clean_item = f'* {clean_item}'
+                elif clean_item.startswith('* ') and not clean_item.startswith('* *'):
+                    pass  # Already correctly formatted
+                else:
+                    clean_item = f'* {clean_item.lstrip("* ")}'
+                formatted_items.append(clean_item)
+            return '\n'.join(formatted_items) if formatted_items else f"* {default_message}"
+
+        # If it's a string, clean up ONLY the specific pattern "* *" which is incorrect bullet formatting
+        if isinstance(content, str):
+            # Fix only the specific "* *" pattern, preserve valid markdown bold formatting like **text**
+            cleaned_content = content.replace('* *', '*').strip()
+            return cleaned_content
+
+        return str(content)
+
+    async def _get_ticket_summary(self, issue_key: str) -> str:
+        """Fetch ticket summary using Jira MCP."""
+        try:
+            from src.integrations.jira_mcp import JiraMCP
+            jira_client = JiraMCP()
+            issue_data = await jira_client.get_issue(issue_key, fields="summary")
+            if issue_data and 'summary' in issue_data.get('fields', {}):
+                return issue_data['fields']['summary']
+        except Exception as e:
+            logger.warning(f"Failed to fetch summary for {issue_key}: {e}")
+        return "Unknown"
 
     def format_client_agenda(self, activity: ProjectActivity) -> str:
         """Format the aggregated activity into a client-ready agenda."""
         days = (datetime.fromisoformat(activity.end_date) -
                datetime.fromisoformat(activity.start_date)).days
+
+        # Format attention section with highlighted background
+        attention_section = ""
+        if activity.attention_required:
+            # Handle both string and list formats
+            attention_content = activity.attention_required
+            if isinstance(attention_content, str) and attention_content.strip():
+                attention_section = f"""
+## 🚨 Attention Required
+> **Important items that need immediate attention:**
+
+{self._format_section_content(activity.attention_required, "No urgent items requiring attention")}
+"""
+            elif isinstance(attention_content, list) and attention_content:
+                attention_section = f"""
+## 🚨 Attention Required
+> **Important items that need immediate attention:**
+
+{self._format_section_content(activity.attention_required, "No urgent items requiring attention")}
+"""
 
         # Format detailed Jira ticket changes
         ticket_changes_section = ""
@@ -996,7 +1151,7 @@ class ProjectActivityAggregator:
                     for change in ticket_info['changes'][:3]:
                         ticket_changes_section += f"  - {change}\n"
 
-        # Format time tracking section with per-ticket details
+        # Format time tracking section with per-ticket details and names
         time_section = ""
         if activity.total_hours > 0:
             time_section = f"\n## ⏱️ Time Tracking\n* **Total Time Logged:** {activity.total_hours:.1f} hours\n"
@@ -1004,6 +1159,9 @@ class ProjectActivityAggregator:
             # Group time entries by ticket
             if activity.time_entries:
                 ticket_hours = {}
+                ticket_summaries = {}
+
+                # Collect hours and get summaries from ticket changes if available
                 for entry in activity.time_entries:
                     ticket_key = entry.get('issue_key', 'Unknown')
                     hours = entry.get('hours', 0)
@@ -1011,16 +1169,57 @@ class ProjectActivityAggregator:
                         ticket_hours[ticket_key] = 0
                     ticket_hours[ticket_key] += hours
 
-                # Show top tickets by time logged
+                # Try to get summaries from existing jira_ticket_changes first
+                if activity.jira_ticket_changes:
+                    for change in activity.jira_ticket_changes:
+                        change_ticket_key = change.get('ticket_key')
+                        if change_ticket_key in ticket_hours and change_ticket_key not in ticket_summaries:
+                            # Try multiple fields for the summary
+                            summary = (change.get('ticket_summary') or
+                                     change.get('summary') or
+                                     change.get('title') or
+                                     change.get('subject'))
+                            if summary and summary != 'Unknown':
+                                ticket_summaries[change_ticket_key] = summary
+
+                # For tickets without summaries, try to get them from completed tickets
+                if activity.completed_tickets:
+                    for ticket in activity.completed_tickets:
+                        ticket_key = ticket.get('key', '')
+                        if ticket_key in ticket_hours and ticket_key not in ticket_summaries:
+                            # Try multiple fields for the summary
+                            summary = (ticket.get('summary') or
+                                     ticket.get('title') or
+                                     ticket.get('subject') or
+                                     ticket.get('fields', {}).get('summary'))
+                            if summary and summary != 'Unknown':
+                                ticket_summaries[ticket_key] = summary
+
+                # Also check time entries themselves for any embedded summary info
+                for entry in activity.time_entries:
+                    ticket_key = entry.get('issue_key', 'Unknown')
+                    if ticket_key in ticket_hours and ticket_key not in ticket_summaries:
+                        # Try to get summary from the time entry itself
+                        summary = (entry.get('issue_summary') or
+                                 entry.get('summary') or
+                                 entry.get('description'))
+                        if summary and summary != 'Unknown':
+                            ticket_summaries[ticket_key] = summary
+
+                # Show top tickets by time logged with full names
                 sorted_tickets = sorted(ticket_hours.items(), key=lambda x: x[1], reverse=True)
                 time_section += "\n**Time by Ticket:**\n"
                 for ticket_key, hours in sorted_tickets[:8]:  # Show top 8 tickets
-                    time_section += f"* **{ticket_key}:** {hours:.1f}h\n"
+                    summary = ticket_summaries.get(ticket_key, '')  # Get summary if available
+                    if summary and summary != 'Unknown':
+                        time_section += f"* **{ticket_key}** - {summary}: {hours:.1f}h\n"
+                    else:
+                        time_section += f"* **{ticket_key}:** {hours:.1f}h\n"
 
         agenda = f"""
 # {activity.project_name} - Weekly Status Update
 **Period:** {activity.start_date[:10]} to {activity.end_date[:10]} ({days} days)
-
+{attention_section}
 ## 💬 Noteworthy Discussions
 {self._format_section_content(activity.noteworthy_discussions, "No significant discussions this period")}
 
