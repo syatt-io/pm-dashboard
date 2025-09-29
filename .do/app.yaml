@@ -13,7 +13,7 @@ databases:
 services:
   - name: backend
     github:
-      repo: your-username/agent-pm
+      repo: syattsamimi/pm-dashboard
       branch: main
       deploy_on_push: true
     source_dir: /
@@ -91,7 +91,7 @@ services:
   # Frontend (React)
   - name: frontend
     github:
-      repo: your-username/agent-pm
+      repo: syattsamimi/pm-dashboard
       branch: main
       deploy_on_push: true
     source_dir: /frontend
