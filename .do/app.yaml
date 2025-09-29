@@ -18,7 +18,7 @@ services:
     source_dir: /
 
     # Build both Python dependencies and React frontend
-    build_command: pip install -r requirements.txt && cd frontend && npm install && npm run build && cd ..
+    build_command: pip install -r requirements.txt && npm run build
 
     # Run Flask which will serve both API and React static files
     run_command: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
@@ -65,14 +65,14 @@ services:
 
       # Jira Configuration
       - key: JIRA_URL
-        value: https://your-domain.atlassian.net
+        value: https://syatt.atlassian.net
       - key: JIRA_USERNAME
-        value: your-email@example.com
+        value: mike.samimi@syatt.io
       - key: JIRA_API_TOKEN
         value: YOUR_JIRA_API_TOKEN
         type: SECRET
       - key: JIRA_PROJECT_KEY
-        value: YOUR_PROJECT
+        value: PM
 
       # Slack (optional)
       - key: SLACK_BOT_TOKEN
@@ -82,7 +82,7 @@ services:
         value: YOUR_SLACK_SIGNING_SECRET
         type: SECRET
       - key: SLACK_CHANNEL
-        value: "#your-channel"
+        value: "#mikes-minion"
 
       # Tempo (optional)
       - key: TEMPO_API_TOKEN
