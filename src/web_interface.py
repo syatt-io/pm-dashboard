@@ -2888,35 +2888,7 @@ def save_fireflies_api_key(user):
                 'error': 'API key is required'
             }), 400
 
-        # Validate the API key before saving (inlined to avoid import issues)
-        def validate_fireflies_api_key_inline(api_key: str) -> bool:
-            """Validate a Fireflies API key by making a test request."""
-            if not api_key or not api_key.strip():
-                return False
-            try:
-                import requests
-                payload = {
-                    "query": "query { transcripts(limit: 1) { id } }",
-                    "variables": {}
-                }
-                response = requests.post(
-                    "https://api.fireflies.ai/graphql",
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {api_key.strip()}",
-                        "Content-Type": "application/json"
-                    },
-                    timeout=10
-                )
-                return response.status_code == 200 and 'data' in response.json()
-            except Exception:
-                return False
-
-        if not validate_fireflies_api_key_inline(api_key):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid Fireflies API key. Please check the key and try again.'
-            }), 400
+        # Skip validation here since the frontend already validates via the separate endpoint
 
         # Save the encrypted API key
         from sqlalchemy import create_engine
