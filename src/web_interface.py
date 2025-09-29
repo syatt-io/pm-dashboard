@@ -3014,24 +3014,14 @@ def create_users_table_endpoint():
         with database_engine.connect() as conn:
             trans = conn.begin()
             try:
-                # Create enum type first
-                conn.execute(text("""
-                    DO $$
-                    BEGIN
-                        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userrole') THEN
-                            CREATE TYPE userrole AS ENUM ('NO_ACCESS', 'MEMBER', 'ADMIN');
-                        END IF;
-                    END$$;
-                """))
-
-                # Create users table
+                # Create users table without custom enum (use VARCHAR for role)
                 conn.execute(text("""
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
                         email VARCHAR(255) UNIQUE NOT NULL,
                         name VARCHAR(255),
                         google_id VARCHAR(255) UNIQUE,
-                        role userrole DEFAULT 'MEMBER',
+                        role VARCHAR(50) DEFAULT 'MEMBER',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         last_login TIMESTAMP,
