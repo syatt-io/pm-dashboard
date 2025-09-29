@@ -85,7 +85,8 @@ try:
     Base.metadata.create_all(database_engine)
     logger.info("Database tables created/verified")
 except Exception as e:
-    logger.error(f"Error creating database tables: {e}")
+    logger.warning(f"Could not create database tables (may already exist or lack permissions): {e}")
+    # Continue anyway - tables may already exist
 
 # Initialize auth service with factory, not instance
 auth_service = AuthService(db_session_factory)

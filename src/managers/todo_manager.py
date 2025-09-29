@@ -33,7 +33,15 @@ class TodoManager:
     def __init__(self):
         """Initialize TODO manager."""
         self.engine = create_engine(settings.agent.database_url)
-        Base.metadata.create_all(self.engine)
+
+        # Try to create tables, but don't fail if we don't have permissions
+        try:
+            Base.metadata.create_all(self.engine)
+            logger.info("Database tables created successfully")
+        except Exception as e:
+            logger.warning(f"Could not create database tables (may already exist or lack permissions): {e}")
+            # Continue anyway - tables may already exist
+
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
         self.notifier = NotificationManager(settings.notifications)
