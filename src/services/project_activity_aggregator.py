@@ -11,6 +11,7 @@ from src.integrations.fireflies import FirefliesClient
 from src.integrations.jira_mcp import JiraMCPClient
 from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.managers.slack_bot import SlackTodoBot
+from src.utils.prompt_manager import get_prompt_manager
 
 # MCP Tempo function should be available globally in Claude Code environment
 # If not available, define a fallback
@@ -117,6 +118,9 @@ class ProjectActivityAggregator:
         engine = create_engine(f"sqlite:///{db_path}")
         Session = sessionmaker(bind=engine)
         self.session = Session()
+
+        # Initialize prompt manager
+        self.prompt_manager = get_prompt_manager()
 
     async def aggregate_project_activity(
         self,
@@ -448,23 +452,16 @@ class ProjectActivityAggregator:
             if len(combined_text.strip()) < 50:
                 return
 
-            discussions_prompt = f"""
-            Analyze the following Slack channel discussions for project {activity.project_name} ({activity.project_key}).
-            Extract key discussions, decisions, and project-relevant information.
+            # Get max chars from settings
+            max_chars = self.prompt_manager.get_setting('slack_messages_max_chars', 3000)
 
-            Slack Messages:
-            {combined_text[:3000]}  # Limit to avoid token issues
-
-            Please identify:
-            1. Important decisions or agreements made
-            2. Technical discussions or solutions
-            3. Project updates or status changes
-            4. Blockers or issues mentioned
-            5. Action items or next steps discussed
-
-            Return a JSON array of strings, each representing a key discussion point or decision.
-            Focus on business-relevant content, ignore casual conversation.
-            """
+            # Get and format the prompt from configuration
+            discussions_prompt = self.prompt_manager.format_prompt(
+                'slack_analysis', 'discussions_prompt_template',
+                project_name=activity.project_name,
+                project_key=activity.project_key,
+                messages=combined_text[:max_chars]  # Limit to avoid token issues
+            )
 
             from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -481,7 +478,8 @@ class ProjectActivityAggregator:
 
             # Parse the response
             discussions = json.loads(response.content) if response.content.startswith('[') else [response.content]
-            activity.key_discussions = discussions[:10]  # Limit to top 10 discussions
+            max_discussions = self.prompt_manager.get_setting('max_key_discussions', 10)
+            activity.key_discussions = discussions[:max_discussions]  # Limit to configured max
 
         except Exception as e:
             logger.error(f"Error extracting key discussions: {e}")
@@ -844,76 +842,35 @@ class ProjectActivityAggregator:
                 for key, data in list(issue_hours.items())[:5]:  # Top 5 issues by time
                     time_summary.append(f"• {key} ({data['hours']}h): {data['summary'][:50]}...")
 
-            # Generate comprehensive insights combining all context sources
-            insights_prompt = f"""
-            You are a senior project manager creating a concise, focused weekly digest. Avoid duplication and make every word count. Create a strategic summary using these three sections only:
-
-            ## PROJECT CONTEXT
-            Project: {activity.project_name} ({activity.project_key})
-            Time Period: {activity.start_date} to {activity.end_date}
-            Team Activity: {len(activity.meetings)} meetings, {len(activity.slack_messages)} team discussions, {activity.total_hours:.1f} hours logged
-
-            ## MEETING DISCUSSIONS
-            Key meeting outcomes and decisions:
-            {chr(10).join(f'- {summary}' for summary in activity.meeting_summaries[:3]) or '- No recent meetings'}
-
-            Decisions made:
-            {chr(10).join(f'- {decision}' for decision in all_decisions[:3]) or '- No major decisions recorded'}
-
-            ## TEAM DISCUSSIONS (SLACK)
-            Key discussions and decisions from Slack channels:
-            {chr(10).join(f'- {discussion}' for discussion in activity.key_discussions[:5]) if activity.key_discussions else '- No significant Slack discussions'}
-
-            ## WORK COMPLETED
-            Tickets completed with full names:
-            {chr(10).join(f'- {ticket.get("key", "Unknown")}: {ticket.get("summary", "No summary")}' for ticket in activity.completed_tickets[:5]) or '- No tickets completed'}
-
-            Time logged by ticket:
-            {chr(10).join(time_summary) or '- No time tracking data available'}
-
-            ## BLOCKERS & ISSUES
-            Current blockers:
-            {chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified'}
-
-            ## REQUIRED ANALYSIS
-            Create a focused digest with these FOUR sections:
-
-            1. **noteworthy_discussions**: Key discussions, decisions, and insights from meetings AND Slack channels with important context and details
-            2. **work_completed**: Include both COMPLETED tickets AND tickets that had time tracked (even if in progress), with FULL ticket names and meaningful outcomes
-            3. **topics_for_discussion**: Specific issues requiring client input, unresolved blockers, or strategic decisions needed with context
-            4. **attention_required**: ONLY include if there are urgent items, blockers, or issues that need immediate attention - otherwise set to empty string
-
-            ## ATTENTION TRIGGERS (Check for these specific items):
-            - Monthly retainer hours: If this project has monthly retainer limits and current month total is approaching or exceeding them
-            - High-priority tickets that are blocked or overdue
-            - Critical technical issues mentioned in Slack discussions
-            - Client deliverables that are pending review or approval
-            - Resource constraints or capacity issues
-            - Budget concerns for project-based work that is over estimated hours
-
-            CRITICAL REQUIREMENTS:
-            - Include sufficient detail for business context - not overly brief
-            - RETURN COMPLETE SENTENCES AND PHRASES: Never break down text character by character
-            - Write normal, coherent bullet points with full words and sentences
-            - Use proper markdown list format: each point starts with "* " on new line (NOT "* * ")
-            - NO DOUBLE ASTERISKS: Use single asterisk for bullet points
-            - Include full Jira ticket titles, not just keys (e.g., "SUBS-608: Hero Rotating Banner Mobile Arrows Hidden")
-            - In work_completed section: include ALL tickets that had time logged, not just completed ones
-            - Incorporate noteworthy Slack discussions into the appropriate sections, especially important decisions or technical discussions
-            - Focus on business impact and client-relevant information
-            - Each bullet point should be a complete, readable sentence or phrase - never individual characters
-            - ABSOLUTELY NEVER split words or sentences into individual letters
-            - Each point should provide specific, actionable information with context
-            - For attention_required: only populate if there are genuine urgent issues, blockers, time-sensitive matters, or hour tracking concerns
-
-            Format as JSON with the four keys above. Each section should contain markdown-formatted bullet points.
-            """
+            # Format the insights prompt from configuration
+            insights_prompt = self.prompt_manager.format_prompt(
+                'digest_generation', 'insights_prompt_template',
+                project_name=activity.project_name,
+                project_key=activity.project_key,
+                start_date=activity.start_date,
+                end_date=activity.end_date,
+                num_meetings=len(activity.meetings),
+                num_discussions=len(activity.slack_messages),
+                total_hours=activity.total_hours,
+                meeting_summaries=chr(10).join(f'- {summary}' for summary in activity.meeting_summaries[:3]) or '- No recent meetings',
+                decisions=chr(10).join(f'- {decision}' for decision in all_decisions[:3]) or '- No major decisions recorded',
+                slack_discussions=chr(10).join(f'- {discussion}' for discussion in activity.key_discussions[:5]) if activity.key_discussions else '- No significant Slack discussions',
+                completed_tickets=chr(10).join(f'- {ticket.get("key", "Unknown")}: {ticket.get("summary", "No summary")}' for ticket in activity.completed_tickets[:5]) or '- No tickets completed',
+                time_summary=chr(10).join(time_summary) or '- No time tracking data available',
+                blockers=chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified'
+            )
 
             # Use the LLM directly instead of the non-existent generate_insights method
             from langchain_core.messages import HumanMessage, SystemMessage
 
+            # Get system message from configuration
+            system_message = self.prompt_manager.get_prompt(
+                'digest_generation', 'system_message',
+                default="You are a project management assistant. Generate concise, client-ready insights from project activity data."
+            )
+
             messages = [
-                SystemMessage(content="You are a project management assistant. Generate concise, client-ready insights from project activity data."),
+                SystemMessage(content=system_message),
                 HumanMessage(content=insights_prompt)
             ]
 
@@ -959,8 +916,10 @@ class ProjectActivityAggregator:
                     activity.next_steps = next_steps
 
                     # Also store the raw action items and blockers for additional context
-                    activity.meeting_action_items = all_action_items[:10]  # Store top 10 action items
-                    activity.meeting_blockers = all_blockers[:5]  # Store top 5 blockers
+                    max_action_items = self.prompt_manager.get_setting('max_action_items_in_digest', 10)
+                    max_blockers = self.prompt_manager.get_setting('max_blockers_in_digest', 5)
+                    activity.meeting_action_items = all_action_items[:max_action_items]  # Store top action items
+                    activity.meeting_blockers = all_blockers[:max_blockers]  # Store top blockers
 
                 except json.JSONDecodeError as e:
                     logger.warning(f"Failed to parse AI insights as JSON: {e}")

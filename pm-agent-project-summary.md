@@ -234,16 +234,6 @@ python main.py --mode development
 - Atlassian developer community
 - LangChain documentation for agent development
 
-## Project Timeline
-
-```
-Week 1: Foundation & Setup
-Week 2: MCP Configuration
-Week 3-4: Core Agent Development
-Week 5: Daily Notification System
-Week 6: Testing & Deployment
-Week 7-8: Monitoring & Optimization
-```
 
 ## Getting Started Checklist
 

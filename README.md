@@ -1,282 +1,325 @@
 # Autonomous PM Agent
 
-An AI-powered project management assistant that automatically processes meeting transcripts from Fireflies.ai and creates/manages Jira tickets through the Model Context Protocol (MCP).
+An intelligent project management system that automatically processes meeting transcripts, generates weekly digests, tracks time, and manages action items across your organization. Built with AI-powered analysis and seamless integrations with Fireflies.ai, Jira, Slack, and Tempo.
 
-## Features
+## 🚀 Key Features
 
-- **Automated Meeting Processing**: Retrieves transcripts from Fireflies.ai and extracts action items
-- **Smart Ticket Creation**: Automatically creates Jira tickets from identified action items
-- **Daily Notifications**: Sends digest emails and Slack notifications for outstanding TODOs
-- **MCP Integration**: Uses standardized protocol for tool connections
-- **Multi-channel Alerts**: Supports Slack, Email, and Microsoft Teams notifications
+### Core Capabilities
+- **AI Meeting Analysis**: Automatically processes Fireflies.ai transcripts to extract action items, decisions, and blockers
+- **Smart Project Linking**: Intelligently associates meetings with relevant projects based on content
+- **Weekly Digests**: Generates comprehensive project status reports with insights
+- **Time Tracking Integration**: Syncs with Tempo to track project hours and budget
+- **Multi-Project Management**: Handles multiple concurrent projects with custom settings
+- **User Authentication**: Google SSO and user management with role-based access
 
-## Quick Start
+### Web Interface
+- **Modern React Frontend**: Intuitive dashboard for managing meetings, projects, and action items
+- **Real-time Processing**: Live meeting analysis and ticket creation
+- **Project Settings**: Configure notification schedules, Slack channels, and team members per project
+- **Manual Overrides**: Edit action items before creating Jira tickets
 
-### 1. Prerequisites
+### Automation Features
+- **Scheduled Reports**: Weekly project digests sent automatically
+- **Smart Notifications**: Alerts for blockers, overdue items, and budget concerns
+- **Bulk Ticket Creation**: Create multiple Jira tickets with one click
+- **Hours Tracking Reports**: Automated time tracking summaries
+
+## 📋 Prerequisites
 
 - Python 3.11+
-- Docker Desktop
-- Access to:
-  - Fireflies.ai API
-  - Jira Cloud instance
+- Node.js 18+
+- PostgreSQL or SQLite
+- API Access:
+  - Fireflies.ai API key
+  - Jira Cloud instance with API token
+  - Tempo API token (for time tracking)
+  - OpenAI or Anthropic API key
   - Slack workspace (optional)
-  - Email SMTP server (optional)
+  - Google OAuth credentials (for SSO)
 
-### 2. Environment Setup
+## 🛠️ Installation
 
+### 1. Clone the Repository
 ```bash
-# Clone and setup
 git clone <repository-url>
 cd agent-pm
+```
 
+### 2. Backend Setup
+```bash
 # Create virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Install Python dependencies
 pip install -r requirements.txt
 
 # Copy environment template
 cp .env.example .env
 ```
 
-### 3. Configure Environment Variables
+### 3. Frontend Setup
+```bash
+cd frontend
+npm install
+```
+
+### 4. Configure Environment Variables
 
 Edit `.env` with your credentials:
 
 ```bash
-# Fireflies
-FIREFLIES_API_KEY=your_api_key_here
+# Core Services
+FIREFLIES_API_KEY=your_fireflies_key
+OPENAI_API_KEY=your_openai_key  # or ANTHROPIC_API_KEY
 
-# Jira
-JIRA_URL=https://company.atlassian.net
-JIRA_USERNAME=email@company.com
-JIRA_API_TOKEN=your_token_here
+# Jira Configuration
+JIRA_URL=https://your-domain.atlassian.net
+JIRA_USERNAME=your-email@company.com
+JIRA_API_TOKEN=your_jira_token
+JIRA_PROJECT_KEY=YOUR_DEFAULT_PROJECT
 
-# AI Model (choose one)
-OPENAI_API_KEY=your_openai_key
-# OR
-ANTHROPIC_API_KEY=your_claude_key
+# Tempo (Time Tracking)
+TEMPO_API_TOKEN=your_tempo_token
 
-# Notifications (optional)
+# Google OAuth (for SSO)
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+
+# Slack (Optional)
 SLACK_BOT_TOKEN=xoxb-your-token
-SMTP_HOST=smtp.gmail.com
-SMTP_USER=notifications@company.com
-SMTP_PASS=your_password
+SLACK_SIGNING_SECRET=your_secret
+SLACK_CHANNEL=#your-default-channel
+
+# Email (Optional - using SendGrid)
+SENDGRID_API_KEY=your_sendgrid_key
+SENDGRID_FROM_EMAIL=notifications@company.com
+
+# Security
+JWT_SECRET_KEY=your-secret-key-here
 ```
 
-### 4. Start MCP Services
-
+### 5. Initialize Database
 ```bash
-# Start Jira MCP server and other services
-docker-compose up -d
+# Run migrations
+python migrations/migrate_database.py
+python migrations/migrate_add_users.py
 
-# Check services are running
-docker-compose ps
+# Or start fresh
+rm pm_agent.db  # Remove existing database
+python main.py  # Auto-creates tables on first run
 ```
 
-### 5. Test the Agent
+## 🚀 Running the Application
+
+### Development Mode
+
+Start both backend and frontend:
 
 ```bash
-# Test all connections
-python main.py --test
+# Terminal 1: Backend API
+source venv/bin/activate
+python main.py
 
-# Run once (development mode)
-python main.py --once
+# Terminal 2: Frontend React App
+cd frontend
+PORT=4001 npm start
+```
 
-# Run on schedule (production)
+Access the application at:
+- Frontend: http://localhost:4001
+- Backend API: http://localhost:4000
+
+### Production Mode
+
+```bash
+# Backend with production settings
 python main.py --mode production
+
+# Frontend build
+cd frontend
+npm run build
+# Serve the build folder with your web server
 ```
 
-## Development Commands
-
-### Running the Agent
-
-```bash
-# Development mode (run once)
-python main.py --mode development --once
-
-# Test connections
-python main.py --test
-
-# Production mode (scheduled)
-python main.py --mode production
-```
-
-### Working with MCP Services
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs jira-mcp
-docker-compose logs fireflies-mcp
-
-# Restart specific service
-docker-compose restart jira-mcp
-
-# Stop all services
-docker-compose down
-```
-
-### Database Management
-
-```bash
-# Initialize database (SQLite by default)
-python -c "from main import PMAgent; PMAgent()"
-
-# For PostgreSQL (production)
-export DATABASE_URL="postgresql://user:pass@localhost/pm_agent"
-```
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 agent-pm/
-├── main.py                 # Main agent orchestrator
+├── main.py                         # Main application entry point
 ├── config/
-│   └── settings.py        # Configuration management
+│   ├── settings.py                # Configuration management
+│   └── ai_prompts.yaml            # Customizable AI prompts
 ├── src/
-│   ├── integrations/
-│   │   ├── fireflies.py   # Fireflies.ai API client
-│   │   └── jira_mcp.py    # Jira MCP client
-│   ├── processors/
-│   │   └── transcript_analyzer.py  # AI transcript analysis
-│   ├── managers/
-│   │   └── notifications.py        # Multi-channel notifications
-│   └── mcp/
-│       ├── fireflies_mcp_server.py # Fireflies MCP wrapper
-│       └── Dockerfile.fireflies    # MCP container config
-├── docker-compose.yml     # MCP services orchestration
-└── requirements.txt       # Python dependencies
+│   ├── web_interface.py           # Flask API server
+│   ├── models/                    # Database models
+│   │   ├── base.py
+│   │   ├── project.py
+│   │   └── user.py
+│   ├── routes/                    # API endpoints
+│   │   ├── auth.py               # Authentication routes
+│   │   ├── meetings.py           # Meeting management
+│   │   └── projects.py          # Project management
+│   ├── services/                  # Business logic
+│   │   ├── project_activity_aggregator.py  # Digest generation
+│   │   ├── hours_report_agent.py          # Time tracking
+│   │   ├── meeting_project_linker.py      # Smart project linking
+│   │   └── scheduler.py                   # Automated tasks
+│   ├── integrations/              # External service clients
+│   │   ├── fireflies.py          # Fireflies.ai API
+│   │   ├── jira_mcp.py          # Jira integration
+│   │   └── tempo.py             # Tempo time tracking
+│   ├── processors/                # Data processing
+│   │   └── transcript_analyzer.py # AI meeting analysis
+│   ├── managers/                  # Service managers
+│   │   ├── notifications.py      # Multi-channel alerts
+│   │   ├── slack_bot.py         # Slack integration
+│   │   └── todo_manager.py      # Task management
+│   └── utils/                     # Utilities
+│       ├── prompt_manager.py    # AI prompt configuration
+│       └── project_matcher.py   # Project association logic
+├── frontend/                      # React application
+│   ├── src/
+│   │   ├── components/          # React components
+│   │   ├── services/           # API services
+│   │   └── App.js
+│   └── package.json
+├── migrations/                    # Database migrations
+├── templates/                     # Legacy HTML templates
+└── static/                       # Legacy static assets
 ```
 
-## How It Works
+## 💡 Key Workflows
 
-1. **Meeting Collection**: Agent polls Fireflies.ai for new meeting transcripts
-2. **AI Analysis**: Uses LLM to extract action items, decisions, and blockers
-3. **Ticket Creation**: Creates structured Jira tickets via MCP protocol
-4. **Notification System**: Sends daily digests and urgent alerts
-5. **Progress Tracking**: Monitors TODO completion and deadlines
-
-## Configuration Options
-
-### Notification Scheduling
-
-```bash
-# Set custom digest times
-MORNING_DIGEST_TIME=08:00
-EVENING_DIGEST_TIME=17:00
-
-# Cron schedule for agent runs
-AGENT_RUN_SCHEDULE="0 8,17 * * *"  # 8 AM and 5 PM daily
+### 1. Meeting Processing Flow
+```
+Fireflies Meeting → AI Analysis → Action Items → Review Interface → Jira Tickets
 ```
 
-### AI Model Selection
-
-```bash
-# OpenAI (default)
-AI_PROVIDER=openai
-OPENAI_MODEL=gpt-4
-
-# Anthropic Claude
-AI_PROVIDER=anthropic
-ANTHROPIC_MODEL=claude-3-opus-20240229
+### 2. Weekly Digest Generation
+```
+Collect Meetings → Aggregate Jira Activity → Fetch Slack Discussions →
+Track Time Entries → Generate AI Insights → Send Digest
 ```
 
-### Jira Integration
-
-```bash
-# Default project for tickets
-JIRA_DEFAULT_PROJECT=PM
-
-# Atlassian MCP server configuration is handled via Docker
+### 3. Project Management
+```
+Create Project → Configure Settings → Link Meetings →
+Generate Reports → Track Progress
 ```
 
-## Production Deployment
+## 🔧 Configuration
 
-### Option 1: VM with systemd
+### AI Prompt Customization
 
+Edit `config/ai_prompts.yaml` to customize:
+- Meeting analysis prompts
+- Digest generation templates
+- Slack discussion analysis
+- Action item extraction logic
+
+### Project-Specific Settings
+
+Each project can have:
+- Custom Slack channel
+- Specific team members
+- Notification schedules
+- Budget thresholds
+- Priority rules
+
+## 📊 API Endpoints
+
+### Authentication
+- `POST /api/auth/google` - Google SSO login
+- `POST /api/auth/logout` - Logout
+- `GET /api/auth/me` - Current user info
+
+### Projects
+- `GET /api/projects` - List all projects
+- `POST /api/projects` - Create new project
+- `PUT /api/projects/{id}` - Update project
+- `GET /api/projects/{id}/digest` - Generate project digest
+- `GET /api/projects/{id}/hours` - Get time tracking data
+
+### Meetings
+- `GET /api/meetings` - List recent meetings
+- `GET /api/meetings/{id}/analyze` - Analyze specific meeting
+- `POST /api/meetings/{id}/link` - Link meeting to project
+- `POST /api/meetings/analyze-batch` - Bulk analysis
+
+### Action Items
+- `GET /api/action-items` - List action items
+- `POST /api/action-items/create-tickets` - Create Jira tickets
+- `PUT /api/action-items/{id}` - Update action item
+- `DELETE /api/action-items/{id}` - Delete action item
+
+## 🚨 Monitoring & Debugging
+
+### Check Logs
 ```bash
-# Create systemd service
-sudo cp scripts/pm-agent.service /etc/systemd/system/
-sudo systemctl enable pm-agent
-sudo systemctl start pm-agent
-```
+# Application logs
+tail -f logs/app.log
 
-### Option 2: Cloud Functions
-
-Deploy `main.py` as a scheduled cloud function (AWS Lambda, Google Cloud Functions).
-
-### Option 3: Kubernetes
-
-Use the provided Kubernetes manifests in `deploy/k8s/`.
-
-## Troubleshooting
-
-### Common Issues
-
-1. **MCP Connection Failed**
-   ```bash
-   # Check if Docker services are running
-   docker-compose ps
-
-   # Check MCP server logs
-   docker-compose logs jira-mcp
-   ```
-
-2. **Fireflies API Errors**
-   ```bash
-   # Test API key
-   python -c "from src.integrations.fireflies import FirefliesClient; print(FirefliesClient('your_key').get_recent_meetings(1))"
-   ```
-
-3. **Notification Failures**
-   ```bash
-   # Test notification channels
-   python main.py --test
-   ```
-
-### Logs and Monitoring
-
-```bash
-# View agent logs
-tail -f pm_agent.log
-
-# Database queries
+# View database
 sqlite3 pm_agent.db ".tables"
-sqlite3 pm_agent.db "SELECT * FROM processed_meetings LIMIT 5;"
+sqlite3 pm_agent.db "SELECT * FROM meetings ORDER BY date DESC LIMIT 5;"
 ```
 
-## API Reference
+### Test Integrations
+```bash
+# Test Fireflies connection
+python -c "from src.integrations.fireflies import FirefliesClient; client = FirefliesClient(); print(client.get_recent_meetings(1))"
 
-### Fireflies MCP Endpoints
+# Test Jira connection
+python -c "from src.integrations.jira_mcp import JiraMCPClient; client = JiraMCPClient(); print(client.get_projects())"
+```
 
-- `POST /mcp` with method `fireflies/getRecentMeetings`
-- `POST /mcp` with method `fireflies/getTranscript`
-- `POST /mcp` with method `fireflies/searchMeetings`
+## 🔐 Security Features
 
-### Jira MCP Endpoints
+- JWT-based authentication
+- Google SSO integration
+- User role management
+- API key encryption
+- Secure session handling
+- CORS protection
 
-- Uses standard Atlassian MCP server endpoints
-- Supports ticket creation, updates, and queries
+## 🚀 Deployment
 
-## Contributing
+### Docker Deployment
+```bash
+docker build -t pm-agent .
+docker run -p 4000:4000 -p 4001:4001 --env-file .env pm-agent
+```
+
+### Cloud Deployment (Heroku/Railway/Render)
+1. Set environment variables in cloud platform
+2. Configure database URL
+3. Deploy with Git push
+4. Set up scheduled jobs for automation
+
+### Production Checklist
+- [ ] Configure production database (PostgreSQL recommended)
+- [ ] Set strong JWT secret key
+- [ ] Configure SSL certificates
+- [ ] Set up monitoring (Sentry, DataDog)
+- [ ] Configure backup strategy
+- [ ] Set rate limiting
+- [ ] Configure CDN for frontend
+
+## 🤝 Contributing
 
 1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Create Pull Request
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
 
-## License
+## 🎯 Roadmap
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+- [ ] AI-powered project predictions
+- [ ] Integration with more tools
+- [ ] Custom workflow automation
+- [ ] Real-time collaboration features
 
-## Support
-
-For support and questions:
-- Create an issue in this repository
-- Check the troubleshooting section above
-- Review MCP documentation: https://modelcontextprotocol.io/
+---
+Built with ❤️ by the Syatt team

@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
+from src.utils.prompt_manager import get_prompt_manager
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ class TranscriptAnalyzer:
         """Initialize the analyzer with an LLM."""
         self.llm = llm or self._default_llm()
         self.parser = PydanticOutputParser(pydantic_object=MeetingAnalysis)
+        self.prompt_manager = get_prompt_manager()
 
     @staticmethod
     def _default_llm():
@@ -69,31 +71,30 @@ class TranscriptAnalyzer:
                           meeting_date: datetime = None) -> MeetingAnalysis:
         """Analyze a meeting transcript to extract structured information."""
 
-        system_prompt = """You are an expert meeting analyst. Your job is to analyze meeting transcripts and extract:
-        1. A concise executive summary
-        2. Key decisions that were made
-        3. Clear action items with assignees and deadlines where mentioned
-        4. Any blockers or risks discussed
-        5. Topics that need follow-up discussion
+        # Get prompts from configuration
+        system_prompt_base = self.prompt_manager.get_prompt(
+            'meeting_analysis', 'system_prompt',
+            default="""You are an expert meeting analyst. Extract key information from meeting transcripts."""
+        )
 
-        For action items, be specific and actionable. Include:
-        - Clear title and description
-        - Assignee name if mentioned (otherwise null)
-        - Due date if mentioned (in ISO format YYYY-MM-DD)
-        - Priority based on urgency discussed (High/Medium/Low)
-        - Relevant context from the meeting
-        - Dependencies if any were mentioned
+        # Add format instructions to the system prompt
+        system_prompt = f"{system_prompt_base}\n\n{{format_instructions}}"
 
-        {format_instructions}
-        """
+        # Get the human prompt template
+        human_prompt_template = self.prompt_manager.get_prompt(
+            'meeting_analysis', 'human_prompt_template',
+            default="""Meeting: {meeting_title}\nDate: {meeting_date}\n\nTranscript:\n{transcript}\n\nPlease analyze this meeting transcript and extract structured information."""
+        )
 
-        human_prompt = f"""Meeting: {meeting_title or 'Team Meeting'}
-        Date: {meeting_date.strftime('%Y-%m-%d') if meeting_date else 'Today'}
+        # Get transcript max chars from settings
+        max_chars = self.prompt_manager.get_setting('transcript_max_chars', 8000)
 
-        Transcript:
-        {transcript[:8000]}  # Limit to avoid token limits
-
-        Please analyze this meeting transcript and extract structured information."""
+        # Format the human prompt
+        human_prompt = human_prompt_template.format(
+            meeting_title=meeting_title or 'Team Meeting',
+            meeting_date=meeting_date.strftime('%Y-%m-%d') if meeting_date else 'Today',
+            transcript=transcript[:max_chars]  # Limit to avoid token limits
+        )
 
         messages = [
             SystemMessage(content=system_prompt.format(
@@ -127,15 +128,12 @@ class TranscriptAnalyzer:
     def extract_action_items(self, transcript: str) -> List[ActionItem]:
         """Extract just action items from a transcript."""
 
-        prompt = """Extract all action items from this meeting transcript.
-        Focus on:
-        - Tasks that someone needs to complete
-        - Deadlines mentioned
-        - Assignments to specific people
-        - Follow-up actions
-
-        Return as a JSON array of action items with title, description, assignee, due_date, and priority.
-        """
+        # Get action items prompt from configuration
+        prompt = self.prompt_manager.get_prompt(
+            'meeting_analysis', 'action_items_prompt',
+            default="""Extract all action items from this meeting transcript.
+            Return as a JSON array of action items with title, description, assignee, due_date, and priority."""
+        )
 
         messages = [
             SystemMessage(content=prompt),
@@ -171,16 +169,12 @@ class TranscriptAnalyzer:
     def identify_blockers(self, transcript: str) -> List[str]:
         """Identify blockers and risks from the transcript."""
 
-        prompt = """Identify any blockers, risks, or concerns mentioned in this meeting.
-        Look for:
-        - Dependencies that are blocking progress
-        - Resource constraints
-        - Technical challenges
-        - Timeline concerns
-        - Team capacity issues
-
-        Return as a JSON array of strings describing each blocker/risk.
-        """
+        # Get blockers prompt from configuration
+        prompt = self.prompt_manager.get_prompt(
+            'meeting_analysis', 'blockers_prompt',
+            default="""Identify any blockers, risks, or concerns mentioned in this meeting.
+            Return as a JSON array of strings describing each blocker/risk."""
+        )
 
         messages = [
             SystemMessage(content=prompt),
@@ -197,15 +191,11 @@ class TranscriptAnalyzer:
     def generate_meeting_summary(self, transcript: str, max_length: int = 500) -> str:
         """Generate a concise meeting summary."""
 
-        prompt = f"""Create a concise summary of this meeting in {max_length} characters or less.
-        Include:
-        - Main topics discussed
-        - Key decisions
-        - Important outcomes
-        - Next steps
-
-        Be concise and focus on the most important points.
-        """
+        # Get summary prompt from configuration and format it
+        prompt = self.prompt_manager.format_prompt(
+            'meeting_analysis', 'summary_prompt',
+            max_length=max_length
+        )
 
         messages = [
             SystemMessage(content=prompt),
