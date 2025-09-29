@@ -18,16 +18,7 @@ services:
     source_dir: /
 
     # Build both Python dependencies and React frontend
-    build_command: |
-      pip install -r requirements.txt &&
-      curl -fsSL https://deb.nodesource.com/setup_18.x | bash - &&
-      apt-get update && apt-get install -y nodejs &&
-      which node && node --version &&
-      which npm && npm --version &&
-      cd frontend &&
-      npm install &&
-      npm run build &&
-      cd ..
+    build_command: pip install -r requirements.txt && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && apt-get update && apt-get install -y nodejs && which node && node --version && which npm && npm --version && cd frontend && npm install && npm run build && cd ..
 
     # Run Flask which will serve both API and React static files
     run_command: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
