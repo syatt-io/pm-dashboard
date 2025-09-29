@@ -2978,11 +2978,22 @@ def serve_react(path):
     if path.startswith('api/'):
         return jsonify({'error': 'Not found'}), 404
 
-    # Build directory path
-    react_build_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build')
+    # Try multiple possible build directory paths
+    possible_build_dirs = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build'),  # Local dev
+        os.path.join(os.getcwd(), 'frontend', 'build'),  # Current working directory
+        '/workspace/frontend/build',  # DigitalOcean workspace
+        'frontend/build'  # Relative path
+    ]
+
+    react_build_dir = None
+    for build_dir in possible_build_dirs:
+        if os.path.exists(build_dir):
+            react_build_dir = build_dir
+            break
 
     # In production, serve React build
-    if os.path.exists(react_build_dir):
+    if react_build_dir and os.path.exists(react_build_dir):
         # Try to serve the requested file
         if path != "" and os.path.exists(os.path.join(react_build_dir, path)):
             return send_from_directory(react_build_dir, path)
@@ -2990,8 +3001,14 @@ def serve_react(path):
             # Serve index.html for client-side routing
             return send_from_directory(react_build_dir, 'index.html')
     else:
-        # In development, provide helpful message
-        return jsonify({'message': 'React build not found. In development, run npm start in frontend directory.'}), 404
+        # Debug information for troubleshooting
+        debug_info = {
+            'message': 'React build not found',
+            'cwd': os.getcwd(),
+            'checked_paths': possible_build_dirs,
+            'exists_checks': [os.path.exists(p) for p in possible_build_dirs]
+        }
+        return jsonify(debug_info), 404
 
 
 if __name__ == '__main__':
