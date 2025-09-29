@@ -87,12 +87,12 @@ try:
 except Exception as e:
     logger.error(f"Error creating database tables: {e}")
 
-# Initialize auth service
-auth_service = AuthService(db_session_factory())
+# Initialize auth service with factory, not instance
+auth_service = AuthService(db_session_factory)
 app.auth_service = auth_service
 
 # Register auth blueprint
-auth_blueprint = create_auth_blueprint(db_session_factory())
+auth_blueprint = create_auth_blueprint(db_session_factory)
 app.register_blueprint(auth_blueprint)
 
 # Initialize components

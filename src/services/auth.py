@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 class AuthService:
     """Service for handling authentication and authorization."""
 
-    def __init__(self, db_session: Session):
-        self.db_session = db_session
+    def __init__(self, db_session_factory):
+        self.db_session_factory = db_session_factory
         self.google_client_id = os.getenv('GOOGLE_CLIENT_ID')
         self.jwt_secret = os.getenv('JWT_SECRET_KEY', 'default-secret-key-change-in-production')
         self.jwt_expiry_hours = int(os.getenv('JWT_EXPIRY_HOURS', '24'))
@@ -51,37 +51,43 @@ class AuthService:
 
     def create_or_update_user(self, user_info):
         """Create or update user from Google info."""
-        # First try to find by google_id
-        user = self.db_session.query(User).filter_by(google_id=user_info['google_id']).first()
+        db_session = self.db_session_factory()
+        try:
+            # First try to find by google_id
+            user = db_session.query(User).filter_by(google_id=user_info['google_id']).first()
 
-        # If not found by google_id, try to find by email (for existing users with placeholder google_id)
-        if not user:
-            user = self.db_session.query(User).filter_by(email=user_info['email']).first()
+            # If not found by google_id, try to find by email (for existing users with placeholder google_id)
+            if not user:
+                user = db_session.query(User).filter_by(email=user_info['email']).first()
 
-            # If found by email, update the google_id with the real one from Google
-            if user:
-                logger.info(f"Updating existing user {user_info['email']} with real Google ID")
-                user.google_id = user_info['google_id']
-                user.name = user_info['name']  # Update name in case it changed
+                # If found by email, update the google_id with the real one from Google
+                if user:
+                    logger.info(f"Updating existing user {user_info['email']} with real Google ID")
+                    user.google_id = user_info['google_id']
+                    user.name = user_info['name']  # Update name in case it changed
 
-        if not user:
-            # Truly new user - check if it's the admin
-            role = UserRole.ADMIN if user_info['email'] == self.admin_email else UserRole.NO_ACCESS
+            if not user:
+                # Truly new user - check if it's the admin
+                role = UserRole.ADMIN if user_info['email'] == self.admin_email else UserRole.NO_ACCESS
 
-            user = User(
-                email=user_info['email'],
-                name=user_info['name'],
-                google_id=user_info['google_id'],
-                role=role
-            )
-            self.db_session.add(user)
-            logger.info(f"New user created: {user_info['email']} with role {role.value}")
+                user = User(
+                    email=user_info['email'],
+                    name=user_info['name'],
+                    google_id=user_info['google_id'],
+                    role=role
+                )
+                db_session.add(user)
+                logger.info(f"New user created: {user_info['email']} with role {role.value}")
 
-        # Update last login
-        user.last_login = datetime.utcnow()
-        self.db_session.commit()
+            # Update last login
+            user.last_login = datetime.utcnow()
+            db_session.commit()
 
-        return user
+            # Detach from session
+            db_session.expunge(user)
+            return user
+        finally:
+            db_session.close()
 
     def generate_jwt_token(self, user, remember_me=False):
         """Generate JWT token for authenticated user."""
@@ -110,9 +116,10 @@ class AuthService:
 
     def get_current_user(self, token):
         """Get current user from JWT token."""
+        db_session = self.db_session_factory()
         try:
             payload = self.verify_jwt_token(token)
-            user = self.db_session.query(User).filter_by(id=payload['user_id']).first()
+            user = db_session.query(User).filter_by(id=payload['user_id']).first()
 
             if not user:
                 raise ValueError("User not found")
@@ -120,10 +127,14 @@ class AuthService:
             if not user.can_access():
                 raise ValueError("User access denied")
 
+            # Detach user from session so it can be used across requests
+            db_session.expunge(user)
             return user
         except Exception as e:
             logger.error(f"Failed to get current user: {e}")
             raise
+        finally:
+            db_session.close()
 
 
 def auth_required(f):

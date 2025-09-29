@@ -7,10 +7,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def create_auth_blueprint(db_session: Session):
-    """Create authentication blueprint with database session."""
+def create_auth_blueprint(db_session_factory):
+    """Create authentication blueprint with database session factory."""
     auth_bp = Blueprint('auth', __name__)
-    auth_service = AuthService(db_session)
+    auth_service = AuthService(db_session_factory)
 
     @auth_bp.route('/api/auth/google', methods=['POST'])
     def google_login():
