@@ -1,0 +1,110 @@
+databases:
+- engine: PG
+  name: agentpm-db
+  version: "15"
+ingress:
+  rules:
+  - component:
+      name: backend
+    match:
+      path:
+        prefix: /api
+  - component:
+      name: frontend
+    match:
+      path:
+        prefix: /
+name: agent-pm
+region: nyc
+services:
+- build_command: pip install -r requirements.txt
+  envs:
+  - key: FLASK_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  - key: BACKEND_PORT
+    scope: RUN_AND_BUILD_TIME
+    value: "8080"
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${agentpm-db.DATABASE_URL}
+  - key: JWT_SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:0wLq90yfrcZg5a2Z8jAHscYpa+HwihFH:cA+9j+oW88TL4+uSe0dyBdwbI6nHL4adzyp7ADhO7wPK5vopZXQ2cA==]
+  - key: GOOGLE_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:Ji6LnDtTQ2nPvKf71QwpWIJ/lzNRLvWP:0tdyakcJ3EVzfDOcb74XJwoy0BoXQwfmD9g1prL+5lfKjqOPwA==]
+  - key: FIREFLIES_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:kegRf5b/Z0YYaBntysQkwLIUeFcLm3BQ:hGC2/MtMSOygudE1PHGVoLiee6iZoAidBYrlUxJA+ge2VWBea2M=]
+  - key: OPENAI_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:kEbuZ3ufasB2d1dYQinbJZ6pxnNn1oGv:rmKvr4NEdL3DNbzNHixXqi8SY7ZEWNd5lJ3/qDq3bmwuPgw=]
+  - key: JIRA_URL
+    scope: RUN_AND_BUILD_TIME
+    value: https://your-domain.atlassian.net
+  - key: JIRA_USERNAME
+    scope: RUN_AND_BUILD_TIME
+    value: your-email@example.com
+  - key: JIRA_API_TOKEN
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:iO5FY9/m1JbKQ3jKStvjFUznUt/2bi1h:+PUnF1/8Urh7cOng0UP9uSCAPthQdXmV2wnT/5QtOkF7g2k=]
+  - key: JIRA_PROJECT_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: YOUR_PROJECT
+  - key: SLACK_BOT_TOKEN
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:bLmbKsz+RBioY0/lkljuBBoq3in9U8A7:LseZN1piBZwRIbQgNEDFXgTEpJmkvr5Uv4Mnr1RvNjK/+0BE]
+  - key: SLACK_SIGNING_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:5LVrvulhtFOVr46Dm5SYRwxylbclc3RQ:9zBxbublR+PR8lzhwXA7e9w/NWV9I4eorSRmkKn3T/Y2GMDFaRgsUL0=]
+  - key: SLACK_CHANNEL
+    scope: RUN_AND_BUILD_TIME
+    value: '#your-channel'
+  - key: TEMPO_API_TOKEN
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:9Vbo+9J0+i5H3212d4u1sJkdAxr+mHUy:AXNW6mCx6795wax2UsqPLMeUsutnZwnG6Uk0qfPj97FhKj1r]
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: syatt-io/pm-dashboard
+  health_check:
+    failure_threshold: 3
+    http_path: /api/health
+    initial_delay_seconds: 30
+    period_seconds: 10
+    success_threshold: 1
+    timeout_seconds: 5
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: professional-xs
+  name: backend
+  run_command: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
+  source_dir: /
+- build_command: npm install && npm run build
+  envs:
+  - key: REACT_APP_API_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${backend.PUBLIC_URL}
+  - key: REACT_APP_GOOGLE_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:L071Vn/4zsAYb0ViNXQfzFEIQXitKixv:u9iw0xfRpmqxXs/sQQ4NK4rLwu8rTfPwOGQBPIN97GdN0hVVsA==]
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: syatt-io/pm-dashboard
+  http_port: 3000
+  instance_count: 1
+  instance_size_slug: basic-xs
+  name: frontend
+  run_command: npx serve -s build -l $PORT
+  source_dir: /frontend

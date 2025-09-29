@@ -1,6 +1,6 @@
 """Web-based interface for interactive meeting processing."""
 
-from flask import Flask, render_template, request, jsonify, session, redirect
+from flask import Flask, render_template, request, jsonify, session, redirect, send_from_directory
 from flask_cors import CORS
 import asyncio
 import uuid
@@ -2961,6 +2961,31 @@ def validate_fireflies_api_key_endpoint(user):
             'valid': False,
             'error': 'Failed to validate API key'
         }), 500
+
+
+# Serve React build files in production
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    """Serve React application in production."""
+    # Skip API routes
+    if path.startswith('api/'):
+        return jsonify({'error': 'Not found'}), 404
+
+    # Build directory path
+    react_build_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build')
+
+    # In production, serve React build
+    if os.path.exists(react_build_dir):
+        # Try to serve the requested file
+        if path != "" and os.path.exists(os.path.join(react_build_dir, path)):
+            return send_from_directory(react_build_dir, path)
+        else:
+            # Serve index.html for client-side routing
+            return send_from_directory(react_build_dir, 'index.html')
+    else:
+        # In development, provide helpful message
+        return jsonify({'message': 'React build not found. In development, run npm start in frontend directory.'}), 404
 
 
 if __name__ == '__main__':

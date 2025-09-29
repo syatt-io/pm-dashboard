@@ -5,26 +5,32 @@ region: nyc
 databases:
   - name: agentpm-db
     engine: PG
-    version: "16"
-    production: true
-    cluster_name: agentpm-cluster
+    version: "15"
+    production: false
 
-# Backend API (Flask)
+# Single service for both backend and frontend
 services:
-  - name: backend
+  - name: app
     github:
-      repo: syattsamimi/pm-dashboard
+      repo: syatt-io/pm-dashboard
       branch: main
       deploy_on_push: true
     source_dir: /
-    build_command: pip install -r requirements.txt
+
+    # Build both Python dependencies and React frontend
+    build_command: |
+      pip install -r requirements.txt &&
+      cd frontend &&
+      npm install &&
+      npm run build &&
+      cd ..
+
+    # Run Flask which will serve both API and React static files
     run_command: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
+
     http_port: 8080
     instance_count: 1
     instance_size_slug: professional-xs
-
-    routes:
-      - path: /api
 
     envs:
       # Flask Configuration
@@ -44,6 +50,11 @@ services:
 
       # Google OAuth
       - key: GOOGLE_CLIENT_ID
+        value: YOUR_GOOGLE_CLIENT_ID
+        type: SECRET
+
+      # React App Google Client ID (same value)
+      - key: REACT_APP_GOOGLE_CLIENT_ID
         value: YOUR_GOOGLE_CLIENT_ID
         type: SECRET
 
@@ -90,26 +101,3 @@ services:
       timeout_seconds: 5
       success_threshold: 1
       failure_threshold: 3
-
-  # Frontend (React)
-  - name: frontend
-    github:
-      repo: syattsamimi/pm-dashboard
-      branch: main
-      deploy_on_push: true
-    source_dir: /frontend
-    build_command: npm install && npm run build
-    run_command: npx serve -s build -l $PORT
-    http_port: 3000
-    instance_count: 1
-    instance_size_slug: basic-xs
-
-    envs:
-      - key: REACT_APP_API_URL
-        value: ${backend.PUBLIC_URL}
-      - key: REACT_APP_GOOGLE_CLIENT_ID
-        value: YOUR_GOOGLE_CLIENT_ID
-        type: SECRET
-
-    routes:
-      - path: /
