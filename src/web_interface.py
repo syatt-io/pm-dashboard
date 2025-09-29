@@ -2890,9 +2890,12 @@ def save_fireflies_api_key(user):
 
         # Validate the API key before saving
         try:
-            from src.utils.encryption import validate_fireflies_api_key
+            from .utils.encryption import validate_fireflies_api_key
         except ImportError:
-            from utils.encryption import validate_fireflies_api_key
+            try:
+                from src.utils.encryption import validate_fireflies_api_key
+            except ImportError:
+                from utils.encryption import validate_fireflies_api_key
         if not validate_fireflies_api_key(api_key):
             return jsonify({
                 'success': False,
@@ -2985,9 +2988,12 @@ def validate_fireflies_api_key_endpoint(user):
 
         # Validate the API key
         try:
-            from src.utils.encryption import validate_fireflies_api_key
+            from .utils.encryption import validate_fireflies_api_key
         except ImportError:
-            from utils.encryption import validate_fireflies_api_key
+            try:
+                from src.utils.encryption import validate_fireflies_api_key
+            except ImportError:
+                from utils.encryption import validate_fireflies_api_key
         is_valid = validate_fireflies_api_key(api_key)
 
         return jsonify({
