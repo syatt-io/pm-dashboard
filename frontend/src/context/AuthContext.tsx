@@ -24,7 +24,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Configure axios defaults
-axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+axios.defaults.baseURL = process.env.REACT_APP_API_URL ||
+  (window.location.hostname === 'localhost'
+    ? 'http://localhost:4000'
+    : 'https://agent-pm-tsbbb.ondigitalocean.app');
 axios.defaults.withCredentials = true;
 
 // Add auth token to all requests

@@ -1,7 +1,11 @@
 // @ts-nocheck
 import { fetchUtils } from 'react-admin';
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = process.env.REACT_APP_API_URL
+  ? `${process.env.REACT_APP_API_URL}/api`
+  : (window.location.hostname === 'localhost'
+    ? 'http://localhost:4000/api'
+    : 'https://agent-pm-tsbbb.ondigitalocean.app/api');
 
 const httpClient = (url, options = {}) => {
     // Add auth token if available
