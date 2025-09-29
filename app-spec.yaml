@@ -88,5 +88,5 @@ services:
   instance_count: 1
   instance_size_slug: professional-xs
   name: app
-  run_command: python scripts/create_users_table.py && gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
+  run_command: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
   source_dir: /
