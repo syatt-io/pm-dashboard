@@ -1598,7 +1598,7 @@ def my_projects():
 
 
 @app.route('/api/my-projects/user/<email>', methods=['GET'])
-def get_user_settings(email):
+def get_user_my_projects_settings(email):
     """Get user settings by email."""
     try:
         from main import UserPreference
@@ -2813,6 +2813,15 @@ def health_check():
 def get_user_settings(user):
     """Get current user settings."""
     try:
+        # Refresh user from database to get latest data
+        from sqlalchemy.orm import Session
+
+        # Get the session that the user object is attached to
+        session = Session.object_session(user)
+        if session:
+            session.expire(user)  # Mark user as expired to force refresh
+            session.refresh(user)  # Refresh from database
+
         return jsonify({
             'success': True,
             'data': {

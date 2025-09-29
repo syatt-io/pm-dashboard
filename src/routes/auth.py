@@ -160,7 +160,7 @@ def create_auth_blueprint(db_session: Session):
 
     @auth_bp.route('/api/auth/users', methods=['GET'])
     @admin_required
-    def get_all_users():
+    def get_all_users(current_user):
         """Get all users (admin only)."""
         try:
             from src.models.user import User
@@ -174,7 +174,7 @@ def create_auth_blueprint(db_session: Session):
 
     @auth_bp.route('/api/auth/users/<int:user_id>/role', methods=['PUT'])
     @admin_required
-    def update_user_role(user_id):
+    def update_user_role(current_user, user_id):
         """Update user role (admin only)."""
         try:
             from src.models.user import User
@@ -195,7 +195,7 @@ def create_auth_blueprint(db_session: Session):
                 return jsonify({'error': 'User not found'}), 404
 
             # Prevent self-demotion for admin
-            if user.id == request.current_user.id and role != UserRole.ADMIN:
+            if user.id == current_user.id and role != UserRole.ADMIN:
                 return jsonify({'error': 'Cannot change your own admin role'}), 400
 
             user.role = role
@@ -213,7 +213,7 @@ def create_auth_blueprint(db_session: Session):
 
     @auth_bp.route('/api/auth/users/<int:user_id>/status', methods=['PUT'])
     @admin_required
-    def update_user_status(user_id):
+    def update_user_status(current_user, user_id):
         """Update user active status (admin only)."""
         try:
             from src.models.user import User
@@ -228,7 +228,7 @@ def create_auth_blueprint(db_session: Session):
                 return jsonify({'error': 'User not found'}), 404
 
             # Prevent self-deactivation
-            if user.id == request.current_user.id and not is_active:
+            if user.id == current_user.id and not is_active:
                 return jsonify({'error': 'Cannot deactivate your own account'}), 400
 
             user.is_active = is_active
