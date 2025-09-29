@@ -51,10 +51,18 @@ class AuthService:
 
     def create_or_update_user(self, user_info):
         """Create or update user from Google info."""
+        logger.info(f"Creating/updating user: {user_info.get('email', 'unknown')}")
         db_session = self.db_session_factory()
+        logger.info("Database session created successfully")
         try:
             # First try to find by google_id
-            user = db_session.query(User).filter_by(google_id=user_info['google_id']).first()
+            logger.info(f"Querying for user with google_id: {user_info.get('google_id', 'unknown')}")
+            try:
+                user = db_session.query(User).filter_by(google_id=user_info['google_id']).first()
+                logger.info(f"Query result: {user}")
+            except Exception as query_error:
+                logger.error(f"Database query failed: {query_error}", exc_info=True)
+                raise
 
             # If not found by google_id, try to find by email (for existing users with placeholder google_id)
             if not user:

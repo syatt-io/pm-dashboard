@@ -66,10 +66,13 @@ def create_auth_blueprint(db_session_factory):
             return response
 
         except ValueError as e:
+            logger.error(f"Login failed with ValueError: {e}")
             return jsonify({'error': str(e)}), 400
         except Exception as e:
-            logger.error(f"Login failed: {e}")
-            return jsonify({'error': 'Login failed'}), 500
+            logger.error(f"Login failed with unexpected error: {e}", exc_info=True)
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
     @auth_bp.route('/api/auth/user', methods=['GET'])
     @auth_required
