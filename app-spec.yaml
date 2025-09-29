@@ -1,0 +1,92 @@
+databases:
+- engine: PG
+  name: agentpm-db
+  version: "15"
+ingress:
+  rules:
+  - component:
+      name: app
+    match:
+      path:
+        prefix: /
+name: agent-pm
+region: nyc
+services:
+- build_command: pip install -r requirements.txt && curl -fsSL https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-x64.tar.xz
+    -o node.tar.xz && tar -xf node.tar.xz && export PATH=$PWD/node-v18.19.0-linux-x64/bin:$PATH
+    && pwd && ls -la && test -d frontend && echo "frontend directory exists" || echo
+    "frontend directory missing" && ls -la frontend/ && cd frontend && npm install
+    && npm run build && cd ..
+  envs:
+  - key: FLASK_ENV
+    scope: RUN_AND_BUILD_TIME
+    value: production
+  - key: BACKEND_PORT
+    scope: RUN_AND_BUILD_TIME
+    value: "8080"
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${agentpm-db.DATABASE_URL}
+  - key: JWT_SECRET_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:udHzH3BgMjK6T1kLZIX8KDU/3x5UG9d1:fHgPWoAVZRc87AjoAVjclP9rGENtTdIjxeaV2oFZJFunZlxiIPGN+g==]
+  - key: GOOGLE_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    value: "557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com"
+  - key: REACT_APP_GOOGLE_CLIENT_ID
+    scope: RUN_AND_BUILD_TIME
+    value: "557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com"
+  - key: FIREFLIES_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:0lMLTLHJTaVcFmc7m0864kngQZCwrkqB:CBwh31NeBc0aNtI1Rxw22IevQpLgYZPu0QpDZQoonPCeN1j0R/Y=]
+  - key: OPENAI_API_KEY
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:olHk1aSMHF7kt69Jku/v9DbItDrQ+n7m:6F4Iu1lLmLNIsyha7gDdtieJKpNvIjNFRR/hnkHyl4ILGOk=]
+  - key: JIRA_URL
+    scope: RUN_AND_BUILD_TIME
+    value: https://syatt.atlassian.net
+  - key: JIRA_USERNAME
+    scope: RUN_AND_BUILD_TIME
+    value: mike.samimi@syatt.io
+  - key: JIRA_API_TOKEN
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:oWWYp5GN4JSdCd4T4H6mdWuAvdC/bc8B:ALKHzxxKtkW3yuHFeCbBr5/inZYXk6s+mJz/lzT1X94Me4Y=]
+  - key: JIRA_PROJECT_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: PM
+  - key: SLACK_BOT_TOKEN
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:urk3L/Zxp6+v3/gk3oyNnlOnp/wSuNhp:D66HIGlU0Dcmovfu+D28fP0vn4OA28yRl2omQxSiSH6TCKvm]
+  - key: SLACK_SIGNING_SECRET
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:+x3zHPzoeZeVVaBm78Z8k8NNGqBVMQr5:Jymp+wZOHwY9Vyj9DkFi5NmR9Zrg00ND7z7lO52xOnGosuS7kKfEKQk=]
+  - key: SLACK_CHANNEL
+    scope: RUN_AND_BUILD_TIME
+    value: '#mikes-minion'
+  - key: TEMPO_API_TOKEN
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: EV[1:+yjikIwezrkmC3w+6oSk3IlgasVPVRRx:pwnY9XMKOox5d4q0b83+HDYmWbGI/dHn1C1iVY/b7NeZq/Z7]
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: syatt-io/pm-dashboard
+  health_check:
+    failure_threshold: 3
+    http_path: /api/health
+    initial_delay_seconds: 30
+    period_seconds: 10
+    success_threshold: 1
+    timeout_seconds: 5
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: professional-xs
+  name: app
+  run_command: python scripts/create_users_table.py && gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
+  source_dir: /
