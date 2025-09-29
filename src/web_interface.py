@@ -2969,6 +2969,12 @@ def validate_fireflies_api_key_endpoint(user):
         }), 500
 
 
+# Specific route for my-projects (temporary debug)
+@app.route('/my-projects')
+def my_projects_route():
+    """Handle my-projects route specifically."""
+    return serve_react('my-projects')
+
 # Serve React build files in production
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
