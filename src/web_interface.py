@@ -1587,15 +1587,15 @@ def get_jira_metadata(project_key):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# My Projects Routes
-@app.route('/my-projects')
-def my_projects():
-    """Show My Projects configuration page."""
-    breadcrumbs = [
-        {'title': 'Home', 'url': '/'},
-        {'title': 'My Projects', 'url': '/my-projects'}
-    ]
-    return render_template('my_projects.html', breadcrumbs=breadcrumbs)
+# My Projects Routes - Handled by React app
+# @app.route('/my-projects')
+# def my_projects():
+#     """Show My Projects configuration page."""
+#     breadcrumbs = [
+#         {'title': 'Home', 'url': '/'},
+#         {'title': 'My Projects', 'url': '/my-projects'}
+#     ]
+#     return render_template('my_projects.html', breadcrumbs=breadcrumbs)
 
 
 @app.route('/api/my-projects/user/<email>', methods=['GET'])
