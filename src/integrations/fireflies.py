@@ -192,10 +192,10 @@ class FirefliesClient:
             return response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"Fireflies API request failed: {e}")
-            return {}
+            raise
         except ValueError as e:
             logger.error(f"Failed to parse Fireflies API response: {e}")
-            return {}
+            raise
 
     @staticmethod
     def _format_transcript(sentences: List[Dict[str, Any]]) -> str:

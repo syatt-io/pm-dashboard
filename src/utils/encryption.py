@@ -105,7 +105,21 @@ def validate_fireflies_api_key(api_key: str) -> bool:
         return False
 
     try:
-        from integrations.fireflies import FirefliesClient
+        # Try different import paths to handle both local and production environments
+        try:
+            from src.integrations.fireflies import FirefliesClient
+        except ImportError:
+            try:
+                from integrations.fireflies import FirefliesClient
+            except ImportError:
+                # Add current directory to path if needed
+                import sys
+                import os
+                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                if current_dir not in sys.path:
+                    sys.path.insert(0, current_dir)
+                from integrations.fireflies import FirefliesClient
+
         client = FirefliesClient(api_key.strip())
 
         # Try to fetch recent meetings (with a small limit)
@@ -113,6 +127,9 @@ def validate_fireflies_api_key(api_key: str) -> bool:
 
         # If we get here without exception, the key is valid
         return True
+    except ImportError as e:
+        logger.error(f"Failed to import FirefliesClient: {e}")
+        return False
     except Exception as e:
         logger.info(f"API key validation failed: {e}")
         return False

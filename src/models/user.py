@@ -129,7 +129,11 @@ class User(Base):
             return False
 
         try:
-            from utils.encryption import validate_fireflies_api_key
+            # Try different import paths to handle both local and production environments
+            try:
+                from src.utils.encryption import validate_fireflies_api_key
+            except ImportError:
+                from utils.encryption import validate_fireflies_api_key
             return validate_fireflies_api_key(api_key)
         except Exception as e:
             logger.error(f"Failed to validate API key for user {self.id}: {e}")
