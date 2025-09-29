@@ -28,6 +28,7 @@ from src.services.auth import AuthService, auth_required, admin_required
 from src.routes.auth import create_auth_blueprint
 from src.models.user import UserWatchedProject
 from sqlalchemy import create_engine, text
+from main import TodoItem
 from sqlalchemy.orm import sessionmaker
 
 
@@ -521,7 +522,6 @@ def todo_dashboard():
 def get_todos(user):
     """Get all TODO items for React Admin."""
     try:
-        from main import TodoItem
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
@@ -600,7 +600,6 @@ def create_todo(user):
         data = request.json
 
         # Import here to avoid circular imports
-        from main import TodoItem
         from datetime import datetime
         import uuid
 
@@ -776,7 +775,6 @@ def delete_todo_api(user, todo_id):
 def edit_todo_page(todo_id):
     """Show edit page for a TODO item."""
     try:
-        from main import TodoItem
         todo = todo_manager.session.query(TodoItem).filter_by(id=todo_id).first()
         if not todo:
             return render_template('error.html', error="TODO not found")
@@ -2449,7 +2447,6 @@ async def _execute_decisions(decisions, analysis):
 
                 elif decision['destination'] == 'todo':
                     # Create TODO item in database
-                    from main import TodoItem
                     import uuid
 
                     todo = TodoItem(
