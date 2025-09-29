@@ -1,9 +1,12 @@
 """User model and authentication-related models."""
-from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean, ForeignKey, UniqueConstraint, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
+import logging
+
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -28,6 +31,7 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime)
     is_active = Column(Boolean, default=True)
+    fireflies_api_key_encrypted = Column(Text, nullable=True)
 
     # Relationships
     # todos = relationship("TodoItem", back_populates="user", cascade="all, delete-orphan")
@@ -43,7 +47,8 @@ class User(Base):
             'role': self.role.value,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
-            'is_active': self.is_active
+            'is_active': self.is_active,
+            'has_fireflies_key': self.has_fireflies_api_key()
         }
 
     def has_role(self, role):
@@ -59,6 +64,54 @@ class User(Base):
     def can_access(self):
         """Check if user can access the system."""
         return self.role != UserRole.NO_ACCESS and self.is_active
+
+    def has_fireflies_api_key(self):
+        """Check if user has configured a Fireflies API key."""
+        return bool(self.fireflies_api_key_encrypted)
+
+    def set_fireflies_api_key(self, api_key: str):
+        """Set and encrypt the user's Fireflies API key."""
+        if not api_key or not api_key.strip():
+            self.fireflies_api_key_encrypted = None
+            return
+
+        try:
+            from utils.encryption import encrypt_api_key
+            self.fireflies_api_key_encrypted = encrypt_api_key(api_key.strip())
+            logger.info(f"Fireflies API key set for user {self.id}")
+        except Exception as e:
+            logger.error(f"Failed to encrypt API key for user {self.id}: {e}")
+            raise
+
+    def get_fireflies_api_key(self) -> str:
+        """Get and decrypt the user's Fireflies API key."""
+        if not self.fireflies_api_key_encrypted:
+            return ""
+
+        try:
+            from utils.encryption import decrypt_api_key
+            return decrypt_api_key(self.fireflies_api_key_encrypted)
+        except Exception as e:
+            logger.error(f"Failed to decrypt API key for user {self.id}: {e}")
+            return ""
+
+    def clear_fireflies_api_key(self):
+        """Clear the user's Fireflies API key."""
+        self.fireflies_api_key_encrypted = None
+        logger.info(f"Fireflies API key cleared for user {self.id}")
+
+    def validate_fireflies_api_key(self) -> bool:
+        """Validate the user's current Fireflies API key."""
+        api_key = self.get_fireflies_api_key()
+        if not api_key:
+            return False
+
+        try:
+            from utils.encryption import validate_fireflies_api_key
+            return validate_fireflies_api_key(api_key)
+        except Exception as e:
+            logger.error(f"Failed to validate API key for user {self.id}: {e}")
+            return False
 
 
 class UserWatchedProject(Base):

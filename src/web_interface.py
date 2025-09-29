@@ -1029,10 +1029,38 @@ def get_meetings(user):
         date_range = request.args.get('date_range', '7')  # Default to 7 days
         projects = request.args.get('projects', '')  # Comma-separated project keys
 
-        logger.info(f"Fetching live meetings - date_range={date_range}, projects={projects}")
+        logger.info(f"Fetching live meetings for user {user.id} - date_range={date_range}, projects={projects}")
 
-        # Initialize Fireflies client
-        fireflies_client = FirefliesClient(settings.fireflies.api_key)
+        # Check if user has configured their own Fireflies API key
+        user_api_key = user.get_fireflies_api_key()
+
+        if not user_api_key:
+            # User hasn't configured their API key
+            logger.info(f"User {user.id} has no Fireflies API key configured")
+            return jsonify({
+                'data': [],
+                'total': 0,
+                'page': page,
+                'perPage': per_page,
+                'totalPages': 0,
+                'error': 'no_api_key',
+                'message': 'Please configure your Fireflies API key in Settings to view meetings.'
+            })
+
+        # Initialize Fireflies client with user's API key
+        try:
+            fireflies_client = FirefliesClient(user_api_key)
+        except Exception as e:
+            logger.error(f"Failed to initialize Fireflies client for user {user.id}: {e}")
+            return jsonify({
+                'data': [],
+                'total': 0,
+                'page': page,
+                'perPage': per_page,
+                'totalPages': 0,
+                'error': 'invalid_api_key',
+                'message': 'Invalid Fireflies API key. Please check your Settings.'
+            }), 400
 
         # Fetch live meetings from Fireflies
         if date_range == 'all':
@@ -1043,8 +1071,21 @@ def get_meetings(user):
             except ValueError:
                 days_back = 7
 
-        live_meetings = fireflies_client.get_recent_meetings(days_back=days_back, limit=200)
-        logger.info(f"Fetched {len(live_meetings)} meetings from Fireflies")
+        # Fetch live meetings from Fireflies with error handling
+        try:
+            live_meetings = fireflies_client.get_recent_meetings(days_back=days_back, limit=200)
+            logger.info(f"Fetched {len(live_meetings)} meetings from Fireflies for user {user.id}")
+        except Exception as e:
+            logger.error(f"Failed to fetch meetings from Fireflies for user {user.id}: {e}")
+            return jsonify({
+                'data': [],
+                'total': 0,
+                'page': page,
+                'perPage': per_page,
+                'totalPages': 0,
+                'error': 'fireflies_error',
+                'message': 'Failed to fetch meetings from Fireflies. Please check your API key and try again.'
+            }), 500
 
         # Get cached analysis data for overlay
         from main import ProcessedMeeting
@@ -1193,11 +1234,24 @@ def get_meeting_detail(user, meeting_id):
         Session = sessionmaker(bind=engine)
         db_session = Session()
 
-        # Initialize Fireflies client
-        if not settings.fireflies.api_key:
-            return jsonify({'error': 'Fireflies API key not configured'}), 500
+        # Check if user has configured their own Fireflies API key
+        user_api_key = user.get_fireflies_api_key()
 
-        fireflies_client = FirefliesClient(api_key=settings.fireflies.api_key)
+        if not user_api_key:
+            return jsonify({
+                'error': 'no_api_key',
+                'message': 'Please configure your Fireflies API key in Settings to view meeting details.'
+            }), 400
+
+        # Initialize Fireflies client with user's API key
+        try:
+            fireflies_client = FirefliesClient(api_key=user_api_key)
+        except Exception as e:
+            logger.error(f"Failed to initialize Fireflies client for user {user.id}: {e}")
+            return jsonify({
+                'error': 'invalid_api_key',
+                'message': 'Invalid Fireflies API key. Please check your Settings.'
+            }), 400
 
         # Get the meeting transcript from Fireflies
         transcript = fireflies_client.get_meeting_transcript(meeting_id)
@@ -1250,7 +1304,8 @@ def get_meeting_detail(user, meeting_id):
 
 
 @app.route("/api/meetings/<meeting_id>/analyze", methods=["POST"])
-def analyze_meeting_api(meeting_id):
+@auth_required
+def analyze_meeting_api(user, meeting_id):
     """Trigger analysis for a specific meeting via API."""
     try:
         # Initialize database
@@ -1262,8 +1317,29 @@ def analyze_meeting_api(meeting_id):
         Session = sessionmaker(bind=engine)
         db_session = Session()
 
-        # Get meeting transcript using global fireflies client
-        transcript = fireflies.get_meeting_transcript(meeting_id)
+        # Check if user has configured their own Fireflies API key
+        user_api_key = user.get_fireflies_api_key()
+
+        if not user_api_key:
+            db_session.close()
+            return jsonify({
+                'error': 'no_api_key',
+                'message': 'Please configure your Fireflies API key in Settings to analyze meetings.'
+            }), 400
+
+        # Initialize Fireflies client with user's API key
+        try:
+            user_fireflies_client = FirefliesClient(api_key=user_api_key)
+        except Exception as e:
+            logger.error(f"Failed to initialize Fireflies client for user {user.id}: {e}")
+            db_session.close()
+            return jsonify({
+                'error': 'invalid_api_key',
+                'message': 'Invalid Fireflies API key. Please check your Settings.'
+            }), 400
+
+        # Get meeting transcript using user's API key
+        transcript = user_fireflies_client.get_meeting_transcript(meeting_id)
         if not transcript:
             db_session.close()
             return jsonify({'error': 'Meeting not found'}), 404
@@ -2725,6 +2801,156 @@ def health_check():
         return jsonify({
             'status': 'unhealthy',
             'error': str(e)
+        }), 500
+
+
+# =============================================================================
+# User Settings API Endpoints
+# =============================================================================
+
+@app.route("/api/user/settings", methods=["GET"])
+@auth_required
+def get_user_settings(user):
+    """Get current user settings."""
+    try:
+        return jsonify({
+            'success': True,
+            'data': {
+                'user': user.to_dict(),
+                'settings': {
+                    'has_fireflies_key': user.has_fireflies_api_key(),
+                    'fireflies_key_valid': user.validate_fireflies_api_key() if user.has_fireflies_api_key() else False
+                }
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting user settings for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route("/api/user/fireflies-key", methods=["POST"])
+@auth_required
+def save_fireflies_api_key(user):
+    """Save or update user's Fireflies API key."""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'API key is required'
+            }), 400
+
+        # Validate the API key before saving
+        from utils.encryption import validate_fireflies_api_key
+        if not validate_fireflies_api_key(api_key):
+            return jsonify({
+                'success': False,
+                'error': 'Invalid Fireflies API key. Please check the key and try again.'
+            }), 400
+
+        # Save the encrypted API key
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        engine = create_engine(settings.agent.database_url)
+        Session = sessionmaker(bind=engine)
+        db_session = Session()
+
+        try:
+            # Refresh user object from database
+            db_user = db_session.merge(user)
+            db_user.set_fireflies_api_key(api_key)
+            db_session.commit()
+
+            logger.info(f"Fireflies API key saved for user {user.id}")
+            return jsonify({
+                'success': True,
+                'message': 'Fireflies API key saved successfully'
+            })
+
+        except Exception as e:
+            db_session.rollback()
+            raise e
+        finally:
+            db_session.close()
+
+    except Exception as e:
+        logger.error(f"Error saving Fireflies API key for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route("/api/user/fireflies-key", methods=["DELETE"])
+@auth_required
+def delete_fireflies_api_key(user):
+    """Delete user's Fireflies API key."""
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        engine = create_engine(settings.agent.database_url)
+        Session = sessionmaker(bind=engine)
+        db_session = Session()
+
+        try:
+            # Refresh user object from database
+            db_user = db_session.merge(user)
+            db_user.clear_fireflies_api_key()
+            db_session.commit()
+
+            logger.info(f"Fireflies API key deleted for user {user.id}")
+            return jsonify({
+                'success': True,
+                'message': 'Fireflies API key deleted successfully'
+            })
+
+        except Exception as e:
+            db_session.rollback()
+            raise e
+        finally:
+            db_session.close()
+
+    except Exception as e:
+        logger.error(f"Error deleting Fireflies API key for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route("/api/user/fireflies-key/validate", methods=["POST"])
+@auth_required
+def validate_fireflies_api_key_endpoint(user):
+    """Validate a Fireflies API key without saving it."""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+
+        if not api_key:
+            return jsonify({
+                'valid': False,
+                'error': 'API key is required'
+            }), 400
+
+        # Validate the API key
+        from utils.encryption import validate_fireflies_api_key
+        is_valid = validate_fireflies_api_key(api_key)
+
+        return jsonify({
+            'valid': is_valid,
+            'message': 'API key is valid' if is_valid else 'API key is invalid'
+        })
+
+    except Exception as e:
+        logger.error(f"Error validating Fireflies API key: {e}")
+        return jsonify({
+            'valid': False,
+            'error': 'Failed to validate API key'
         }), 500
 
 
