@@ -98,7 +98,14 @@ class User(Base):
             return
 
         try:
-            from utils.encryption import encrypt_api_key
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import encrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import encrypt_api_key
+                except ImportError:
+                    from utils.encryption import encrypt_api_key
             self.fireflies_api_key_encrypted = encrypt_api_key(api_key.strip())
             logger.info(f"Fireflies API key set for user {self.id}")
         except Exception as e:
@@ -111,7 +118,14 @@ class User(Base):
             return ""
 
         try:
-            from utils.encryption import decrypt_api_key
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import decrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import decrypt_api_key
+                except ImportError:
+                    from utils.encryption import decrypt_api_key
             return decrypt_api_key(self.fireflies_api_key_encrypted)
         except Exception as e:
             logger.error(f"Failed to decrypt API key for user {self.id}: {e}")
@@ -131,9 +145,12 @@ class User(Base):
         try:
             # Try different import paths to handle both local and production environments
             try:
-                from src.utils.encryption import validate_fireflies_api_key
+                from ..utils.encryption import validate_fireflies_api_key
             except ImportError:
-                from utils.encryption import validate_fireflies_api_key
+                try:
+                    from src.utils.encryption import validate_fireflies_api_key
+                except ImportError:
+                    from utils.encryption import validate_fireflies_api_key
             return validate_fireflies_api_key(api_key)
         except Exception as e:
             logger.error(f"Failed to validate API key for user {self.id}: {e}")
