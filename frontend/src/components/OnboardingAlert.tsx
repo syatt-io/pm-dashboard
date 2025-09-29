@@ -32,7 +32,7 @@ const OnboardingAlert: React.FC<OnboardingAlertProps> = ({ onDismiss }) => {
 
   const checkUserSettings = async () => {
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
       const response = await fetch(`${API_BASE_URL}/api/user/settings`, {
         credentials: 'include',
       });

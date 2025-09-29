@@ -86,12 +86,35 @@ db_session_factory = sessionmaker(bind=database_engine)
 
 # Create tables if they don't exist
 try:
-    from src.models.user import Base
+    from src.models.user import Base, User
+    from src.models import ProcessedMeeting, TodoItem
     Base.metadata.create_all(database_engine)
     logger.info("Database tables created/verified")
 except Exception as e:
     logger.warning(f"Could not create database tables (may already exist or lack permissions): {e}")
-    # Continue anyway - tables may already exist
+    # Try to create just the users table if it doesn't exist
+    try:
+        database_engine.execute("SELECT 1 FROM users LIMIT 1")
+    except:
+        try:
+            # Create users table with raw SQL as a fallback
+            database_engine.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    name VARCHAR(255),
+                    google_id VARCHAR(255) UNIQUE,
+                    role VARCHAR(50) DEFAULT 'member',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_login TIMESTAMP,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    fireflies_api_key_encrypted TEXT
+                )
+            """)
+            logger.info("Created users table with raw SQL")
+        except Exception as create_error:
+            logger.error(f"Failed to create users table: {create_error}")
 
 # Initialize auth service with factory, not instance
 auth_service = AuthService(db_session_factory)

@@ -75,7 +75,7 @@ export const Settings = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
       const response = await fetch(`${API_BASE_URL}/api/user/settings`, {
         credentials: 'include',
       });
@@ -117,7 +117,7 @@ export const Settings = () => {
       setValidating(true);
       setValidationResult(null);
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
       const response = await fetch(`${API_BASE_URL}/api/user/fireflies-key/validate`, {
         method: 'POST',
         headers: {
@@ -161,7 +161,7 @@ export const Settings = () => {
     try {
       setSaving(true);
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
       const response = await fetch(`${API_BASE_URL}/api/user/fireflies-key`, {
         method: 'POST',
         headers: {
@@ -193,7 +193,7 @@ export const Settings = () => {
     try {
       setDeleting(true);
 
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
       const response = await fetch(`${API_BASE_URL}/api/user/fireflies-key`, {
         method: 'DELETE',
         credentials: 'include',

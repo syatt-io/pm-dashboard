@@ -96,7 +96,7 @@ export const LearningsList = (props: ListProps) => {
     const fetchStats = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch('http://localhost:4000/api/learnings/stats', {
+            const response = await fetch('' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '/api/learnings/stats', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
