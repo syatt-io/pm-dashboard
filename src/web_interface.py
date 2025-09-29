@@ -2980,9 +2980,9 @@ def serve_react(path):
 
     # Try multiple possible build directory paths
     possible_build_dirs = [
+        '/workspace/frontend/build',  # DigitalOcean workspace (production)
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build'),  # Local dev
         os.path.join(os.getcwd(), 'frontend', 'build'),  # Current working directory
-        '/workspace/frontend/build',  # DigitalOcean workspace
         'frontend/build'  # Relative path
     ]
 
