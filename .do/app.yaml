@@ -18,12 +18,7 @@ services:
     source_dir: /
 
     # Build both Python dependencies and React frontend
-    build_command: |
-      pip install -r requirements.txt &&
-      cd frontend &&
-      npm install &&
-      npm run build &&
-      cd ..
+    build_command: pip install -r requirements.txt && cd frontend && npm install && npm run build && cd ..
 
     # Run Flask which will serve both API and React static files
     run_command: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
