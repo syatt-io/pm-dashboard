@@ -23,6 +23,9 @@ services:
     instance_count: 1
     instance_size_slug: professional-xs
 
+    routes:
+      - path: /api
+
     envs:
       # Flask Configuration
       - key: FLASK_ENV
