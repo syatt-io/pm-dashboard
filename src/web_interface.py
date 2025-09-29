@@ -3006,6 +3006,66 @@ def my_projects_route():
     """Handle my-projects route specifically."""
     return serve_react('my-projects')
 
+# Emergency route to create users table
+@app.route('/api/admin/create-users-table', methods=['POST', 'GET'])
+def create_users_table_endpoint():
+    """Create users table in the database - emergency endpoint."""
+    try:
+        with database_engine.connect() as conn:
+            trans = conn.begin()
+            try:
+                # Create enum type first
+                conn.execute(text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userrole') THEN
+                            CREATE TYPE userrole AS ENUM ('NO_ACCESS', 'MEMBER', 'ADMIN');
+                        END IF;
+                    END$$;
+                """))
+
+                # Create users table
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id SERIAL PRIMARY KEY,
+                        email VARCHAR(255) UNIQUE NOT NULL,
+                        name VARCHAR(255),
+                        google_id VARCHAR(255) UNIQUE,
+                        role userrole DEFAULT 'MEMBER',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_login TIMESTAMP,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        fireflies_api_key_encrypted TEXT
+                    );
+                """))
+
+                trans.commit()
+
+                # Verify table exists
+                result = conn.execute(text("SELECT COUNT(*) FROM users"))
+                count = result.scalar()
+
+                return jsonify({
+                    'success': True,
+                    'message': 'Users table created successfully',
+                    'table_exists': True,
+                    'row_count': count
+                })
+
+            except Exception as e:
+                trans.rollback()
+                return jsonify({
+                    'success': False,
+                    'error': f'Failed to create table: {str(e)}'
+                }), 500
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Database connection failed: {str(e)}'
+        }), 500
+
 # Serve React build files in production
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
