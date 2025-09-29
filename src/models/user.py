@@ -40,11 +40,17 @@ class User(Base):
 
     def to_dict(self):
         """Convert user to dictionary."""
+        # Get role value safely - use cached value if available (for detached objects)
+        role_value = getattr(self, '_role_value', None)
+        if role_value is None:
+            # Fallback to accessing the role relationship
+            role_value = self.role.value if self.role else 'NO_ACCESS'
+
         return {
             'id': self.id,
             'email': self.email,
             'name': self.name,
-            'role': self.role.value,
+            'role': role_value,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'is_active': self.is_active,
@@ -55,15 +61,31 @@ class User(Base):
         """Check if user has a specific role."""
         if isinstance(role, str):
             role = UserRole[role.upper()]
-        return self.role == role
+
+        # Get current role safely
+        current_role = self._get_role()
+        return current_role == role
 
     def is_admin(self):
         """Check if user is admin."""
-        return self.role == UserRole.ADMIN
+        current_role = self._get_role()
+        return current_role == UserRole.ADMIN
 
     def can_access(self):
         """Check if user can access the system."""
-        return self.role != UserRole.NO_ACCESS and self.is_active
+        current_role = self._get_role()
+        return current_role != UserRole.NO_ACCESS and self.is_active
+
+    def _get_role(self):
+        """Get role safely, handling detached objects."""
+        # Get role value safely - use cached value if available (for detached objects)
+        role_value = getattr(self, '_role_value', None)
+        if role_value is not None:
+            # Convert string back to enum
+            return UserRole(role_value)
+        else:
+            # Fallback to accessing the role relationship
+            return self.role if self.role else UserRole.NO_ACCESS
 
     def has_fireflies_api_key(self):
         """Check if user has configured a Fireflies API key."""

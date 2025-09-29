@@ -91,8 +91,14 @@ class AuthService:
             user.last_login = datetime.utcnow()
             db_session.commit()
 
+            # Make sure we have the role value before detaching
+            user_role_value = user.role.value if user.role else None
+
             # Detach from session
             db_session.expunge(user)
+
+            # Restore the role value as a simple attribute
+            user._role_value = user_role_value
             return user
         finally:
             db_session.close()
@@ -102,10 +108,16 @@ class AuthService:
         # Extend expiry if remember_me is True
         expiry_hours = self.jwt_expiry_hours * 7 if remember_me else self.jwt_expiry_hours
 
+        # Get role value safely - use cached value if available
+        role_value = getattr(user, '_role_value', None)
+        if role_value is None:
+            # Fallback to accessing the role relationship
+            role_value = user.role.value if user.role else 'NO_ACCESS'
+
         payload = {
             'user_id': user.id,
             'email': user.email,
-            'role': user.role.value,
+            'role': role_value,
             'exp': datetime.utcnow() + timedelta(hours=expiry_hours),
             'iat': datetime.utcnow()
         }
@@ -135,8 +147,14 @@ class AuthService:
             if not user.can_access():
                 raise ValueError("User access denied")
 
+            # Make sure we have the role value before detaching
+            user_role_value = user.role.value if user.role else None
+
             # Detach user from session so it can be used across requests
             db_session.expunge(user)
+
+            # Restore the role value as a simple attribute
+            user._role_value = user_role_value
             return user
         except Exception as e:
             logger.error(f"Failed to get current user: {e}")
