@@ -27,9 +27,9 @@ from src.services.scheduler import get_scheduler, start_scheduler, stop_schedule
 from src.services.auth import AuthService, auth_required, admin_required
 from src.routes.auth import create_auth_blueprint
 from src.models.user import UserWatchedProject
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from main import TodoItem
-from sqlalchemy.orm import sessionmaker
+from src.utils.database import get_engine, get_session_factory, get_session, close_session, init_database
 
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,7 @@ logger = logging.getLogger(__name__)
 def get_project_keywords_from_db():
     """Load project keywords from database as a dictionary."""
     try:
-        from sqlalchemy import create_engine, text
-        engine = create_engine(settings.agent.database_url)
+        engine = get_engine()
 
         project_keywords = {}
         with engine.connect() as conn:
@@ -82,48 +81,11 @@ CORS(app, origins=cors_origins, supports_credentials=True,
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 # Set up database and auth
-database_engine = create_engine(settings.agent.database_url)
-db_session_factory = sessionmaker(bind=database_engine)
+# Initialize database once at startup
+init_database()
 
-# Create tables if they don't exist
-try:
-    from src.models.user import Base, User
-    from src.models import ProcessedMeeting, TodoItem
-    Base.metadata.create_all(database_engine)
-    logger.info("Database tables created/verified using SQLAlchemy")
-except Exception as e:
-    logger.warning(f"SQLAlchemy table creation failed: {e}")
-
-# Always try to ensure users table exists with raw SQL
-try:
-    with database_engine.connect() as conn:
-        # PostgreSQL-specific table creation with proper transaction handling
-        trans = conn.begin()
-        try:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    email VARCHAR(255) UNIQUE NOT NULL,
-                    name VARCHAR(255),
-                    google_id VARCHAR(255) UNIQUE,
-                    role VARCHAR(50) DEFAULT 'member',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    last_login TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE,
-                    fireflies_api_key_encrypted TEXT
-                )
-            """))
-            trans.commit()
-            logger.info("Ensured users table exists with raw SQL")
-        except Exception as e:
-            trans.rollback()
-            logger.error(f"Failed to create users table: {e}")
-            raise
-except Exception as e:
-    logger.error(f"Critical: Could not ensure users table exists: {e}")
-    # Don't fail startup, but log the error
-    pass
+# Get session factory for auth services
+db_session_factory = get_session_factory()
 
 # Initialize auth service with factory, not instance
 auth_service = AuthService(db_session_factory)
@@ -156,8 +118,7 @@ if settings.notifications.slack_bot_token:
 def run_database_migrations():
     """Run any necessary database migrations."""
     try:
-        from sqlalchemy import create_engine, text
-        engine = create_engine(settings.agent.database_url)
+        engine = get_engine()
 
         with engine.connect() as conn:
             # Check if we need to migrate slack_user_id to slack_username

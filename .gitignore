@@ -109,3 +109,8 @@ jspm_packages/
 
 # Yarn Integrity file
 .yarn-integrity
+
+# DigitalOcean App Platform
+app.yaml
+do-app-spec.yaml
+app-spec.yaml
