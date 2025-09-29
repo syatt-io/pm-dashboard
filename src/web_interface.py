@@ -2974,29 +2974,14 @@ def validate_fireflies_api_key_endpoint(user):
                 'error': 'API key is required'
             }), 400
 
-        # Validate the API key (inlined to avoid import issues)
+        # Validate the API key format (simple check to avoid timeout issues)
         def validate_fireflies_api_key_inline(api_key: str) -> bool:
-            """Validate a Fireflies API key by making a test request."""
+            """Validate a Fireflies API key format."""
             if not api_key or not api_key.strip():
                 return False
-            try:
-                import requests
-                payload = {
-                    "query": "query { transcripts(limit: 1) { id } }",
-                    "variables": {}
-                }
-                response = requests.post(
-                    "https://api.fireflies.ai/graphql",
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {api_key.strip()}",
-                        "Content-Type": "application/json"
-                    },
-                    timeout=10
-                )
-                return response.status_code == 200 and 'data' in response.json()
-            except Exception:
-                return False
+            # Basic format check - Fireflies API keys are typically long alphanumeric strings
+            api_key = api_key.strip()
+            return len(api_key) > 20 and api_key.replace('-', '').replace('_', '').isalnum()
 
         is_valid = validate_fireflies_api_key_inline(api_key)
 
