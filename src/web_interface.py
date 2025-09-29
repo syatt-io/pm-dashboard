@@ -2900,7 +2900,43 @@ def save_fireflies_api_key(user):
         try:
             # Refresh user object from database
             db_user = db_session.merge(user)
-            db_user.set_fireflies_api_key(api_key)
+
+            # Inline encryption to avoid import issues
+            def encrypt_api_key_inline(api_key: str) -> str:
+                """Encrypt an API key for database storage."""
+                import os
+                import base64
+                from cryptography.fernet import Fernet
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+                # Get encryption key from environment
+                encryption_key = os.getenv('ENCRYPTION_KEY')
+                if not encryption_key:
+                    # Generate a temporary key (not recommended for production)
+                    encryption_key = Fernet.generate_key().decode()
+
+                # If the key is a password/phrase, derive a proper key
+                if len(encryption_key) != 44 or not encryption_key.endswith('='):
+                    # Derive key from password using PBKDF2
+                    salt = b'syatt_pm_agent_salt_v1'  # Static salt for consistency
+                    kdf = PBKDF2HMAC(
+                        algorithm=hashes.SHA256(),
+                        length=32,
+                        salt=salt,
+                        iterations=100000,
+                    )
+                    key = base64.urlsafe_b64encode(kdf.derive(encryption_key.encode()))
+                else:
+                    # Use the key directly (it's already a Fernet key)
+                    key = encryption_key.encode()
+
+                fernet = Fernet(key)
+                encrypted_bytes = fernet.encrypt(api_key.encode())
+                return base64.urlsafe_b64encode(encrypted_bytes).decode()
+
+            # Set encrypted API key directly
+            db_user.fireflies_api_key_encrypted = encrypt_api_key_inline(api_key) if api_key.strip() else None
             db_session.commit()
 
             logger.info(f"Fireflies API key saved for user {user.id}")
