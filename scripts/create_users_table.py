@@ -27,12 +27,43 @@ def create_tables():
     engine = create_engine(database_url)
 
     print("Creating tables...")
+
+    # Try SQLAlchemy first
     try:
         Base.metadata.create_all(engine)
-        print("Tables created successfully!")
+        print("Tables created successfully with SQLAlchemy!")
     except Exception as e:
-        print(f"Error creating tables: {e}")
-        sys.exit(1)
+        print(f"SQLAlchemy failed: {e}")
+        print("Trying raw SQL...")
+
+        # Fallback to raw SQL
+        try:
+            with engine.connect() as conn:
+                trans = conn.begin()
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS users (
+                            id SERIAL PRIMARY KEY,
+                            email VARCHAR(255) UNIQUE NOT NULL,
+                            name VARCHAR(255),
+                            google_id VARCHAR(255) UNIQUE,
+                            role VARCHAR(50) DEFAULT 'member',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            last_login TIMESTAMP,
+                            is_active BOOLEAN DEFAULT TRUE,
+                            fireflies_api_key_encrypted TEXT
+                        )
+                    """))
+                    trans.commit()
+                    print("Users table created successfully with raw SQL!")
+                except Exception as e:
+                    trans.rollback()
+                    print(f"Failed to create users table: {e}")
+                    raise
+        except Exception as e:
+            print(f"Error creating tables with raw SQL: {e}")
+            sys.exit(1)
 
 if __name__ == "__main__":
     create_tables()

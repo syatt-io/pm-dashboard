@@ -89,36 +89,40 @@ try:
     from src.models.user import Base, User
     from src.models import ProcessedMeeting, TodoItem
     Base.metadata.create_all(database_engine)
-    logger.info("Database tables created/verified")
+    logger.info("Database tables created/verified using SQLAlchemy")
 except Exception as e:
-    logger.warning(f"Could not create database tables (may already exist or lack permissions): {e}")
-    # Try to create just the users table if it doesn't exist
-    try:
-        with database_engine.connect() as conn:
-            result = conn.execute(text("SELECT 1 FROM users LIMIT 1"))
-            result.close()
-    except:
+    logger.warning(f"SQLAlchemy table creation failed: {e}")
+
+# Always try to ensure users table exists with raw SQL
+try:
+    with database_engine.connect() as conn:
+        # PostgreSQL-specific table creation with proper transaction handling
+        trans = conn.begin()
         try:
-            # Create users table with raw SQL as a fallback
-            with database_engine.connect() as conn:
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        id SERIAL PRIMARY KEY,
-                        email VARCHAR(255) UNIQUE NOT NULL,
-                        name VARCHAR(255),
-                        google_id VARCHAR(255) UNIQUE,
-                        role VARCHAR(50) DEFAULT 'member',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        last_login TIMESTAMP,
-                        is_active BOOLEAN DEFAULT TRUE,
-                        fireflies_api_key_encrypted TEXT
-                    )
-                """))
-                conn.commit()
-            logger.info("Created users table with raw SQL")
-        except Exception as create_error:
-            logger.error(f"Failed to create users table: {create_error}")
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(255) UNIQUE NOT NULL,
+                    name VARCHAR(255),
+                    google_id VARCHAR(255) UNIQUE,
+                    role VARCHAR(50) DEFAULT 'member',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_login TIMESTAMP,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    fireflies_api_key_encrypted TEXT
+                )
+            """))
+            trans.commit()
+            logger.info("Ensured users table exists with raw SQL")
+        except Exception as e:
+            trans.rollback()
+            logger.error(f"Failed to create users table: {e}")
+            raise
+except Exception as e:
+    logger.error(f"Critical: Could not ensure users table exists: {e}")
+    # Don't fail startup, but log the error
+    pass
 
 # Initialize auth service with factory, not instance
 auth_service = AuthService(db_session_factory)
