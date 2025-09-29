@@ -56,7 +56,12 @@ def get_project_keywords_from_db():
 
 import os
 template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
-app = Flask(__name__, template_folder=template_dir)
+# Configure React build directory for static files
+react_build_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build')
+app = Flask(__name__,
+            template_folder=template_dir,
+            static_folder=react_build_dir,
+            static_url_path='')
 
 # Production-ready secret key
 app.secret_key = os.getenv('JWT_SECRET_KEY', 'your-secret-key-here')
