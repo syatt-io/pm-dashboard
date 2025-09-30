@@ -847,20 +847,13 @@ def edit_todo_page(todo_id):
 def get_watched_projects(user):
     """Get user's watched projects."""
     try:
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
+        with session_scope() as session:
+            watched_projects = session.query(UserWatchedProject)\
+                .filter_by(user_id=user.id)\
+                .order_by(UserWatchedProject.created_at.desc())\
+                .all()
 
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        session = Session()
-
-        watched_projects = session.query(UserWatchedProject)\
-            .filter_by(user_id=user.id)\
-            .order_by(UserWatchedProject.created_at.desc())\
-            .all()
-
-        result = [wp.project_key for wp in watched_projects]
-        session.close()
+            result = [wp.project_key for wp in watched_projects]
 
         return jsonify({
             'success': True,
@@ -877,30 +870,21 @@ def get_watched_projects(user):
 def watch_project(user, project_key):
     """Add a project to user's watched list."""
     try:
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
+        with session_scope() as session:
+            # Check if already watching
+            existing = session.query(UserWatchedProject)\
+                .filter_by(user_id=user.id, project_key=project_key)\
+                .first()
 
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        session = Session()
+            if existing:
+                return jsonify({'success': True, 'message': 'Already watching this project'})
 
-        # Check if already watching
-        existing = session.query(UserWatchedProject)\
-            .filter_by(user_id=user.id, project_key=project_key)\
-            .first()
-
-        if existing:
-            session.close()
-            return jsonify({'success': True, 'message': 'Already watching this project'})
-
-        # Add new watched project
-        watched_project = UserWatchedProject(
-            user_id=user.id,
-            project_key=project_key
-        )
-        session.add(watched_project)
-        session.commit()
-        session.close()
+            # Add new watched project
+            watched_project = UserWatchedProject(
+                user_id=user.id,
+                project_key=project_key
+            )
+            session.add(watched_project)
 
         return jsonify({'success': True, 'message': f'Now watching {project_key}'})
 
@@ -914,25 +898,16 @@ def watch_project(user, project_key):
 def unwatch_project(user, project_key):
     """Remove a project from user's watched list."""
     try:
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
+        with session_scope() as session:
+            watched_project = session.query(UserWatchedProject)\
+                .filter_by(user_id=user.id, project_key=project_key)\
+                .first()
 
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        session = Session()
-
-        watched_project = session.query(UserWatchedProject)\
-            .filter_by(user_id=user.id, project_key=project_key)\
-            .first()
-
-        if watched_project:
-            session.delete(watched_project)
-            session.commit()
-            session.close()
-            return jsonify({'success': True, 'message': f'Stopped watching {project_key}'})
-        else:
-            session.close()
-            return jsonify({'success': False, 'message': 'Project not in watched list'})
+            if watched_project:
+                session.delete(watched_project)
+                return jsonify({'success': True, 'message': f'Stopped watching {project_key}'})
+            else:
+                return jsonify({'success': False, 'message': 'Project not in watched list'})
 
     except Exception as e:
         logger.error(f"Failed to unwatch project {project_key}: {e}")
@@ -1177,23 +1152,16 @@ def get_meetings(user):
 
         # Get cached analysis data for overlay
         from src.models import ProcessedMeeting
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         # Create lookup dict for cached analysis
         cached_analyses = {}
         try:
-            all_cached = db_session.query(ProcessedMeeting).all()
-            for cached in all_cached:
-                cached_analyses[cached.meeting_id] = cached
+            with session_scope() as db_session:
+                all_cached = db_session.query(ProcessedMeeting).all()
+                for cached in all_cached:
+                    cached_analyses[cached.meeting_id] = cached
         except Exception as e:
             logger.warning(f"Error loading cached analyses: {e}")
-        finally:
-            db_session.close()
 
         # Convert Fireflies data to our format and apply project filtering
         meeting_list = []
