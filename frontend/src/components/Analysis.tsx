@@ -522,8 +522,15 @@ const WatchedProjectsNotice = () => {
       if (response.ok) {
         const data = await response.json();
         setWatchedProjects(data.watched_projects || []);
+      } else if (response.status === 401) {
+        // Silently handle auth errors - user may not be logged in yet
+        console.warn('Not authenticated for watched projects');
+      } else {
+        // Silently handle other errors to prevent retry loops
+        console.warn(`Error loading watched projects: ${response.status}`);
       }
     } catch (error) {
+      // Silently handle errors to prevent infinite retry loop
       console.error('Error loading watched projects:', error);
     }
   };
