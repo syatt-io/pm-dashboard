@@ -181,6 +181,26 @@ def error_response(error, status_code=500, details=None):
 def run_database_migrations():
     """Run any necessary database migrations."""
     try:
+        # Run Alembic migrations first
+        import subprocess
+        import os
+        logger.info("Running Alembic migrations...")
+        try:
+            # Get the project root directory
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            result = subprocess.run(
+                ['alembic', 'upgrade', 'head'],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.info(f"Alembic migrations completed: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Alembic migration failed: {e.stderr}")
+        except Exception as e:
+            logger.warning(f"Alembic migration error: {e}")
+
         from sqlalchemy.orm import sessionmaker
         engine = get_engine()
 
