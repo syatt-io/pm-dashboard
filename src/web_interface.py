@@ -118,6 +118,7 @@ if settings.notifications.slack_bot_token:
 def run_database_migrations():
     """Run any necessary database migrations."""
     try:
+        from sqlalchemy.orm import sessionmaker
         engine = get_engine()
 
         with engine.connect() as conn:
@@ -186,6 +187,7 @@ def meetings_dashboard():
         from main import ProcessedMeeting
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.agent.database_url)
         Session = sessionmaker(bind=engine)
@@ -240,6 +242,7 @@ def analyze_meeting(meeting_id):
         from main import ProcessedMeeting
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.agent.database_url)
         Session = sessionmaker(bind=engine)
@@ -759,6 +762,7 @@ def get_watched_projects(user):
     """Get user's watched projects."""
     try:
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.agent.database_url)
         Session = sessionmaker(bind=engine)
@@ -788,6 +792,7 @@ def watch_project(user, project_key):
     """Add a project to user's watched list."""
     try:
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.agent.database_url)
         Session = sessionmaker(bind=engine)
@@ -824,6 +829,7 @@ def unwatch_project(user, project_key):
     """Remove a project from user's watched list."""
     try:
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.agent.database_url)
         Session = sessionmaker(bind=engine)
@@ -1600,6 +1606,7 @@ def get_user_my_projects_settings(email):
         from main import UserPreference
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
         engine = create_engine(settings.agent.database_url)
         Session = sessionmaker(bind=engine)
@@ -1642,6 +1649,7 @@ def save_user_settings():
         from main import UserPreference
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
         import uuid
 
         engine = create_engine(settings.agent.database_url)
@@ -1912,6 +1920,7 @@ def project_dashboard(email):
             from main import UserPreference
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
 
             engine = create_engine(settings.agent.database_url)
             Session = sessionmaker(bind=engine)
@@ -2021,6 +2030,7 @@ def meeting_project_dashboard():
                 from main import UserPreference
                 from sqlalchemy.orm import sessionmaker
                 from sqlalchemy import create_engine
+                from sqlalchemy.orm import sessionmaker
 
                 engine = create_engine(settings.agent.database_url)
                 Session = sessionmaker(bind=engine)
