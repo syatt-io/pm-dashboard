@@ -62,24 +62,17 @@ const ProjectSelectInput = (props: any) => {
     pagination: { page: 1, perPage: 1000 },
   });
 
-  console.log('ProjectSelectInput - projects:', projects, 'isLoading:', isLoading, 'error:', error);
-  console.log('ProjectSelectInput - projects type:', typeof projects);
-  console.log('ProjectSelectInput - projects isArray:', Array.isArray(projects));
-  console.log('ProjectSelectInput - todos:', todos);
-
   if (isLoading) {
     return <SelectInput {...props} choices={[]} disabled />;
   }
 
   if (error) {
-    console.error('ProjectSelectInput - Error loading projects:', error);
     // Return a basic dropdown with just the existing project keys from todos
     const existingProjectKeys = [...new Set(todos?.map((todo: any) => todo.project_key).filter(Boolean))] || [];
     const fallbackChoices = existingProjectKeys.map(key => ({
       id: key,
       name: `${key} - (Unavailable)`,
     }));
-    console.log('ProjectSelectInput - Using fallback choices:', fallbackChoices);
     return <SelectInput {...props} choices={fallbackChoices} />;
   }
 
@@ -112,7 +105,6 @@ const ProjectSelectInput = (props: any) => {
   // Sort choices alphabetically
   choices.sort((a, b) => a.id.localeCompare(b.id));
 
-  console.log('ProjectSelectInput - Final choices:', choices);
   return <SelectInput {...props} choices={choices} />;
 };
 

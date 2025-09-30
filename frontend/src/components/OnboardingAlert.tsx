@@ -48,7 +48,7 @@ const OnboardingAlert: React.FC<OnboardingAlertProps> = ({ onDismiss }) => {
         }
       }
     } catch (error) {
-      console.error('Error checking user settings:', error);
+      // Error checking settings - will be handled by UI
     } finally {
       setLoading(false);
     }

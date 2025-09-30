@@ -556,6 +556,65 @@ def get_todos(user):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/dashboard/stats', methods=['GET'])
+@auth_required
+def get_dashboard_stats(user):
+    """Get dashboard statistics efficiently (counts only, no full records)."""
+    try:
+        from sqlalchemy import create_engine, func
+        from sqlalchemy.orm import sessionmaker
+
+        engine = create_engine(settings.agent.database_url)
+        Session = sessionmaker(bind=engine)
+        db_session = Session()
+
+        # Count total meetings
+        total_meetings = db_session.query(func.count(Meeting.id)).scalar() or 0
+
+        # Count todos by status
+        if user.role.value != 'admin':
+            # Non-admin users see only their todos
+            total_todos = db_session.query(func.count(TodoItem.id)).filter(TodoItem.user_id == user.id).scalar() or 0
+            completed_todos = db_session.query(func.count(TodoItem.id)).filter(
+                TodoItem.user_id == user.id,
+                TodoItem.status == 'done'
+            ).scalar() or 0
+        else:
+            # Admin sees all todos
+            total_todos = db_session.query(func.count(TodoItem.id)).scalar() or 0
+            completed_todos = db_session.query(func.count(TodoItem.id)).filter(
+                TodoItem.status == 'done'
+            ).scalar() or 0
+
+        # Count active projects (assumes JiraProject model exists)
+        try:
+            from src.models import JiraProject
+            total_projects = db_session.query(func.count(JiraProject.key)).filter(
+                JiraProject.is_active == True
+            ).scalar() or 0
+        except (ImportError, AttributeError):
+            # If JiraProject model doesn't exist, return 0
+            total_projects = 0
+
+        db_session.close()
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'total_meetings': total_meetings,
+                'total_todos': total_todos,
+                'completed_todos': completed_todos,
+                'active_todos': total_todos - completed_todos,
+                'total_projects': total_projects,
+                'todo_completion_rate': round((completed_todos / total_todos * 100) if total_todos > 0 else 0)
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error fetching dashboard stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/todos', methods=['POST'])
 @auth_required
 def create_todo(user):

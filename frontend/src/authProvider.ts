@@ -14,7 +14,7 @@ export const authProvider: AuthProvider = {
     try {
       await axios.post('/api/auth/logout');
     } catch (error) {
-      console.error('Logout error:', error);
+      // Logout endpoint may fail if token expired - proceed with local cleanup
     } finally {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('rememberMe');

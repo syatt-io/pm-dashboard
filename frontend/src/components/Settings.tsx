@@ -91,7 +91,6 @@ export const Settings = () => {
         throw new globalThis.Error(data.error || 'Failed to load settings');
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
       showSnackbar('Failed to load settings', 'error');
     } finally {
       setLoading(false);
@@ -136,7 +135,6 @@ export const Settings = () => {
 
       return isValid;
     } catch (error) {
-      console.error('Error validating API key:', error);
       setValidationResult({ valid: false, message: 'Failed to validate API key' });
       return false;
     } finally {
@@ -180,7 +178,6 @@ export const Settings = () => {
         throw new globalThis.Error(data.error || 'Failed to save API key');
       }
     } catch (error) {
-      console.error('Error saving API key:', error);
       showSnackbar('Failed to save API key', 'error');
     } finally {
       setSaving(false);
@@ -206,7 +203,6 @@ export const Settings = () => {
         throw new globalThis.Error(data.error || 'Failed to delete API key');
       }
     } catch (error) {
-      console.error('Error deleting API key:', error);
       showSnackbar('Failed to delete API key', 'error');
     } finally {
       setDeleting(false);

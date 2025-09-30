@@ -151,11 +151,9 @@ const WatchToggle = ({ record }: { record: any }) => {
           setWatched(data.watched_projects.includes(record.key));
         } else if (response.status === 401) {
           // Silently handle auth errors - user may not be logged in yet
-          console.warn('Not authenticated');
         }
       } catch (error) {
         // Silently handle errors to prevent infinite retry loop
-        console.error('Error loading watched projects:', error);
       } finally {
         setLoading(false);
       }
@@ -208,7 +206,6 @@ const WatchToggle = ({ record }: { record: any }) => {
         }
       }
     } catch (error) {
-      console.error('Error updating project watch status:', error);
       notify('Error updating project watch status', { type: 'error' });
     }
   };
@@ -269,14 +266,11 @@ const WatchedProjectsHeader = () => {
         setWatchedProjects(data.watched_projects);
       } else if (response.status === 401) {
         // Silently handle auth errors - user may not be logged in yet
-        console.warn('Not authenticated for watched projects');
       } else {
         // Silently handle other errors to prevent retry loops
-        console.warn(`Error loading watched projects: ${response.status}`);
       }
     } catch (error) {
       // Silently handle errors to prevent infinite retry loop
-      console.error('Error loading watched projects:', error);
     }
   };
 
@@ -544,11 +538,9 @@ const ProjectDetailDialog = ({
         const data = await response.json();
         setRecentMeetings(data.data || []);
       } else {
-        console.error('Failed to fetch project meetings:', response.statusText);
         setRecentMeetings([]);
       }
     } catch (error) {
-      console.error('Error fetching project meetings:', error);
       setRecentMeetings([]);
     } finally {
       setLoadingMeetings(false);
@@ -568,20 +560,15 @@ const ProjectDetailDialog = ({
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('All TODOs fetched:', data.data);
         // Filter TODOs for this project
         const projectTodos = data.data?.filter((todo: any) => {
-          console.log(`Checking TODO: ${todo.title} - project_key: ${todo.project_key} vs ${projectKey}`);
           return todo.project_key === projectKey;
         }) || [];
-        console.log(`Filtered TODOs for ${projectKey}:`, projectTodos);
         setRecentTodos(projectTodos);
       } else {
-        console.error('Failed to fetch todos:', response.statusText);
         setRecentTodos([]);
       }
     } catch (error) {
-      console.error('Error fetching todos:', error);
       setRecentTodos([]);
     } finally {
       setLoadingTodos(false);
@@ -610,14 +597,11 @@ const ProjectDetailDialog = ({
       if (response.ok) {
         const data = await response.json();
         setDigestData(data);
-        console.log('Project digest generated:', data);
       } else {
-        console.error('Failed to generate digest:', response.statusText);
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         alert(`Error generating digest: ${errorData.error || response.statusText}`);
       }
     } catch (error) {
-      console.error('Error generating digest:', error);
       alert(`Error generating digest: ${error.message}`);
     } finally {
       setGeneratingDigest(false);
@@ -1116,14 +1100,11 @@ export const ProjectList = () => {
         setWatchedProjects(watched);
       } else if (response.status === 401) {
         // Silently handle auth errors - user may not be logged in yet
-        console.warn('Not authenticated for watched projects');
       } else {
         // Silently handle other errors to prevent retry loops
-        console.warn(`Error loading watched projects: ${response.status}`);
       }
     } catch (error) {
       // Silently handle errors to prevent infinite retry loop
-      console.error('Error loading watched projects:', error);
     }
   }, []);
 

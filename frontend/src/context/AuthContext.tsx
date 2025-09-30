@@ -33,13 +33,8 @@ axios.defaults.withCredentials = true;
 // Add auth token to all requests
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
-  console.log('[axios interceptor] Request to:', config.url);
-  console.log('[axios interceptor] Token exists:', !!token);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
-    console.log('[axios interceptor] Authorization header set');
-  } else {
-    console.log('[axios interceptor] No token, skipping Authorization header');
   }
   return config;
 });
@@ -104,7 +99,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await axios.get('/api/auth/user');
       setUser(response.data.user);
     } catch (error) {
-      console.error('Auth check failed:', error);
+      // Auth check failed - remove token and let user re-authenticate
       localStorage.removeItem('auth_token');
     } finally {
       setLoading(false);
@@ -113,33 +108,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (credential: string, rememberMe: boolean) => {
     try {
-      console.log('[AuthContext] login - Sending login request with credential:', credential.substring(0, 50) + '...');
       const response = await axios.post('/api/auth/google', {
         credential,
         rememberMe
       });
 
-      console.log('[AuthContext] login - Login response received:', response);
-      console.log('[AuthContext] login - Response status:', response.status);
-      console.log('[AuthContext] login - Response data:', response.data);
-
       const { token, user } = response.data;
 
       if (!token) {
-        console.error('[AuthContext] login - No token in response!');
         throw new Error('No token received from server');
       }
 
-      console.log('[AuthContext] login - Token received, length:', token.length);
-      console.log('[AuthContext] login - Token preview:', token.substring(0, 20) + '...');
-
       localStorage.setItem('auth_token', token);
       localStorage.setItem('rememberMe', rememberMe.toString());
-
-      // Verify token was stored
-      const storedToken = localStorage.getItem('auth_token');
-      console.log('[AuthContext] login - Token stored in localStorage:', !!storedToken);
-      console.log('[AuthContext] login - Stored token matches:', storedToken === token);
 
       setUser(user);
 
@@ -148,10 +129,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error('Access denied. Please contact an administrator.');
       }
     } catch (error: any) {
-      console.error('Login failed:', error);
-      console.error('Error response:', error.response);
-      console.error('Error status:', error.response?.status);
-      console.error('Error data:', error.response?.data);
       throw new Error(error.response?.data?.error || 'Login failed');
     }
   };
@@ -160,7 +137,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await axios.post('/api/auth/logout');
     } catch (error) {
-      console.error('Logout error:', error);
+      // Logout endpoint may fail if token expired - proceed with local cleanup
     } finally {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('rememberMe');
@@ -178,7 +155,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const { token } = response.data;
       localStorage.setItem('auth_token', token);
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      // Token refresh failed - will be handled by axios interceptor
       throw error;
     }
   };

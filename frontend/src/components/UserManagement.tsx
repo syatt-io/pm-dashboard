@@ -36,21 +36,13 @@ const UserList = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching users from /api/auth/users...');
       const response = await axios.get('/api/auth/users');
-      console.log('Users response:', response);
-      console.log('Users data:', response.data);
       if (response.data && response.data.users) {
         setUsers(response.data.users);
-        console.log('Users set:', response.data.users);
       } else {
-        console.error('Unexpected response format:', response.data);
         setError('Unexpected response format from server');
       }
     } catch (error: any) {
-      console.error('Failed to fetch users:', error);
-      console.error('Error response:', error.response);
-      console.error('Error data:', error.response?.data);
       setError(error.response?.data?.error || 'Failed to fetch users');
     } finally {
       setLoading(false);
@@ -62,7 +54,7 @@ const UserList = () => {
       await axios.put(`/api/auth/users/${userId}/role`, { role: newRole });
       fetchUsers();
     } catch (error) {
-      console.error('Failed to update role:', error);
+      // Error will be shown in UI via error state
     }
   };
 
@@ -71,7 +63,7 @@ const UserList = () => {
       await axios.put(`/api/auth/users/${userId}/status`, { is_active: isActive });
       fetchUsers();
     } catch (error) {
-      console.error('Failed to update status:', error);
+      // Error will be shown in UI via error state
     }
   };
 

@@ -95,7 +95,7 @@ const CreateJiraTicketDialog = ({
         setAssignees(data.users || []);
       }
     } catch (error) {
-      console.error('Failed to load users:', error);
+      // Failed to load users - will be handled by UI
     }
   };
 
@@ -108,7 +108,7 @@ const CreateJiraTicketDialog = ({
         setProjects(data.projects || []);
       }
     } catch (error) {
-      console.error('Failed to load projects:', error);
+      // Failed to load projects - will be handled by UI
     } finally {
       setLoadingProjects(false);
     }
@@ -123,7 +123,7 @@ const CreateJiraTicketDialog = ({
         setIssueTypes(data.issue_types || data.issueTypes || []);
       }
     } catch (error) {
-      console.error('Failed to load issue types:', error);
+      // Failed to load issue types - will be handled by UI
     } finally {
       setLoadingIssueTypes(false);
     }
@@ -524,14 +524,11 @@ const WatchedProjectsNotice = () => {
         setWatchedProjects(data.watched_projects || []);
       } else if (response.status === 401) {
         // Silently handle auth errors - user may not be logged in yet
-        console.warn('Not authenticated for watched projects');
       } else {
         // Silently handle other errors to prevent retry loops
-        console.warn(`Error loading watched projects: ${response.status}`);
       }
     } catch (error) {
       // Silently handle errors to prevent infinite retry loop
-      console.error('Error loading watched projects:', error);
     }
   };
 

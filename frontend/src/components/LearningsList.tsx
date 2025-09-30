@@ -106,7 +106,7 @@ export const LearningsList = (props: ListProps) => {
                 setStats(data.stats);
             }
         } catch (error) {
-            console.error('Error fetching stats:', error);
+            // Failed to fetch stats - will be handled by UI
         }
     };
 

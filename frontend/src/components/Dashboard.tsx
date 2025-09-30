@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -16,6 +16,7 @@ import {
   Business,
 } from '@mui/icons-material';
 import { useGetList } from 'react-admin';
+import API_BASE_URL from '../config';
 
 const StatCard = ({ title, value, icon, color = 'primary', subtitle }: any) => (
   <Card sx={{ height: '100%' }}>
@@ -108,27 +109,58 @@ const RecentActivityCard = () => {
 };
 
 export const Dashboard = () => {
-  const { data: meetings } = useGetList('meetings', {
-    pagination: { page: 1, perPage: 100 },
-    sort: { field: 'date', order: 'DESC' },
+  const [stats, setStats] = useState({
+    total_meetings: 0,
+    total_todos: 0,
+    completed_todos: 0,
+    active_todos: 0,
+    total_projects: 0,
+    todo_completion_rate: 0,
   });
+  const [loading, setLoading] = useState(true);
 
-  const { data: todos } = useGetList('todos', {
-    pagination: { page: 1, perPage: 100 },
-    sort: { field: 'created_at', order: 'DESC' },
-  });
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_BASE_URL}/api/dashboard/stats`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-  const { data: projects } = useGetList('projects', {
-    pagination: { page: 1, perPage: 100 },
-    sort: { field: 'name', order: 'ASC' },
-  });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setStats(data.data);
+          }
+        }
+      } catch (error) {
+        // Failed to fetch stats - will show zeros
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const totalMeetings = meetings?.length || 0;
-  const totalTodos = todos?.length || 0;
-  const completedTodos = todos?.filter((todo: any) => todo.status === 'done').length || 0;
-  const totalProjects = projects?.length || 0;
+    fetchStats();
+  }, []);
 
-  const todoCompletionRate = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
+  const totalMeetings = stats.total_meetings;
+  const totalTodos = stats.total_todos;
+  const completedTodos = stats.completed_todos;
+  const totalProjects = stats.total_projects;
+  const todoCompletionRate = stats.todo_completion_rate;
+
+  if (loading) {
+    return (
+      <Box p={3}>
+        <Typography variant="h4" gutterBottom fontWeight="bold">
+          🚀 PM Command Center
+        </Typography>
+        <LinearProgress sx={{ mt: 2 }} />
+      </Box>
+    );
+  }
 
   return (
     <Box p={3}>

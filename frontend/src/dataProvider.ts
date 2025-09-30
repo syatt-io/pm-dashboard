@@ -43,16 +43,12 @@ export const dataProvider: DataProvider = {
         const getWatchedProjects = async () => {
             try {
                 const token = localStorage.getItem('auth_token');
-                console.log('[dataProvider] getWatchedProjects - Token exists:', !!token);
-                console.log('[dataProvider] getWatchedProjects - Token preview:', token?.substring(0, 20) + '...');
 
                 if (!token) {
-                    console.warn('[dataProvider] getWatchedProjects - No token found, returning empty array');
                     return [];
                 }
 
                 const url = `${API_URL}/watched-projects`;
-                console.log('[dataProvider] getWatchedProjects - Fetching from:', url);
 
                 const response = await fetch(url, {
                     headers: {
@@ -61,25 +57,13 @@ export const dataProvider: DataProvider = {
                     },
                 });
 
-                console.log('[dataProvider] getWatchedProjects - Response status:', response.status);
-
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('[dataProvider] getWatchedProjects - Success, projects:', data.watched_projects);
                     return data.watched_projects || [];
-                } else if (response.status === 401) {
-                    // Silently handle auth errors - user may not be logged in yet
-                    const errorText = await response.text();
-                    console.warn('[dataProvider] getWatchedProjects - 401 Unauthorized');
-                    console.warn('[dataProvider] getWatchedProjects - Error response:', errorText);
-                } else {
-                    // Silently handle other errors to prevent retry loops
-                    const errorText = await response.text();
-                    console.warn(`[dataProvider] getWatchedProjects - Error ${response.status}: ${errorText}`);
                 }
+                // Silently handle errors - user may not be logged in yet or have no watched projects
             } catch (error) {
                 // Silently handle errors to prevent infinite retry loop
-                console.error('[dataProvider] getWatchedProjects - Exception:', error);
             }
             return [];
         };
@@ -148,13 +132,6 @@ export const dataProvider: DataProvider = {
         }
 
         return httpClient(url).then(({ json }) => {
-            // Debug logging for projects resource
-            if (resource === 'projects') {
-                console.log('Projects API response:', json);
-                console.log('Projects array exists:', !!json.projects);
-                console.log('Projects array length:', json.projects ? json.projects.length : 0);
-            }
-
             // Handle the standard API response format with json.data
             if (json.data && Array.isArray(json.data)) {
                 let data = json.data;
@@ -183,7 +160,6 @@ export const dataProvider: DataProvider = {
                             ...meeting
                         };
                     });
-                    console.log('Analysis data transformed:', data.length, 'records');
                 }
 
                 return {
@@ -236,7 +212,7 @@ export const dataProvider: DataProvider = {
                 total: Array.isArray(json) ? json.length : 0,
             };
         }).catch(error => {
-            console.error(`Error fetching ${resource}:`, error);
+            // Re-throw error for react-admin to handle
             return Promise.reject(error);
         });
     },
@@ -266,7 +242,6 @@ export const dataProvider: DataProvider = {
         return httpClient(url).then(({ json }) => {
             if (resource === 'analysis') {
                 // For analysis, transform the meeting data similarly to getList
-                console.log('getOne analysis - Response:', json);
                 const meetingId = json.meeting_id || json.id || params.id;
                 return {
                     data: {
@@ -299,7 +274,6 @@ export const dataProvider: DataProvider = {
                 data: { id: params.id, ...json },
             };
         }).catch(error => {
-            console.error(`Error fetching single ${resource}:`, error);
             return Promise.reject(error);
         });
     },
@@ -314,7 +288,6 @@ export const dataProvider: DataProvider = {
                 ...json
             })),
         })).catch(error => {
-            console.error('Error in getMany:', error);
             return Promise.reject(error);
         });
     },
@@ -336,7 +309,6 @@ export const dataProvider: DataProvider = {
         switch (resource) {
             case 'todos':
                 url = `${API_URL}/todos`;
-                console.log('Creating TODO with data:', body);
                 break;
             case 'tickets':
                 url = `${API_URL}/process`;
@@ -352,9 +324,6 @@ export const dataProvider: DataProvider = {
             method: 'POST',
             body: JSON.stringify(body),
         }).then(({ json }) => {
-            if (resource === 'todos') {
-                console.log('TODO create response:', json);
-            }
             if (resource === 'learnings' && json.learning) {
                 return {
                     data: { id: json.learning.id, ...json.learning },
@@ -364,7 +333,6 @@ export const dataProvider: DataProvider = {
                 data: { id: json.id || Date.now(), ...json },
             };
         }).catch(error => {
-            console.error(`Error creating ${resource}:`, error);
             return Promise.reject(error);
         });
     },
@@ -375,7 +343,6 @@ export const dataProvider: DataProvider = {
         switch (resource) {
             case 'todos':
                 url = `${API_URL}/todos/${params.id}`;
-                console.log('Updating TODO with data:', params.data);
                 break;
             case 'jira_projects':
                 url = `${API_URL}/jira/projects/${params.id}`;
@@ -391,14 +358,10 @@ export const dataProvider: DataProvider = {
             method: 'PUT',
             body: JSON.stringify(params.data),
         }).then(({ json }) => {
-            if (resource === 'todos') {
-                console.log('TODO update response:', json);
-            }
             return {
                 data: { ...params.data, id: params.id } as any,
             };
         }).catch(error => {
-            console.error(`Error updating ${resource}:`, error);
             return Promise.reject(error);
         });
     },
@@ -413,7 +376,6 @@ export const dataProvider: DataProvider = {
         return Promise.all(queries).then(responses => ({
             data: params.ids,
         })).catch(error => {
-            console.error('Error in updateMany:', error);
             return Promise.reject(error);
         });
     },
@@ -437,7 +399,6 @@ export const dataProvider: DataProvider = {
         }).then(() => ({
             data: params.previousData,
         })).catch(error => {
-            console.error(`Error deleting ${resource}:`, error);
             return Promise.reject(error);
         });
     },
@@ -451,7 +412,6 @@ export const dataProvider: DataProvider = {
         return Promise.all(queries).then(() => ({
             data: params.ids,
         })).catch(error => {
-            console.error('Error in deleteMany:', error);
             return Promise.reject(error);
         });
     },
