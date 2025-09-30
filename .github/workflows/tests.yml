@@ -1,13 +1,10 @@
 name: Tests
 
 on:
-  # Only run on pull requests to avoid duplicate runs on push to main
-  # (main branch auto-deploys to production)
+  push:
+    branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
-  # Still run on push to develop branch for testing
-  push:
-    branches: [ develop ]
 
 jobs:
   backend-tests:
@@ -125,26 +122,27 @@ jobs:
       working-directory: ./frontend
       run: npm run lint || true  # Allow failure for now
 
-  # integration-tests:
-  #   name: Integration Tests
-  #   runs-on: ubuntu-latest
-  #   # DISABLED: This was running on every push to main and causing error emails
-  #   # Re-enable when test_production.py is properly configured
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
-  #   steps:
-  #   - uses: actions/checkout@v3
+    steps:
+    - uses: actions/checkout@v3
 
-  #   - name: Set up Python 3.12
-  #     uses: actions/setup-python@v4
-  #     with:
-  #       python-version: '3.12'
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
 
-  #   - name: Install dependencies
-  #     run: |
-  #       python -m pip install --upgrade pip
-  #       pip install -r requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest
 
-  #   - name: Run integration tests
-  #     run: |
-  #       python test_production.py
+    - name: Run integration tests
+      env:
+        TESTING: true
+      run: |
+        pytest tests/integration/ -v
