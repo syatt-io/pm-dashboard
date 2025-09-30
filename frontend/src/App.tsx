@@ -1,15 +1,12 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Admin, Resource, ListGuesser, EditGuesser, ShowGuesser, radiantLightTheme, radiantDarkTheme } from 'react-admin';
+import { Admin, Resource, radiantLightTheme, radiantDarkTheme } from 'react-admin';
 import { dataProvider } from './dataProvider';
 import { authProvider } from './authProvider';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Icons
-import AnalyticsIcon from '@mui/icons-material/Analytics';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import TaskIcon from '@mui/icons-material/Task';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import SettingsIcon from '@mui/icons-material/Settings';
 import BusinessIcon from '@mui/icons-material/Business';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -28,7 +25,6 @@ import { LearningCreate } from './components/LearningCreate';
 import { LearningEdit } from './components/LearningEdit';
 import { LearningShow } from './components/LearningShow';
 import Login from './components/Login';
-import ProtectedRoute from './components/ProtectedRoute';
 import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
 
@@ -44,6 +40,7 @@ const AdminApp = () => {
       layout={CustomLayout}
       theme={radiantLightTheme}
       darkTheme={radiantDarkTheme}
+      loginPage={Login}
     >
         <Resource
           name="analysis"
@@ -103,21 +100,9 @@ const AdminApp = () => {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <AdminApp />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <AdminApp />
+    </AuthProvider>
   );
 }
 
