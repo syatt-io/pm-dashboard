@@ -115,6 +115,56 @@ if settings.notifications.slack_bot_token:
         slack_bot = None
 
 
+# ============================================================================
+# Standardized API Response Helpers
+# ============================================================================
+
+def success_response(data=None, message=None, status_code=200):
+    """
+    Standard success response format for all API endpoints.
+
+    Args:
+        data: Response data (dict, list, or None)
+        message: Optional success message
+        status_code: HTTP status code (default 200)
+
+    Returns:
+        Flask jsonify response with consistent format
+    """
+    response = {'success': True}
+
+    if data is not None:
+        response['data'] = data
+
+    if message is not None:
+        response['message'] = message
+
+    return jsonify(response), status_code
+
+
+def error_response(error, status_code=500, details=None):
+    """
+    Standard error response format for all API endpoints.
+
+    Args:
+        error: Error message (string)
+        status_code: HTTP status code (default 500)
+        details: Optional additional error details
+
+    Returns:
+        Flask jsonify response with consistent format
+    """
+    response = {
+        'success': False,
+        'error': str(error)
+    }
+
+    if details is not None:
+        response['details'] = details
+
+    return jsonify(response), status_code
+
+
 def run_database_migrations():
     """Run any necessary database migrations."""
     try:
@@ -553,7 +603,7 @@ def get_todos(user):
 
     except Exception as e:
         logger.error(f"Error fetching todos: {e}")
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/dashboard/stats', methods=['GET'])
@@ -598,21 +648,18 @@ def get_dashboard_stats(user):
 
         db_session.close()
 
-        return jsonify({
-            'success': True,
-            'data': {
-                'total_meetings': total_meetings,
-                'total_todos': total_todos,
-                'completed_todos': completed_todos,
-                'active_todos': total_todos - completed_todos,
-                'total_projects': total_projects,
-                'todo_completion_rate': round((completed_todos / total_todos * 100) if total_todos > 0 else 0)
-            }
+        return success_response(data={
+            'total_meetings': total_meetings,
+            'total_todos': total_todos,
+            'completed_todos': completed_todos,
+            'active_todos': total_todos - completed_todos,
+            'total_projects': total_projects,
+            'todo_completion_rate': round((completed_todos / total_todos * 100) if total_todos > 0 else 0)
         })
 
     except Exception as e:
         logger.error(f"Error fetching dashboard stats: {e}")
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/todos', methods=['POST'])
@@ -650,10 +697,10 @@ def create_todo(user):
         todo_manager.session.add(todo)
         todo_manager.session.commit()
 
-        return jsonify({'success': True, 'id': todo.id})
+        return success_response(data={'id': todo.id}, message='TODO created successfully', status_code=201)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/todos/<todo_id>/complete', methods=['POST'])
@@ -668,12 +715,12 @@ def complete_todo_api(user, todo_id):
         success = todo_manager.complete_todo(todo_id, completed_by, notes)
 
         if success:
-            return jsonify({'success': True})
+            return success_response(message='TODO marked as complete')
         else:
-            return jsonify({'success': False, 'error': 'TODO not found'}), 404
+            return error_response('TODO not found', status_code=404)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/todos/<todo_id>/snooze', methods=['POST'])
@@ -687,12 +734,12 @@ def snooze_todo_api(user, todo_id):
         success = todo_manager.snooze_todo(todo_id, days)
 
         if success:
-            return jsonify({'success': True})
+            return success_response(message=f'TODO snoozed for {days} day(s)')
         else:
-            return jsonify({'success': False, 'error': 'TODO not found'}), 404
+            return error_response('TODO not found', status_code=404)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/todos/<todo_id>/update', methods=['POST'])
@@ -704,12 +751,12 @@ def update_todo_api(user, todo_id):
         success = todo_manager.update_todo(todo_id, data)
 
         if success:
-            return jsonify({'success': True})
+            return success_response(message='TODO updated successfully')
         else:
-            return jsonify({'success': False, 'error': 'TODO not found'}), 404
+            return error_response('TODO not found', status_code=404)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/todos/<todo_id>', methods=['GET'])
@@ -719,7 +766,7 @@ def get_todo_api(user, todo_id):
     try:
         todo = todo_manager.get_todo(todo_id)
         if not todo:
-            return jsonify({'error': 'TODO not found'}), 404
+            return error_response('TODO not found', status_code=404)
 
         todo_data = {
             'id': todo.id,
@@ -739,7 +786,7 @@ def get_todo_api(user, todo_id):
         return jsonify(todo_data)
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/todos/<todo_id>', methods=['PUT'])
@@ -770,12 +817,12 @@ def update_todo_put_api(user, todo_id):
                 }
                 return jsonify(todo_data)
             else:
-                return jsonify({'success': False, 'error': 'TODO not found after update'}), 404
+                return error_response('TODO not found after update', status_code=404)
         else:
-            return jsonify({'success': False, 'error': 'TODO not found'}), 404
+            return error_response('TODO not found', status_code=404)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/api/todos/<todo_id>', methods=['DELETE'])
@@ -786,12 +833,12 @@ def delete_todo_api(user, todo_id):
         success = todo_manager.delete_todo(todo_id)
 
         if success:
-            return jsonify({'success': True})
+            return success_response(message='TODO deleted successfully')
         else:
-            return jsonify({'success': False, 'error': 'TODO not found'}), 404
+            return error_response('TODO not found', status_code=404)
 
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 @app.route('/todos/edit/<todo_id>')
