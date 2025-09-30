@@ -184,7 +184,7 @@ def meetings_dashboard():
         meetings = fireflies.get_recent_meetings(days_back=10, limit=200)
 
         # Check which meetings have been analyzed
-        from main import ProcessedMeeting
+        from src.models import ProcessedMeeting
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
@@ -239,7 +239,7 @@ def analyze_meeting(meeting_id):
 
     try:
         # Check if meeting has been analyzed before (unless forcing re-analysis)
-        from main import ProcessedMeeting
+        from src.models import ProcessedMeeting
         from sqlalchemy.orm import sessionmaker
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
@@ -1090,7 +1090,7 @@ def get_meetings(user):
             }), 500
 
         # Get cached analysis data for overlay
-        from main import ProcessedMeeting
+        from src.models import ProcessedMeeting
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
@@ -1228,7 +1228,7 @@ def get_meeting_detail(user, meeting_id):
     """Get details for a specific meeting."""
     try:
         # Initialize database session
-        from main import ProcessedMeeting
+        from src.models import ProcessedMeeting
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
@@ -1311,7 +1311,7 @@ def analyze_meeting_api(user, meeting_id):
     """Trigger analysis for a specific meeting via API."""
     try:
         # Initialize database
-        from main import ProcessedMeeting
+        from src.models import ProcessedMeeting
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
@@ -1419,6 +1419,13 @@ def analyze_meeting_api(user, meeting_id):
 def get_jira_projects():
     """Get all Jira projects with local database enhancements."""
     try:
+        # Check if Jira credentials are configured
+        if not settings.jira.url or not settings.jira.username or not settings.jira.api_token:
+            logger.error("Jira credentials not configured")
+            return jsonify({"success": False, "error": "Jira credentials not configured"}), 500
+
+        logger.info(f"Fetching projects from Jira URL: {settings.jira.url}")
+
         # Fetch projects from Jira
         async def fetch_projects():
             async with JiraMCPClient(
@@ -1429,6 +1436,7 @@ def get_jira_projects():
                 return await jira_client.get_projects()
 
         jira_projects = asyncio.run(fetch_projects())
+        logger.info(f"Fetched {len(jira_projects)} projects from Jira")
 
         # Merge with local database data
         from sqlalchemy import create_engine, text
