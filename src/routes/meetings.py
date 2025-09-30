@@ -10,7 +10,7 @@ import json
 from config.settings import settings
 from src.services.auth import auth_required
 from src.integrations.fireflies import FirefliesClient
-from src.services.meeting_analyzer import MeetingAnalyzer
+from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.utils.database import get_engine, session_scope
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 meetings_bp = Blueprint('meetings', __name__)
 
 # Initialize analyzer
-analyzer = MeetingAnalyzer()
+analyzer = TranscriptAnalyzer()
 
 
 # Import response helpers from parent module
