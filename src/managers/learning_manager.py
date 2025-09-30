@@ -19,8 +19,7 @@ class LearningManager:
         """Initialize learning manager."""
         self.engine = create_engine(settings.agent.database_url)
         Base.metadata.create_all(self.engine)
-        Session = sessionmaker(bind=self.engine)
-        self.session = Session()
+        self.Session = sessionmaker(bind=self.engine)
 
     def create_learning(
         self,
@@ -33,34 +32,42 @@ class LearningManager:
         """Create a new learning entry.
 
         Args:
-            content: The learning content/insight
+            content: The learning content/insight (will be stored as title+description)
             submitted_by: Username of submitter
-            submitted_by_id: User ID (e.g., Slack ID)
+            submitted_by_id: User ID
             category: Optional category
             source: Source of the learning (slack, web, retrospective)
 
         Returns:
             Created Learning object
         """
+        session = self.Session()
         try:
+            # Split content into title and description if it's long
+            title = content[:255] if len(content) <= 255 else content[:252] + "..."
+            description = content if len(content) > 255 else None
+
             learning = Learning(
-                content=content,
-                submitted_by=submitted_by,
-                submitted_by_id=submitted_by_id,
+                title=title,
+                description=description,
+                user_id=int(submitted_by_id) if submitted_by_id and submitted_by_id.isdigit() else None,
                 category=category,
                 source=source
             )
 
-            self.session.add(learning)
-            self.session.commit()
+            session.add(learning)
+            session.commit()
+            session.refresh(learning)
 
-            logger.info(f"Learning created: {learning.id} by {submitted_by}")
+            logger.info(f"Learning created: {learning.id}")
             return learning
 
         except Exception as e:
             logger.error(f"Error creating learning: {e}")
-            self.session.rollback()
+            session.rollback()
             raise
+        finally:
+            session.close()
 
     def get_learnings(
         self,
@@ -75,24 +82,29 @@ class LearningManager:
             limit: Maximum number of results
             offset: Pagination offset
             category: Filter by category
-            include_archived: Include archived learnings
+            include_archived: Include archived learnings (note: schema doesn't have is_archived)
 
         Returns:
             List of Learning objects
         """
-        query = self.session.query(Learning)
+        session = self.Session()
+        try:
+            query = session.query(Learning)
 
-        if not include_archived:
-            query = query.filter(Learning.is_archived == False)
+            if category:
+                query = query.filter(Learning.category == category)
 
-        if category:
-            query = query.filter(Learning.category == category)
+            return query.order_by(desc(Learning.created_at)).offset(offset).limit(limit).all()
+        finally:
+            session.close()
 
-        return query.order_by(desc(Learning.created_at)).offset(offset).limit(limit).all()
-
-    def get_learning(self, learning_id: str) -> Optional[Learning]:
+    def get_learning(self, learning_id: int) -> Optional[Learning]:
         """Get a single learning by ID."""
-        return self.session.query(Learning).filter(Learning.id == learning_id).first()
+        session = self.Session()
+        try:
+            return session.query(Learning).filter(Learning.id == learning_id).first()
+        finally:
+            session.close()
 
     def search_learnings(
         self,
@@ -100,27 +112,31 @@ class LearningManager:
         limit: int = 20,
         include_archived: bool = False
     ) -> List[Learning]:
-        """Search learnings by content.
+        """Search learnings by title and description.
 
         Args:
             search_term: Text to search for
             limit: Maximum results
-            include_archived: Include archived learnings
+            include_archived: Include archived learnings (note: schema doesn't have is_archived)
 
         Returns:
             List of matching Learning objects
         """
-        query = self.session.query(Learning)
+        session = self.Session()
+        try:
+            query = session.query(Learning)
 
-        if not include_archived:
-            query = query.filter(Learning.is_archived == False)
+            # Case-insensitive search in title and description
+            query = query.filter(
+                or_(
+                    Learning.title.ilike(f'%{search_term}%'),
+                    Learning.description.ilike(f'%{search_term}%')
+                )
+            )
 
-        # Case-insensitive search
-        query = query.filter(
-            Learning.content.ilike(f'%{search_term}%')
-        )
-
-        return query.order_by(desc(Learning.created_at)).limit(limit).all()
+            return query.order_by(desc(Learning.created_at)).limit(limit).all()
+        finally:
+            session.close()
 
     def get_recent_learnings(self, days: int = 7, limit: int = 10) -> List[Learning]:
         """Get learnings from the last N days.
@@ -132,14 +148,15 @@ class LearningManager:
         Returns:
             List of recent Learning objects
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        session = self.Session()
+        try:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
 
-        return self.session.query(Learning).filter(
-            and_(
-                Learning.created_at >= cutoff_date,
-                Learning.is_archived == False
-            )
-        ).order_by(desc(Learning.created_at)).limit(limit).all()
+            return session.query(Learning).filter(
+                Learning.created_at >= cutoff_date
+            ).order_by(desc(Learning.created_at)).limit(limit).all()
+        finally:
+            session.close()
 
     def get_categories(self) -> List[str]:
         """Get all unique categories used in learnings.
@@ -147,18 +164,19 @@ class LearningManager:
         Returns:
             List of category strings
         """
-        categories = self.session.query(Learning.category).filter(
-            and_(
-                Learning.category != None,
-                Learning.is_archived == False
-            )
-        ).distinct().all()
+        session = self.Session()
+        try:
+            categories = session.query(Learning.category).filter(
+                Learning.category != None
+            ).distinct().all()
 
-        return [cat[0] for cat in categories if cat[0]]
+            return [cat[0] for cat in categories if cat[0]]
+        finally:
+            session.close()
 
     def update_learning(
         self,
-        learning_id: str,
+        learning_id: int,
         content: str = None,
         category: str = None
     ) -> bool:
@@ -172,29 +190,35 @@ class LearningManager:
         Returns:
             True if successful, False otherwise
         """
+        session = self.Session()
         try:
-            learning = self.get_learning(learning_id)
+            learning = session.query(Learning).filter(Learning.id == learning_id).first()
             if not learning:
                 return False
 
             if content is not None:
-                learning.content = content
+                # Split content into title and description
+                learning.title = content[:255] if len(content) <= 255 else content[:252] + "..."
+                learning.description = content if len(content) > 255 else None
             if category is not None:
                 learning.category = category
 
             learning.updated_at = datetime.utcnow()
-            self.session.commit()
+            session.commit()
 
             logger.info(f"Learning updated: {learning_id}")
             return True
 
         except Exception as e:
             logger.error(f"Error updating learning {learning_id}: {e}")
-            self.session.rollback()
+            session.rollback()
             return False
+        finally:
+            session.close()
 
-    def archive_learning(self, learning_id: str) -> bool:
+    def archive_learning(self, learning_id: int) -> bool:
         """Archive (soft delete) a learning.
+        Note: Production schema doesn't have is_archived column, so this will delete the record.
 
         Args:
             learning_id: ID of learning to archive
@@ -202,22 +226,25 @@ class LearningManager:
         Returns:
             True if successful, False otherwise
         """
+        session = self.Session()
         try:
-            learning = self.get_learning(learning_id)
+            learning = session.query(Learning).filter(Learning.id == learning_id).first()
             if not learning:
                 return False
 
-            learning.is_archived = True
-            learning.updated_at = datetime.utcnow()
-            self.session.commit()
+            # Since there's no is_archived column, we'll actually delete it
+            session.delete(learning)
+            session.commit()
 
-            logger.info(f"Learning archived: {learning_id}")
+            logger.info(f"Learning deleted: {learning_id}")
             return True
 
         except Exception as e:
-            logger.error(f"Error archiving learning {learning_id}: {e}")
-            self.session.rollback()
+            logger.error(f"Error deleting learning {learning_id}: {e}")
+            session.rollback()
             return False
+        finally:
+            session.close()
 
     def get_stats(self) -> Dict[str, Any]:
         """Get statistics about learnings.
@@ -225,33 +252,29 @@ class LearningManager:
         Returns:
             Dictionary with stats
         """
-        total = self.session.query(Learning).filter(
-            Learning.is_archived == False
-        ).count()
+        session = self.Session()
+        try:
+            total = session.query(Learning).count()
 
-        today = self.session.query(Learning).filter(
-            and_(
-                Learning.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0),
-                Learning.is_archived == False
-            )
-        ).count()
+            today = session.query(Learning).filter(
+                Learning.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            ).count()
 
-        this_week = self.session.query(Learning).filter(
-            and_(
-                Learning.created_at >= datetime.utcnow() - timedelta(days=7),
-                Learning.is_archived == False
-            )
-        ).count()
+            this_week = session.query(Learning).filter(
+                Learning.created_at >= datetime.utcnow() - timedelta(days=7)
+            ).count()
 
-        categories = self.get_categories()
+            categories = self.get_categories()
 
-        return {
-            'total': total,
-            'today': today,
-            'this_week': this_week,
-            'categories_count': len(categories),
-            'categories': categories[:10]  # Top 10 categories
-        }
+            return {
+                'total': total,
+                'today': today,
+                'this_week': this_week,
+                'categories_count': len(categories),
+                'categories': categories[:10]  # Top 10 categories
+            }
+        finally:
+            session.close()
 
     def format_learning_for_slack(self, learning: Learning) -> str:
         """Format a learning for Slack display.
@@ -264,8 +287,9 @@ class LearningManager:
         """
         category_str = f" [{learning.category}]" if learning.category else ""
         date_str = learning.created_at.strftime('%m/%d')
+        content = learning.description or learning.title
 
         return (
-            f"💡{category_str} *{learning.content}*\n"
-            f"   _by {learning.submitted_by} on {date_str}_"
+            f"💡{category_str} *{content}*\n"
+            f"   _on {date_str}_"
         )
