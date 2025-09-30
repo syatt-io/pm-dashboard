@@ -189,13 +189,14 @@ export const dataProvider: DataProvider = {
                     })),
                     total: json.todos.length,
                 };
-            } else if ((resource === 'projects' || resource === 'jira_projects') && json.projects) {
+            } else if ((resource === 'projects' || resource === 'jira_projects') && (json.projects || json.data?.projects)) {
+                const projects = json.projects || json.data?.projects || [];
                 return {
-                    data: json.projects.map((project: any) => ({
+                    data: projects.map((project: any) => ({
                         id: project.key,
                         ...project
                     })),
-                    total: json.projects.length,
+                    total: projects.length,
                 };
             } else if (resource === 'learnings' && json.learnings) {
                 return {
