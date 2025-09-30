@@ -48,7 +48,12 @@ def get_project_keywords_from_db():
     try:
         engine = get_engine()
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT project_key, keywords FROM project_keywords"))
+            # Aggregate keywords by project_key (note: column is 'keyword' not 'keywords')
+            result = conn.execute(text("""
+                SELECT project_key, array_agg(LOWER(keyword)) as keywords
+                FROM project_keywords
+                GROUP BY project_key
+            """))
             return {row[0]: row[1] for row in result}
     except Exception as e:
         logger.warning(f"Error loading project keywords: {e}")
