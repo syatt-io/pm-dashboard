@@ -1281,15 +1281,6 @@ def get_meetings(user):
 def get_meeting_detail(user, meeting_id):
     """Get details for a specific meeting."""
     try:
-        # Initialize database session
-        from src.models import ProcessedMeeting
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
-
         # Check if user has configured their own Fireflies API key
         user_api_key = user.get_fireflies_api_key()
 
@@ -1315,7 +1306,10 @@ def get_meeting_detail(user, meeting_id):
             return jsonify({'error': 'Meeting not found'}), 404
 
         # Check if we have analysis cached for this meeting
-        cached = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+        from src.models import ProcessedMeeting
+        cached = None
+        with session_scope() as db_session:
+            cached = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
         # Build the response
         meeting_data = {
@@ -1364,20 +1358,12 @@ def get_meeting_detail(user, meeting_id):
 def analyze_meeting_api(user, meeting_id):
     """Trigger analysis for a specific meeting via API."""
     try:
-        # Initialize database
         from src.models import ProcessedMeeting
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         # Check if user has configured their own Fireflies API key
         user_api_key = user.get_fireflies_api_key()
 
         if not user_api_key:
-            db_session.close()
             return jsonify({
                 'error': 'no_api_key',
                 'message': 'Please configure your Fireflies API key in Settings to analyze meetings.'
@@ -1388,7 +1374,6 @@ def analyze_meeting_api(user, meeting_id):
             user_fireflies_client = FirefliesClient(api_key=user_api_key)
         except Exception as e:
             logger.error(f"Failed to initialize Fireflies client for user {user.id}: {e}")
-            db_session.close()
             return jsonify({
                 'error': 'invalid_api_key',
                 'message': 'Invalid Fireflies API key. Please check your Settings.'
@@ -1397,7 +1382,6 @@ def analyze_meeting_api(user, meeting_id):
         # Get meeting transcript using user's API key
         transcript = user_fireflies_client.get_meeting_transcript(meeting_id)
         if not transcript:
-            db_session.close()
             return jsonify({'error': 'Meeting not found'}), 404
 
         logger.info(f"Starting API analysis for meeting {meeting_id}")
@@ -1424,35 +1408,33 @@ def analyze_meeting_api(user, meeting_id):
         ]
 
         # Check for existing record to handle race conditions
-        existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+        with session_scope() as db_session:
+            existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
-        if existing_meeting:
-            # Update existing record
-            existing_meeting.analyzed_at = analyzed_at
-            existing_meeting.summary = analysis.summary
-            existing_meeting.key_decisions = analysis.key_decisions
-            existing_meeting.blockers = analysis.blockers
-            existing_meeting.action_items = action_items_data
-            existing_meeting.title = transcript.title
-            existing_meeting.date = transcript.date
-            logger.info(f"Updated existing processed meeting record for {meeting_id}")
-        else:
-            # Create new record
-            processed_meeting = ProcessedMeeting(
-                meeting_id=meeting_id,
-                title=transcript.title,
-                date=transcript.date,
-                analyzed_at=analyzed_at,
-                summary=analysis.summary,
-                key_decisions=analysis.key_decisions,
-                blockers=analysis.blockers,
-                action_items=action_items_data
-            )
-            db_session.add(processed_meeting)
-            logger.info(f"Created new processed meeting record for {meeting_id}")
-
-        db_session.commit()
-        db_session.close()
+            if existing_meeting:
+                # Update existing record
+                existing_meeting.analyzed_at = analyzed_at
+                existing_meeting.summary = analysis.summary
+                existing_meeting.key_decisions = analysis.key_decisions
+                existing_meeting.blockers = analysis.blockers
+                existing_meeting.action_items = action_items_data
+                existing_meeting.title = transcript.title
+                existing_meeting.date = transcript.date
+                logger.info(f"Updated existing processed meeting record for {meeting_id}")
+            else:
+                # Create new record
+                processed_meeting = ProcessedMeeting(
+                    meeting_id=meeting_id,
+                    title=transcript.title,
+                    date=transcript.date,
+                    analyzed_at=analyzed_at,
+                    summary=analysis.summary,
+                    key_decisions=analysis.key_decisions,
+                    blockers=analysis.blockers,
+                    action_items=action_items_data
+                )
+                db_session.add(processed_meeting)
+                logger.info(f"Created new processed meeting record for {meeting_id}")
 
         return jsonify({
             'success': True,
