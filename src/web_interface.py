@@ -1475,8 +1475,8 @@ def get_jira_projects():
         logger.info(f"Fetched {len(jira_projects)} projects from Jira")
 
         # Merge with local database data
-        from sqlalchemy import create_engine, text
-        engine = create_engine(settings.agent.database_url)
+        from sqlalchemy import text
+        engine = get_engine()
 
         enhanced_projects = []
         try:
@@ -1656,32 +1656,24 @@ def get_user_my_projects_settings(email):
     """Get user settings by email."""
     try:
         from main import UserPreference
-        from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
 
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
+        with session_scope() as db_session:
+            user_pref = db_session.query(UserPreference).filter_by(email=email).first()
 
-        user_pref = db_session.query(UserPreference).filter_by(email=email).first()
+            if user_pref:
+                # Store email in session for future redirects
+                session['user_email'] = email
 
-        if user_pref:
-            # Store email in session for future redirects
-            session['user_email'] = email
-
-            settings_data = {
-                'email': user_pref.email,
-                'slack_username': user_pref.slack_username,
-                'notification_cadence': user_pref.notification_cadence,
-                'selected_projects': user_pref.selected_projects or [],
-                'last_notification_sent': user_pref.last_notification_sent.isoformat() if user_pref.last_notification_sent else None
-            }
-            db_session.close()
-            return jsonify({'success': True, 'user_settings': settings_data})
-        else:
-            db_session.close()
-            return jsonify({'success': False, 'error': 'User not found'}), 404
+                settings_data = {
+                    'email': user_pref.email,
+                    'slack_username': user_pref.slack_username,
+                    'notification_cadence': user_pref.notification_cadence,
+                    'selected_projects': user_pref.selected_projects or [],
+                    'last_notification_sent': user_pref.last_notification_sent.isoformat() if user_pref.last_notification_sent else None
+                }
+                return jsonify({'success': True, 'user_settings': settings_data})
+            else:
+                return jsonify({'success': False, 'error': 'User not found'}), 404
 
     except Exception as e:
         logger.error(f"Error getting user settings: {e}")
@@ -1699,68 +1691,59 @@ def save_user_settings():
             return jsonify({'success': False, 'error': 'Email is required'}), 400
 
         from main import UserPreference
-        from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
         import uuid
 
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
+        with session_scope() as db_session:
+            # Check if user exists
+            user_pref = db_session.query(UserPreference).filter_by(email=email).first()
 
-        # Check if user exists
-        user_pref = db_session.query(UserPreference).filter_by(email=email).first()
+            if user_pref:
+                # Update existing user
+                user_pref.slack_username = data.get('slack_username')
+                user_pref.notification_cadence = data.get('notification_cadence', 'daily')
+                user_pref.selected_projects = data.get('selected_projects', [])
+                user_pref.updated_at = datetime.now()
+            else:
+                # Create new user
+                user_pref = UserPreference(
+                    id=str(uuid.uuid4()),
+                    email=email,
+                    slack_username=data.get('slack_username'),
+                    notification_cadence=data.get('notification_cadence', 'daily'),
+                    selected_projects=data.get('selected_projects', []),
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                db_session.add(user_pref)
 
-        if user_pref:
-            # Update existing user
-            user_pref.slack_username = data.get('slack_username')
-            user_pref.notification_cadence = data.get('notification_cadence', 'daily')
-            user_pref.selected_projects = data.get('selected_projects', [])
-            user_pref.updated_at = datetime.now()
-        else:
-            # Create new user
-            user_pref = UserPreference(
-                id=str(uuid.uuid4()),
-                email=email,
-                slack_username=data.get('slack_username'),
-                notification_cadence=data.get('notification_cadence', 'daily'),
-                selected_projects=data.get('selected_projects', []),
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
-            db_session.add(user_pref)
+            # Handle project updates if provided
+            project_updates = data.get('project_updates', [])
+            if project_updates:
+                from sqlalchemy import text
+                for update in project_updates:
+                    project_key = update.get('key')
+                    project_name = update.get('name')
+                    forecasted_hours = update.get('forecasted_hours_month', 0)
+                    is_active = update.get('is_active', True)
 
-        # Handle project updates if provided
-        project_updates = data.get('project_updates', [])
-        if project_updates:
-            from sqlalchemy import text
-            for update in project_updates:
-                project_key = update.get('key')
-                project_name = update.get('name')
-                forecasted_hours = update.get('forecasted_hours_month', 0)
-                is_active = update.get('is_active', True)
-
-                if project_key:
-                    # Insert or update project in projects table
-                    db_session.execute(text("""
-                        INSERT INTO projects (key, name, forecasted_hours_month, is_active, created_at, updated_at)
-                        VALUES (:key, :name, :forecasted_hours, :is_active, :created_at, :updated_at)
-                        ON CONFLICT(key) DO UPDATE SET
-                            name = EXCLUDED.name,
-                            forecasted_hours_month = EXCLUDED.forecasted_hours_month,
-                            is_active = EXCLUDED.is_active,
-                            updated_at = EXCLUDED.updated_at
-                    """), {
-                        'key': project_key,
-                        'name': project_name or project_key,
-                        'forecasted_hours': forecasted_hours,
-                        'is_active': is_active,
-                        'created_at': datetime.now(),
-                        'updated_at': datetime.now()
-                    })
-
-        db_session.commit()
-        db_session.close()
+                    if project_key:
+                        # Insert or update project in projects table
+                        db_session.execute(text("""
+                            INSERT INTO projects (key, name, forecasted_hours_month, is_active, created_at, updated_at)
+                            VALUES (:key, :name, :forecasted_hours, :is_active, :created_at, :updated_at)
+                            ON CONFLICT(key) DO UPDATE SET
+                                name = EXCLUDED.name,
+                                forecasted_hours_month = EXCLUDED.forecasted_hours_month,
+                                is_active = EXCLUDED.is_active,
+                                updated_at = EXCLUDED.updated_at
+                        """), {
+                            'key': project_key,
+                            'name': project_name or project_key,
+                            'forecasted_hours': forecasted_hours,
+                            'is_active': is_active,
+                            'created_at': datetime.now(),
+                            'updated_at': datetime.now()
+                        })
 
         # Store user email in session for future redirects
         session['user_email'] = email
@@ -1779,8 +1762,8 @@ def update_project(project_key):
         data = request.json
 
         # Connect to database
-        from sqlalchemy import create_engine, text
-        engine = create_engine(settings.agent.database_url)
+        from sqlalchemy import text
+        engine = get_engine()
 
         with engine.connect() as conn:
             # Check if project exists in local DB
@@ -1970,20 +1953,12 @@ def project_dashboard(email):
         user_projects = []
         try:
             from main import UserPreference
-            from sqlalchemy.orm import sessionmaker
-            from sqlalchemy import create_engine
-            from sqlalchemy.orm import sessionmaker
 
-            engine = create_engine(settings.agent.database_url)
-            Session = sessionmaker(bind=engine)
-            db_session = Session()
-
-            user_pref = db_session.query(UserPreference).filter_by(email=email).first()
-            if user_pref:
-                user_projects = user_pref.selected_projects or []
-                logger.info(f"User {email} has selected projects: {user_projects}")
-
-            db_session.close()
+            with session_scope() as db_session:
+                user_pref = db_session.query(UserPreference).filter_by(email=email).first()
+                if user_pref:
+                    user_projects = user_pref.selected_projects or []
+                    logger.info(f"User {email} has selected projects: {user_projects}")
         except Exception as e:
             logger.error(f"Error getting user projects: {e}")
 
@@ -2080,19 +2055,11 @@ def meeting_project_dashboard():
             email = request.args.get('email')
             if email:
                 from main import UserPreference
-                from sqlalchemy.orm import sessionmaker
-                from sqlalchemy import create_engine
-                from sqlalchemy.orm import sessionmaker
 
-                engine = create_engine(settings.agent.database_url)
-                Session = sessionmaker(bind=engine)
-                db_session = Session()
-
-                user_pref = db_session.query(UserPreference).filter_by(email=email).first()
-                if user_pref and user_pref.selected_projects:
-                    project_keys = user_pref.selected_projects
-
-                db_session.close()
+                with session_scope() as db_session:
+                    user_pref = db_session.query(UserPreference).filter_by(email=email).first()
+                    if user_pref and user_pref.selected_projects:
+                        project_keys = user_pref.selected_projects
 
         if not project_keys:
             return jsonify({'success': False, 'error': 'No projects specified'}), 400
@@ -2142,7 +2109,7 @@ def sync_hours():
         import re
         from collections import defaultdict
 
-        engine = create_engine(settings.agent.database_url)
+        engine = get_engine()
         projects_updated = 0
 
         # Get all active projects
@@ -2974,53 +2941,47 @@ def save_fireflies_api_key(user):
         # Skip validation here since the frontend already validates via the separate endpoint
 
         # Save the encrypted API key
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
+        # Inline encryption to avoid import issues
+        def encrypt_api_key_inline(api_key: str) -> str:
+            """Encrypt an API key for database storage."""
+            import os
+            import base64
+            from cryptography.fernet import Fernet
+            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+            # Get encryption key from environment
+            encryption_key = os.getenv('ENCRYPTION_KEY')
+            if not encryption_key:
+                # Generate a temporary key (not recommended for production)
+                encryption_key = Fernet.generate_key().decode()
+
+            # If the key is a password/phrase, derive a proper key
+            if len(encryption_key) != 44 or not encryption_key.endswith('='):
+                # Derive key from password using PBKDF2
+                salt = b'syatt_pm_agent_salt_v1'  # Static salt for consistency
+                kdf = PBKDF2HMAC(
+                    algorithm=hashes.SHA256(),
+                    length=32,
+                    salt=salt,
+                    iterations=100000,
+                )
+                key = base64.urlsafe_b64encode(kdf.derive(encryption_key.encode()))
+            else:
+                # Use the key directly (it's already a Fernet key)
+                key = encryption_key.encode()
+
+            fernet = Fernet(key)
+            encrypted_bytes = fernet.encrypt(api_key.encode())
+            return base64.urlsafe_b64encode(encrypted_bytes).decode()
 
         try:
-            # Refresh user object from database
-            db_user = db_session.merge(user)
+            with session_scope() as db_session:
+                # Refresh user object from database
+                db_user = db_session.merge(user)
 
-            # Inline encryption to avoid import issues
-            def encrypt_api_key_inline(api_key: str) -> str:
-                """Encrypt an API key for database storage."""
-                import os
-                import base64
-                from cryptography.fernet import Fernet
-                from cryptography.hazmat.primitives import hashes
-                from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
-                # Get encryption key from environment
-                encryption_key = os.getenv('ENCRYPTION_KEY')
-                if not encryption_key:
-                    # Generate a temporary key (not recommended for production)
-                    encryption_key = Fernet.generate_key().decode()
-
-                # If the key is a password/phrase, derive a proper key
-                if len(encryption_key) != 44 or not encryption_key.endswith('='):
-                    # Derive key from password using PBKDF2
-                    salt = b'syatt_pm_agent_salt_v1'  # Static salt for consistency
-                    kdf = PBKDF2HMAC(
-                        algorithm=hashes.SHA256(),
-                        length=32,
-                        salt=salt,
-                        iterations=100000,
-                    )
-                    key = base64.urlsafe_b64encode(kdf.derive(encryption_key.encode()))
-                else:
-                    # Use the key directly (it's already a Fernet key)
-                    key = encryption_key.encode()
-
-                fernet = Fernet(key)
-                encrypted_bytes = fernet.encrypt(api_key.encode())
-                return base64.urlsafe_b64encode(encrypted_bytes).decode()
-
-            # Set encrypted API key directly
-            db_user.fireflies_api_key_encrypted = encrypt_api_key_inline(api_key) if api_key.strip() else None
-            db_session.commit()
+                # Set encrypted API key directly
+                db_user.fireflies_api_key_encrypted = encrypt_api_key_inline(api_key) if api_key.strip() else None
 
             logger.info(f"Fireflies API key saved for user {user.id}")
             return jsonify({
@@ -3029,10 +2990,7 @@ def save_fireflies_api_key(user):
             })
 
         except Exception as e:
-            db_session.rollback()
             raise e
-        finally:
-            db_session.close()
 
     except Exception as e:
         logger.error(f"Error saving Fireflies API key for user {user.id}: {e}")
@@ -3047,29 +3005,16 @@ def save_fireflies_api_key(user):
 def delete_fireflies_api_key(user):
     """Delete user's Fireflies API key."""
     try:
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
-
-        try:
+        with session_scope() as db_session:
             # Refresh user object from database
             db_user = db_session.merge(user)
             db_user.clear_fireflies_api_key()
-            db_session.commit()
 
-            logger.info(f"Fireflies API key deleted for user {user.id}")
-            return jsonify({
-                'success': True,
-                'message': 'Fireflies API key deleted successfully'
-            })
-
-        except Exception as e:
-            db_session.rollback()
-            raise e
-        finally:
-            db_session.close()
+        logger.info(f"Fireflies API key deleted for user {user.id}")
+        return jsonify({
+            'success': True,
+            'message': 'Fireflies API key deleted successfully'
+        })
 
     except Exception as e:
         logger.error(f"Error deleting Fireflies API key for user {user.id}: {e}")
