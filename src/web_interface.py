@@ -95,6 +95,19 @@ app.auth_service = auth_service
 auth_blueprint = create_auth_blueprint(db_session_factory)
 app.register_blueprint(auth_blueprint)
 
+# Register extracted route blueprints
+from src.routes.health import health_bp
+from src.routes.todos import todos_bp
+from src.routes.meetings import meetings_bp
+from src.routes.jira import jira_bp
+from src.routes.learnings import learnings_bp
+
+app.register_blueprint(health_bp)
+app.register_blueprint(todos_bp)
+app.register_blueprint(meetings_bp)
+app.register_blueprint(jira_bp)
+app.register_blueprint(learnings_bp)
+
 # Initialize components
 fireflies = FirefliesClient(settings.fireflies.api_key)
 analyzer = TranscriptAnalyzer()
