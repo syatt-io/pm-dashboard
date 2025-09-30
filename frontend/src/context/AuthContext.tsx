@@ -33,8 +33,13 @@ axios.defaults.withCredentials = true;
 // Add auth token to all requests
 axios.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
+  console.log('[axios interceptor] Request to:', config.url);
+  console.log('[axios interceptor] Token exists:', !!token);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+    console.log('[axios interceptor] Authorization header set');
+  } else {
+    console.log('[axios interceptor] No token, skipping Authorization header');
   }
   return config;
 });
@@ -108,20 +113,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (credential: string, rememberMe: boolean) => {
     try {
-      console.log('Sending login request with credential:', credential.substring(0, 50) + '...');
+      console.log('[AuthContext] login - Sending login request with credential:', credential.substring(0, 50) + '...');
       const response = await axios.post('/api/auth/google', {
         credential,
         rememberMe
       });
 
-      console.log('Login response received:', response);
-      console.log('Response status:', response.status);
-      console.log('Response data:', response.data);
+      console.log('[AuthContext] login - Login response received:', response);
+      console.log('[AuthContext] login - Response status:', response.status);
+      console.log('[AuthContext] login - Response data:', response.data);
 
       const { token, user } = response.data;
 
+      if (!token) {
+        console.error('[AuthContext] login - No token in response!');
+        throw new Error('No token received from server');
+      }
+
+      console.log('[AuthContext] login - Token received, length:', token.length);
+      console.log('[AuthContext] login - Token preview:', token.substring(0, 20) + '...');
+
       localStorage.setItem('auth_token', token);
       localStorage.setItem('rememberMe', rememberMe.toString());
+
+      // Verify token was stored
+      const storedToken = localStorage.getItem('auth_token');
+      console.log('[AuthContext] login - Token stored in localStorage:', !!storedToken);
+      console.log('[AuthContext] login - Stored token matches:', storedToken === token);
 
       setUser(user);
 

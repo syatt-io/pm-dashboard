@@ -44,28 +44,43 @@ export const dataProvider: any = {
         const getWatchedProjects = async () => {
             try {
                 const token = localStorage.getItem('auth_token');
-                if (!token) return [];
+                console.log('[dataProvider] getWatchedProjects - Token exists:', !!token);
+                console.log('[dataProvider] getWatchedProjects - Token preview:', token?.substring(0, 20) + '...');
 
-                const response = await fetch(`${API_URL}/watched-projects`, {
+                if (!token) {
+                    console.warn('[dataProvider] getWatchedProjects - No token found, returning empty array');
+                    return [];
+                }
+
+                const url = `${API_URL}/watched-projects`;
+                console.log('[dataProvider] getWatchedProjects - Fetching from:', url);
+
+                const response = await fetch(url, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json',
                     },
                 });
 
+                console.log('[dataProvider] getWatchedProjects - Response status:', response.status);
+
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('[dataProvider] getWatchedProjects - Success, projects:', data.watched_projects);
                     return data.watched_projects || [];
                 } else if (response.status === 401) {
                     // Silently handle auth errors - user may not be logged in yet
-                    console.warn('Not authenticated for watched projects');
+                    const errorText = await response.text();
+                    console.warn('[dataProvider] getWatchedProjects - 401 Unauthorized');
+                    console.warn('[dataProvider] getWatchedProjects - Error response:', errorText);
                 } else {
                     // Silently handle other errors to prevent retry loops
-                    console.warn(`Error loading watched projects: ${response.status}`);
+                    const errorText = await response.text();
+                    console.warn(`[dataProvider] getWatchedProjects - Error ${response.status}: ${errorText}`);
                 }
             } catch (error) {
                 // Silently handle errors to prevent infinite retry loop
-                console.error('Error fetching watched projects:', error);
+                console.error('[dataProvider] getWatchedProjects - Exception:', error);
             }
             return [];
         };
