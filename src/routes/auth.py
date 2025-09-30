@@ -128,9 +128,13 @@ def create_auth_blueprint(db_session_factory):
                 try:
                     payload = jwt_lib.decode(token, auth_service.jwt_secret, algorithms=['HS256'], options={"verify_exp": False})
                     from src.models.user import User
-                    user = db_session.query(User).filter_by(id=payload['user_id']).first()
-                    if not user or not user.can_access():
-                        raise ValueError("User not found or access denied")
+                    db_session = db_session_factory()
+                    try:
+                        user = db_session.query(User).filter_by(id=payload['user_id']).first()
+                        if not user or not user.can_access():
+                            raise ValueError("User not found or access denied")
+                    finally:
+                        db_session.close()
                 except Exception:
                     return jsonify({'error': 'Invalid token'}), 401
 
@@ -165,6 +169,7 @@ def create_auth_blueprint(db_session_factory):
     @admin_required
     def get_all_users(current_user):
         """Get all users (admin only)."""
+        db_session = db_session_factory()
         try:
             from src.models.user import User
             users = db_session.query(User).all()
@@ -174,11 +179,14 @@ def create_auth_blueprint(db_session_factory):
         except Exception as e:
             logger.error(f"Failed to get users: {e}")
             return jsonify({'error': 'Failed to get users'}), 500
+        finally:
+            db_session.close()
 
     @auth_bp.route('/api/auth/users/<int:user_id>/role', methods=['PUT'])
     @admin_required
     def update_user_role(current_user, user_id):
         """Update user role (admin only)."""
+        db_session = db_session_factory()
         try:
             from src.models.user import User
             data = request.get_json()
@@ -213,11 +221,14 @@ def create_auth_blueprint(db_session_factory):
             logger.error(f"Failed to update user role: {e}")
             db_session.rollback()
             return jsonify({'error': 'Failed to update user role'}), 500
+        finally:
+            db_session.close()
 
     @auth_bp.route('/api/auth/users/<int:user_id>/status', methods=['PUT'])
     @admin_required
     def update_user_status(current_user, user_id):
         """Update user active status (admin only)."""
+        db_session = db_session_factory()
         try:
             from src.models.user import User
             data = request.get_json()
@@ -246,5 +257,7 @@ def create_auth_blueprint(db_session_factory):
             logger.error(f"Failed to update user status: {e}")
             db_session.rollback()
             return jsonify({'error': 'Failed to update user status'}), 500
+        finally:
+            db_session.close()
 
     return auth_bp
