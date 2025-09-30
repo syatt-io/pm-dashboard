@@ -2830,6 +2830,9 @@ def jira_health_check():
     """Diagnostic endpoint for Jira connection."""
     try:
         import os
+        import base64
+        import httpx
+
         diagnostics = {
             'jira_url': settings.jira.url if hasattr(settings, 'jira') else 'NOT_LOADED',
             'jira_username': settings.jira.username if hasattr(settings, 'jira') else 'NOT_LOADED',
@@ -2842,6 +2845,38 @@ def jira_health_check():
             'env_jira_token_length': len(os.getenv('JIRA_API_TOKEN', '')),
             'env_jira_token_prefix': os.getenv('JIRA_API_TOKEN', '')[:10] + '...' if os.getenv('JIRA_API_TOKEN') else None,
         }
+
+        # Test actual Jira API call synchronously
+        try:
+            auth_string = base64.b64encode(f"{settings.jira.username}:{settings.jira.api_token}".encode()).decode()
+
+            # Use httpx synchronously for testing
+            client = httpx.Client(timeout=30.0)
+            response = client.get(
+                f"{settings.jira.url}/rest/api/3/project",
+                headers={
+                    "Authorization": f"Basic {auth_string}",
+                    "Accept": "application/json"
+                }
+            )
+
+            diagnostics['api_test'] = {
+                'status_code': response.status_code,
+                'success': response.status_code == 200,
+                'project_count': len(response.json()) if response.status_code == 200 else 0,
+                'error': response.text if response.status_code != 200 else None
+            }
+
+            client.close()
+
+        except Exception as api_error:
+            import traceback
+            diagnostics['api_test'] = {
+                'success': False,
+                'error': str(api_error),
+                'traceback': traceback.format_exc()
+            }
+
         return jsonify(diagnostics)
     except Exception as e:
         import traceback
