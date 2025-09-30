@@ -1435,43 +1435,51 @@ def get_jira_projects():
         engine = create_engine(settings.agent.database_url)
 
         enhanced_projects = []
-        with engine.connect() as conn:
-            for project in jira_projects:
-                # Get local project data
-                result = conn.execute(text(
-                    "SELECT forecasted_hours_month, is_active, project_work_type, total_hours, current_month_hours, cumulative_hours, slack_channel, weekly_meeting_day FROM projects WHERE key = :key"
-                ), {"key": project["key"]}).fetchone()
+        try:
+            with engine.connect() as conn:
+                for project in jira_projects:
+                    enhanced_project = project.copy()
+                    try:
+                        # Get local project data (may fail if table doesn't exist)
+                        result = conn.execute(text(
+                            "SELECT forecasted_hours_month, is_active, project_work_type, total_hours, current_month_hours, cumulative_hours, slack_channel, weekly_meeting_day FROM projects WHERE key = :key"
+                        ), {"key": project["key"]}).fetchone()
 
-                enhanced_project = project.copy()
-                if result:
-                    enhanced_project["forecasted_hours_month"] = float(result[0]) if result[0] else 0
-                    enhanced_project["is_active"] = bool(result[1]) if result[1] is not None else True
-                    enhanced_project["project_work_type"] = result[2] if result[2] else 'project-based'
-                    enhanced_project["total_hours"] = float(result[3]) if result[3] else 0
-                    enhanced_project["current_month_hours"] = float(result[4]) if result[4] else 0
-                    enhanced_project["cumulative_hours"] = float(result[5]) if result[5] else 0
-                    enhanced_project["slack_channel"] = result[6] if result[6] else None
-                    enhanced_project["weekly_meeting_day"] = result[7] if result[7] else None
+                        if result:
+                            enhanced_project["forecasted_hours_month"] = float(result[0]) if result[0] else 0
+                            enhanced_project["is_active"] = bool(result[1]) if result[1] is not None else True
+                            enhanced_project["project_work_type"] = result[2] if result[2] else 'project-based'
+                            enhanced_project["total_hours"] = float(result[3]) if result[3] else 0
+                            enhanced_project["current_month_hours"] = float(result[4]) if result[4] else 0
+                            enhanced_project["cumulative_hours"] = float(result[5]) if result[5] else 0
+                            enhanced_project["slack_channel"] = result[6] if result[6] else None
+                            enhanced_project["weekly_meeting_day"] = result[7] if result[7] else None
+                        else:
+                            # No database record - use defaults
+                            enhanced_project["forecasted_hours_month"] = 0
+                            enhanced_project["is_active"] = True
+                            enhanced_project["project_work_type"] = 'project-based'
+                            enhanced_project["total_hours"] = 0
+                            enhanced_project["current_month_hours"] = 0
+                            enhanced_project["cumulative_hours"] = 0
+                            enhanced_project["slack_channel"] = None
+                            enhanced_project["weekly_meeting_day"] = None
+                    except Exception:
+                        # Projects table doesn't exist or query failed - use defaults
+                        enhanced_project["forecasted_hours_month"] = 0
+                        enhanced_project["is_active"] = True
+                        enhanced_project["project_work_type"] = 'project-based'
+                        enhanced_project["total_hours"] = 0
+                        enhanced_project["current_month_hours"] = 0
+                        enhanced_project["cumulative_hours"] = 0
+                        enhanced_project["slack_channel"] = None
+                        enhanced_project["weekly_meeting_day"] = None
 
-                    # Debug logging for BEAU
-                    if project["key"] == "BEAU":
-                        logger.info(f"BEAU project found in database: current_month_hours={result[4]}, cumulative_hours={result[5]}")
-                        logger.info(f"BEAU enhanced_project after assignment: {enhanced_project.get('current_month_hours')}, {enhanced_project.get('cumulative_hours')}")
-                else:
-                    enhanced_project["forecasted_hours_month"] = 0
-                    enhanced_project["is_active"] = True
-                    enhanced_project["project_work_type"] = 'project-based'
-                    enhanced_project["total_hours"] = 0
-                    enhanced_project["current_month_hours"] = 0
-                    enhanced_project["cumulative_hours"] = 0
-                    enhanced_project["slack_channel"] = None
-                    enhanced_project["weekly_meeting_day"] = None
-
-                    # Debug logging for BEAU
-                    if project["key"] == "BEAU":
-                        logger.info(f"BEAU project NOT found in database - using defaults")
-
-                enhanced_projects.append(enhanced_project)
+                    enhanced_projects.append(enhanced_project)
+        except Exception as e:
+            # If database operations fail entirely, return projects without enhancements
+            logger.warning(f"Could not enhance projects with database data: {e}")
+            enhanced_projects = jira_projects
 
         return jsonify({"success": True, "projects": enhanced_projects})
     except Exception as e:
