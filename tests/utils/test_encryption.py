@@ -69,13 +69,11 @@ def test_encryption_produces_different_outputs():
     assert decrypt_api_key(encrypted2) == api_key
 
 
-def test_encrypt_none_raises_error():
-    """Test that encrypting None raises appropriate error."""
-    with pytest.raises((TypeError, AttributeError)):
-        encrypt_api_key(None)
+def test_encrypt_none_returns_empty_string():
+    """Test that encrypting None returns empty string (graceful handling)."""
+    assert encrypt_api_key(None) == ""
 
 
-def test_decrypt_none_raises_error():
-    """Test that decrypting None raises appropriate error."""
-    with pytest.raises((TypeError, AttributeError)):
-        decrypt_api_key(None)
+def test_decrypt_none_returns_empty_string():
+    """Test that decrypting None returns empty string (graceful handling)."""
+    assert decrypt_api_key(None) == ""
