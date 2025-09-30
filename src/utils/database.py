@@ -39,18 +39,24 @@ def get_engine():
         else:
             # Development or SQLite configuration
             connect_args = {}
+            engine_kwargs = {
+                "connect_args": connect_args,
+                "echo": False  # Set to True for SQL debugging
+            }
+
             if 'sqlite' in db_url:
                 connect_args = {"check_same_thread": False}
+                # SQLite doesn't support pool_size/max_overflow parameters
+            else:
+                # PostgreSQL in development
+                engine_kwargs.update({
+                    "pool_size": 5,
+                    "max_overflow": 10,
+                    "pool_pre_ping": True,
+                    "pool_recycle": 3600
+                })
 
-            _engine = create_engine(
-                db_url,
-                pool_size=5,
-                max_overflow=10,
-                pool_pre_ping=True,  # Verify connections before using
-                pool_recycle=3600,  # Recycle connections after 1 hour
-                connect_args=connect_args,
-                echo=False  # Set to True for SQL debugging
-            )
+            _engine = create_engine(db_url, **engine_kwargs)
             logger.info("Database engine initialized for development with connection pooling")
     return _engine
 
