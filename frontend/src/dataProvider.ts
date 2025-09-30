@@ -132,85 +132,50 @@ export const dataProvider: DataProvider = {
         }
 
         return httpClient(url).then(({ json }) => {
-            // Handle the standard API response format with json.data
-            if (json.data && Array.isArray(json.data)) {
-                let data = json.data;
+            // Standard format: {data: [...], total: number}
+            // Handle nested data from success_response wrapper: {success: true, data: {...}}
+            let responseData = json.data;
 
-                // Special handling for analysis resource - transform all meetings
-                if (resource === 'analysis') {
-                    data = json.data.map((meeting: any) => {
-                        // Ensure consistent ID handling
-                        const meetingId = meeting.meeting_id || meeting.id;
-                        return {
-                            id: meetingId,
-                            meeting_title: meeting.title || 'Untitled Meeting',
-                            analyzed_at: meeting.analyzed_at || meeting.date,
-                            action_items: meeting.action_items || [],
-                            key_decisions: meeting.key_decisions || [],
-                            blockers: meeting.blockers || [],
-                            follow_ups: meeting.follow_ups || [],
-                            summary: meeting.summary || (meeting.action_items && meeting.action_items.length > 0 ? 'Meeting analysis completed' : 'Not analyzed yet'),
-                            // Include all original meeting fields with consistent ID
-                            meeting_id: meetingId,
-                            title: meeting.title,
-                            date: meeting.date,
-                            confidence: meeting.confidence,
-                            relevance_score: meeting.relevance_score,
-                            action_items_count: meeting.action_items_count || 0,
-                            ...meeting
-                        };
-                    });
-                }
-
-                return {
-                    data: data.map((item: any, index: number) => ({
-                        id: item.id || item.meeting_id || item.key || index,
-                        ...item
-                    })),
-                    total: json.total || data.length,
-                };
+            // If data is wrapped in success response with nested data.projects, unwrap it
+            if (responseData && typeof responseData === 'object' && 'projects' in responseData) {
+                responseData = responseData.projects;
             }
 
-            // Fallback for legacy formats
-            if (resource === 'meetings' && json.dashboard?.project_meetings) {
-                const meetings = Object.values(json.dashboard.project_meetings).flat();
-                return {
-                    data: meetings.map((meeting: any, index: number) => ({
-                        id: meeting.meeting_id || index,
+            // Ensure we have an array
+            if (!Array.isArray(responseData)) {
+                responseData = [];
+            }
+
+            // Special handling for analysis resource - transform all meetings
+            if (resource === 'analysis' && responseData.length > 0) {
+                responseData = responseData.map((meeting: any) => {
+                    const meetingId = meeting.meeting_id || meeting.id;
+                    return {
+                        id: meetingId,
+                        meeting_title: meeting.title || 'Untitled Meeting',
+                        analyzed_at: meeting.analyzed_at || meeting.date,
+                        action_items: meeting.action_items || [],
+                        key_decisions: meeting.key_decisions || [],
+                        blockers: meeting.blockers || [],
+                        follow_ups: meeting.follow_ups || [],
+                        summary: meeting.summary || (meeting.action_items && meeting.action_items.length > 0 ? 'Meeting analysis completed' : 'Not analyzed yet'),
+                        meeting_id: meetingId,
+                        title: meeting.title,
+                        date: meeting.date,
+                        confidence: meeting.confidence,
+                        relevance_score: meeting.relevance_score,
+                        action_items_count: meeting.action_items_count || 0,
                         ...meeting
-                    })),
-                    total: meetings.length,
-                };
-            } else if (resource === 'todos' && json.todos) {
-                return {
-                    data: json.todos.map((todo: any) => ({
-                        id: todo.id,
-                        ...todo
-                    })),
-                    total: json.todos.length,
-                };
-            } else if ((resource === 'projects' || resource === 'jira_projects') && (json.projects || json.data?.projects)) {
-                const projects = json.projects || json.data?.projects || [];
-                return {
-                    data: projects.map((project: any) => ({
-                        id: project.key,
-                        ...project
-                    })),
-                    total: projects.length,
-                };
-            } else if (resource === 'learnings' && json.learnings) {
-                return {
-                    data: json.learnings.map((learning: any) => ({
-                        id: learning.id,
-                        ...learning
-                    })),
-                    total: json.total || json.learnings.length,
-                };
+                    };
+                });
             }
 
             return {
-                data: Array.isArray(json) ? json : [],
-                total: Array.isArray(json) ? json.length : 0,
+                data: responseData.map((item: any, index: number) => ({
+                    id: item.id || item.meeting_id || item.key || index,
+                    ...item
+                })),
+                total: json.total || responseData.length,
             };
         }).catch(error => {
             // Re-throw error for react-admin to handle

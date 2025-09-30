@@ -52,9 +52,9 @@ def get_learnings(user):
             category=category
         )
 
+        # Return in React Admin format
         return jsonify({
-            'success': True,
-            'learnings': [learning.to_dict() for learning in learnings],
+            'data': [learning.to_dict() for learning in learnings],
             'total': len(learnings)
         })
 
@@ -175,9 +175,9 @@ def search_learnings(user):
 
         learnings = manager.search_learnings(search_term)
 
+        # Return in React Admin format
         return jsonify({
-            'success': True,
-            'learnings': [learning.to_dict() for learning in learnings],
+            'data': [learning.to_dict() for learning in learnings],
             'total': len(learnings)
         })
 
