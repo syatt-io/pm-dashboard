@@ -33,10 +33,12 @@ services:
     value: EV[1:udHzH3BgMjK6T1kLZIX8KDU/3x5UG9d1:fHgPWoAVZRc87AjoAVjclP9rGENtTdIjxeaV2oFZJFunZlxiIPGN+g==]
   - key: GOOGLE_CLIENT_ID
     scope: RUN_AND_BUILD_TIME
-    value: "557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com"
+    value: 557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com
   - key: REACT_APP_GOOGLE_CLIENT_ID
     scope: RUN_AND_BUILD_TIME
-    value: "557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com"
+    value: 557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com
+  - key: REACT_APP_API_URL
+    scope: RUN_AND_BUILD_TIME
   - key: FIREFLIES_API_KEY
     scope: RUN_AND_BUILD_TIME
     type: SECRET
@@ -73,6 +75,9 @@ services:
     scope: RUN_AND_BUILD_TIME
     type: SECRET
     value: EV[1:+yjikIwezrkmC3w+6oSk3IlgasVPVRRx:pwnY9XMKOox5d4q0b83+HDYmWbGI/dHn1C1iVY/b7NeZq/Z7]
+  - key: ENCRYPTION_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: ILTHiZKz04ZdRIYTbp-c_T-sLES8FC05MNT90XuwLsw=
   github:
     branch: main
     deploy_on_push: true
@@ -86,7 +91,8 @@ services:
     timeout_seconds: 5
   http_port: 8080
   instance_count: 1
-  instance_size_slug: professional-xs
+  instance_size_slug: apps-s-1vcpu-0.5gb
   name: app
-  run_command: gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
+  run_command: gunicorn --bind 0.0.0.0:$PORT --workers 2 --worker-class sync --max-requests
+    1000 --max-requests-jitter 50 --timeout 120 src.web_interface:app
   source_dir: /
