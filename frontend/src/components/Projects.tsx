@@ -123,33 +123,46 @@ function TabPanel(props: TabPanelProps) {
 
 const WatchToggle = ({ record }: { record: any }) => {
   const [watched, setWatched] = useState(false);
+  const [loading, setLoading] = useState(false);
   const notify = useNotify();
 
   useEffect(() => {
     // Load watched projects from API
-    loadWatchedProjectsFromAPI();
-  }, [record.key]);
+    const loadWatchedProjectsFromAPI = async () => {
+      if (loading) return; // Prevent multiple simultaneous requests
 
-  const loadWatchedProjectsFromAPI = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) return;
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
 
-      const response = await fetch(`${API_BASE_URL}/api/watched-projects`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+        const response = await fetch(`${API_BASE_URL}/api/watched-projects`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        setWatched(data.watched_projects.includes(record.key));
+        if (response.ok) {
+          const data = await response.json();
+          setWatched(data.watched_projects.includes(record.key));
+        } else if (response.status === 401) {
+          // Silently handle auth errors - user may not be logged in yet
+          console.warn('Not authenticated');
+        }
+      } catch (error) {
+        // Silently handle errors to prevent infinite retry loop
+        console.error('Error loading watched projects:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading watched projects:', error);
-    }
-  };
+    };
+
+    loadWatchedProjectsFromAPI();
+  }, [record.key]); // Only re-run when record.key changes
 
   const handleToggle = async () => {
     try {
