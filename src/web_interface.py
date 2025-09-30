@@ -2825,6 +2825,29 @@ def health_check():
         }), 500
 
 
+@app.route('/api/health/jira', methods=['GET'])
+def jira_health_check():
+    """Diagnostic endpoint for Jira connection."""
+    try:
+        import os
+        diagnostics = {
+            'jira_url': settings.jira.url if hasattr(settings, 'jira') else 'NOT_LOADED',
+            'jira_username': settings.jira.username if hasattr(settings, 'jira') else 'NOT_LOADED',
+            'jira_token_set': bool(settings.jira.api_token) if hasattr(settings, 'jira') and hasattr(settings.jira, 'api_token') else False,
+            'jira_token_length': len(settings.jira.api_token) if hasattr(settings, 'jira') and hasattr(settings.jira, 'api_token') and settings.jira.api_token else 0,
+            'jira_token_prefix': settings.jira.api_token[:10] + '...' if hasattr(settings, 'jira') and hasattr(settings.jira, 'api_token') and settings.jira.api_token else None,
+            'env_jira_url': os.getenv('JIRA_URL'),
+            'env_jira_username': os.getenv('JIRA_USERNAME'),
+            'env_jira_token_set': bool(os.getenv('JIRA_API_TOKEN')),
+            'env_jira_token_length': len(os.getenv('JIRA_API_TOKEN', '')),
+            'env_jira_token_prefix': os.getenv('JIRA_API_TOKEN', '')[:10] + '...' if os.getenv('JIRA_API_TOKEN') else None,
+        }
+        return jsonify(diagnostics)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 # =============================================================================
 # User Settings API Endpoints
 # =============================================================================
