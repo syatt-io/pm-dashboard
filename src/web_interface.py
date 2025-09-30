@@ -223,68 +223,29 @@ def run_database_migrations():
 run_database_migrations()
 
 
-@app.route('/')
-def main_dashboard():
-    """Main landing page - redirects to project dashboard or setup form."""
-    try:
-        # Check if user has set up their email/profile
-        user_email = session.get('user_email')
+# OLD FLASK ROUTE - Now handled by React Router
+# @app.route('/')
+# def main_dashboard():
+#     """Main landing page - redirects to project dashboard or setup form."""
+#     try:
+#         # Check if user has set up their email/profile
+#         user_email = session.get('user_email')
+#
+#         if user_email:
+#             # User is set up, redirect to their project dashboard
+#             return redirect(f'/my-projects/dashboard/{user_email}')
+#         else:
+#             # New user, show setup form
+#             return redirect('/my-projects')
+#     except Exception as e:
+#         logger.error(f"Error in main dashboard: {e}")
+#         return render_template('error.html', error=str(e))
 
-        if user_email:
-            # User is set up, redirect to their project dashboard
-            return redirect(f'/my-projects/dashboard/{user_email}')
-        else:
-            # New user, show setup form
-            return redirect('/my-projects')
-    except Exception as e:
-        logger.error(f"Error in main dashboard: {e}")
-        return render_template('error.html', error=str(e))
-
-@app.route('/meetings')
-def meetings_dashboard():
-    """Dashboard showing recent meetings."""
-    try:
-        meetings = fireflies.get_recent_meetings(days_back=10, limit=200)
-
-        # Check which meetings have been analyzed
-        from src.models import ProcessedMeeting
-
-        analyzed_meetings = {}
-        with session_scope() as db_session:
-            processed_meetings = db_session.query(ProcessedMeeting).all()
-            for pm in processed_meetings:
-                if pm.analyzed_at:
-                    analyzed_meetings[pm.meeting_id] = pm.analyzed_at
-
-        # Format meetings for display
-        formatted_meetings = []
-        for meeting in meetings:
-            date_val = meeting.get('date', 0)
-            if isinstance(date_val, (int, float)) and date_val > 1000000000000:
-                meeting_date = datetime.fromtimestamp(date_val / 1000)
-                date_str = meeting_date.strftime('%Y-%m-%d %I:%M %p')
-            else:
-                date_str = str(date_val)
-
-            meeting_id = meeting['id']
-            analyzed_at = analyzed_meetings.get(meeting_id)
-
-            formatted_meetings.append({
-                'id': meeting_id,
-                'title': meeting.get('title', 'Untitled'),
-                'date': date_str,
-                'duration': meeting.get('duration', 0),
-                'is_analyzed': analyzed_at is not None,
-                'analyzed_at': analyzed_at.strftime('%Y-%m-%d %I:%M %p') if analyzed_at else None
-            })
-
-        breadcrumbs = [
-            {'title': 'Home', 'url': '/'}
-        ]
-        return render_template('dashboard_new.html', meetings=formatted_meetings, breadcrumbs=breadcrumbs)
-
-    except Exception as e:
-        return render_template('error.html', error=str(e))
+# OLD FLASK ROUTE - Now handled by React Router
+# @app.route('/meetings')
+# def meetings_dashboard():
+#     """Dashboard showing recent meetings."""
+#     # This old template-based route is no longer needed - React app handles /meetings
 
 
 @app.route('/analyze/<meeting_id>')
@@ -3066,11 +3027,12 @@ def validate_fireflies_api_key_endpoint(user):
         }), 500
 
 
+# OLD FLASK ROUTE - Now handled by React Router via catch-all
 # Specific route for my-projects (temporary debug)
-@app.route('/my-projects')
-def my_projects_route():
-    """Handle my-projects route specifically."""
-    return serve_react('my-projects')
+# @app.route('/my-projects')
+# def my_projects_route():
+#     """Handle my-projects route specifically."""
+#     return serve_react('my-projects')
 
 # Emergency route to create users table
 @app.route('/api/admin/create-users-table', methods=['POST', 'GET'])
