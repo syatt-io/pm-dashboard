@@ -88,10 +88,8 @@ export const dataProvider: any = {
                 const watchedProjectsForAnalysis = await getWatchedProjects();
                 if (watchedProjectsForAnalysis.length > 0) {
                     queryParams.set('projects', watchedProjectsForAnalysis.join(','));
-                } else {
-                    // If no watched projects, set default projects to ensure we get some results
-                    queryParams.set('projects', 'BEAU,RNWL,SUBS,IRIS');
                 }
+                // No fallback - if user has no watched projects, show nothing
                 break;
             case 'todos':
                 url = `${API_URL}/todos`;

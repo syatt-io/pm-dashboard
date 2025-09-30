@@ -73,7 +73,6 @@ const AdminApp = () => {
           list={ProjectList}
           show={ProjectShow}
           icon={BusinessIcon}
-          options={{ label: 'My Projects' }}
         />
         <Resource
           name="learnings"
