@@ -11,6 +11,7 @@ from config.settings import settings
 from src.services.auth import auth_required
 from src.integrations.fireflies import FirefliesClient
 from src.services.meeting_analyzer import MeetingAnalyzer
+from src.utils.database import get_engine, session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,9 @@ def error_response(error, status_code=500, details=None):
 # Helper function for project keyword mapping
 def get_project_keywords_from_db():
     """Get project keywords mapping from database."""
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import text
     try:
-        engine = create_engine(settings.agent.database_url)
+        engine = get_engine()
         with engine.connect() as conn:
             result = conn.execute(text("SELECT project_key, keywords FROM project_keywords"))
             return {row[0]: row[1] for row in result}
@@ -70,20 +71,13 @@ def meetings_dashboard():
 
         # Check which meetings have been analyzed
         from src.models import ProcessedMeeting
-        from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import create_engine
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         analyzed_meetings = {}
-        processed_meetings = db_session.query(ProcessedMeeting).all()
-        for pm in processed_meetings:
-            if pm.analyzed_at:
-                analyzed_meetings[pm.meeting_id] = pm.analyzed_at
-
-        db_session.close()
+        with session_scope() as db_session:
+            processed_meetings = db_session.query(ProcessedMeeting).all()
+            for pm in processed_meetings:
+                if pm.analyzed_at:
+                    analyzed_meetings[pm.meeting_id] = pm.analyzed_at
 
         # Format meetings for display
         formatted_meetings = []
@@ -124,16 +118,11 @@ def analyze_meeting(meeting_id):
     try:
         # Check if meeting has been analyzed before (unless forcing re-analysis)
         from src.models import ProcessedMeeting
-        from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import create_engine
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         cached_meeting = None
         if not force_reanalyze:
-            cached_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+            with session_scope() as db_session:
+                cached_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
         if cached_meeting and cached_meeting.analyzed_at:
             # Use cached analysis results
@@ -183,8 +172,6 @@ def analyze_meeting(meeting_id):
                 'analyzed_at': cached_meeting.analyzed_at.isoformat() if cached_meeting.analyzed_at else None
             }
 
-            db_session.close()
-
             breadcrumbs = [
                 {'title': 'Home', 'url': '/'},
                 {'title': 'Meetings', 'url': '/'},
@@ -209,7 +196,6 @@ def analyze_meeting(meeting_id):
 
         transcript = fireflies.get_meeting_transcript(meeting_id)
         if not transcript:
-            db_session.close()
             return render_template('error.html', error="Could not fetch meeting transcript")
 
         # Analyze with AI
@@ -234,35 +220,33 @@ def analyze_meeting(meeting_id):
         ]
 
         # Always check for existing record to handle race conditions
-        existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+        with session_scope() as db_session:
+            existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
-        if existing_meeting:
-            # Update existing record
-            existing_meeting.analyzed_at = analyzed_at
-            existing_meeting.summary = analysis.summary
-            existing_meeting.key_decisions = analysis.key_decisions
-            existing_meeting.blockers = analysis.blockers
-            existing_meeting.action_items = action_items_data
-            existing_meeting.title = transcript.title
-            existing_meeting.date = transcript.date
-            logger.info(f"Updated existing processed meeting record for {meeting_id}")
-        else:
-            # Create new record
-            processed_meeting = ProcessedMeeting(
-                meeting_id=meeting_id,
-                title=transcript.title,
-                date=transcript.date,
-                analyzed_at=analyzed_at,
-                summary=analysis.summary,
-                key_decisions=analysis.key_decisions,
-                blockers=analysis.blockers,
-                action_items=action_items_data
-            )
-            db_session.add(processed_meeting)
-            logger.info(f"Created new processed meeting record for {meeting_id}")
-
-        db_session.commit()
-        db_session.close()
+            if existing_meeting:
+                # Update existing record
+                existing_meeting.analyzed_at = analyzed_at
+                existing_meeting.summary = analysis.summary
+                existing_meeting.key_decisions = analysis.key_decisions
+                existing_meeting.blockers = analysis.blockers
+                existing_meeting.action_items = action_items_data
+                existing_meeting.title = transcript.title
+                existing_meeting.date = transcript.date
+                logger.info(f"Updated existing processed meeting record for {meeting_id}")
+            else:
+                # Create new record
+                processed_meeting = ProcessedMeeting(
+                    meeting_id=meeting_id,
+                    title=transcript.title,
+                    date=transcript.date,
+                    analyzed_at=analyzed_at,
+                    summary=analysis.summary,
+                    key_decisions=analysis.key_decisions,
+                    blockers=analysis.blockers,
+                    action_items=action_items_data
+                )
+                db_session.add(processed_meeting)
+                logger.info(f"Created new processed meeting record for {meeting_id}")
 
         # Store in session for later processing
         session['current_analysis'] = {
@@ -396,23 +380,16 @@ def get_meetings(user):
 
         # Get cached analysis data for overlay
         from src.models import ProcessedMeeting
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         # Create lookup dict for cached analysis
         cached_analyses = {}
         try:
-            all_cached = db_session.query(ProcessedMeeting).all()
-            for cached in all_cached:
-                cached_analyses[cached.meeting_id] = cached
+            with session_scope() as db_session:
+                all_cached = db_session.query(ProcessedMeeting).all()
+                for cached in all_cached:
+                    cached_analyses[cached.meeting_id] = cached
         except Exception as e:
             logger.warning(f"Error loading cached analyses: {e}")
-        finally:
-            db_session.close()
 
         # Convert Fireflies data to our format and apply project filtering
         meeting_list = []
@@ -532,14 +509,7 @@ def get_meetings(user):
 def get_meeting_detail(user, meeting_id):
     """Get details for a specific meeting."""
     try:
-        # Initialize database session
         from src.models import ProcessedMeeting
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         # Check if user has configured their own Fireflies API key
         user_api_key = user.get_fireflies_api_key()
@@ -566,7 +536,9 @@ def get_meeting_detail(user, meeting_id):
             return jsonify({'error': 'Meeting not found'}), 404
 
         # Check if we have analysis cached for this meeting
-        cached = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+        cached = None
+        with session_scope() as db_session:
+            cached = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
         # Build the response
         meeting_data = {
@@ -615,20 +587,12 @@ def get_meeting_detail(user, meeting_id):
 def analyze_meeting_api(user, meeting_id):
     """Trigger analysis for a specific meeting via API."""
     try:
-        # Initialize database
         from src.models import ProcessedMeeting
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         # Check if user has configured their own Fireflies API key
         user_api_key = user.get_fireflies_api_key()
 
         if not user_api_key:
-            db_session.close()
             return jsonify({
                 'error': 'no_api_key',
                 'message': 'Please configure your Fireflies API key in Settings to analyze meetings.'
@@ -639,7 +603,6 @@ def analyze_meeting_api(user, meeting_id):
             user_fireflies_client = FirefliesClient(api_key=user_api_key)
         except Exception as e:
             logger.error(f"Failed to initialize Fireflies client for user {user.id}: {e}")
-            db_session.close()
             return jsonify({
                 'error': 'invalid_api_key',
                 'message': 'Invalid Fireflies API key. Please check your Settings.'
@@ -648,7 +611,6 @@ def analyze_meeting_api(user, meeting_id):
         # Get meeting transcript using user's API key
         transcript = user_fireflies_client.get_meeting_transcript(meeting_id)
         if not transcript:
-            db_session.close()
             return jsonify({'error': 'Meeting not found'}), 404
 
         logger.info(f"Starting API analysis for meeting {meeting_id}")
@@ -675,35 +637,33 @@ def analyze_meeting_api(user, meeting_id):
         ]
 
         # Check for existing record to handle race conditions
-        existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+        with session_scope() as db_session:
+            existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
-        if existing_meeting:
-            # Update existing record
-            existing_meeting.analyzed_at = analyzed_at
-            existing_meeting.summary = analysis.summary
-            existing_meeting.key_decisions = analysis.key_decisions
-            existing_meeting.blockers = analysis.blockers
-            existing_meeting.action_items = action_items_data
-            existing_meeting.title = transcript.title
-            existing_meeting.date = transcript.date
-            logger.info(f"Updated existing processed meeting record for {meeting_id}")
-        else:
-            # Create new record
-            processed_meeting = ProcessedMeeting(
-                meeting_id=meeting_id,
-                title=transcript.title,
-                date=transcript.date,
-                analyzed_at=analyzed_at,
-                summary=analysis.summary,
-                key_decisions=analysis.key_decisions,
-                blockers=analysis.blockers,
-                action_items=action_items_data
-            )
-            db_session.add(processed_meeting)
-            logger.info(f"Created new processed meeting record for {meeting_id}")
-
-        db_session.commit()
-        db_session.close()
+            if existing_meeting:
+                # Update existing record
+                existing_meeting.analyzed_at = analyzed_at
+                existing_meeting.summary = analysis.summary
+                existing_meeting.key_decisions = analysis.key_decisions
+                existing_meeting.blockers = analysis.blockers
+                existing_meeting.action_items = action_items_data
+                existing_meeting.title = transcript.title
+                existing_meeting.date = transcript.date
+                logger.info(f"Updated existing processed meeting record for {meeting_id}")
+            else:
+                # Create new record
+                processed_meeting = ProcessedMeeting(
+                    meeting_id=meeting_id,
+                    title=transcript.title,
+                    date=transcript.date,
+                    analyzed_at=analyzed_at,
+                    summary=analysis.summary,
+                    key_decisions=analysis.key_decisions,
+                    blockers=analysis.blockers,
+                    action_items=action_items_data
+                )
+                db_session.add(processed_meeting)
+                logger.info(f"Created new processed meeting record for {meeting_id}")
 
         return jsonify({
             'success': True,
@@ -794,18 +754,11 @@ def meeting_project_dashboard():
             email = request.args.get('email')
             if email:
                 from main import UserPreference
-                from sqlalchemy.orm import sessionmaker
-                from sqlalchemy import create_engine
 
-                engine = create_engine(settings.agent.database_url)
-                Session = sessionmaker(bind=engine)
-                db_session = Session()
-
-                user_pref = db_session.query(UserPreference).filter_by(email=email).first()
-                if user_pref and user_pref.selected_projects:
-                    project_keys = user_pref.selected_projects
-
-                db_session.close()
+                with session_scope() as db_session:
+                    user_pref = db_session.query(UserPreference).filter_by(email=email).first()
+                    if user_pref and user_pref.selected_projects:
+                        project_keys = user_pref.selected_projects
 
         if not project_keys:
             return jsonify({'success': False, 'error': 'No projects specified'}), 400

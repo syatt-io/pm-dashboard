@@ -248,21 +248,13 @@ def meetings_dashboard():
 
         # Check which meetings have been analyzed
         from src.models import ProcessedMeeting
-        from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         analyzed_meetings = {}
-        processed_meetings = db_session.query(ProcessedMeeting).all()
-        for pm in processed_meetings:
-            if pm.analyzed_at:
-                analyzed_meetings[pm.meeting_id] = pm.analyzed_at
-
-        db_session.close()
+        with session_scope() as db_session:
+            processed_meetings = db_session.query(ProcessedMeeting).all()
+            for pm in processed_meetings:
+                if pm.analyzed_at:
+                    analyzed_meetings[pm.meeting_id] = pm.analyzed_at
 
         # Format meetings for display
         formatted_meetings = []
@@ -303,17 +295,11 @@ def analyze_meeting(meeting_id):
     try:
         # Check if meeting has been analyzed before (unless forcing re-analysis)
         from src.models import ProcessedMeeting
-        from sqlalchemy.orm import sessionmaker
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
 
         cached_meeting = None
         if not force_reanalyze:
-            cached_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+            with session_scope() as db_session:
+                cached_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
         if cached_meeting and cached_meeting.analyzed_at:
             # Use cached analysis results
@@ -363,8 +349,6 @@ def analyze_meeting(meeting_id):
                 'analyzed_at': cached_meeting.analyzed_at.isoformat() if cached_meeting.analyzed_at else None
             }
 
-            db_session.close()
-
             breadcrumbs = [
                 {'title': 'Home', 'url': '/'},
                 {'title': 'Meetings', 'url': '/'},
@@ -386,7 +370,6 @@ def analyze_meeting(meeting_id):
         # Get meeting transcript
         transcript = fireflies.get_meeting_transcript(meeting_id)
         if not transcript:
-            db_session.close()
             return render_template('error.html', error="Could not fetch meeting transcript")
 
         # Analyze with AI
@@ -411,35 +394,33 @@ def analyze_meeting(meeting_id):
         ]
 
         # Always check for existing record to handle race conditions
-        existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+        with session_scope() as db_session:
+            existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
 
-        if existing_meeting:
-            # Update existing record
-            existing_meeting.analyzed_at = analyzed_at
-            existing_meeting.summary = analysis.summary
-            existing_meeting.key_decisions = analysis.key_decisions
-            existing_meeting.blockers = analysis.blockers
-            existing_meeting.action_items = action_items_data
-            existing_meeting.title = transcript.title
-            existing_meeting.date = transcript.date
-            logger.info(f"Updated existing processed meeting record for {meeting_id}")
-        else:
-            # Create new record
-            processed_meeting = ProcessedMeeting(
-                meeting_id=meeting_id,
-                title=transcript.title,
-                date=transcript.date,
-                analyzed_at=analyzed_at,
-                summary=analysis.summary,
-                key_decisions=analysis.key_decisions,
-                blockers=analysis.blockers,
-                action_items=action_items_data
-            )
-            db_session.add(processed_meeting)
-            logger.info(f"Created new processed meeting record for {meeting_id}")
-
-        db_session.commit()
-        db_session.close()
+            if existing_meeting:
+                # Update existing record
+                existing_meeting.analyzed_at = analyzed_at
+                existing_meeting.summary = analysis.summary
+                existing_meeting.key_decisions = analysis.key_decisions
+                existing_meeting.blockers = analysis.blockers
+                existing_meeting.action_items = action_items_data
+                existing_meeting.title = transcript.title
+                existing_meeting.date = transcript.date
+                logger.info(f"Updated existing processed meeting record for {meeting_id}")
+            else:
+                # Create new record
+                processed_meeting = ProcessedMeeting(
+                    meeting_id=meeting_id,
+                    title=transcript.title,
+                    date=transcript.date,
+                    analyzed_at=analyzed_at,
+                    summary=analysis.summary,
+                    key_decisions=analysis.key_decisions,
+                    blockers=analysis.blockers,
+                    action_items=action_items_data
+                )
+                db_session.add(processed_meeting)
+                logger.info(f"Created new processed meeting record for {meeting_id}")
 
         # Store in session for later processing
         session['current_analysis'] = {
@@ -549,64 +530,56 @@ def todo_dashboard():
 def get_todos(user):
     """Get all TODO items for React Admin."""
     try:
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
+        with session_scope() as db_session:
+            # Get pagination parameters
+            page = int(request.args.get('page', 1))
+            per_page = int(request.args.get('perPage', 25))
+            sort_field = request.args.get('sort', 'created_at')
+            sort_order = request.args.get('order', 'DESC')
 
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
+            # Calculate offset
+            offset = (page - 1) * per_page
 
-        # Get pagination parameters
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('perPage', 25))
-        sort_field = request.args.get('sort', 'created_at')
-        sort_order = request.args.get('order', 'DESC')
+            # Build query - filter by user_id unless user is admin
+            query = db_session.query(TodoItem)
+            if user.role.value != 'admin':
+                query = query.filter(TodoItem.user_id == user.id)
 
-        # Calculate offset
-        offset = (page - 1) * per_page
-
-        # Build query - filter by user_id unless user is admin
-        query = db_session.query(TodoItem)
-        if user.role.value != 'admin':
-            query = query.filter(TodoItem.user_id == user.id)
-
-        # Apply sorting
-        if hasattr(TodoItem, sort_field):
-            column = getattr(TodoItem, sort_field)
-            if sort_order.upper() == 'DESC':
-                query = query.order_by(column.desc())
+            # Apply sorting
+            if hasattr(TodoItem, sort_field):
+                column = getattr(TodoItem, sort_field)
+                if sort_order.upper() == 'DESC':
+                    query = query.order_by(column.desc())
+                else:
+                    query = query.order_by(column.asc())
             else:
-                query = query.order_by(column.asc())
-        else:
-            # Default sort by created_at DESC
-            query = query.order_by(TodoItem.created_at.desc())
+                # Default sort by created_at DESC
+                query = query.order_by(TodoItem.created_at.desc())
 
-        # Get total count for pagination
-        total = query.count()
+            # Get total count for pagination
+            total = query.count()
 
-        # Apply pagination
-        todos = query.offset(offset).limit(per_page).all()
+            # Apply pagination
+            todos = query.offset(offset).limit(per_page).all()
 
-        # Convert to list of dictionaries
-        todo_list = []
-        for todo in todos:
-            todo_data = {
-                'id': todo.id,
-                'title': todo.title,
-                'description': todo.description,
-                'assignee': todo.assignee,
-                'due_date': todo.due_date.isoformat() if todo.due_date else None,
-                'status': todo.status,
-                'ticket_key': todo.ticket_key,
-                'created_at': todo.created_at.isoformat() if todo.created_at else None,
-                'updated_at': todo.updated_at.isoformat() if todo.updated_at else None,
-                'source_meeting_id': todo.source_meeting_id,
-                'priority': todo.priority,
-                'project_key': getattr(todo, 'project_key', None)
-            }
-            todo_list.append(todo_data)
-
-        db_session.close()
+            # Convert to list of dictionaries
+            todo_list = []
+            for todo in todos:
+                todo_data = {
+                    'id': todo.id,
+                    'title': todo.title,
+                    'description': todo.description,
+                    'assignee': todo.assignee,
+                    'due_date': todo.due_date.isoformat() if todo.due_date else None,
+                    'status': todo.status,
+                    'ticket_key': todo.ticket_key,
+                    'created_at': todo.created_at.isoformat() if todo.created_at else None,
+                    'updated_at': todo.updated_at.isoformat() if todo.updated_at else None,
+                    'source_meeting_id': todo.source_meeting_id,
+                    'priority': todo.priority,
+                    'project_key': getattr(todo, 'project_key', None)
+                }
+                todo_list.append(todo_data)
 
         # Return in React Admin format
         return jsonify({

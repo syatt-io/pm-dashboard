@@ -61,8 +61,8 @@ def get_jira_projects():
         logger.info(f"Fetched {len(jira_projects)} projects from Jira")
 
         # Merge with local database data
-        from sqlalchemy import create_engine, text
-        engine = create_engine(settings.agent.database_url)
+        from sqlalchemy import text
+        engine = get_engine()
 
         enhanced_projects = []
         try:
@@ -233,8 +233,8 @@ def update_project(project_key):
         data = request.json
 
         # Connect to database
-        from sqlalchemy import create_engine, text
-        engine = create_engine(settings.agent.database_url)
+        from sqlalchemy import text
+        engine = get_engine()
 
         with engine.connect() as conn:
             # Check if project exists in local DB
