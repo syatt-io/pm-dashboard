@@ -669,10 +669,12 @@ const AnalysisStatusBanner = () => {
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${API_BASE_URL}/api/meetings/${record.id}/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -682,7 +684,7 @@ const AnalysisStatusBanner = () => {
         window.location.reload();
       } else {
         const error = await response.json();
-        notify(`Analysis failed: ${error.error}`, { type: 'error' });
+        notify(`Analysis failed: ${error.error || error.message || 'Unknown error'}`, { type: 'error' });
       }
     } catch (error) {
       notify(`Analysis failed: ${error}`, { type: 'error' });
