@@ -16,26 +16,41 @@ def get_engine():
     """Get or create the global database engine."""
     global _engine
     if _engine is None:
-        # In production with multiple workers, use NullPool to avoid connection pooling issues
-        # This ensures each worker manages its own connections properly
-        if os.getenv('FLASK_ENV') == 'production':
+        # Connection pooling configuration
+        is_production = os.getenv('FLASK_ENV') == 'production'
+        db_url = settings.agent.database_url
+
+        # PostgreSQL-specific settings for production
+        if is_production and 'postgresql' in db_url:
             _engine = create_engine(
-                settings.agent.database_url,
-                poolclass=NullPool,  # No connection pooling - create new connections as needed
+                db_url,
+                pool_size=10,  # Reasonable pool size for production
+                max_overflow=20,  # Allow bursts of connections
+                pool_pre_ping=True,  # Verify connections before using
+                pool_recycle=1800,  # Recycle connections after 30 minutes
                 connect_args={
                     "connect_timeout": 10,
                     "options": "-c statement_timeout=30000"  # 30 second statement timeout
-                }
+                },
+                echo=False  # Disable SQL logging in production
             )
+            logger.info("Database engine initialized for production (PostgreSQL) with connection pooling")
         else:
-            # In development, use default connection pooling
+            # Development or SQLite configuration
+            connect_args = {}
+            if 'sqlite' in db_url:
+                connect_args = {"check_same_thread": False}
+
             _engine = create_engine(
-                settings.agent.database_url,
+                db_url,
                 pool_size=5,
                 max_overflow=10,
                 pool_pre_ping=True,  # Verify connections before using
-                pool_recycle=3600  # Recycle connections after 1 hour
+                pool_recycle=3600,  # Recycle connections after 1 hour
+                connect_args=connect_args,
+                echo=False  # Set to True for SQL debugging
             )
+            logger.info("Database engine initialized for development with connection pooling")
     return _engine
 
 def get_session_factory():
@@ -83,13 +98,17 @@ def cleanup_connections():
     if _session_factory is not None:
         try:
             _session_factory.remove()
-        except:
-            pass
-        _session_factory = None
+            logger.info("Session factory cleaned up successfully")
+        except Exception as e:
+            logger.warning(f"Error cleaning up session factory: {e}")
+        finally:
+            _session_factory = None
 
     if _engine is not None:
         try:
             _engine.dispose()
-        except:
-            pass
-        _engine = None
+            logger.info("Database engine disposed successfully")
+        except Exception as e:
+            logger.warning(f"Error disposing database engine: {e}")
+        finally:
+            _engine = None

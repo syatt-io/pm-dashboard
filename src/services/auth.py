@@ -18,11 +18,44 @@ class AuthService:
 
     def __init__(self, db_session_factory):
         self.db_session_factory = db_session_factory
+
+        # Get required configuration from environment
         self.google_client_id = os.getenv('GOOGLE_CLIENT_ID')
-        self.jwt_secret = os.getenv('JWT_SECRET_KEY', 'default-secret-key-change-in-production')
+        self.allowed_domain = os.getenv('ALLOWED_EMAIL_DOMAIN', '@syatt.io')
+        self.admin_email = os.getenv('ADMIN_EMAIL', 'mike.samimi@syatt.io')
+
+        # JWT Configuration - FAIL FAST if not configured in production
+        self.jwt_secret = os.getenv('JWT_SECRET_KEY')
+        is_production = os.getenv('FLASK_ENV') == 'production'
+
+        if not self.jwt_secret:
+            if is_production:
+                error_msg = (
+                    "CRITICAL: JWT_SECRET_KEY is not set in production environment. "
+                    "This is a security risk. Application startup aborted."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            else:
+                # Development fallback with clear warning
+                logger.warning("=" * 80)
+                logger.warning("WARNING: Using default JWT_SECRET_KEY in development mode")
+                logger.warning("This is INSECURE and should NEVER be used in production")
+                logger.warning("Set JWT_SECRET_KEY environment variable")
+                logger.warning("=" * 80)
+                self.jwt_secret = 'dev-only-secret-key-do-not-use-in-production'
+
         self.jwt_expiry_hours = int(os.getenv('JWT_EXPIRY_HOURS', '24'))
-        self.allowed_domain = '@syatt.io'
-        self.admin_email = 'mike.samimi@syatt.io'
+
+        # Validate configuration
+        if not self.google_client_id:
+            logger.warning("GOOGLE_CLIENT_ID is not set - Google OAuth will not work")
+
+        if not self.allowed_domain.startswith('@'):
+            logger.warning(f"ALLOWED_EMAIL_DOMAIN should start with '@', got: {self.allowed_domain}")
+            self.allowed_domain = f"@{self.allowed_domain}"
+
+        logger.info(f"AuthService initialized - Domain: {self.allowed_domain}, Admin: {self.admin_email}")
 
     def verify_google_token(self, token):
         """Verify Google OAuth token and return user info."""

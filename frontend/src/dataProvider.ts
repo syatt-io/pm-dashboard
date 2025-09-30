@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { fetchUtils } from 'react-admin';
+import { fetchUtils, DataProvider, GetListParams, GetOneParams, CreateParams, UpdateParams, DeleteParams } from 'react-admin';
 
 const API_URL = process.env.REACT_APP_API_URL
   ? `${process.env.REACT_APP_API_URL}/api`
@@ -7,7 +6,7 @@ const API_URL = process.env.REACT_APP_API_URL
     ? 'http://localhost:4000/api'
     : 'https://agent-pm-tsbbb.ondigitalocean.app/api');
 
-const httpClient = (url, options = {}) => {
+const httpClient = (url: string, options: fetchUtils.Options = {}) => {
     // Add auth token if available
     const token = localStorage.getItem('auth_token');
     if (token) {
@@ -23,8 +22,8 @@ const httpClient = (url, options = {}) => {
     return fetchUtils.fetchJson(url, options);
 };
 
-export const dataProvider: any = {
-    getList: async (resource, params) => {
+export const dataProvider: DataProvider = {
+    getList: async (resource: string, params: GetListParams) => {
         const { page, perPage } = params.pagination;
         const { field, order } = params.sort;
         const { filter } = params;
@@ -242,7 +241,7 @@ export const dataProvider: any = {
         });
     },
 
-    getOne: (resource, params) => {
+    getOne: (resource: string, params: GetOneParams) => {
         let url = '';
 
         switch (resource) {
@@ -305,7 +304,7 @@ export const dataProvider: any = {
         });
     },
 
-    getMany: (resource, params) => {
+    getMany: (resource: string, params: { ids: any[] }) => {
         const queries = params.ids.map(id =>
             httpClient(`${API_URL}/${resource}/${id}`)
         );
@@ -320,7 +319,7 @@ export const dataProvider: any = {
         });
     },
 
-    getManyReference: (resource, params) => {
+    getManyReference: (resource: string, params: any) => {
         return dataProvider.getList(resource, {
             ...params,
             filter: {
@@ -330,7 +329,7 @@ export const dataProvider: any = {
         });
     },
 
-    create: (resource, params) => {
+    create: (resource: string, params: CreateParams) => {
         let url = '';
         let body = params.data;
 
@@ -370,7 +369,7 @@ export const dataProvider: any = {
         });
     },
 
-    update: (resource, params) => {
+    update: (resource: string, params: UpdateParams) => {
         let url = '';
 
         switch (resource) {
@@ -404,7 +403,7 @@ export const dataProvider: any = {
         });
     },
 
-    updateMany: (resource, params) => {
+    updateMany: (resource: string, params: { ids: any[]; data: any }) => {
         const queries = params.ids.map(id =>
             httpClient(`${API_URL}/${resource}/${id}`, {
                 method: 'PUT',
@@ -419,7 +418,7 @@ export const dataProvider: any = {
         });
     },
 
-    delete: (resource, params) => {
+    delete: (resource: string, params: DeleteParams) => {
         let url = '';
 
         switch (resource) {
@@ -443,7 +442,7 @@ export const dataProvider: any = {
         });
     },
 
-    deleteMany: (resource, params) => {
+    deleteMany: (resource: string, params: { ids: any[] }) => {
         const queries = params.ids.map(id =>
             httpClient(`${API_URL}/${resource}/${id}`, {
                 method: 'DELETE',
