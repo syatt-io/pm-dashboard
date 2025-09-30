@@ -2860,10 +2860,12 @@ def jira_health_check():
                 }
             )
 
+            response_data = response.json() if response.status_code == 200 else None
             diagnostics['api_test'] = {
                 'status_code': response.status_code,
                 'success': response.status_code == 200,
-                'project_count': len(response.json()) if response.status_code == 200 else 0,
+                'project_count': len(response_data) if response_data else 0,
+                'sample_response': response_data[:2] if response_data and len(response_data) > 0 else response_data,
                 'error': response.text if response.status_code != 200 else None
             }
 
