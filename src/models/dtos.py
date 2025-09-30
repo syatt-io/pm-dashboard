@@ -35,7 +35,7 @@ class ProcessedMeetingDTO:
             return None
 
         return cls(
-            meeting_id=meeting.meeting_id,
+            meeting_id=meeting.fireflies_id,
             title=meeting.title,
             date=meeting.date,
             processed_at=meeting.processed_at,

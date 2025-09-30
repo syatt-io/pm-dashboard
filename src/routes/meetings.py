@@ -127,7 +127,7 @@ def analyze_meeting(meeting_id):
         cached_meeting_dto = None
         if not force_reanalyze:
             with session_scope() as db_session:
-                cached_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+                cached_meeting = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
                 if cached_meeting:
                     cached_meeting_dto = ProcessedMeetingDTO.from_orm(cached_meeting)
 
@@ -228,7 +228,7 @@ def analyze_meeting(meeting_id):
 
         # Always check for existing record to handle race conditions
         with session_scope() as db_session:
-            existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+            existing_meeting = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
 
             if existing_meeting:
                 # Update existing record
@@ -242,8 +242,10 @@ def analyze_meeting(meeting_id):
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
             else:
                 # Create new record
+                import uuid
                 processed_meeting = ProcessedMeeting(
-                    meeting_id=meeting_id,
+                    id=str(uuid.uuid4()),
+                    fireflies_id=meeting_id,
                     title=transcript.title,
                     date=transcript.date,
                     analyzed_at=analyzed_at,
@@ -545,7 +547,7 @@ def get_meeting_detail(user, meeting_id):
         # Check if we have analysis cached for this meeting (convert to DTO)
         cached_dto = None
         with session_scope() as db_session:
-            cached = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+            cached = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
             if cached:
                 cached_dto = ProcessedMeetingDTO.from_orm(cached)
 
@@ -647,7 +649,7 @@ def analyze_meeting_api(user, meeting_id):
 
         # Check for existing record to handle race conditions
         with session_scope() as db_session:
-            existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+            existing_meeting = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
 
             if existing_meeting:
                 # Update existing record
@@ -661,8 +663,10 @@ def analyze_meeting_api(user, meeting_id):
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
             else:
                 # Create new record
+                import uuid
                 processed_meeting = ProcessedMeeting(
-                    meeting_id=meeting_id,
+                    id=str(uuid.uuid4()),
+                    fireflies_id=meeting_id,
                     title=transcript.title,
                     date=transcript.date,
                     analyzed_at=analyzed_at,

@@ -40,6 +40,13 @@ class ProcessedMeeting(Base):
     duration = Column(Integer)
     summary = Column(Text)
     action_items = Column(Text)  # JSON string
+    key_decisions = Column(Text)  # JSON string
+    blockers = Column(Text)  # JSON string
+    analyzed_at = Column(DateTime)
+    processed_at = Column(DateTime)
+    tickets_created = Column(Text)  # JSON string
+    todos_created = Column(Text)  # JSON string
+    success = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
