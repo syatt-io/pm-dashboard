@@ -759,21 +759,88 @@ const AnalysisStatusBanner = () => {
   );
 };
 
-export const AnalysisShow = () => (
-  <Show title="📊 Meeting Analysis">
-    <SimpleShowLayout>
-      {/* Analysis Status Banner */}
-      <FunctionField render={() => <AnalysisStatusBanner />} />
+const AnalysisShowErrorFallback = ({ error }: { error: any }) => {
+  let errorMessage = 'An error occurred while loading the meeting';
+  let helpText = 'Please try again later';
 
-      {/* Summary Metrics */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Analysis Overview
+  if (error?.body?.error === 'no_api_key') {
+    errorMessage = 'Fireflies API Key Not Configured';
+    helpText = 'Please configure your Fireflies API key in Settings to view meeting details.';
+  } else if (error?.body?.error === 'invalid_api_key') {
+    errorMessage = 'Invalid Fireflies API Key';
+    helpText = 'Please check your Fireflies API key in Settings.';
+  } else if (error?.body?.error === 'Meeting not found') {
+    errorMessage = 'Meeting Not Found';
+    helpText = 'This meeting may not exist in your Fireflies account or may have been deleted.';
+  } else if (error?.message?.includes('Authentication required')) {
+    errorMessage = 'Authentication Required';
+    helpText = 'Please log in to view meeting details.';
+  }
+
+  return (
+    <Box sx={{ p: 4 }}>
+      <Alert severity="error" sx={{ mb: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          {errorMessage}
+        </Typography>
+        <Typography variant="body2">
+          {helpText}
+        </Typography>
+        {error?.body?.message && (
+          <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+            Details: {error.body.message}
           </Typography>
-          <FunctionField render={() => <AnalysisSummary />} />
-        </CardContent>
-      </Card>
+        )}
+      </Alert>
+      <Button
+        variant="contained"
+        color="primary"
+        href="/#/settings"
+        sx={{ mt: 2 }}
+      >
+        Go to Settings
+      </Button>
+      <Button
+        variant="outlined"
+        href="/#/analysis"
+        sx={{ mt: 2, ml: 2 }}
+      >
+        Back to Analysis
+      </Button>
+    </Box>
+  );
+};
+
+export const AnalysisShow = () => {
+  const [error, setError] = React.useState<any>(null);
+
+  return (
+    <>
+      {error ? (
+        <AnalysisShowErrorFallback error={error} />
+      ) : (
+        <Show
+          title="📊 Meeting Analysis"
+          queryOptions={{
+            onError: (err: any) => {
+              console.error('Error loading meeting:', err);
+              setError(err);
+            },
+          }}
+        >
+          <SimpleShowLayout>
+            {/* Analysis Status Banner */}
+            <FunctionField render={() => <AnalysisStatusBanner />} />
+
+            {/* Summary Metrics */}
+            <Card sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Analysis Overview
+                </Typography>
+                <FunctionField render={() => <AnalysisSummary />} />
+              </CardContent>
+            </Card>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {/* Meeting Summary and Key Decisions Row */}
@@ -913,6 +980,9 @@ export const AnalysisShow = () => (
           </Box>
         </Box>
       </Box>
-    </SimpleShowLayout>
-  </Show>
-);
+          </SimpleShowLayout>
+        </Show>
+      )}
+    </>
+  );
+};
