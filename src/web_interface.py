@@ -294,14 +294,16 @@ def analyze_meeting(meeting_id):
 
     try:
         # Check if meeting has been analyzed before (unless forcing re-analysis)
-        from src.models import ProcessedMeeting
+        from src.models import ProcessedMeeting, ProcessedMeetingDTO
 
-        cached_meeting = None
+        cached_meeting_dto = None
         if not force_reanalyze:
             with session_scope() as db_session:
                 cached_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+                if cached_meeting:
+                    cached_meeting_dto = ProcessedMeetingDTO.from_orm(cached_meeting)
 
-        if cached_meeting and cached_meeting.analyzed_at:
+        if cached_meeting_dto and cached_meeting_dto.analyzed_at:
             # Use cached analysis results
             logger.info(f"Using cached analysis for meeting {meeting_id}")
 
@@ -324,13 +326,13 @@ def analyze_meeting(meeting_id):
                                 self.context = data.get('context', '')
                         self.action_items.append(ActionItem(item_data))
 
-            analysis = CachedAnalysis(cached_meeting)
+            analysis = CachedAnalysis(cached_meeting_dto)
 
             # Store in session for later processing
             session['current_analysis'] = {
                 'meeting_id': meeting_id,
-                'meeting_title': cached_meeting.title,
-                'meeting_date': cached_meeting.date.isoformat() if cached_meeting.date else '',
+                'meeting_title': cached_meeting_dto.title,
+                'meeting_date': cached_meeting_dto.date.isoformat() if cached_meeting_dto.date else '',
                 'summary': analysis.summary,
                 'key_decisions': analysis.key_decisions,
                 'blockers': analysis.blockers,
@@ -346,21 +348,21 @@ def analyze_meeting(meeting_id):
                     for item in analysis.action_items
                 ],
                 'is_cached': True,
-                'analyzed_at': cached_meeting.analyzed_at.isoformat() if cached_meeting.analyzed_at else None
+                'analyzed_at': cached_meeting_dto.analyzed_at.isoformat() if cached_meeting_dto.analyzed_at else None
             }
 
             breadcrumbs = [
                 {'title': 'Home', 'url': '/'},
                 {'title': 'Meetings', 'url': '/'},
-                {'title': f'{cached_meeting.title}', 'url': f'/analyze/{meeting_id}'},
+                {'title': f'{cached_meeting_dto.title}', 'url': f'/analyze/{meeting_id}'},
                 {'title': 'Analysis Results', 'url': '#'}
             ]
 
             return render_template('analysis_new.html',
-                                 meeting_title=cached_meeting.title,
+                                 meeting_title=cached_meeting_dto.title,
                                  analysis=analysis,
                                  is_cached=True,
-                                 analyzed_at=cached_meeting.analyzed_at,
+                                 analyzed_at=cached_meeting_dto.analyzed_at,
                                  meeting_id=meeting_id,
                                  breadcrumbs=breadcrumbs)
 
@@ -1151,15 +1153,15 @@ def get_meetings(user):
             }), 500
 
         # Get cached analysis data for overlay
-        from src.models import ProcessedMeeting
+        from src.models import ProcessedMeeting, ProcessedMeetingDTO
 
-        # Create lookup dict for cached analysis
+        # Create lookup dict for cached analysis (using DTOs to avoid detached object issues)
         cached_analyses = {}
         try:
             with session_scope() as db_session:
                 all_cached = db_session.query(ProcessedMeeting).all()
                 for cached in all_cached:
-                    cached_analyses[cached.meeting_id] = cached
+                    cached_analyses[cached.meeting_id] = ProcessedMeetingDTO.from_orm(cached)
         except Exception as e:
             logger.warning(f"Error loading cached analyses: {e}")
 
@@ -1305,11 +1307,13 @@ def get_meeting_detail(user, meeting_id):
         if not transcript:
             return jsonify({'error': 'Meeting not found'}), 404
 
-        # Check if we have analysis cached for this meeting
-        from src.models import ProcessedMeeting
-        cached = None
+        # Check if we have analysis cached for this meeting (convert to DTO)
+        from src.models import ProcessedMeeting, ProcessedMeetingDTO
+        cached_dto = None
         with session_scope() as db_session:
             cached = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
+            if cached:
+                cached_dto = ProcessedMeetingDTO.from_orm(cached)
 
         # Build the response
         meeting_data = {
@@ -1331,17 +1335,17 @@ def get_meeting_detail(user, meeting_id):
         }
 
         # Add cached analysis data if available
-        if cached:
+        if cached_dto:
             meeting_data.update({
-                'action_items_count': getattr(cached, 'action_items_count', 0),
-                'relevance_score': getattr(cached, 'relevance_score', 0),
-                'confidence': getattr(cached, 'confidence', 0),
-                'analyzed_at': cached.analyzed_at.isoformat() if cached.analyzed_at else None,
-                'action_items': getattr(cached, 'action_items', []),
-                'key_decisions': getattr(cached, 'key_decisions', []),
-                'blockers': getattr(cached, 'blockers', []),
-                'follow_ups': getattr(cached, 'follow_ups', []),
-                'summary': getattr(cached, 'summary', None)
+                'action_items_count': len(cached_dto.action_items) if cached_dto.action_items else 0,
+                'relevance_score': 0,  # Not stored in DTO currently
+                'confidence': 0,  # Not stored in DTO currently
+                'analyzed_at': cached_dto.analyzed_at.isoformat() if cached_dto.analyzed_at else None,
+                'action_items': cached_dto.action_items or [],
+                'key_decisions': cached_dto.key_decisions or [],
+                'blockers': cached_dto.blockers or [],
+                'follow_ups': [],  # Not stored in DTO currently
+                'summary': cached_dto.summary
             })
 
         return jsonify(meeting_data)

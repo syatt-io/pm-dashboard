@@ -43,13 +43,31 @@ class ProcessedMeeting(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-# Export all models
+# Import DTOs
+from .dtos import (
+    ProcessedMeetingDTO,
+    TodoItemDTO,
+    UserDTO,
+    UserWatchedProjectDTO,
+    LearningDTO,
+    convert_list_to_dtos
+)
+
+# Export all models and DTOs
 __all__ = [
+    # ORM Models
     'User',
     'UserRole',
     'UserWatchedProject',
     'Learning',
     'TodoItem',
     'ProcessedMeeting',
-    'Base'
+    'Base',
+    # DTOs
+    'ProcessedMeetingDTO',
+    'TodoItemDTO',
+    'UserDTO',
+    'UserWatchedProjectDTO',
+    'LearningDTO',
+    'convert_list_to_dtos'
 ]
