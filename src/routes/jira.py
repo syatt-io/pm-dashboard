@@ -7,6 +7,7 @@ import asyncio
 
 from config.settings import settings
 from src.integrations.jira_mcp import JiraMCPClient
+from src.utils.database import get_engine
 
 logger = logging.getLogger(__name__)
 
