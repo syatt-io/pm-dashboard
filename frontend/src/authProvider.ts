@@ -39,7 +39,7 @@ export const authProvider: AuthProvider = {
   },
 
   // Called when the user navigates to a new location to check for permissions
-  getPermissions: async () => {
+  getPermissions: async (params: any) => {
     try {
       const response = await axios.get('/api/auth/user');
       const user = response.data.user;

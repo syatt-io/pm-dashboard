@@ -142,7 +142,7 @@ describe('authProvider', () => {
 
             localStorage.setItem('user', JSON.stringify(mockUser));
 
-            const permissions = await authProvider.getPermissions();
+            const permissions = await authProvider.getPermissions({});
 
             expect(permissions).toBe('admin');
         });
@@ -156,13 +156,13 @@ describe('authProvider', () => {
 
             localStorage.setItem('user', JSON.stringify(mockUser));
 
-            const permissions = await authProvider.getPermissions();
+            const permissions = await authProvider.getPermissions({});
 
             expect(permissions).toBe('user');
         });
 
         it('should return undefined if no user', async () => {
-            const permissions = await authProvider.getPermissions();
+            const permissions = await authProvider.getPermissions({});
 
             expect(permissions).toBeUndefined();
         });
