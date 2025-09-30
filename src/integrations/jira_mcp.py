@@ -260,6 +260,9 @@ class JiraMCPClient:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
+                logger.info(f"Attempting to fetch projects from Jira API: {self.jira_url}")
+                logger.info(f"Using username: {self.username}")
+
                 auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
 
                 response = await self.client.get(
@@ -269,6 +272,8 @@ class JiraMCPClient:
                         "Accept": "application/json"
                     }
                 )
+
+                logger.info(f"Jira API response status: {response.status_code}")
                 response.raise_for_status()
 
                 projects = response.json()
@@ -276,6 +281,7 @@ class JiraMCPClient:
                 return projects
 
             # Fallback to MCP
+            logger.warning("Jira credentials not configured for direct API, trying MCP fallback")
             mcp_request = {
                 "method": "jira/getProjects",
                 "params": {}
@@ -294,11 +300,13 @@ class JiraMCPClient:
                 logger.info(f"Retrieved {len(projects)} Jira projects via MCP")
                 return projects
             else:
-                logger.error(f"Failed to get projects: {result.get('error')}")
+                logger.error(f"Failed to get projects via MCP: {result.get('error')}")
                 return []
 
         except Exception as e:
+            import traceback
             logger.error(f"Error fetching Jira projects: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
 
     async def get_issue_types(self, project_key: Optional[str] = None) -> List[Dict[str, Any]]:
