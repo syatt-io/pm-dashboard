@@ -23,6 +23,8 @@ class TodoItem(Base):
     status = Column(String(50), default='pending')
     project_key = Column(String(50))
     user_id = Column(Integer)
+    ticket_key = Column(String(50))  # Jira ticket key
+    source_meeting_id = Column(String(36))  # Reference to processed_meetings
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     due_date = Column(DateTime)
