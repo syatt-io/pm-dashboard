@@ -243,6 +243,7 @@ def analyze_meeting(meeting_id):
             else:
                 # Create new record
                 import uuid
+                import json
                 processed_meeting = ProcessedMeeting(
                     id=str(uuid.uuid4()),
                     fireflies_id=meeting_id,
@@ -250,9 +251,9 @@ def analyze_meeting(meeting_id):
                     date=transcript.date,
                     analyzed_at=analyzed_at,
                     summary=analysis.summary,
-                    key_decisions=analysis.key_decisions,
-                    blockers=analysis.blockers,
-                    action_items=action_items_data
+                    key_decisions=json.dumps(analysis.key_decisions) if analysis.key_decisions else None,
+                    blockers=json.dumps(analysis.blockers) if analysis.blockers else None,
+                    action_items=json.dumps(action_items_data) if action_items_data else None
                 )
                 db_session.add(processed_meeting)
                 logger.info(f"Created new processed meeting record for {meeting_id}")
@@ -664,6 +665,7 @@ def analyze_meeting_api(user, meeting_id):
             else:
                 # Create new record
                 import uuid
+                import json
                 processed_meeting = ProcessedMeeting(
                     id=str(uuid.uuid4()),
                     fireflies_id=meeting_id,
@@ -671,9 +673,9 @@ def analyze_meeting_api(user, meeting_id):
                     date=transcript.date,
                     analyzed_at=analyzed_at,
                     summary=analysis.summary,
-                    key_decisions=analysis.key_decisions,
-                    blockers=analysis.blockers,
-                    action_items=action_items_data
+                    key_decisions=json.dumps(analysis.key_decisions) if analysis.key_decisions else None,
+                    blockers=json.dumps(analysis.blockers) if analysis.blockers else None,
+                    action_items=json.dumps(action_items_data) if action_items_data else None
                 )
                 db_session.add(processed_meeting)
                 logger.info(f"Created new processed meeting record for {meeting_id}")

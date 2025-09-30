@@ -31,8 +31,21 @@ class ProcessedMeetingDTO:
 
         Must be called while the session is still active!
         """
+        import json
+
         if meeting is None:
             return None
+
+        # Helper to safely parse JSON fields
+        def parse_json_field(field_value, default=None):
+            if field_value is None:
+                return default if default is not None else []
+            if isinstance(field_value, str):
+                try:
+                    return json.loads(field_value)
+                except (json.JSONDecodeError, ValueError):
+                    return default if default is not None else []
+            return field_value  # Already parsed
 
         return cls(
             meeting_id=meeting.fireflies_id,
@@ -41,11 +54,11 @@ class ProcessedMeetingDTO:
             processed_at=meeting.processed_at,
             analyzed_at=meeting.analyzed_at,
             summary=meeting.summary,
-            key_decisions=meeting.key_decisions or [],
-            blockers=meeting.blockers or [],
-            action_items=meeting.action_items or [],
-            tickets_created=meeting.tickets_created or [],
-            todos_created=meeting.todos_created or [],
+            key_decisions=parse_json_field(meeting.key_decisions, []),
+            blockers=parse_json_field(meeting.blockers, []),
+            action_items=parse_json_field(meeting.action_items, []),
+            tickets_created=parse_json_field(meeting.tickets_created, []),
+            todos_created=parse_json_field(meeting.todos_created, []),
             success=meeting.success if hasattr(meeting, 'success') else True
         )
 

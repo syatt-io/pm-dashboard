@@ -236,6 +236,27 @@ def run_database_migrations():
                 # Old column doesn't exist, so no migration needed
                 logger.info("No migration needed - slack_username column already exists")
 
+            # Add new columns to processed_meetings table
+            columns_to_add = [
+                ('key_decisions', 'TEXT'),
+                ('blockers', 'TEXT'),
+                ('analyzed_at', 'TIMESTAMP'),
+                ('processed_at', 'TIMESTAMP'),
+                ('tickets_created', 'TEXT'),
+                ('todos_created', 'TEXT'),
+                ('success', 'BOOLEAN DEFAULT true')
+            ]
+
+            for column_name, column_type in columns_to_add:
+                try:
+                    conn.execute(text(f"ALTER TABLE processed_meetings ADD COLUMN {column_name} {column_type}"))
+                    conn.commit()
+                    logger.info(f"Added {column_name} column to processed_meetings")
+                except Exception as e:
+                    # Column might already exist
+                    if 'already exists' not in str(e).lower() and 'duplicate' not in str(e).lower():
+                        logger.debug(f"Column {column_name} migration note: {e}")
+
     except Exception as e:
         logger.warning(f"Migration failed: {e}")
 
