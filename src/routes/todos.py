@@ -5,11 +5,9 @@ from datetime import datetime
 import logging
 import uuid
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from config.settings import settings
 from src.services.auth import auth_required
+from src.utils.database import session_scope
 from main import TodoItem
 from src.managers.todo_manager import TodoManager
 
@@ -98,67 +96,62 @@ def edit_todo_page(todo_id):
 def get_todos(user):
     """Get all TODO items for React Admin."""
     try:
-        engine = create_engine(settings.agent.database_url)
-        Session = sessionmaker(bind=engine)
-        db_session = Session()
+        with session_scope() as db_session:
+            # Get pagination parameters
+            page = int(request.args.get('page', 1))
+            per_page = int(request.args.get('perPage', 25))
+            sort_field = request.args.get('sort', 'created_at')
+            sort_order = request.args.get('order', 'DESC')
 
-        # Get pagination parameters
-        page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('perPage', 25))
-        sort_field = request.args.get('sort', 'created_at')
-        sort_order = request.args.get('order', 'DESC')
+            # Calculate offset
+            offset = (page - 1) * per_page
 
-        # Calculate offset
-        offset = (page - 1) * per_page
+            # Build query - filter by user_id unless user is admin
+            query = db_session.query(TodoItem)
+            if user.role.value != 'admin':
+                query = query.filter(TodoItem.user_id == user.id)
 
-        # Build query - filter by user_id unless user is admin
-        query = db_session.query(TodoItem)
-        if user.role.value != 'admin':
-            query = query.filter(TodoItem.user_id == user.id)
-
-        # Apply sorting
-        if hasattr(TodoItem, sort_field):
-            column = getattr(TodoItem, sort_field)
-            if sort_order.upper() == 'DESC':
-                query = query.order_by(column.desc())
+            # Apply sorting
+            if hasattr(TodoItem, sort_field):
+                column = getattr(TodoItem, sort_field)
+                if sort_order.upper() == 'DESC':
+                    query = query.order_by(column.desc())
+                else:
+                    query = query.order_by(column.asc())
             else:
-                query = query.order_by(column.asc())
-        else:
-            # Default sort by created_at DESC
-            query = query.order_by(TodoItem.created_at.desc())
+                # Default sort by created_at DESC
+                query = query.order_by(TodoItem.created_at.desc())
 
-        # Get total count for pagination
-        total = query.count()
+            # Get total count for pagination
+            total = query.count()
 
-        # Apply pagination
-        todos = query.offset(offset).limit(per_page).all()
+            # Apply pagination
+            todos = query.offset(offset).limit(per_page).all()
 
-        # Convert to list of dictionaries
-        todo_list = []
-        for todo in todos:
-            todo_data = {
-                'id': todo.id,
-                'title': todo.title,
-                'description': todo.description,
-                'assignee': todo.assignee,
-                'due_date': todo.due_date.isoformat() if todo.due_date else None,
-                'status': todo.status,
-                'ticket_key': todo.ticket_key,
-                'created_at': todo.created_at.isoformat() if todo.created_at else None,
-                'updated_at': todo.updated_at.isoformat() if todo.updated_at else None,
-                'source_meeting_id': todo.source_meeting_id,
-                'priority': todo.priority,
-                'project_key': getattr(todo, 'project_key', None)
-            }
-            todo_list.append(todo_data)
+            # Convert to list of dictionaries
+            todo_list = []
+            for todo in todos:
+                todo_data = {
+                    'id': todo.id,
+                    'title': todo.title,
+                    'description': todo.description,
+                    'assignee': todo.assignee,
+                    'due_date': todo.due_date.isoformat() if todo.due_date else None,
+                    'status': todo.status,
+                    'ticket_key': todo.ticket_key,
+                    'created_at': todo.created_at.isoformat() if todo.created_at else None,
+                    'updated_at': todo.updated_at.isoformat() if todo.updated_at else None,
+                    'source_meeting_id': todo.source_meeting_id,
+                    'priority': todo.priority,
+                    'project_key': getattr(todo, 'project_key', None)
+                }
+                todo_list.append(todo_data)
 
-        db_session.close()
-
-        # Return in React Admin format
-        return jsonify({
-            'data': todo_list,
-            'total': total
-        })
+            # Return in React Admin format
+            return jsonify({
+                'data': todo_list,
+                'total': total
+            })
 
     except Exception as e:
         logger.error(f"Error fetching todos: {e}")

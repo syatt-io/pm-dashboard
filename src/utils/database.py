@@ -1,5 +1,6 @@
 """Database connection management utilities."""
 import logging
+from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import NullPool
@@ -72,6 +73,25 @@ def close_session(session):
         session.close()
     except Exception as e:
         logger.warning(f"Error closing session: {e}")
+
+@contextmanager
+def session_scope():
+    """Provide a transactional scope around a series of operations.
+
+    Usage:
+        with session_scope() as session:
+            # use session here
+            # automatically commits on success, rolls back on error
+    """
+    session = get_session()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        close_session(session)
 
 def init_database():
     """Initialize database tables."""
