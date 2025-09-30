@@ -223,219 +223,6 @@ def run_database_migrations():
 run_database_migrations()
 
 
-# OLD FLASK ROUTE - Now handled by React Router
-# @app.route('/')
-# def main_dashboard():
-#     """Main landing page - redirects to project dashboard or setup form."""
-#     try:
-#         # Check if user has set up their email/profile
-#         user_email = session.get('user_email')
-#
-#         if user_email:
-#             # User is set up, redirect to their project dashboard
-#             return redirect(f'/my-projects/dashboard/{user_email}')
-#         else:
-#             # New user, show setup form
-#             return redirect('/my-projects')
-#     except Exception as e:
-#         logger.error(f"Error in main dashboard: {e}")
-#         return render_template('error.html', error=str(e))
-
-# OLD FLASK ROUTE - Now handled by React Router
-# @app.route('/meetings')
-# def meetings_dashboard():
-#     """Dashboard showing recent meetings."""
-#     # This old template-based route is no longer needed - React app handles /meetings
-
-
-@app.route('/analyze/<meeting_id>')
-def analyze_meeting(meeting_id):
-    """Analyze a specific meeting and show results."""
-    force_reanalyze = request.args.get('reanalyze', 'false').lower() == 'true'
-
-    try:
-        # Check if meeting has been analyzed before (unless forcing re-analysis)
-        from src.models import ProcessedMeeting, ProcessedMeetingDTO
-
-        cached_meeting_dto = None
-        if not force_reanalyze:
-            with session_scope() as db_session:
-                cached_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
-                if cached_meeting:
-                    cached_meeting_dto = ProcessedMeetingDTO.from_orm(cached_meeting)
-
-        if cached_meeting_dto and cached_meeting_dto.analyzed_at:
-            # Use cached analysis results
-            logger.info(f"Using cached analysis for meeting {meeting_id}")
-
-            # Recreate analysis object from cached data
-            class CachedAnalysis:
-                def __init__(self, cached_data):
-                    self.summary = cached_data.summary
-                    self.key_decisions = cached_data.key_decisions or []
-                    self.blockers = cached_data.blockers or []
-                    # Convert action items back to objects
-                    self.action_items = []
-                    for item_data in (cached_data.action_items or []):
-                        class ActionItem:
-                            def __init__(self, data):
-                                self.title = data.get('title', '')
-                                self.description = data.get('description', '')
-                                self.assignee = data.get('assignee', '')
-                                self.due_date = data.get('due_date', '')
-                                self.priority = data.get('priority', 'Medium')
-                                self.context = data.get('context', '')
-                        self.action_items.append(ActionItem(item_data))
-
-            analysis = CachedAnalysis(cached_meeting_dto)
-
-            # Store in session for later processing
-            session['current_analysis'] = {
-                'meeting_id': meeting_id,
-                'meeting_title': cached_meeting_dto.title,
-                'meeting_date': cached_meeting_dto.date.isoformat() if cached_meeting_dto.date else '',
-                'summary': analysis.summary,
-                'key_decisions': analysis.key_decisions,
-                'blockers': analysis.blockers,
-                'action_items': [
-                    {
-                        'title': item.title,
-                        'description': item.description,
-                        'assignee': item.assignee,
-                        'due_date': item.due_date,
-                        'priority': item.priority,
-                        'context': item.context
-                    }
-                    for item in analysis.action_items
-                ],
-                'is_cached': True,
-                'analyzed_at': cached_meeting_dto.analyzed_at.isoformat() if cached_meeting_dto.analyzed_at else None
-            }
-
-            breadcrumbs = [
-                {'title': 'Home', 'url': '/'},
-                {'title': 'Meetings', 'url': '/'},
-                {'title': f'{cached_meeting_dto.title}', 'url': f'/analyze/{meeting_id}'},
-                {'title': 'Analysis Results', 'url': '#'}
-            ]
-
-            return render_template('analysis_new.html',
-                                 meeting_title=cached_meeting_dto.title,
-                                 analysis=analysis,
-                                 is_cached=True,
-                                 analyzed_at=cached_meeting_dto.analyzed_at,
-                                 meeting_id=meeting_id,
-                                 breadcrumbs=breadcrumbs)
-
-        # No cached analysis or forcing re-analysis - perform new analysis
-        logger.info(f"Performing {'re-' if force_reanalyze else ''}analysis for meeting {meeting_id}")
-
-        # Get meeting transcript
-        transcript = fireflies.get_meeting_transcript(meeting_id)
-        if not transcript:
-            return render_template('error.html', error="Could not fetch meeting transcript")
-
-        # Analyze with AI
-        analysis = analyzer.analyze_transcript(
-            transcript.transcript,
-            transcript.title,
-            transcript.date
-        )
-
-        # Store analysis results in database
-        analyzed_at = datetime.now()
-        action_items_data = [
-            {
-                'title': item.title,
-                'description': item.description,
-                'assignee': item.assignee,
-                'due_date': item.due_date,
-                'priority': item.priority,
-                'context': item.context
-            }
-            for item in analysis.action_items
-        ]
-
-        # Always check for existing record to handle race conditions
-        with session_scope() as db_session:
-            existing_meeting = db_session.query(ProcessedMeeting).filter_by(meeting_id=meeting_id).first()
-
-            if existing_meeting:
-                # Update existing record
-                existing_meeting.analyzed_at = analyzed_at
-                existing_meeting.summary = analysis.summary
-                existing_meeting.key_decisions = analysis.key_decisions
-                existing_meeting.blockers = analysis.blockers
-                existing_meeting.action_items = action_items_data
-                existing_meeting.title = transcript.title
-                existing_meeting.date = transcript.date
-                logger.info(f"Updated existing processed meeting record for {meeting_id}")
-            else:
-                # Create new record
-                processed_meeting = ProcessedMeeting(
-                    meeting_id=meeting_id,
-                    title=transcript.title,
-                    date=transcript.date,
-                    analyzed_at=analyzed_at,
-                    summary=analysis.summary,
-                    key_decisions=analysis.key_decisions,
-                    blockers=analysis.blockers,
-                    action_items=action_items_data
-                )
-                db_session.add(processed_meeting)
-                logger.info(f"Created new processed meeting record for {meeting_id}")
-
-        # Store in session for later processing
-        session['current_analysis'] = {
-            'meeting_id': meeting_id,
-            'meeting_title': transcript.title,
-            'meeting_date': transcript.date.isoformat(),
-            'summary': analysis.summary,
-            'key_decisions': analysis.key_decisions,
-            'blockers': analysis.blockers,
-            'action_items': action_items_data,
-            'is_cached': False,
-            'analyzed_at': analyzed_at.isoformat()
-        }
-
-        breadcrumbs = [
-            {'title': 'Home', 'url': '/'},
-            {'title': 'Meetings', 'url': '/'},
-            {'title': f'{transcript.title}', 'url': f'/analyze/{meeting_id}'},
-            {'title': 'Analysis Results', 'url': '#'}
-        ]
-
-        return render_template('analysis_new.html',
-                             meeting_title=transcript.title,
-                             analysis=analysis,
-                             is_cached=False,
-                             analyzed_at=analyzed_at,
-                             meeting_id=meeting_id,
-                             breadcrumbs=breadcrumbs)
-
-    except Exception as e:
-        logger.error(f"Error analyzing meeting {meeting_id}: {e}")
-        return render_template('error.html', error=str(e))
-
-
-@app.route('/review')
-def review_items():
-    """Review action items interactively."""
-    analysis = session.get('current_analysis')
-    if not analysis:
-        return redirect('/')
-
-    breadcrumbs = [
-        {'title': 'Home', 'url': '/'},
-        {'title': 'Meetings', 'url': '/'},
-        {'title': analysis['meeting_title'], 'url': f"/analyze/{analysis['meeting_id']}"},
-        {'title': 'Review & Process', 'url': '#'}
-    ]
-
-    return render_template('review.html',
-                         meeting_title=analysis['meeting_title'],
-                         action_items=analysis['action_items'],
-                         breadcrumbs=breadcrumbs)
 
 
 @app.route('/api/process', methods=['POST'])
@@ -462,30 +249,6 @@ def process_decisions():
     except Exception as e:
         logger.error(f"Error in process_decisions: {str(e)}")
         return jsonify({'error': str(e)}), 500
-
-
-@app.route('/todos')
-def todo_dashboard():
-    """Display TODO dashboard with active TODOs."""
-    try:
-        # Get summary and categorized TODOs
-        summary = todo_manager.get_todo_summary()
-        overdue_todos = todo_manager.get_overdue_todos()
-        active_todos = todo_manager.get_active_todos()
-
-        breadcrumbs = [
-            {'title': 'Home', 'url': '/'},
-            {'title': 'TODO Dashboard', 'url': '/todos'}
-        ]
-
-        return render_template('todos.html',
-                             summary=summary,
-                             overdue_todos=overdue_todos,
-                             active_todos=active_todos,
-                             breadcrumbs=breadcrumbs)
-
-    except Exception as e:
-        return render_template('error.html', error=f"TODO Dashboard Error: {str(e)}")
 
 
 @app.route('/api/todos', methods=['GET'])
@@ -784,24 +547,6 @@ def delete_todo_api(user, todo_id):
         return error_response(str(e), status_code=500)
 
 
-@app.route('/todos/edit/<todo_id>')
-def edit_todo_page(todo_id):
-    """Show edit page for a TODO item."""
-    try:
-        todo = todo_manager.session.query(TodoItem).filter_by(id=todo_id).first()
-        if not todo:
-            return render_template('error.html', error="TODO not found")
-
-        breadcrumbs = [
-            {'title': 'Home', 'url': '/'},
-            {'title': 'TODO Dashboard', 'url': '/todos'},
-            {'title': f'Edit: {todo.title[:30]}...', 'url': '#'}
-        ]
-
-        return render_template('edit_todo.html', todo=todo, breadcrumbs=breadcrumbs)
-
-    except Exception as e:
-        return render_template('error.html', error=f"Edit TODO Error: {str(e)}")
 
 
 # Watched Projects API Routes
@@ -1606,15 +1351,6 @@ def get_jira_metadata(project_key):
 
 
 # My Projects Routes - Handled by React app
-# @app.route('/my-projects')
-# def my_projects():
-#     """Show My Projects configuration page."""
-#     breadcrumbs = [
-#         {'title': 'Home', 'url': '/'},
-#         {'title': 'My Projects', 'url': '/my-projects'}
-#     ]
-#     return render_template('my_projects.html', breadcrumbs=breadcrumbs)
-
 
 @app.route('/api/my-projects/user/<email>', methods=['GET'])
 def get_user_my_projects_settings(email):
@@ -1884,65 +1620,6 @@ def send_daily_project_notifications():
         logger.error(f"Error sending daily notifications: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
-@app.route('/my-projects/dashboard/<email>')
-def project_dashboard(email):
-    """Show project changes dashboard for a user."""
-    try:
-        from src.services.project_monitor import ProjectMonitor
-        from datetime import datetime, timedelta
-
-        # Get days parameter from query string, default to 7 days
-        days = request.args.get('days', 7, type=int)
-
-        # Get recent changes with debug info
-        monitor = ProjectMonitor()
-        since = datetime.now() - timedelta(days=days)
-        changes = asyncio.run(monitor.get_user_project_changes(email, since))
-
-        logger.info(f"Dashboard for {email}: Found {len(changes)} changes since {since}")
-
-        # Group changes by project
-        changes_by_project = {}
-        for change in changes:
-            project_key = change['project_key']
-            if project_key not in changes_by_project:
-                changes_by_project[project_key] = []
-            changes_by_project[project_key].append(change)
-
-        # Sort each project's changes by timestamp (newest first)
-        for project_key in changes_by_project:
-            changes_by_project[project_key].sort(key=lambda x: x['change_timestamp'], reverse=True)
-
-        # If no changes, try to get user preferences to show selected projects
-        user_projects = []
-        try:
-            from main import UserPreference
-
-            with session_scope() as db_session:
-                user_pref = db_session.query(UserPreference).filter_by(email=email).first()
-                if user_pref:
-                    user_projects = user_pref.selected_projects or []
-                    logger.info(f"User {email} has selected projects: {user_projects}")
-        except Exception as e:
-            logger.error(f"Error getting user projects: {e}")
-
-        breadcrumbs = [
-            {'title': 'Home', 'url': '/'},
-            {'title': 'My Projects', 'url': '/my-projects'},
-            {'title': f'Dashboard - {email}', 'url': f'/my-projects/dashboard/{email}'}
-        ]
-
-        return render_template('project_dashboard.html',
-                             email=email,
-                             changes=changes,
-                             changes_by_project=changes_by_project,
-                             user_projects=user_projects,
-                             breadcrumbs=breadcrumbs)
-
-    except Exception as e:
-        logger.error(f"Error loading project dashboard: {e}")
-        return render_template('error.html', error=str(e))
 
 
 # Meeting-Project Linking Routes
@@ -3026,13 +2703,6 @@ def validate_fireflies_api_key_endpoint(user):
             'error': 'Failed to validate API key'
         }), 500
 
-
-# OLD FLASK ROUTE - Now handled by React Router via catch-all
-# Specific route for my-projects (temporary debug)
-# @app.route('/my-projects')
-# def my_projects_route():
-#     """Handle my-projects route specifically."""
-#     return serve_react('my-projects')
 
 # Emergency route to create users table
 @app.route('/api/admin/create-users-table', methods=['POST', 'GET'])
