@@ -1,15 +1,15 @@
 """Models package for the agent-pm application."""
 
+# Import base first
+from .base import Base
+
 # Import all model classes for easy access
 from .user import User, UserRole, UserWatchedProject
 from .learning import Learning
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
-
-Base = declarative_base()
+from datetime import datetime, timezone
 
 class TodoItem(Base):
     """Simple TODO item model."""
@@ -25,8 +25,8 @@ class TodoItem(Base):
     user_id = Column(Integer)
     ticket_key = Column(String(50))  # Jira ticket key
     source_meeting_id = Column(String(36))  # Reference to processed_meetings
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     due_date = Column(DateTime)
 
 class ProcessedMeeting(Base):
@@ -40,8 +40,8 @@ class ProcessedMeeting(Base):
     duration = Column(Integer)
     summary = Column(Text)
     action_items = Column(Text)  # JSON string
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 # Import DTOs
 from .dtos import (

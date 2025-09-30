@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, desc, or_, and_
 
@@ -150,7 +150,7 @@ class LearningManager:
         """
         session = self.Session()
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             return session.query(Learning).filter(
                 Learning.created_at >= cutoff_date
@@ -203,7 +203,7 @@ class LearningManager:
             if category is not None:
                 learning.category = category
 
-            learning.updated_at = datetime.utcnow()
+            learning.updated_at = datetime.now(timezone.utc)
             session.commit()
 
             logger.info(f"Learning updated: {learning_id}")
@@ -257,11 +257,11 @@ class LearningManager:
             total = session.query(Learning).count()
 
             today = session.query(Learning).filter(
-                Learning.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                Learning.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             ).count()
 
             this_week = session.query(Learning).filter(
-                Learning.created_at >= datetime.utcnow() - timedelta(days=7)
+                Learning.created_at >= datetime.now(timezone.utc) - timedelta(days=7)
             ).count()
 
             categories = self.get_categories()

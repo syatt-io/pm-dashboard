@@ -1,7 +1,7 @@
 """Authentication and authorization service."""
 import os
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from functools import wraps
@@ -121,7 +121,7 @@ class AuthService:
                 logger.info(f"New user created: {user_info['email']} with role {role.value}")
 
             # Update last login
-            user.last_login = datetime.utcnow()
+            user.last_login = datetime.now(timezone.utc)
             db_session.commit()
 
             # Make sure we have the role value before detaching
@@ -151,8 +151,8 @@ class AuthService:
             'user_id': user.id,
             'email': user.email,
             'role': role_value,
-            'exp': datetime.utcnow() + timedelta(hours=expiry_hours),
-            'iat': datetime.utcnow()
+            'exp': datetime.now(timezone.utc) + timedelta(hours=expiry_hours),
+            'iat': datetime.now(timezone.utc)
         }
 
         return jwt.encode(payload, self.jwt_secret, algorithm='HS256')

@@ -1,9 +1,8 @@
 """Learning model for storing team learnings and insights."""
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime
+from datetime import datetime, timezone
 
-Base = declarative_base()
+from .base import Base
 
 
 class Learning(Base):
@@ -18,8 +17,8 @@ class Learning(Base):
     category = Column(String(100))
     tags = Column(Text)
     source = Column(String(255))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     def to_dict(self):
         """Convert learning to dictionary."""

@@ -1,14 +1,13 @@
 """User model and authentication-related models."""
 from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean, ForeignKey, UniqueConstraint, Text
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 import enum
 import logging
 
-logger = logging.getLogger(__name__)
+from .base import Base
 
-Base = declarative_base()
+logger = logging.getLogger(__name__)
 
 
 class UserRole(enum.Enum):
@@ -27,8 +26,8 @@ class User(Base):
     name = Column(String(255), nullable=False)
     google_id = Column(String(255), unique=True, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.NO_ACCESS, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     last_login = Column(DateTime)
     is_active = Column(Boolean, default=True)
     fireflies_api_key_encrypted = Column(Text, nullable=True)
@@ -164,7 +163,7 @@ class UserWatchedProject(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     project_key = Column(String(50), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Ensure unique combination of user_id and project_key
     __table_args__ = (UniqueConstraint('user_id', 'project_key', name='_user_project_watch_uc'),)
