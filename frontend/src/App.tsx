@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Admin, Resource, ListGuesser, EditGuesser, ShowGuesser, radiantLightTheme, radiantDarkTheme } from 'react-admin';
 import { dataProvider } from './dataProvider';
+import { authProvider } from './authProvider';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Icons
@@ -37,6 +38,7 @@ const AdminApp = () => {
   return (
     <Admin
       dataProvider={dataProvider}
+      authProvider={authProvider}
       dashboard={Dashboard}
       title="PM Command Center"
       layout={CustomLayout}
