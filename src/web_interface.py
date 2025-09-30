@@ -365,10 +365,11 @@ def get_dashboard_stats(user):
     """Get dashboard statistics efficiently (counts only, no full records)."""
     try:
         from sqlalchemy import func
+        from src.models import ProcessedMeeting
 
         with session_scope() as db_session:
-            # Count total meetings
-            total_meetings = db_session.query(func.count(Meeting.id)).scalar() or 0
+            # Count total meetings (processed meetings from Fireflies)
+            total_meetings = db_session.query(func.count(ProcessedMeeting.id)).scalar() or 0
 
             # Count todos by status
             if user.role.value != 'admin':
