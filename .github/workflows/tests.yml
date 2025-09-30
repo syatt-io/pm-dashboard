@@ -1,10 +1,13 @@
 name: Tests
 
 on:
-  push:
-    branches: [ main, develop ]
+  # Only run on pull requests to avoid duplicate runs on push to main
+  # (main branch auto-deploys to production)
   pull_request:
     branches: [ main, develop ]
+  # Still run on push to develop branch for testing
+  push:
+    branches: [ develop ]
 
 jobs:
   backend-tests:
