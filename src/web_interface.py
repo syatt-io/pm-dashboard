@@ -2843,48 +2843,62 @@ def create_users_table_endpoint():
 @app.route('/<path:path>')
 def serve_react(path):
     """Serve React application in production."""
-    logger.info(f"=== serve_react called with path: '{path}' ===")
+    try:
+        print(f"=== SERVE_REACT CALLED: path='{path}' ===", flush=True)
 
-    # Skip API routes
-    if path.startswith('api/'):
-        logger.info(f"Skipping API route: {path}")
-        return jsonify({'error': 'Not found'}), 404
+        # Skip API and Slack routes
+        if path.startswith('api/') or path.startswith('slack/'):
+            print(f"Skipping API/Slack route: {path}", flush=True)
+            return jsonify({'error': 'Not found'}), 404
 
-    # Try multiple possible build directory paths
-    possible_build_dirs = [
-        '/workspace/frontend/build',  # DigitalOcean workspace (production)
-        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build'),  # Local dev
-        os.path.join(os.getcwd(), 'frontend', 'build'),  # Current working directory
-        'frontend/build'  # Relative path
-    ]
+        # Try multiple possible build directory paths
+        possible_build_dirs = [
+            '/workspace/frontend/build',  # DigitalOcean workspace (production)
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build'),  # Local dev
+            os.path.join(os.getcwd(), 'frontend', 'build'),  # Current working directory
+            'frontend/build'  # Relative path
+        ]
 
-    react_build_dir = None
-    for build_dir in possible_build_dirs:
-        if os.path.exists(build_dir):
-            react_build_dir = build_dir
-            logger.info(f"Found React build directory: {build_dir}")
-            break
+        print(f"Checking build directories...", flush=True)
+        react_build_dir = None
+        for build_dir in possible_build_dirs:
+            exists = os.path.exists(build_dir)
+            print(f"  {build_dir}: exists={exists}", flush=True)
+            if exists:
+                react_build_dir = build_dir
+                print(f"✓ Found React build directory: {build_dir}", flush=True)
+                break
 
-    # In production, serve React build
-    if react_build_dir and os.path.exists(react_build_dir):
-        # Try to serve the requested file
-        if path != "" and os.path.exists(os.path.join(react_build_dir, path)):
-            logger.info(f"Serving file: {path}")
-            return send_from_directory(react_build_dir, path)
+        # In production, serve React build
+        if react_build_dir:
+            index_path = os.path.join(react_build_dir, 'index.html')
+            index_exists = os.path.exists(index_path)
+            print(f"index.html exists: {index_exists}", flush=True)
+
+            # Try to serve the requested file
+            if path != "" and os.path.exists(os.path.join(react_build_dir, path)):
+                print(f"Serving specific file: {path}", flush=True)
+                return send_from_directory(react_build_dir, path)
+            else:
+                # Serve index.html for client-side routing
+                print(f"Serving index.html for SPA route: '{path}'", flush=True)
+                return send_from_directory(react_build_dir, 'index.html')
         else:
-            # Serve index.html for client-side routing
-            logger.info(f"Serving index.html for path: {path}")
-            return send_from_directory(react_build_dir, 'index.html')
-    else:
-        # Debug information for troubleshooting
-        debug_info = {
-            'message': 'React build not found',
-            'cwd': os.getcwd(),
-            'checked_paths': possible_build_dirs,
-            'exists_checks': [os.path.exists(p) for p in possible_build_dirs]
-        }
-        logger.error(f"React build not found! Debug info: {debug_info}")
-        return jsonify(debug_info), 404
+            # Debug information for troubleshooting
+            debug_info = {
+                'message': 'React build directory not found',
+                'cwd': os.getcwd(),
+                'checked_paths': possible_build_dirs,
+                'exists_checks': [os.path.exists(p) for p in possible_build_dirs]
+            }
+            print(f"❌ ERROR: React build not found! {debug_info}", flush=True)
+            return jsonify(debug_info), 404
+
+    except Exception as e:
+        print(f"❌ EXCEPTION in serve_react: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 if __name__ == '__main__':
