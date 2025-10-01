@@ -36,9 +36,9 @@ jobs:
     - name: Run backend tests
       env:
         TESTING: true
-        DATABASE_URL: sqlite:///:memory:
+        DATABASE_URL: "sqlite:///:memory:"
         OPENAI_API_KEY: test-key
-        JIRA_URL: https://test.atlassian.net
+        JIRA_URL: "https://test.atlassian.net"
         JIRA_USERNAME: test@example.com
         JIRA_API_TOKEN: test-token
         ENCRYPTION_KEY: test-encryption-key-32-bytes-long!
