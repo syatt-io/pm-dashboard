@@ -397,7 +397,8 @@ def get_meetings(user):
             with session_scope() as db_session:
                 all_cached = db_session.query(ProcessedMeeting).all()
                 for cached in all_cached:
-                    cached_analyses[cached.meeting_id] = ProcessedMeetingDTO.from_orm(cached)
+                    # Use fireflies_id as the key to match Fireflies API meeting IDs
+                    cached_analyses[cached.fireflies_id] = ProcessedMeetingDTO.from_orm(cached)
         except Exception as e:
             logger.warning(f"Error loading cached analyses: {e}")
 
