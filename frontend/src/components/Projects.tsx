@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   TextField,
   useNotify,
-  useRefresh,
   useDataProvider,
   Button,
 } from 'react-admin';
@@ -25,7 +24,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  IconButton,
   MenuItem,
   Select,
   InputLabel,
@@ -46,14 +44,10 @@ import {
 import {
   Star,
   StarBorder,
-  Edit as EditIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
   Sync as SyncIcon,
   Work as WorkIcon,
   AccessTime as TimeIcon,
   People as PeopleIcon,
-  Schedule as ScheduleIcon,
   Forum as ForumIcon,
   Assignment as TaskIcon,
   CalendarToday as CalendarIcon,
@@ -145,7 +139,7 @@ const WatchToggle = ({ record }: { record: any }) => {
     };
 
     loadWatchedProjectsFromAPI();
-  }, [record.key]); // Only re-run when record.key changes
+  }, [record.key, loading]); // Only re-run when record.key changes
 
   const handleToggle = async () => {
     try {
@@ -310,83 +304,6 @@ const ActiveToggle = ({ record, onToggle }: { record: Project, onToggle: (record
       }
       label={record.is_active ? 'Active' : 'Inactive'}
     />
-  );
-};
-
-const EditableProjectRow = ({ project, onSave }: { project: Project, onSave: (project: Project) => void }) => {
-  const [editing, setEditing] = useState(false);
-  const [editedProject, setEditedProject] = useState(project);
-
-  const handleSave = () => {
-    onSave(editedProject);
-    setEditing(false);
-  };
-
-  const handleCancel = () => {
-    setEditedProject(project);
-    setEditing(false);
-  };
-
-  if (!editing) {
-    return (
-      <TableRow>
-        <TableCell>{project.name}</TableCell>
-        <TableCell>{project.key}</TableCell>
-        <TableCell>{project.projectTypeKey || 'Unknown'}</TableCell>
-        <TableCell>{project.project_work_type || 'project-based'}</TableCell>
-        <TableCell>{project.forecasted_hours_month || 0}</TableCell>
-        <TableCell>{project.total_hours || 0}</TableCell>
-        <TableCell>
-          <IconButton onClick={() => setEditing(true)} size="small">
-            <EditIcon />
-          </IconButton>
-        </TableCell>
-      </TableRow>
-    );
-  }
-
-  return (
-    <TableRow>
-      <TableCell>{project.name}</TableCell>
-      <TableCell>{project.key}</TableCell>
-      <TableCell>{project.projectTypeKey || 'Unknown'}</TableCell>
-      <TableCell>
-        <FormControl size="small" fullWidth>
-          <Select
-            value={editedProject.project_work_type || 'project-based'}
-            onChange={(e) => setEditedProject({ ...editedProject, project_work_type: e.target.value as 'project-based' | 'growth-support' | 'n-a' })}
-          >
-            <MenuItem value="project-based">Project-based</MenuItem>
-            <MenuItem value="growth-support">Growth & Support</MenuItem>
-            <MenuItem value="n-a">N/A</MenuItem>
-          </Select>
-        </FormControl>
-      </TableCell>
-      <TableCell>
-        <input
-          type="number"
-          value={editedProject.forecasted_hours_month || 0}
-          onChange={(e) => setEditedProject({ ...editedProject, forecasted_hours_month: parseFloat(e.target.value) || 0 })}
-          style={{ width: '80px' }}
-        />
-      </TableCell>
-      <TableCell>
-        <input
-          type="number"
-          value={editedProject.total_hours || 0}
-          onChange={(e) => setEditedProject({ ...editedProject, total_hours: parseFloat(e.target.value) || 0 })}
-          style={{ width: '80px' }}
-        />
-      </TableCell>
-      <TableCell>
-        <IconButton onClick={handleSave} size="small" color="primary">
-          <SaveIcon />
-        </IconButton>
-        <IconButton onClick={handleCancel} size="small">
-          <CancelIcon />
-        </IconButton>
-      </TableCell>
-    </TableRow>
   );
 };
 
@@ -1054,13 +971,11 @@ const ProjectDetailDialog = ({
 
 export const ProjectList = () => {
   const notify = useNotify();
-  const refresh = useRefresh();
   const dataProvider = useDataProvider();
   const [tabValue, setTabValue] = useState(0);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [activeProjects, setActiveProjects] = useState<Project[]>([]);
   const [watchedProjects, setWatchedProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectDetailOpen, setProjectDetailOpen] = useState(false);
@@ -1197,7 +1112,7 @@ export const ProjectList = () => {
   const handleSyncHours = async () => {
     setSyncing(true);
     try {
-      const response = await fetch('${API_BASE_URL}/api/sync-hours', {
+      const response = await fetch(`${API_BASE_URL}/api/sync-hours`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

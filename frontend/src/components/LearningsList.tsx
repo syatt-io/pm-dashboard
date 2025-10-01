@@ -7,8 +7,6 @@ import {
     TopToolbar,
     FilterButton,
     CreateButton,
-    useNotify,
-    useRefresh,
     TextInput,
     SelectInput,
     ListProps,
@@ -83,8 +81,6 @@ export const LearningsList = (props: ListProps) => {
     const theme = useTheme();
     const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
     const [stats, setStats] = useState<any>(null);
-    const notify = useNotify();
-    const refresh = useRefresh();
 
     useEffect(() => {
         fetchStats();

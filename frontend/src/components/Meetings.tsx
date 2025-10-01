@@ -16,7 +16,6 @@ import {
   Button,
   useRedirect,
   useNotify,
-  TopToolbar,
   useListContext,
 } from 'react-admin';
 import {

@@ -30,7 +30,6 @@ import {
   Typography,
   Box,
   Chip,
-  IconButton,
   Accordion,
   AccordionSummary,
   AccordionDetails,
@@ -189,9 +188,6 @@ const MarkAsDoneButton = () => {
 
 const ChangeDueDateButton = () => {
   const record = useRecordContext();
-  const [update] = useUpdate();
-  const notify = useNotify();
-  const refresh = useRefresh();
   const redirect = useRedirect();
 
   if (!record) return null;
