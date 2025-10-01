@@ -2839,12 +2839,6 @@ def create_users_table_endpoint():
         }), 500
 
 # Serve React build files in production
-# Explicit route for /login (React Admin's default login page path)
-@app.route('/login')
-def serve_login():
-    """Explicitly serve React app for login page."""
-    return serve_react('login')
-
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_react(path):

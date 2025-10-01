@@ -312,6 +312,5 @@ When working on this project:
 4. Cache API responses to avoid rate limits
 5. Run lint/typecheck before committing changes
 6. Test form functionality after Jira integration changes
-- always make updates only to the react app, the old Flask app is no longer being used
 - never use mock data without approval
 - IMPORTANT: for getting tracked time in Tempo, use the APIs not the MCP tools. Don't use MCP tools as fallback either, the data will be wrong

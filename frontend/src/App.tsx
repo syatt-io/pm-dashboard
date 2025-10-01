@@ -43,6 +43,7 @@ const AdminApp = () => {
       theme={radiantLightTheme}
       darkTheme={radiantDarkTheme}
       loginPage={Login}
+      requireAuth
     >
         <Resource
           name="analysis"
