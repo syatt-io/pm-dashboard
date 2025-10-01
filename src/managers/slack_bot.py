@@ -1272,12 +1272,13 @@ class SlackTodoBot:
 
             # Create the learning
             # Note: We don't pass submitted_by_id because Slack user IDs don't map to database user IDs
+            # Store the user's name in source so it's visible in the UI
             learning = self.learning_manager.create_learning(
                 content=content,
                 submitted_by=user_name,
                 submitted_by_id=None,  # Slack users don't have database user IDs
                 category=category,
-                source=f'slack:{user_id}'  # Store Slack user ID in source for reference
+                source=f'slack - {user_name}'  # Store name in source for UI display
             )
 
             # Format response
