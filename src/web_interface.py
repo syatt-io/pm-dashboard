@@ -307,10 +307,33 @@ def get_todos(user):
             # Calculate offset
             offset = (page - 1) * per_page
 
-            # Build query - filter by user_id unless user is admin
+            # Build query with visibility rules
             query = db_session.query(TodoItem)
             if user.role.value != 'admin':
-                query = query.filter(TodoItem.user_id == user.id)
+                # Non-admin users see:
+                # 1. Their own Slack-created TODOs (source='slack' AND user_id=current_user.id)
+                # 2. Meeting-created TODOs for projects they're following (source='meeting_analysis' AND project in watched_projects)
+
+                # Get user's watched projects
+                from src.models.user import UserWatchedProject
+                watched_project_keys = [
+                    wp.project_key
+                    for wp in db_session.query(UserWatchedProject).filter(
+                        UserWatchedProject.user_id == user.id
+                    ).all()
+                ]
+
+                # Apply visibility filter
+                visibility_filter = or_(
+                    # Own Slack TODOs
+                    and_(TodoItem.source == 'slack', TodoItem.user_id == user.id),
+                    # Meeting TODOs for watched projects
+                    and_(
+                        TodoItem.source == 'meeting_analysis',
+                        TodoItem.project_key.in_(watched_project_keys) if watched_project_keys else False
+                    )
+                )
+                query = query.filter(visibility_filter)
 
             # Apply sorting
             if hasattr(TodoItem, sort_field):
@@ -371,12 +394,30 @@ def get_dashboard_stats(user):
             # Count total meetings (processed meetings from Fireflies)
             total_meetings = db_session.query(func.count(ProcessedMeeting.id)).scalar() or 0
 
-            # Count todos by status
+            # Count todos by status with visibility rules
             if user.role.value != 'admin':
-                # Non-admin users see only their todos
-                total_todos = db_session.query(func.count(TodoItem.id)).filter(TodoItem.user_id == user.id).scalar() or 0
+                # Non-admin users see:
+                # 1. Their own Slack-created TODOs
+                # 2. Meeting-created TODOs for projects they're following
+                from src.models.user import UserWatchedProject
+                watched_project_keys = [
+                    wp.project_key
+                    for wp in db_session.query(UserWatchedProject).filter(
+                        UserWatchedProject.user_id == user.id
+                    ).all()
+                ]
+
+                visibility_filter = or_(
+                    and_(TodoItem.source == 'slack', TodoItem.user_id == user.id),
+                    and_(
+                        TodoItem.source == 'meeting_analysis',
+                        TodoItem.project_key.in_(watched_project_keys) if watched_project_keys else False
+                    )
+                )
+
+                total_todos = db_session.query(func.count(TodoItem.id)).filter(visibility_filter).scalar() or 0
                 completed_todos = db_session.query(func.count(TodoItem.id)).filter(
-                    TodoItem.user_id == user.id,
+                    visibility_filter,
                     TodoItem.status == 'done'
                 ).scalar() or 0
             else:

@@ -67,6 +67,8 @@ class TodoItem(Base):
     source_meeting_id = Column(String)
     priority = Column(String, default='Medium')
     project_key = Column(String)
+    user_id = Column(Integer)  # App user ID who created this TODO
+    source = Column(String)  # 'slack' or 'meeting_analysis'
 
 
 class UserPreference(Base):
@@ -241,7 +243,8 @@ class PMAgent:
                     due_date=datetime.fromisoformat(item.due_date) if item.due_date else None,
                     source_meeting_id=meeting_id,
                     ticket_key=tickets_created.get(item.title),
-                    project_key=settings.jira.default_project  # Use the default project from settings
+                    project_key=settings.jira.default_project,  # Use the default project from settings
+                    source='meeting_analysis'  # Mark as meeting-created for visibility filtering
                 )
                 self.db_session.add(todo)
 

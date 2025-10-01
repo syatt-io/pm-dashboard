@@ -473,6 +473,9 @@ class SlackTodoBot:
 
             assignee = self._get_user_display_name(user_id)
 
+            # Map Slack user to app user
+            app_user_id = self._map_slack_user_to_app_user(user_id)
+
             todo = TodoItem(
                 id=str(uuid.uuid4()),
                 title=title,
@@ -481,14 +484,18 @@ class SlackTodoBot:
                 status='pending',
                 priority='Medium',
                 created_at=datetime.now(),
-                updated_at=datetime.now()
+                updated_at=datetime.now(),
+                user_id=app_user_id,  # Link to app user if found
+                source='slack'  # Mark as Slack-created for visibility filtering
             )
 
             self.todo_manager.session.add(todo)
             self.todo_manager.session.commit()
 
+            visibility_note = "🔒 (Private - only you can see this)" if app_user_id else ""
+
             return {
-                "text": f"✅ TODO created: *{title}*\n"
+                "text": f"✅ TODO created: *{title}* {visibility_note}\n"
                        f"ID: `{todo.id[:8]}` | Assigned to: {assignee}\n"
                        f"💡 Use `/todos complete {todo.id[:8]}` to mark done"
             }
@@ -734,6 +741,58 @@ class SlackTodoBot:
             return user.get("display_name") or user.get("real_name") or user.get("name", user_id)
         except SlackApiError:
             return user_id
+
+    def _get_user_email(self, user_id: str) -> Optional[str]:
+        """Get user's email from Slack."""
+        try:
+            response = self.client.users_info(user=user_id)
+            user = response["user"]
+            profile = user.get("profile", {})
+            return profile.get("email")
+        except SlackApiError as e:
+            logger.warning(f"Failed to get email for Slack user {user_id}: {e}")
+            return None
+
+    def _map_slack_user_to_app_user(self, slack_user_id: str) -> Optional[int]:
+        """Map Slack user to app user by email.
+
+        Args:
+            slack_user_id: Slack user ID
+
+        Returns:
+            App user ID if found, None otherwise
+        """
+        try:
+            # Get Slack user's email
+            email = self._get_user_email(slack_user_id)
+            if not email:
+                logger.warning(f"No email found for Slack user {slack_user_id}")
+                return None
+
+            # Look up app user by email
+            from src.models.user import User
+            from sqlalchemy.orm import sessionmaker
+            from config.settings import settings
+            from sqlalchemy import create_engine
+
+            engine = create_engine(settings.agent.database_url)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+
+            try:
+                user = session.query(User).filter(User.email == email).first()
+                if user:
+                    logger.info(f"Mapped Slack user {slack_user_id} ({email}) to app user {user.id}")
+                    return user.id
+                else:
+                    logger.warning(f"No app user found with email {email}")
+                    return None
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error mapping Slack user to app user: {e}")
+            return None
 
     def get_handler(self):
         """Get Flask request handler for Slack events."""
@@ -1259,6 +1318,9 @@ class SlackTodoBot:
             # Get user display name
             user_name = self._get_user_display_name(user_id)
 
+            # Try to map Slack user to app user
+            app_user_id = self._map_slack_user_to_app_user(user_id)
+
             # Parse category from text if present
             category = None
             content = text
@@ -1270,13 +1332,11 @@ class SlackTodoBot:
                 category = category_match.group(1).lower()
                 content = text.replace(f'#{category_match.group(1)}', '').strip()
 
-            # Create the learning
-            # Note: We don't pass submitted_by_id because Slack user IDs don't map to database user IDs
-            # Store the user's name in source so it's visible in the UI
+            # Create the learning with mapped user ID if available
             learning = self.learning_manager.create_learning(
                 content=content,
                 submitted_by=user_name,
-                submitted_by_id=None,  # Slack users don't have database user IDs
+                submitted_by_id=str(app_user_id) if app_user_id else None,
                 category=category,
                 source=f'slack - {user_name}'  # Store name in source for UI display
             )
