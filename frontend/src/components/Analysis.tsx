@@ -584,9 +584,13 @@ const AnalysisStatusChip = ({ record }: { record: any }) => {
       <Chip
         label="Analyzed"
         color="success"
-        size="small"
+        size="medium"
         variant="filled"
         icon={<CheckCircle />}
+        sx={{
+          fontWeight: 600,
+          px: 1,
+        }}
       />
     );
   }
@@ -594,21 +598,23 @@ const AnalysisStatusChip = ({ record }: { record: any }) => {
   return (
     <Chip
       label="Not Analyzed"
-      color="default"
-      size="small"
+      color="warning"
+      size="medium"
       variant="outlined"
+      sx={{
+        fontWeight: 500,
+        borderWidth: 2,
+        px: 1,
+      }}
     />
   );
 };
 
-const MeetingWithAnalysisStatus = ({ record }: { record: any }) => {
+const MeetingTitle = ({ record }: { record: any }) => {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      <Typography variant="body2">
-        {record.meeting_title || record.title}
-      </Typography>
-      <AnalysisStatusChip record={record} />
-    </Box>
+    <Typography variant="body2">
+      {record.meeting_title || record.title}
+    </Typography>
   );
 };
 
@@ -625,8 +631,13 @@ export const AnalysisList = () => (
       <AnalysisDateRangeFilter />
       <Datagrid rowClick="show" bulkActionButtons={false}>
         <FunctionField
+          label="Status"
+          render={(record: any) => <AnalysisStatusChip record={record} />}
+          sortable={false}
+        />
+        <FunctionField
           label="Meeting"
-          render={(record: any) => <MeetingWithAnalysisStatus record={record} />}
+          render={(record: any) => <MeetingTitle record={record} />}
         />
         <DateField
           source="date"
