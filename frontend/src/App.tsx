@@ -44,6 +44,7 @@ const AdminApp = () => {
       darkTheme={radiantDarkTheme}
       loginPage={Login}
       requireAuth
+      disableTelemetry
     >
         <Resource
           name="analysis"
