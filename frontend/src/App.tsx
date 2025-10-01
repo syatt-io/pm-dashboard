@@ -4,6 +4,8 @@ import { dataProvider } from './dataProvider';
 import { authProvider } from './authProvider';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
+// NOTE: React Admin provides its own router - do NOT wrap in BrowserRouter!
+
 // Icons
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import TaskIcon from '@mui/icons-material/Task';
