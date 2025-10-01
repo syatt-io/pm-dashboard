@@ -2901,6 +2901,22 @@ def serve_react(path):
         raise
 
 
+# 404 error handler - serve React app for client-side routing
+@app.errorhandler(404)
+def not_found(e):
+    """Handle 404 errors by serving React app for client-side routing."""
+    # Get the requested path
+    path = request.path
+
+    # Skip API routes - return actual 404
+    if path.startswith('/api/') or path.startswith('/slack/'):
+        return jsonify({'error': 'Not found'}), 404
+
+    # For all other routes, serve React app (let React Admin handle routing)
+    print(f"=== 404 HANDLER: serving React for path '{path}' ===", flush=True)
+    return serve_react(path.lstrip('/'))
+
+
 if __name__ == '__main__':
     # Create templates directory and files
     import os
