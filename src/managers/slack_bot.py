@@ -1271,12 +1271,13 @@ class SlackTodoBot:
                 content = text.replace(f'#{category_match.group(1)}', '').strip()
 
             # Create the learning
+            # Note: We don't pass submitted_by_id because Slack user IDs don't map to database user IDs
             learning = self.learning_manager.create_learning(
                 content=content,
                 submitted_by=user_name,
-                submitted_by_id=user_id,
+                submitted_by_id=None,  # Slack users don't have database user IDs
                 category=category,
-                source='slack'
+                source=f'slack:{user_id}'  # Store Slack user ID in source for reference
             )
 
             # Format response
