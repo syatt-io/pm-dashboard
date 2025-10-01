@@ -38,6 +38,7 @@ jobs:
         TESTING: true
         DATABASE_URL: "sqlite:///:memory:"
         OPENAI_API_KEY: test-key
+        FIREFLIES_API_KEY: test-fireflies-key
         JIRA_URL: "https://test.atlassian.net"
         JIRA_USERNAME: test@example.com
         JIRA_API_TOKEN: test-token
@@ -144,5 +145,12 @@ jobs:
     - name: Run integration tests
       env:
         TESTING: true
+        DATABASE_URL: "sqlite:///:memory:"
+        OPENAI_API_KEY: test-key
+        FIREFLIES_API_KEY: test-fireflies-key
+        JIRA_URL: "https://test.atlassian.net"
+        JIRA_USERNAME: test@example.com
+        JIRA_API_TOKEN: test-token
+        ENCRYPTION_KEY: test-encryption-key-32-bytes-long!
       run: |
         pytest tests/integration/ -v

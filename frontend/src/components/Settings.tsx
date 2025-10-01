@@ -29,7 +29,7 @@ import {
   Warning,
   Launch,
 } from '@mui/icons-material';
-import { useDataProvider, useNotify, Loading, Title } from 'react-admin';
+import { Loading, Title } from 'react-admin';
 import { getApiUrl } from '../config';
 
 interface UserSettings {
@@ -64,9 +64,6 @@ export const Settings = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [validationResult, setValidationResult] = useState<{ valid: boolean; message: string } | null>(null);
-
-  const dataProvider = useDataProvider();
-  const notify = useNotify();
 
   // Load user settings on component mount
   useEffect(() => {

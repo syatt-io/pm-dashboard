@@ -2751,7 +2751,8 @@ def validate_fireflies_api_key_endpoint(user):
 def create_users_table_endpoint():
     """Create users table in the database - emergency endpoint."""
     try:
-        with database_engine.connect() as conn:
+        engine = get_engine()
+        with engine.connect() as conn:
             trans = conn.begin()
             try:
                 # Create users table without custom enum (use VARCHAR for role)

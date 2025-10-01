@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   TextField,
   DateField,
@@ -13,16 +13,12 @@ import {
   DateInput,
   useRecordContext,
   FunctionField,
-  ChipField,
   Button,
   useUpdate,
-  useNotify,
-  useRefresh,
   useRedirect,
   useGetList,
   useDelete,
   Loading,
-  Error,
   Title,
   RecordContextProvider,
 } from 'react-admin';
@@ -44,10 +40,8 @@ import {
 import {
   CheckCircle,
   PlayArrow,
-  Pause,
   Circle,
   ArrowBack,
-  Event,
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';

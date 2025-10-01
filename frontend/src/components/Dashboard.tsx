@@ -12,7 +12,6 @@ import {
   MeetingRoom,
   Task,
   CheckCircle,
-  TrendingUp,
   Business,
 } from '@mui/icons-material';
 import { useGetList } from 'react-admin';

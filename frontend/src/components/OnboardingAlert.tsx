@@ -71,7 +71,6 @@ const OnboardingAlert: React.FC<OnboardingAlertProps> = ({ onDismiss }) => {
   }
 
   const isInvalid = userSettings.has_fireflies_key && !userSettings.fireflies_key_valid;
-  const isNewUser = !userSettings.has_fireflies_key;
 
   return (
     <Snackbar

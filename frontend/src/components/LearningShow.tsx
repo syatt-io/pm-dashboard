@@ -6,7 +6,7 @@ import {
     DateField,
     ShowProps,
 } from 'react-admin';
-import { Card, CardContent, Box, Typography, Chip } from '@mui/material';
+import { Card, CardContent, Box, Typography } from '@mui/material';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 
 export const LearningShow = (props: ShowProps) => (

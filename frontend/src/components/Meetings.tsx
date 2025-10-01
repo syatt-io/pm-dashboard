@@ -13,13 +13,9 @@ import {
   DateInput,
   useRecordContext,
   FunctionField,
-  ChipField,
-  ReferenceField,
   Button,
   useRedirect,
   useNotify,
-  FilterButton,
-  FilterForm,
   TopToolbar,
   useListContext,
 } from 'react-admin';
@@ -33,10 +29,9 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Alert,
   Tooltip,
 } from '@mui/material';
-import { Analytics, PlayArrow, FilterList, Launch, CheckCircle } from '@mui/icons-material';
+import { Analytics, PlayArrow, Launch, CheckCircle } from '@mui/icons-material';
 
 const MeetingTitle = () => {
   const record = useRecordContext();

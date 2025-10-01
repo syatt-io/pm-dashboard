@@ -1,26 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  List,
-  Edit,
-  Create,
-  SimpleList,
-  Datagrid,
-  TextField,
-  EmailField,
-  DateField,
-  BooleanField,
-  SelectInput,
-  BooleanInput,
-  SimpleForm,
-  TextInput,
-  EditButton,
-  SaveButton,
-  Toolbar,
-  useRecordContext,
-  useNotify,
-  useRefresh
-} from 'react-admin';
-import { Card, CardContent, Typography, Select, MenuItem, Switch, FormControlLabel, Box } from '@mui/material';
+import { Card, CardContent, Typography, Select, MenuItem, Switch, Box } from '@mui/material';
 import axios from 'axios';
 
 const UserList = () => {
