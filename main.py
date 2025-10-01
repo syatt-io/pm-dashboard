@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 import schedule
 import time
 
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, JSON, text
+from sqlalchemy import create_engine, Column, String, DateTime, Boolean, JSON, Integer, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
