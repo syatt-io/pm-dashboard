@@ -2843,8 +2843,11 @@ def create_users_table_endpoint():
 @app.route('/<path:path>')
 def serve_react(path):
     """Serve React application in production."""
+    logger.info(f"=== serve_react called with path: '{path}' ===")
+
     # Skip API routes
     if path.startswith('api/'):
+        logger.info(f"Skipping API route: {path}")
         return jsonify({'error': 'Not found'}), 404
 
     # Try multiple possible build directory paths
@@ -2859,15 +2862,18 @@ def serve_react(path):
     for build_dir in possible_build_dirs:
         if os.path.exists(build_dir):
             react_build_dir = build_dir
+            logger.info(f"Found React build directory: {build_dir}")
             break
 
     # In production, serve React build
     if react_build_dir and os.path.exists(react_build_dir):
         # Try to serve the requested file
         if path != "" and os.path.exists(os.path.join(react_build_dir, path)):
+            logger.info(f"Serving file: {path}")
             return send_from_directory(react_build_dir, path)
         else:
             # Serve index.html for client-side routing
+            logger.info(f"Serving index.html for path: {path}")
             return send_from_directory(react_build_dir, 'index.html')
     else:
         # Debug information for troubleshooting
@@ -2877,6 +2883,7 @@ def serve_react(path):
             'checked_paths': possible_build_dirs,
             'exists_checks': [os.path.exists(p) for p in possible_build_dirs]
         }
+        logger.error(f"React build not found! Debug info: {debug_info}")
         return jsonify(debug_info), 404
 
 
