@@ -47,10 +47,10 @@ axios.interceptors.response.use(
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       // Don't retry refresh token requests to avoid infinite loops
-      if (originalRequest.url?.includes('/api/auth/refresh')) {
+      if (originalRequest.url?.includes('/api/auth/refresh') || originalRequest.url?.includes('/api/auth/google')) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('rememberMe');
-        window.location.href = '/login';
+        // Let React Admin's authProvider handle the redirect
         return Promise.reject(error);
       }
 
@@ -69,10 +69,9 @@ axios.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${token}`;
         return axios(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, redirect to login
+        // Refresh failed - clean up and let React Admin handle redirect
         localStorage.removeItem('auth_token');
         localStorage.removeItem('rememberMe');
-        window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
@@ -142,7 +141,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.removeItem('auth_token');
       localStorage.removeItem('rememberMe');
       setUser(null);
-      window.location.href = '/login';
+      // Let React Admin handle the redirect via authProvider
     }
   };
 

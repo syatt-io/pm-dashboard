@@ -2837,13 +2837,6 @@ def create_users_table_endpoint():
             'success': False,
             'error': f'Database connection failed: {str(e)}'
         }), 500
-
-# Redirect /login to root to avoid React Admin routing conflicts
-@app.route('/login')
-def redirect_login():
-    """Redirect /login to root - React Admin handles auth routing internally."""
-    return redirect('/')
-
 # Serve React build files in production
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
