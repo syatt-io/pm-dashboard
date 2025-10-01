@@ -101,6 +101,7 @@ const AdminApp = () => {
 };
 
 function App() {
+  // Fixed: No BrowserRouter wrapper - React Admin has its own router
   return (
     <AuthProvider>
       <AdminApp />
