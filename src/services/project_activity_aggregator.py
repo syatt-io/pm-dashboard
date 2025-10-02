@@ -531,9 +531,10 @@ class ProjectActivityAggregator:
             except:
                 pass
 
-            # Helper function to get issue key from Jira using issue ID
+            # Helper function to get issue key and summary from Jira using issue ID
             issue_cache = {}
-            def get_issue_key_from_jira(issue_id):
+            def get_issue_info_from_jira(issue_id):
+                """Get issue key and summary from Jira. Returns tuple (key, summary) or (None, None)."""
                 if issue_id in issue_cache:
                     return issue_cache[issue_id]
 
@@ -546,17 +547,18 @@ class ProjectActivityAggregator:
                         "Accept": "application/json"
                     }
 
-                    url = f"{settings.jira.url}/rest/api/3/issue/{issue_id}"
+                    url = f"{settings.jira.url}/rest/api/3/issue/{issue_id}?fields=key,summary"
                     response = requests.get(url, headers=headers)
                     response.raise_for_status()
                     issue_data = response.json()
                     issue_key = issue_data.get("key")
-                    issue_cache[issue_id] = issue_key
-                    return issue_key
+                    issue_summary = issue_data.get("fields", {}).get("summary", "")
+                    issue_cache[issue_id] = (issue_key, issue_summary)
+                    return issue_key, issue_summary
                 except Exception as e:
-                    logger.debug(f"Error getting issue key for ID {issue_id}: {e}")
-                    issue_cache[issue_id] = None
-                    return None
+                    logger.debug(f"Error getting issue info for ID {issue_id}: {e}")
+                    issue_cache[issue_id] = (None, None)
+                    return None, None
 
             # Get Tempo worklogs using v4 API
             headers = {
@@ -596,9 +598,13 @@ class ProjectActivityAggregator:
             processed_count = 0
             skipped_count = 0
 
+            # Track unique issue keys to fetch summaries for
+            issue_keys_to_fetch = {}
+
             for worklog in worklogs:
                 description = worklog.get("description", "")
                 issue_key = None
+                issue_summary = None
 
                 # First try extracting project key from description (faster)
                 issue_match = re.search(r'([A-Z]+-\d+)', description)
@@ -608,7 +614,7 @@ class ProjectActivityAggregator:
                     # If not found in description, look up via issue ID
                     issue_id = worklog.get("issue", {}).get("id")
                     if issue_id:
-                        issue_key = get_issue_key_from_jira(issue_id)
+                        issue_key, issue_summary = get_issue_info_from_jira(issue_id)
 
                 if not issue_key:
                     skipped_count += 1
@@ -636,7 +642,42 @@ class ProjectActivityAggregator:
                     'description': description,
                     'author': worklog.get("author", {}).get("displayName", "Unknown")
                 }
+                # Add issue summary if we already fetched it
+                if issue_summary:
+                    entry['issue_summary'] = issue_summary
+                else:
+                    # Mark for batch fetch later
+                    if issue_key not in issue_keys_to_fetch:
+                        issue_keys_to_fetch[issue_key] = []
+                    issue_keys_to_fetch[issue_key].append(entry)
+
                 time_entries.append(entry)
+
+            # Batch fetch missing issue summaries
+            if issue_keys_to_fetch:
+                logger.info(f"Fetching summaries for {len(issue_keys_to_fetch)} unique issues")
+                for issue_key, entries in issue_keys_to_fetch.items():
+                    try:
+                        # Use Jira API to get summary
+                        credentials = f"{settings.jira.username}:{settings.jira.api_token}"
+                        encoded_credentials = base64.b64encode(credentials.encode()).decode()
+
+                        headers = {
+                            "Authorization": f"Basic {encoded_credentials}",
+                            "Accept": "application/json"
+                        }
+
+                        url = f"{settings.jira.url}/rest/api/3/issue/{issue_key}?fields=summary"
+                        response = requests.get(url, headers=headers)
+                        response.raise_for_status()
+                        issue_data = response.json()
+                        summary = issue_data.get("fields", {}).get("summary", "")
+
+                        # Update all entries with this issue key
+                        for entry in entries:
+                            entry['issue_summary'] = summary
+                    except Exception as e:
+                        logger.debug(f"Error fetching summary for {issue_key}: {e}")
 
             activity.total_hours = round(total_hours, 2)
             activity.time_entries = time_entries
