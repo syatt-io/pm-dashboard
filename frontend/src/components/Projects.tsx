@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   TextField,
   useNotify,
@@ -941,15 +942,44 @@ const ProjectDetailDialog = ({
                     backgroundColor: '#f8f9fa',
                     border: '1px solid #e9ecef',
                     borderRadius: 1,
-                    p: 2,
-                    maxHeight: '400px',
+                    p: 3,
+                    maxHeight: '600px',
                     overflow: 'auto',
-                    fontFamily: 'monospace',
-                    fontSize: '0.875rem',
-                    lineHeight: 1.6,
-                    whiteSpace: 'pre-wrap'
+                    '& h1': { fontSize: '1.75rem', fontWeight: 600, mt: 2, mb: 2, color: '#2c3e50' },
+                    '& h2': { fontSize: '1.5rem', fontWeight: 600, mt: 2, mb: 1.5, color: '#34495e', borderBottom: '2px solid #e9ecef', pb: 1 },
+                    '& h3': { fontSize: '1.25rem', fontWeight: 600, mt: 2, mb: 1, color: '#34495e' },
+                    '& h4': { fontSize: '1.1rem', fontWeight: 600, mt: 1.5, mb: 1, color: '#34495e' },
+                    '& p': { mb: 1.5, lineHeight: 1.7, color: '#495057' },
+                    '& ul, & ol': { pl: 3, mb: 2 },
+                    '& li': { mb: 0.75, lineHeight: 1.6, color: '#495057' },
+                    '& strong': { fontWeight: 600, color: '#2c3e50' },
+                    '& em': { fontStyle: 'italic' },
+                    '& code': {
+                      backgroundColor: '#e9ecef',
+                      padding: '2px 6px',
+                      borderRadius: '3px',
+                      fontSize: '0.9em',
+                      fontFamily: 'monospace',
+                      color: '#c7254e'
+                    },
+                    '& pre': {
+                      backgroundColor: '#f5f5f5',
+                      p: 2,
+                      borderRadius: 1,
+                      overflow: 'auto',
+                      border: '1px solid #ddd'
+                    },
+                    '& blockquote': {
+                      borderLeft: '4px solid #554DFF',
+                      pl: 2,
+                      ml: 0,
+                      fontStyle: 'italic',
+                      color: '#6c757d'
+                    },
+                    '& a': { color: '#554DFF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } },
+                    '& hr': { border: 'none', borderTop: '1px solid #dee2e6', my: 2 }
                   }}>
-                    {digestData.formatted_agenda}
+                    <ReactMarkdown>{digestData.formatted_agenda}</ReactMarkdown>
                   </Box>
                 </Box>
               )}
