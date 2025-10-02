@@ -14,6 +14,7 @@ from src.managers.notifications import NotificationManager, NotificationContent
 from src.managers.slack_bot import SlackTodoBot
 from src.services.hours_report_agent import HoursReportAgent
 from src.integrations.jira_mcp import JiraMCPClient
+from src.jobs.tempo_sync import run_tempo_sync
 
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,10 @@ class TodoScheduler:
         for hour in [9, 11, 13, 15, 17]:
             schedule.every().day.at(f"{hour:02d}:00").do(self._run_async, self.check_urgent_items)
 
+        # Tempo hours sync at 4 AM EST (9 AM UTC)
+        # Note: This runs at 9 AM UTC which is 4 AM EST (during DST) or 10 AM UTC for standard time
+        schedule.every().day.at("09:00").do(self._run_sync, self.sync_tempo_hours)
+
         logger.info("Scheduled tasks configured")
 
     def _run_async(self, async_func, *args, **kwargs):
@@ -91,6 +96,13 @@ class TodoScheduler:
             asyncio.run(async_func(*args, **kwargs))
         except Exception as e:
             logger.error(f"Error running scheduled task {async_func.__name__}: {e}")
+
+    def _run_sync(self, sync_func, *args, **kwargs):
+        """Run synchronous function."""
+        try:
+            sync_func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Error running scheduled task {sync_func.__name__}: {e}")
 
     def start(self):
         """Start the scheduler in a background thread."""
@@ -451,6 +463,54 @@ class TodoScheduler:
 
         except Exception as e:
             logger.error(f"Error sending weekly hours reports: {e}")
+
+    def sync_tempo_hours(self):
+        """Sync Tempo hours to database (synchronous wrapper)."""
+        try:
+            logger.info("Starting scheduled Tempo hours sync")
+            stats = run_tempo_sync()
+
+            if stats.get("success"):
+                logger.info(
+                    f"Tempo sync completed successfully: "
+                    f"{stats['projects_updated']} projects updated in {stats['duration_seconds']:.2f}s"
+                )
+
+                # Send notification about sync completion
+                summary_body = f"✅ *Tempo Hours Sync Completed*\n\n"
+                summary_body += f"• Projects Updated: {stats['projects_updated']}\n"
+                summary_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
+                summary_body += f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+
+                if stats.get('unique_projects_tracked', 0) > 0:
+                    summary_body += f"• Unique Projects Tracked: {stats['unique_projects_tracked']}\n"
+
+                # Only send notification if in production
+                import os
+                if os.getenv('FLASK_ENV') == 'production':
+                    content = NotificationContent(
+                        title="Tempo Hours Sync",
+                        body=summary_body,
+                        priority="normal"
+                    )
+                    asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+            else:
+                error_msg = stats.get("error", "Unknown error")
+                logger.error(f"Tempo sync failed: {error_msg}")
+
+                # Send error notification
+                content = NotificationContent(
+                    title="⚠️ Tempo Hours Sync Failed",
+                    body=f"Error: {error_msg}\n\nPlease check logs for details.",
+                    priority="high"
+                )
+
+                import os
+                if os.getenv('FLASK_ENV') == 'production':
+                    asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+
+        except Exception as e:
+            logger.error(f"Error in scheduled Tempo sync: {e}")
 
 
 # Global scheduler instance
