@@ -1238,6 +1238,19 @@ class ProjectActivityAggregator:
                     else:
                         time_section += f"* **{ticket_key}:** {hours:.1f}h\n"
 
+        # Format new tickets section
+        new_tickets_section = ""
+        if activity.new_tickets:
+            new_tickets_section = "\n## 🆕 New Tickets Created\n"
+            for ticket in activity.new_tickets[:10]:  # Show up to 10 new tickets
+                ticket_key = ticket.get('key', 'Unknown')
+                summary = ticket.get('summary', 'No summary')
+                assignee = ticket.get('assignee', 'Unassigned')
+                new_tickets_section += f"* **{ticket_key}** - {summary}"
+                if assignee != 'Unassigned':
+                    new_tickets_section += f" (Assigned to: {assignee})"
+                new_tickets_section += "\n"
+
         agenda = f"""
 # {activity.project_name} - Weekly Status Update
 **Period:** {activity.start_date[:10]} to {activity.end_date[:10]} ({days} days)
@@ -1252,6 +1265,7 @@ class ProjectActivityAggregator:
 {self._format_section_content(activity.topics_for_discussion, "No discussion topics identified")}
 {ticket_changes_section}
 {time_section}
+{new_tickets_section}
 ## 📈 Activity Summary
 - **Meetings Held:** {len(activity.meetings)}
 - **Tickets Completed:** {len(activity.completed_tickets)}
