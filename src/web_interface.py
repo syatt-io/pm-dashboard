@@ -64,7 +64,13 @@ app = Flask(__name__,
             static_url_path='')
 
 # Production-ready secret key
-app.secret_key = os.getenv('JWT_SECRET_KEY', 'your-secret-key-here')
+app.secret_key = os.getenv('JWT_SECRET_KEY')
+if not app.secret_key:
+    if os.getenv('FLASK_ENV') == 'production':
+        raise ValueError("JWT_SECRET_KEY must be set in production environment")
+    else:
+        logger.warning("JWT_SECRET_KEY not set - using development fallback (NOT FOR PRODUCTION)")
+        app.secret_key = 'dev-secret-key-change-in-production'
 
 # Configure CORS for development and production
 # Get frontend port from environment, default to 4001

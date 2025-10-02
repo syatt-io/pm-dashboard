@@ -23,7 +23,12 @@ class EncryptionManager:
         encryption_key = os.getenv('ENCRYPTION_KEY')
 
         if not encryption_key:
-            # Generate a key and log a warning
+            # Fail fast in production, use temporary key in development
+            is_production = os.getenv('FLASK_ENV') == 'production'
+            if is_production:
+                raise ValueError("ENCRYPTION_KEY must be set in production environment")
+
+            # Generate a key and log a warning for development
             logger.warning("No ENCRYPTION_KEY found in environment. Generating temporary key.")
             logger.warning("This means encrypted data will not persist across restarts.")
             logger.warning("Set ENCRYPTION_KEY environment variable for production.")

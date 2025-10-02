@@ -4,6 +4,7 @@ from src.services.auth import AuthService, auth_required, admin_required
 from src.models.user import UserRole
 from sqlalchemy.orm import Session
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -54,12 +55,13 @@ def create_auth_blueprint(db_session_factory):
 
             # Set secure cookie
             cookie_max_age = 604800 if remember_me else 86400  # 7 days or 1 day
+            is_production = os.getenv('FLASK_ENV') == 'production'
             response.set_cookie(
                 'auth_token',
                 jwt_token,
                 httponly=True,
-                secure=False,  # Changed for local development
-                samesite='Lax',  # Changed for local development
+                secure=is_production,  # Secure cookies in production only
+                samesite='Strict' if is_production else 'Lax',  # Strict in production
                 max_age=cookie_max_age
             )
             logger.info("=== Login successful, sending response ===")
@@ -150,12 +152,13 @@ def create_auth_blueprint(db_session_factory):
 
             # Update cookie
             cookie_max_age = 604800 if remember_me else 86400
+            is_production = os.getenv('FLASK_ENV') == 'production'
             response.set_cookie(
                 'auth_token',
                 jwt_token,
                 httponly=True,
-                secure=False,  # Changed for local development
-                samesite='Lax',  # Changed for local development
+                secure=is_production,  # Secure cookies in production only
+                samesite='Strict' if is_production else 'Lax',  # Strict in production
                 max_age=cookie_max_age
             )
 

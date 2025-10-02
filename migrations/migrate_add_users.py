@@ -68,7 +68,7 @@ def migrate():
             columns = [row[1] for row in result]
             if 'user_id' not in columns:
                 conn.execute(text("ALTER TABLE todo_items ADD COLUMN user_id INTEGER"))
-                conn.execute(text(f"UPDATE todo_items SET user_id = {admin_user.id}"))
+                conn.execute(text("UPDATE todo_items SET user_id = :user_id"), {"user_id": admin_user.id})
                 print("Added user_id to todo_items table")
             else:
                 print("user_id already exists in todo_items")
@@ -78,7 +78,7 @@ def migrate():
             columns = [row[1] for row in result]
             if 'user_id' not in columns:
                 conn.execute(text("ALTER TABLE processed_meetings ADD COLUMN user_id INTEGER"))
-                conn.execute(text(f"UPDATE processed_meetings SET user_id = {admin_user.id}"))
+                conn.execute(text("UPDATE processed_meetings SET user_id = :user_id"), {"user_id": admin_user.id})
                 print("Added user_id to processed_meetings table")
             else:
                 print("user_id already exists in processed_meetings")
@@ -88,7 +88,7 @@ def migrate():
             columns = [row[1] for row in result]
             if 'user_id' not in columns:
                 conn.execute(text("ALTER TABLE user_preferences ADD COLUMN user_id INTEGER"))
-                conn.execute(text(f"UPDATE user_preferences SET user_id = {admin_user.id}"))
+                conn.execute(text("UPDATE user_preferences SET user_id = :user_id"), {"user_id": admin_user.id})
                 print("Added user_id to user_preferences table")
             else:
                 print("user_id already exists in user_preferences")
