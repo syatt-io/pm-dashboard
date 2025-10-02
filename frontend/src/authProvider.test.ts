@@ -3,10 +3,11 @@
  */
 
 import { authProvider } from './authProvider';
+import axios from 'axios';
 
-// Mock fetch
-global.fetch = jest.fn();
-const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
+// Mock axios
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('authProvider', () => {
     beforeEach(() => {
@@ -15,44 +16,36 @@ describe('authProvider', () => {
     });
 
     describe('login', () => {
-        it('should redirect to Google OAuth', async () => {
-            const mockOpen = jest.spyOn(window, 'open').mockImplementation(() => null);
-
-            await authProvider.login({});
-
-            expect(mockOpen).toHaveBeenCalledWith(
-                expect.stringContaining('/api/auth/google/login'),
-                '_self'
-            );
-
-            mockOpen.mockRestore();
+        it('should resolve successfully (handled by Google OAuth component)', async () => {
+            // Login is handled externally by Google OAuth, so this just resolves
+            await expect(authProvider.login({} as any)).resolves.toBeUndefined();
         });
     });
 
     describe('logout', () => {
         it('should clear localStorage and call logout endpoint', async () => {
             localStorage.setItem('auth_token', 'test-token');
-            localStorage.setItem('user', JSON.stringify({ email: 'test@example.com' }));
+            localStorage.setItem('rememberMe', 'true');
 
-            mockFetch.mockResolvedValueOnce({
-                ok: true,
-                json: async () => ({ success: true })
-            } as Response);
+            mockedAxios.post.mockResolvedValueOnce({
+                data: { success: true },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config: {} as any
+            });
 
             await authProvider.logout({});
 
             expect(localStorage.getItem('auth_token')).toBeNull();
-            expect(localStorage.getItem('user')).toBeNull();
-            expect(mockFetch).toHaveBeenCalledWith(
-                expect.stringContaining('/api/auth/logout'),
-                expect.objectContaining({ method: 'POST' })
-            );
+            expect(localStorage.getItem('rememberMe')).toBeNull();
+            expect(mockedAxios.post).toHaveBeenCalledWith('/api/auth/logout');
         });
 
         it('should handle logout errors gracefully', async () => {
             localStorage.setItem('auth_token', 'test-token');
 
-            mockFetch.mockRejectedValueOnce(new Error('Network error'));
+            mockedAxios.post.mockRejectedValueOnce(new Error('Network error'));
 
             await authProvider.logout({});
 
@@ -65,25 +58,29 @@ describe('authProvider', () => {
         it('should resolve if auth token exists', async () => {
             localStorage.setItem('auth_token', 'test-token');
 
-            await expect(authProvider.checkAuth({})).resolves.toBeUndefined();
+            await expect(authProvider.checkAuth({} as any)).resolves.toBeUndefined();
         });
 
         it('should reject if no auth token', async () => {
-            await expect(authProvider.checkAuth({})).rejects.toThrow();
+            await expect(authProvider.checkAuth({} as any)).rejects.toBeUndefined();
         });
     });
 
     describe('checkError', () => {
-        it('should reject on 401 error', async () => {
+        it('should reject and clear token on 401 error', async () => {
+            localStorage.setItem('auth_token', 'test-token');
             const error = { status: 401 };
 
-            await expect(authProvider.checkError(error)).rejects.toThrow();
+            await expect(authProvider.checkError(error)).rejects.toBeUndefined();
+            expect(localStorage.getItem('auth_token')).toBeNull();
         });
 
-        it('should reject on 403 error', async () => {
+        it('should reject and clear token on 403 error', async () => {
+            localStorage.setItem('auth_token', 'test-token');
             const error = { status: 403 };
 
-            await expect(authProvider.checkError(error)).rejects.toThrow();
+            await expect(authProvider.checkError(error)).rejects.toBeUndefined();
+            expect(localStorage.getItem('auth_token')).toBeNull();
         });
 
         it('should resolve on other errors', async () => {
@@ -95,115 +92,90 @@ describe('authProvider', () => {
         it('should resolve if no error status', async () => {
             const error = { message: 'Some error' };
 
-            await expect(authProvider.checkError(error)).resolves.toBeUndefined();
+            await expect(authProvider.checkError(error as any)).resolves.toBeUndefined();
         });
     });
 
     describe('getIdentity', () => {
-        it('should return user identity from localStorage', async () => {
+        it('should return user identity from API', async () => {
             const mockUser = {
                 id: 1,
                 email: 'test@example.com',
-                name: 'Test User'
+                name: 'Test User',
+                picture: 'https://example.com/avatar.jpg'
             };
 
-            localStorage.setItem('user', JSON.stringify(mockUser));
+            mockedAxios.get.mockResolvedValueOnce({
+                data: { user: mockUser },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config: {} as any
+            });
 
             const identity = await authProvider.getIdentity();
 
             expect(identity).toEqual({
                 id: mockUser.id,
-                fullName: mockUser.name
+                fullName: mockUser.name,
+                avatar: mockUser.picture
             });
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/auth/user');
         });
 
-        it('should return undefined if no user in localStorage', async () => {
-            const identity = await authProvider.getIdentity();
+        it('should reject on API error', async () => {
+            mockedAxios.get.mockRejectedValueOnce(new Error('Unauthorized'));
 
-            expect(identity).toBeUndefined();
-        });
-
-        it('should handle invalid JSON in localStorage', async () => {
-            localStorage.setItem('user', 'invalid-json');
-
-            const identity = await authProvider.getIdentity();
-
-            expect(identity).toBeUndefined();
+            await expect(authProvider.getIdentity()).rejects.toBeUndefined();
         });
     });
 
     describe('getPermissions', () => {
-        it('should return user role from localStorage', async () => {
+        it('should return user role from API', async () => {
             const mockUser = {
                 id: 1,
                 email: 'test@example.com',
                 role: 'admin'
             };
 
-            localStorage.setItem('user', JSON.stringify(mockUser));
+            mockedAxios.get.mockResolvedValueOnce({
+                data: { user: mockUser },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config: {} as any
+            });
 
             const permissions = await authProvider.getPermissions({});
 
             expect(permissions).toBe('admin');
+            expect(mockedAxios.get).toHaveBeenCalledWith('/api/auth/user');
         });
 
         it('should return user role for regular user', async () => {
             const mockUser = {
                 id: 1,
                 email: 'test@example.com',
-                role: 'user'
+                role: 'member'
             };
 
-            localStorage.setItem('user', JSON.stringify(mockUser));
-
-            const permissions = await authProvider.getPermissions({});
-
-            expect(permissions).toBe('user');
-        });
-
-        it('should return undefined if no user', async () => {
-            const permissions = await authProvider.getPermissions({});
-
-            expect(permissions).toBeUndefined();
-        });
-    });
-
-    describe('OAuth callback handling', () => {
-        it('should extract and store token from URL', () => {
-            // Simulate OAuth callback URL
-            Object.defineProperty(window, 'location', {
-                value: {
-                    search: '?token=abc123&user=%7B%22email%22%3A%22test%40example.com%22%7D',
-                    href: 'http://localhost:4001/auth-callback'
-                },
-                writable: true
+            mockedAxios.get.mockResolvedValueOnce({
+                data: { user: mockUser },
+                status: 200,
+                statusText: 'OK',
+                headers: {},
+                config: {} as any
             });
 
-            // This would normally be handled by App component
-            const urlParams = new URLSearchParams(window.location.search);
-            const token = urlParams.get('token');
-            const userParam = urlParams.get('user');
+            const permissions = await authProvider.getPermissions({});
 
-            expect(token).toBe('abc123');
-            expect(userParam).toBeDefined();
+            expect(permissions).toBe('member');
         });
-    });
 
-    describe('Token refresh', () => {
-        it('should handle expired token', async () => {
-            localStorage.setItem('auth_token', 'expired-token');
+        it('should reject on API error', async () => {
+            mockedAxios.get.mockRejectedValueOnce(new Error('Unauthorized'));
 
-            mockFetch.mockResolvedValueOnce({
-                status: 401,
-                ok: false,
-                json: async () => ({ error: 'Token expired' })
-            } as Response);
-
-            const error = { status: 401 };
-            await expect(authProvider.checkError(error)).rejects.toThrow();
-
-            // Token should be cleared
-            expect(localStorage.getItem('auth_token')).toBe('expired-token'); // Not cleared by checkError
+            await expect(authProvider.getPermissions({})).rejects.toBeUndefined();
         });
     });
 });
