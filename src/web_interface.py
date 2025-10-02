@@ -107,12 +107,14 @@ from src.routes.todos import todos_bp
 from src.routes.meetings import meetings_bp
 from src.routes.jira import jira_bp
 from src.routes.learnings import learnings_bp
+from src.routes.scheduler import scheduler_bp
 
 app.register_blueprint(health_bp)
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
 app.register_blueprint(learnings_bp)
+app.register_blueprint(scheduler_bp)
 
 # Initialize components
 fireflies = FirefliesClient(settings.fireflies.api_key)
@@ -483,118 +485,20 @@ def send_slack_digest():
 
 
 # Scheduler and Notification Routes
-@app.route("/api/scheduler/start", methods=["POST"])
-def start_scheduler_api():
-    """Start the TODO scheduler."""
-    try:
-        start_scheduler()
-        return jsonify({"success": True, "message": "Scheduler started"})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route("/api/scheduler/stop", methods=["POST"])
-def stop_scheduler_api():
-    """Stop the TODO scheduler."""
-    try:
-        stop_scheduler()
-        return jsonify({"success": True, "message": "Scheduler stopped"})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route("/api/scheduler/status")
-def scheduler_status():
-    """Get scheduler status."""
-    try:
-        scheduler = get_scheduler()
-        status = {
-            "running": scheduler is not None and scheduler.running if scheduler else False,
-            "active_jobs": len(schedule.jobs) if scheduler else 0
-        }
-        return jsonify(status)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/notifications/daily-digest", methods=["POST"])
-def trigger_daily_digest():
-    """Manually trigger daily digest."""
-    try:
-        scheduler = get_scheduler()
-        if not scheduler:
-            return jsonify({"error": "Scheduler not running"}), 503
-
-        asyncio.run(scheduler.send_daily_digest())
-        return jsonify({"success": True, "message": "Daily digest sent"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/notifications/overdue-reminders", methods=["POST"])
-def trigger_overdue_reminders():
-    """Manually trigger overdue reminders."""
-    try:
-        scheduler = get_scheduler()
-        if not scheduler:
-            return jsonify({"error": "Scheduler not running"}), 503
-
-        asyncio.run(scheduler.send_overdue_reminders())
-        return jsonify({"success": True, "message": "Overdue reminders sent"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/notifications/due-today", methods=["POST"])
-def trigger_due_today_reminders():
-    """Manually trigger due today reminders."""
-    try:
-        scheduler = get_scheduler()
-        if not scheduler:
-            return jsonify({"error": "Scheduler not running"}), 503
-
-        asyncio.run(scheduler.send_due_today_reminders())
-        return jsonify({"success": True, "message": "Due today reminders sent"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/notifications/custom", methods=["POST"])
-def send_custom_notification():
-    """Send custom notification."""
-    try:
-        data = request.json or {}
-        assignee = data.get('assignee', '')
-        message = data.get('message', '')
-        priority = data.get('priority', 'normal')
-
-        if not assignee or not message:
-            return jsonify({"error": "Assignee and message are required"}), 400
-
-        scheduler = get_scheduler()
-        if not scheduler:
-            return jsonify({"error": "Scheduler not running"}), 503
-
-        asyncio.run(scheduler.send_custom_reminder(assignee, message, priority))
-        return jsonify({"success": True, "message": "Custom notification sent"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/api/scheduler/hours-report", methods=["POST"])
-def trigger_hours_report():
-    """Manually trigger weekly hours report."""
-    try:
-        scheduler = get_scheduler()
-        if not scheduler:
-            return jsonify({'success': False, 'error': 'Scheduler not running'}), 500
-
-        asyncio.run(scheduler.send_weekly_hours_reports())
-
-        return jsonify({'success': True, 'message': 'Hours report sent successfully'})
-    except Exception as e:
-        logger.error(f"Error triggering hours report: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 
