@@ -114,8 +114,10 @@ class ProjectActivityAggregator:
             self.slack_bot = None
 
         # Setup database session for accessing stored meetings
-        db_path = "pm_agent.db"
-        engine = create_engine(f"sqlite:///{db_path}")
+        from src.utils.database import get_engine
+        from sqlalchemy.orm import sessionmaker
+
+        engine = get_engine()
         Session = sessionmaker(bind=engine)
         self.session = Session()
 
@@ -190,7 +192,7 @@ class ProjectActivityAggregator:
         logger.info(f"Starting meeting data collection for {activity.project_key}")
         try:
             # Import the database models
-            from main import ProcessedMeeting
+            from src.models import ProcessedMeeting
 
             # Get meetings that are relevant to this project from the database
             logger.info(f"Searching meetings for {activity.project_key} between {start_date} and {end_date}")
