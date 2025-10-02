@@ -14,6 +14,7 @@ import BusinessIcon from '@mui/icons-material/Business';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import PeopleIcon from '@mui/icons-material/People';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
+import FeedbackIcon from '@mui/icons-material/Feedback';
 
 // Components
 import { MeetingList, MeetingShow, MeetingEdit } from './components/Meetings';
@@ -26,6 +27,9 @@ import { LearningsList } from './components/LearningsList';
 import { LearningCreate } from './components/LearningCreate';
 import { LearningEdit } from './components/LearningEdit';
 import { LearningShow } from './components/LearningShow';
+import { FeedbackList } from './components/FeedbackList';
+import { FeedbackCreate } from './components/FeedbackCreate';
+import { FeedbackEdit } from './components/FeedbackEdit';
 import Login from './components/Login';
 import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
@@ -83,6 +87,14 @@ const AdminApp = () => {
           edit={LearningEdit}
           icon={LightbulbIcon}
           options={{ label: 'Team Learnings' }}
+        />
+        <Resource
+          name="feedback"
+          list={FeedbackList}
+          create={FeedbackCreate}
+          edit={FeedbackEdit}
+          icon={FeedbackIcon}
+          options={{ label: 'My Feedback' }}
         />
         {isAdmin && (
           <Resource
