@@ -253,6 +253,50 @@ class SlackTodoBot:
                 logger.error(f"Error handling /learning command: {e}")
                 respond(f"❌ Error processing learning command: {str(e)}")
 
+        @self.app.command("/feedback")
+        def handle_feedback_command(ack, respond, command):
+            """Handle /feedback slash command for saving feedback."""
+            ack()
+
+            try:
+                user_id = command.get('user_id')
+                text = command.get('text', '').strip()
+
+                if not text or text == 'help':
+                    respond(self._get_feedback_help_message())
+                    return
+
+                # Parse command: /feedback @recipient Here is my feedback text
+                # Recipient is optional
+                recipient = None
+                content = text
+
+                # Check if text starts with @mention
+                if text.startswith('<@'):
+                    # Extract Slack user ID from mention
+                    parts = text.split('>', 1)
+                    if len(parts) == 2:
+                        recipient_id = parts[0].replace('<@', '').strip()
+                        # Validate recipient exists in Slack
+                        if self._validate_slack_user(recipient_id):
+                            recipient = self._get_user_display_name(recipient_id)
+                            content = parts[1].strip()
+                        else:
+                            respond("❌ Invalid recipient. Please use a valid Slack user mention.")
+                            return
+
+                # Validate content is not empty
+                if not content:
+                    respond("❌ Please provide feedback content: `/feedback @user Your feedback here`")
+                    return
+
+                # Create the feedback
+                respond(self._create_feedback(user_id, recipient, content))
+
+            except Exception as e:
+                logger.error(f"Error handling /feedback command: {e}")
+                respond(f"❌ Error processing feedback command: {str(e)}")
+
     def _register_listeners(self):
         """Register message listeners."""
 
@@ -320,7 +364,8 @@ class SlackTodoBot:
                            "`/todo <title>` - Quick create TODO\n"
                            "`/agenda <project-key> [days]` - Generate project agenda\n"
                            "`/dadjoke [about <topic>] [for <person>]` - Get a dad joke\n"
-                           "`/learning <text>` - Save a team learning\n\n"
+                           "`/learning <text>` - Save a team learning\n"
+                           "`/feedback [@user] <text>` - Save private feedback\n\n"
                            "*Examples:*\n"
                            "• `/todos list me` - My TODOs\n"
                            "• `/todo Fix login bug` - Quick create\n"
@@ -1555,3 +1600,93 @@ class SlackTodoBot:
         except Exception as e:
             logger.error(f"Error listing categories: {e}")
             return {"text": f"❌ Error retrieving categories: {str(e)}"}
+
+    def _get_feedback_help_message(self) -> Dict[str, Any]:
+        """Get help message for feedback command."""
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "💬 Feedback Tracker Help"
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Save Private Feedback for Later*\n\n"
+                           "`/feedback <text>` - Save feedback without a recipient\n"
+                           "`/feedback @user <text>` - Save feedback for a specific person\n"
+                           "`/feedback help` - Show this help\n\n"
+                           "*Examples:*\n"
+                           "• `/feedback Great job on the presentation!` - General feedback\n"
+                           "• `/feedback @johndoe Excellent work on the API refactor` - Feedback for John\n\n"
+                           "*Note:* All feedback is private to you. Only you can see it."
+                }
+            },
+            {
+                "type": "context",
+                "elements": [{
+                    "type": "plain_text",
+                    "text": "💡 Tip: Use the web dashboard to view and manage your saved feedback"
+                }]
+            }
+        ]
+
+        return {"blocks": blocks}
+
+    def _create_feedback(self, user_id: str, recipient: Optional[str], content: str) -> Dict[str, Any]:
+        """Create a new feedback item from Slack command."""
+        try:
+            from src.models import FeedbackItem
+            import uuid
+
+            # Get user display name
+            user_name = self._get_user_display_name(user_id)
+
+            # Map Slack user to app user
+            app_user_id = self._map_slack_user_to_app_user(user_id)
+
+            if not app_user_id:
+                return {
+                    "text": "❌ Could not find your user account. Please make sure you're logged into the web app first."
+                }
+
+            # Create the feedback
+            feedback = FeedbackItem(
+                id=str(uuid.uuid4()),
+                user_id=app_user_id,
+                recipient=recipient,
+                content=content,
+                status='draft',
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+
+            # Add to database
+            from src.utils.database import session_scope
+            with session_scope() as db_session:
+                db_session.add(feedback)
+                db_session.commit()
+
+            # Format response
+            recipient_str = f" for *{recipient}*" if recipient else ""
+            return {
+                "text": f"✅ Feedback saved{recipient_str}! 🔒 (Private to you)\n\n"
+                       f"💬 *{content}*\n\n"
+                       f"_ID: {feedback.id[:8]} | Status: {feedback.status}_\n"
+                       f"💡 View all your feedback at {settings.web.base_url}/feedback"
+            }
+
+        except Exception as e:
+            logger.error(f"Error creating feedback: {e}")
+            return {"text": f"❌ Error saving feedback: {str(e)}"}
+
+    def _validate_slack_user(self, user_id: str) -> bool:
+        """Validate that a Slack user exists."""
+        try:
+            response = self.client.users_info(user=user_id)
+            return response.get("ok", False) and not response.get("user", {}).get("deleted", False)
+        except SlackApiError:
+            return False

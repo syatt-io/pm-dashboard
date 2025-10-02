@@ -50,6 +50,18 @@ class ProcessedMeeting(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
+class FeedbackItem(Base):
+    """Feedback item model for storing user feedback."""
+    __tablename__ = 'feedback_items'
+
+    id = Column(String(36), primary_key=True)
+    user_id = Column(Integer, nullable=False)  # User who created the feedback
+    recipient = Column(String(255))  # Slack handle or name (optional)
+    content = Column(Text, nullable=False)  # Feedback details
+    status = Column(String(50), default='draft')  # draft or given
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
 # Import DTOs
 from .dtos import (
     ProcessedMeetingDTO,
@@ -69,6 +81,7 @@ __all__ = [
     'Learning',
     'TodoItem',
     'ProcessedMeeting',
+    'FeedbackItem',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',
