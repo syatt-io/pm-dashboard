@@ -253,9 +253,9 @@ class SlackTodoBot:
                 logger.error(f"Error handling /learning command: {e}")
                 respond(f"❌ Error processing learning command: {str(e)}")
 
-        @self.app.command("/feedback")
+        @self.app.command("/feedforward")
         def handle_feedback_command(ack, respond, command):
-            """Handle /feedback slash command for saving feedback."""
+            """Handle /feedforward slash command for saving feedback."""
             ack()
 
             try:
@@ -287,14 +287,14 @@ class SlackTodoBot:
 
                 # Validate content is not empty
                 if not content:
-                    respond("❌ Please provide feedback content: `/feedback @user Your feedback here`")
+                    respond("❌ Please provide feedback content: `/feedforward @user Your feedback here`")
                     return
 
                 # Create the feedback
                 respond(self._create_feedback(user_id, recipient, content))
 
             except Exception as e:
-                logger.error(f"Error handling /feedback command: {e}")
+                logger.error(f"Error handling /feedforward command: {e}")
                 respond(f"❌ Error processing feedback command: {str(e)}")
 
     def _register_listeners(self):
@@ -1616,12 +1616,12 @@ class SlackTodoBot:
                 "text": {
                     "type": "mrkdwn",
                     "text": "*Save Private Feedback for Later*\n\n"
-                           "`/feedback <text>` - Save feedback without a recipient\n"
-                           "`/feedback @user <text>` - Save feedback for a specific person\n"
-                           "`/feedback help` - Show this help\n\n"
+                           "`/feedforward <text>` - Save feedback without a recipient\n"
+                           "`/feedforward @user <text>` - Save feedback for a specific person\n"
+                           "`/feedforward help` - Show this help\n\n"
                            "*Examples:*\n"
-                           "• `/feedback Great job on the presentation!` - General feedback\n"
-                           "• `/feedback @johndoe Excellent work on the API refactor` - Feedback for John\n\n"
+                           "• `/feedforward Great job on the presentation!` - General feedback\n"
+                           "• `/feedforward @johndoe Excellent work on the API refactor` - Feedback for John\n\n"
                            "*Note:* All feedback is private to you. Only you can see it."
                 }
             },
