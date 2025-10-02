@@ -814,26 +814,18 @@ class SlackTodoBot:
                 logger.warning(f"No email found for Slack user {slack_user_id}")
                 return None
 
-            # Look up app user by email
+            # Look up app user by email using shared database session
             from src.models.user import User
-            from sqlalchemy.orm import sessionmaker
-            from config.settings import settings
-            from sqlalchemy import create_engine
+            from src.utils.database import session_scope
 
-            engine = create_engine(settings.agent.database_url)
-            Session = sessionmaker(bind=engine)
-            session = Session()
-
-            try:
-                user = session.query(User).filter(User.email == email).first()
+            with session_scope() as db_session:
+                user = db_session.query(User).filter(User.email == email).first()
                 if user:
                     logger.info(f"Mapped Slack user {slack_user_id} ({email}) to app user {user.id}")
                     return user.id
                 else:
                     logger.warning(f"No app user found with email {email}")
                     return None
-            finally:
-                session.close()
 
         except Exception as e:
             logger.error(f"Error mapping Slack user to app user: {e}")
