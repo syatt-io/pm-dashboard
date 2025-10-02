@@ -1645,12 +1645,20 @@ class SlackTodoBot:
             # Get user display name
             user_name = self._get_user_display_name(user_id)
 
+            # Get email for debugging
+            email = self._get_user_email(user_id)
+            logger.info(f"Creating feedback for Slack user {user_id}, email: {email}")
+
             # Map Slack user to app user
             app_user_id = self._map_slack_user_to_app_user(user_id)
 
             if not app_user_id:
+                if not email:
+                    return {
+                        "text": "❌ Could not retrieve your email from Slack. Please contact your admin to ensure the bot has `users:read.email` permission."
+                    }
                 return {
-                    "text": "❌ Could not find your user account. Please make sure you're logged into the web app first."
+                    "text": f"❌ Could not find user account for email: {email}. Please make sure you're logged into the web app with this email first."
                 }
 
             # Create the feedback
