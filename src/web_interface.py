@@ -1825,7 +1825,11 @@ def meeting_project_dashboard():
 
 @app.route('/api/sync-hours', methods=['POST'])
 def sync_hours():
-    """Sync project hours from Jira/Tempo to local database using accurate Tempo v4 API."""
+    """
+    Manual sync of CURRENT MONTH hours only from Tempo API.
+    This is optimized for quick manual updates via the UI button.
+    For full YTD sync, use the nightly job at 4am EST.
+    """
     try:
         from sqlalchemy import create_engine, text
         from datetime import datetime
@@ -2007,10 +2011,10 @@ def sync_hours():
         # Get date ranges
         current_date = datetime.now()
         start_of_month = current_date.replace(day=1)
-        current_year = current_date.year
 
-        # Fetch worklogs using the proven accurate method
-        logger.info("Starting accurate Tempo v4 API sync")
+        # Manual sync: Only fetch current month worklogs (fast!)
+        # The nightly job at 4am EST handles full YTD sync
+        logger.info("Starting manual Tempo sync (current month only)")
 
         # Get current month worklogs
         current_month_worklogs = get_tempo_worklogs(
@@ -2018,63 +2022,34 @@ def sync_hours():
             current_date.strftime('%Y-%m-%d')
         )
 
-        # Get year-to-date worklogs for cumulative data
-        cumulative_worklogs = get_tempo_worklogs(
-            f"{current_year}-01-01",
-            current_date.strftime('%Y-%m-%d')
-        )
-
-        if not current_month_worklogs and not cumulative_worklogs:
-            logger.warning("No worklogs retrieved from Tempo API")
+        if not current_month_worklogs:
+            logger.warning("No worklogs retrieved from Tempo API for current month")
             return jsonify({
                 'success': False,
-                'message': 'No worklogs retrieved from Tempo API. Check API token configuration.',
+                'message': 'No worklogs retrieved from Tempo API for current month. Check API token configuration.',
                 'projects_updated': 0
             })
 
-        # Process current month data
+        # Process current month data only
         current_month_hours, _ = process_worklogs(current_month_worklogs, active_projects)
 
-        # Process cumulative data
-        _, cumulative_hours = process_worklogs(cumulative_worklogs, active_projects)
-
-        # Update database
+        # Update database - only update current_month_hours
+        # The nightly job handles cumulative_hours updates
         with engine.connect() as conn:
             for project in active_projects:
                 try:
                     project_key = project['key']
-                    project_work_type = project['project_work_type'] or 'project-based'
+                    current_hours = current_month_hours.get(project_key, 0)
 
-                    logger.info(f"Updating project {project_key} (type: {project_work_type})")
+                    # Update only current month hours for all projects
+                    conn.execute(text("""
+                        UPDATE projects
+                        SET current_month_hours = :hours,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE key = :key
+                    """), {"hours": current_hours, "key": project_key})
 
-                    if project_work_type == 'growth-support':
-                        # For growth & support: use current month hours
-                        hours = current_month_hours.get(project_key, 0)
-                        conn.execute(text("""
-                            UPDATE projects
-                            SET current_month_hours = :hours, updated_at = CURRENT_TIMESTAMP
-                            WHERE key = :key
-                        """), {"hours": hours, "key": project_key})
-                        logger.info(f"Updated {project_key} with {hours:.2f} current month hours")
-
-                    else:
-                        # For project-based: use cumulative hours
-                        hours = cumulative_hours.get(project_key, 0)
-                        current_hours = current_month_hours.get(project_key, 0)
-
-                        conn.execute(text("""
-                            UPDATE projects
-                            SET cumulative_hours = :cumulative_hours,
-                                current_month_hours = :current_month_hours,
-                                updated_at = CURRENT_TIMESTAMP
-                            WHERE key = :key
-                        """), {
-                            "cumulative_hours": hours,
-                            "current_month_hours": current_hours,
-                            "key": project_key
-                        })
-                        logger.info(f"Updated {project_key} with {hours:.2f} cumulative hours, {current_hours:.2f} current month hours")
-
+                    logger.info(f"Updated {project_key} with {current_hours:.2f} current month hours")
                     projects_updated += 1
 
                 except Exception as e:
@@ -2086,10 +2061,10 @@ def sync_hours():
 
         return jsonify({
             'success': True,
-            'message': f'Successfully synced hours for {projects_updated} projects using accurate Tempo v4 API',
+            'message': f'Successfully synced current month hours for {projects_updated} projects',
             'projects_updated': projects_updated,
             'current_month_total': sum(current_month_hours.values()),
-            'cumulative_total': sum(cumulative_hours.values())
+            'note': 'Only current month synced. Cumulative hours updated by nightly job at 4am EST.'
         })
 
     except Exception as e:

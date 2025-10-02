@@ -40,6 +40,7 @@ import {
   Skeleton,
   Button as MuiButton,
   TextField as MuiTextField,
+  CircularProgress,
 } from '@mui/material';
 import {
   Star,
@@ -1185,12 +1186,12 @@ export const ProjectList = () => {
               variant="outlined"
               color="primary"
               size="small"
-              startIcon={<SyncIcon />}
+              startIcon={syncing ? <CircularProgress size={16} /> : <SyncIcon />}
               onClick={handleSyncHours}
               disabled={syncing}
               sx={{ textTransform: 'none' }}
             >
-              {syncing ? 'Syncing Hours...' : 'Sync Hours'}
+              {syncing ? 'Syncing Current Month...' : 'Sync Hours'}
             </Button>
           </Box>
 
