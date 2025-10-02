@@ -190,44 +190,64 @@ class ProjectActivityAggregator:
         logger.info(f"Starting meeting data collection for {activity.project_key}")
         try:
             # Import the database models
-            from main import ProcessedMeeting, MeetingProjectConnection
+            from main import ProcessedMeeting
 
             # Get meetings that are relevant to this project from the database
             logger.info(f"Searching meetings for {activity.project_key} between {start_date} and {end_date}")
 
-            # Debug: Check if connection exists first
-            connection_count = self.session.query(MeetingProjectConnection).filter(
-                MeetingProjectConnection.project_key == activity.project_key
-            ).count()
-            logger.info(f"Found {connection_count} meeting connections for {activity.project_key}")
+            # Query processed_meetings directly by matching keywords in title/summary
+            from src.utils.database import get_engine
+            from sqlalchemy import text
 
-            relevant_meetings_query = self.session.query(ProcessedMeeting).join(
-                MeetingProjectConnection,
-                ProcessedMeeting.meeting_id == MeetingProjectConnection.meeting_id
-            ).filter(
-                MeetingProjectConnection.project_key == activity.project_key,
+            # Get project keywords for matching
+            keywords_result = None
+            try:
+                engine = get_engine()
+                with engine.connect() as conn:
+                    keywords_result = conn.execute(text("""
+                        SELECT keyword FROM project_keywords
+                        WHERE project_key = :project_key
+                    """), {"project_key": activity.project_key})
+                    keywords = [row[0].lower() for row in keywords_result]
+            except Exception as e:
+                logger.warning(f"Error loading keywords for {activity.project_key}: {e}")
+                keywords = [activity.project_key.lower()]
+
+            logger.info(f"Using keywords for {activity.project_key}: {keywords}")
+
+            # Get all analyzed meetings in date range
+            all_analyzed_meetings = self.session.query(ProcessedMeeting).filter(
                 ProcessedMeeting.date >= start_date,
                 ProcessedMeeting.date <= end_date,
-                ProcessedMeeting.analyzed_at.is_not(None)  # Only include analyzed meetings
+                ProcessedMeeting.analyzed_at.is_not(None)
             ).all()
-            logger.info(f"Database query found {len(relevant_meetings_query)} meetings for {activity.project_key}")
 
-            # Convert database meetings to activity format
+            logger.info(f"Found {len(all_analyzed_meetings)} total analyzed meetings in date range")
+
+            # Filter by keyword matching in title or summary
             relevant_meetings = []
-            for db_meeting in relevant_meetings_query:
-                meeting_data = {
-                    'id': db_meeting.meeting_id,
-                    'title': db_meeting.title,
-                    'date': db_meeting.date.isoformat() if db_meeting.date else '',
-                    'summary': db_meeting.summary,
-                    'processed_at': db_meeting.processed_at.isoformat() if db_meeting.processed_at else '',
-                    'analyzed_at': db_meeting.analyzed_at.isoformat() if db_meeting.analyzed_at else ''
-                }
-                relevant_meetings.append(meeting_data)
+            for db_meeting in all_analyzed_meetings:
+                title_lower = (db_meeting.title or '').lower()
+                summary_lower = (db_meeting.summary or '').lower()
 
-                # Add the summary to meeting summaries
-                if db_meeting.summary:
-                    activity.meeting_summaries.append(db_meeting.summary)
+                # Check if any keyword matches title or summary
+                if any(keyword in title_lower or keyword in summary_lower for keyword in keywords):
+                    meeting_data = {
+                        'id': db_meeting.fireflies_id or db_meeting.id,
+                        'title': db_meeting.title,
+                        'date': db_meeting.date.isoformat() if db_meeting.date else '',
+                        'summary': db_meeting.summary,
+                        'processed_at': db_meeting.processed_at.isoformat() if db_meeting.processed_at else '',
+                        'analyzed_at': db_meeting.analyzed_at.isoformat() if db_meeting.analyzed_at else ''
+                    }
+                    relevant_meetings.append(meeting_data)
+                    logger.info(f"Matched meeting: {db_meeting.title}")
+
+                    # Add the summary to meeting summaries
+                    if db_meeting.summary:
+                        activity.meeting_summaries.append(db_meeting.summary)
+
+            logger.info(f"Keyword matching found {len(relevant_meetings)} relevant meetings for {activity.project_key}")
 
             # ALSO check for live Fireflies meetings that match this project
             try:
