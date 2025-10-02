@@ -373,16 +373,6 @@ def not_found(e):
 
 
 if __name__ == '__main__':
-    # Create templates directory and files
-    import os
-    os.makedirs('templates', exist_ok=True)
-
-    with open('templates/dashboard.html', 'w') as f:
-        f.write(DASHBOARD_TEMPLATE)
-
-    with open('templates/analysis.html', 'w') as f:
-        f.write(ANALYSIS_TEMPLATE)
-
     # Get port from environment variable, default to 4000
     port = int(os.getenv('BACKEND_PORT', 4000))
     app.run(debug=True, host='127.0.0.1', port=port)
