@@ -976,6 +976,7 @@ export const ProjectList = () => {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [activeProjects, setActiveProjects] = useState<Project[]>([]);
   const [watchedProjects, setWatchedProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectDetailOpen, setProjectDetailOpen] = useState(false);
