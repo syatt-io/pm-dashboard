@@ -108,6 +108,7 @@ from src.routes.meetings import meetings_bp
 from src.routes.jira import jira_bp
 from src.routes.learnings import learnings_bp
 from src.routes.scheduler import scheduler_bp
+from src.routes.slack import slack_bp, init_slack_routes
 
 app.register_blueprint(health_bp)
 app.register_blueprint(todos_bp)
@@ -115,6 +116,7 @@ app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
 app.register_blueprint(learnings_bp)
 app.register_blueprint(scheduler_bp)
+app.register_blueprint(slack_bp)
 
 # Initialize components
 fireflies = FirefliesClient(settings.fireflies.api_key)
@@ -134,6 +136,9 @@ if settings.notifications.slack_bot_token:
     except Exception as e:
         logger.warning(f"Failed to initialize Slack bot: {e}")
         slack_bot = None
+
+# Initialize Slack routes with bot instance
+init_slack_routes(slack_bot)
 
 
 # ============================================================================
@@ -437,51 +442,12 @@ def unwatch_project(user, project_key):
 
 
 # Slack Bot Routes
-@app.route("/slack/events", methods=["POST"])
-def slack_events():
-    """Handle Slack events and commands."""
-    # Handle URL verification challenge from Slack
-    if request.is_json and request.json and request.json.get('type') == 'url_verification':
-        return jsonify({'challenge': request.json.get('challenge')}), 200
-
-    if not slack_bot:
-        return jsonify({"error": "Slack bot not configured"}), 503
-
-    # Let Slack Bolt handler process all requests (slash commands, events, etc.)
-    return slack_bot.get_handler().handle(request)
 
 
-@app.route("/slack/commands", methods=["POST"])
-def slack_commands():
-    """Handle Slack slash commands."""
-    if not slack_bot:
-        return jsonify({"error": "Slack bot not configured"}), 503
-
-    return slack_bot.get_handler().handle(request)
 
 
-@app.route("/slack/interactive", methods=["POST"])
-def slack_interactive():
-    """Handle Slack interactive components."""
-    if not slack_bot:
-        return jsonify({"error": "Slack bot not configured"}), 503
-
-    return slack_bot.get_handler().handle(request)
 
 
-@app.route("/api/slack/digest", methods=["POST"])
-def send_slack_digest():
-    """Manually trigger Slack daily digest."""
-    if not slack_bot:
-        return jsonify({"error": "Slack bot not configured"}), 503
-
-    try:
-        import asyncio
-        channel = request.json.get('channel') if request.json else None
-        asyncio.run(slack_bot.send_daily_digest(channel))
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 # Scheduler and Notification Routes
