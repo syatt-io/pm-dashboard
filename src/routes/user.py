@@ -1,0 +1,180 @@
+"""User settings and preferences routes."""
+from flask import Blueprint, jsonify, request
+import logging
+import os
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+from src.services.auth import auth_required
+from src.utils.database import session_scope
+
+logger = logging.getLogger(__name__)
+
+user_bp = Blueprint('user', __name__, url_prefix='/api/user')
+
+
+def encrypt_api_key_inline(api_key: str) -> str:
+    """Encrypt an API key for database storage."""
+    # Get encryption key from environment
+    encryption_key = os.getenv('ENCRYPTION_KEY')
+    if not encryption_key:
+        # Generate a temporary key (not recommended for production)
+        encryption_key = Fernet.generate_key().decode()
+
+    # If the key is a password/phrase, derive a proper key
+    if len(encryption_key) != 44 or not encryption_key.endswith('='):
+        # Derive key from password using PBKDF2
+        salt = b'syatt_pm_agent_salt_v1'  # Static salt for consistency
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(encryption_key.encode()))
+    else:
+        # Use the key directly (it's already a Fernet key)
+        key = encryption_key.encode()
+
+    fernet = Fernet(key)
+    encrypted_bytes = fernet.encrypt(api_key.encode())
+    return base64.urlsafe_b64encode(encrypted_bytes).decode()
+
+
+def validate_fireflies_api_key_inline(api_key: str) -> bool:
+    """Validate a Fireflies API key format."""
+    if not api_key or not api_key.strip():
+        return False
+    # Basic format check - Fireflies API keys are typically long alphanumeric strings
+    api_key = api_key.strip()
+    return len(api_key) > 20 and api_key.replace('-', '').replace('_', '').isalnum()
+
+
+@user_bp.route("/settings", methods=["GET"])
+@auth_required
+def get_user_settings(user):
+    """Get current user settings."""
+    try:
+        # Refresh user from database to get latest data
+        from sqlalchemy.orm import Session
+
+        # Get the session that the user object is attached to
+        session = Session.object_session(user)
+        if session:
+            session.expire(user)  # Mark user as expired to force refresh
+            session.refresh(user)  # Refresh from database
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'user': user.to_dict(),
+                'settings': {
+                    'has_fireflies_key': user.has_fireflies_api_key(),
+                    'fireflies_key_valid': user.validate_fireflies_api_key() if user.has_fireflies_api_key() else False
+                }
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting user settings for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@user_bp.route("/fireflies-key", methods=["POST"])
+@auth_required
+def save_fireflies_api_key(user):
+    """Save or update user's Fireflies API key."""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+
+        if not api_key:
+            return jsonify({
+                'success': False,
+                'error': 'API key is required'
+            }), 400
+
+        # Skip validation here since the frontend already validates via the separate endpoint
+
+        # Save the encrypted API key
+        try:
+            with session_scope() as db_session:
+                # Refresh user object from database
+                db_user = db_session.merge(user)
+
+                # Set encrypted API key directly
+                db_user.fireflies_api_key_encrypted = encrypt_api_key_inline(api_key) if api_key.strip() else None
+
+            logger.info(f"Fireflies API key saved for user {user.id}")
+            return jsonify({
+                'success': True,
+                'message': 'Fireflies API key saved successfully'
+            })
+
+        except Exception as e:
+            raise e
+
+    except Exception as e:
+        logger.error(f"Error saving Fireflies API key for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@user_bp.route("/fireflies-key", methods=["DELETE"])
+@auth_required
+def delete_fireflies_api_key(user):
+    """Delete user's Fireflies API key."""
+    try:
+        with session_scope() as db_session:
+            # Refresh user object from database
+            db_user = db_session.merge(user)
+            db_user.clear_fireflies_api_key()
+
+        logger.info(f"Fireflies API key deleted for user {user.id}")
+        return jsonify({
+            'success': True,
+            'message': 'Fireflies API key deleted successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting Fireflies API key for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@user_bp.route("/fireflies-key/validate", methods=["POST"])
+@auth_required
+def validate_fireflies_api_key_endpoint(user):
+    """Validate a Fireflies API key without saving it."""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+
+        if not api_key:
+            return jsonify({
+                'valid': False,
+                'error': 'API key is required'
+            }), 400
+
+        # Validate the API key format (simple check to avoid timeout issues)
+        is_valid = validate_fireflies_api_key_inline(api_key)
+
+        return jsonify({
+            'valid': is_valid,
+            'message': 'API key is valid' if is_valid else 'API key is invalid'
+        })
+
+    except Exception as e:
+        logger.error(f"Error validating Fireflies API key: {e}")
+        return jsonify({
+            'valid': False,
+            'error': 'Failed to validate API key'
+        }), 500
