@@ -1842,7 +1842,7 @@ def sync_hours():
             result = conn.execute(text("""
                 SELECT key, name, project_work_type
                 FROM projects
-                WHERE is_active = 1
+                WHERE is_active = true
             """))
             active_projects = [{'key': row[0], 'name': row[1], 'project_work_type': row[2]} for row in result]
 
