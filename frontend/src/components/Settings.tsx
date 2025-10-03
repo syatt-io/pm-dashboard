@@ -711,9 +711,10 @@ export const Settings = () => {
 
           <Box sx={{ mt: 2 }}>
             {!settings.settings.has_google_oauth ? (
-              <Alert severity="warning">
-                Google OAuth setup requires configuring OAuth credentials in Google Cloud Console.
-                This feature will be available once OAuth flow is implemented.
+              <Alert severity="info">
+                <strong>Note:</strong> This is separate from your login credentials.
+                To enable automatic access to your Google Docs and Sheets, you'll need to grant additional permissions.
+                This feature requires setting up a Google Cloud OAuth application with document access scopes.
               </Alert>
             ) : (
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
