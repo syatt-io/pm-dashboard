@@ -89,6 +89,29 @@ export const Settings = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Handle OAuth callback messages from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+
+    if (success === 'google_workspace_connected') {
+      showSnackbar('Google Workspace connected successfully!', 'success');
+      loadSettings(); // Reload settings to show updated connection status
+      // Clean URL
+      window.history.replaceState({}, '', '/settings');
+    } else if (error) {
+      const errorMessages: { [key: string]: string } = {
+        'oauth_denied': 'Google authorization was denied',
+        'oauth_failed': 'Failed to complete Google authorization',
+      };
+      showSnackbar(errorMessages[error] || 'An error occurred', 'error');
+      // Clean URL
+      window.history.replaceState({}, '', '/settings');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -339,6 +362,32 @@ export const Settings = () => {
   };
 
   // Google OAuth handlers
+  const handleGoogleAuthorize = async () => {
+    try {
+      // Call backend to get authorization URL
+      const response = await fetch(getApiUrl('/api/auth/google/workspace/authorize'), {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initiate OAuth flow');
+      }
+
+      const data = await response.json();
+
+      // Redirect to Google OAuth consent screen
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error('No authorization URL returned');
+      }
+    } catch (error) {
+      console.error('Error initiating Google OAuth:', error);
+      showSnackbar('Failed to start Google authorization', 'error');
+    }
+  };
+
   const deleteGoogleOAuth = async () => {
     try {
       setDeletingGoogle(true);
@@ -711,11 +760,20 @@ export const Settings = () => {
 
           <Box sx={{ mt: 2 }}>
             {!settings.settings.has_google_oauth ? (
-              <Alert severity="info">
-                <strong>Note:</strong> This is separate from your login credentials.
-                To enable automatic access to your Google Docs and Sheets, you'll need to grant additional permissions.
-                This feature requires setting up a Google Cloud OAuth application with document access scopes.
-              </Alert>
+              <>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <strong>Note:</strong> This is separate from your login credentials.
+                  To enable automatic access to your Google Docs and Sheets, you'll need to grant additional permissions.
+                </Alert>
+                <Button
+                  variant="contained"
+                  onClick={() => handleGoogleAuthorize()}
+                  startIcon={<Launch />}
+                  disabled={validating}
+                >
+                  Authorize Google Workspace Access
+                </Button>
+              </>
             ) : (
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 <Button

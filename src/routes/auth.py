@@ -1,10 +1,12 @@
 """Authentication API routes."""
-from flask import Blueprint, request, jsonify, make_response
+from flask import Blueprint, request, jsonify, make_response, redirect, session
 from src.services.auth import AuthService, auth_required, admin_required
 from src.models.user import UserRole
 from sqlalchemy.orm import Session
 import logging
 import os
+import secrets
+from google_auth_oauthlib.flow import Flow
 
 logger = logging.getLogger(__name__)
 
@@ -262,5 +264,158 @@ def create_auth_blueprint(db_session_factory):
             return jsonify({'error': 'Failed to update user status'}), 500
         finally:
             db_session.close()
+
+    @auth_bp.route('/api/auth/google/workspace/authorize', methods=['GET'])
+    @auth_required
+    def google_workspace_authorize(user):
+        """Initiate Google Workspace OAuth flow for document access."""
+        try:
+            # Get OAuth credentials from environment
+            client_id = os.getenv('GOOGLE_CLIENT_ID')
+            client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+            redirect_uri = os.getenv('GOOGLE_WORKSPACE_REDIRECT_URI')
+
+            if not all([client_id, client_secret, redirect_uri]):
+                return jsonify({
+                    'error': 'Google Workspace OAuth is not configured. Please contact your administrator.'
+                }), 500
+
+            # Define scopes for Google Workspace access
+            scopes = [
+                'https://www.googleapis.com/auth/drive.readonly',
+                'https://www.googleapis.com/auth/documents.readonly',
+                'https://www.googleapis.com/auth/spreadsheets.readonly'
+            ]
+
+            # Create OAuth flow
+            flow = Flow.from_client_config(
+                {
+                    "web": {
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                },
+                scopes=scopes,
+                redirect_uri=redirect_uri
+            )
+
+            # Generate state parameter for security
+            state = secrets.token_urlsafe(32)
+            session[f'oauth_state_{user.id}'] = state
+
+            # Generate authorization URL
+            authorization_url, _ = flow.authorization_url(
+                access_type='offline',
+                include_granted_scopes='true',
+                state=state,
+                prompt='consent'  # Force consent to get refresh token
+            )
+
+            logger.info(f"Google Workspace OAuth initiated for user {user.id}")
+            return jsonify({
+                'authorization_url': authorization_url
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to initiate Google Workspace OAuth: {e}")
+            return jsonify({'error': 'Failed to start authorization'}), 500
+
+    @auth_bp.route('/api/auth/google/workspace/callback', methods=['GET'])
+    def google_workspace_callback():
+        """Handle Google Workspace OAuth callback."""
+        try:
+            # Get OAuth credentials from environment
+            client_id = os.getenv('GOOGLE_CLIENT_ID')
+            client_secret = os.getenv('GOOGLE_CLIENT_SECRET')
+            redirect_uri = os.getenv('GOOGLE_WORKSPACE_REDIRECT_URI')
+
+            if not all([client_id, client_secret, redirect_uri]):
+                return jsonify({'error': 'OAuth not configured'}), 500
+
+            # Get authorization code and state from callback
+            code = request.args.get('code')
+            state = request.args.get('state')
+            error = request.args.get('error')
+
+            if error:
+                logger.warning(f"OAuth callback error: {error}")
+                # Redirect to settings with error
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=oauth_denied")
+
+            if not code or not state:
+                return jsonify({'error': 'Invalid callback parameters'}), 400
+
+            # Get current user from token
+            token = request.cookies.get('auth_token')
+            if not token:
+                return jsonify({'error': 'Not authenticated'}), 401
+
+            user = auth_service.get_current_user(token)
+
+            # Verify state parameter
+            expected_state = session.get(f'oauth_state_{user.id}')
+            if not expected_state or expected_state != state:
+                logger.warning(f"OAuth state mismatch for user {user.id}")
+                return jsonify({'error': 'Invalid state parameter'}), 400
+
+            # Clear state from session
+            session.pop(f'oauth_state_{user.id}', None)
+
+            # Define scopes
+            scopes = [
+                'https://www.googleapis.com/auth/drive.readonly',
+                'https://www.googleapis.com/auth/documents.readonly',
+                'https://www.googleapis.com/auth/spreadsheets.readonly'
+            ]
+
+            # Exchange code for tokens
+            flow = Flow.from_client_config(
+                {
+                    "web": {
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                },
+                scopes=scopes,
+                redirect_uri=redirect_uri
+            )
+
+            flow.fetch_token(code=code)
+            credentials = flow.credentials
+
+            # Store tokens in user's database record
+            token_data = {
+                'access_token': credentials.token,
+                'refresh_token': credentials.refresh_token,
+                'token_uri': credentials.token_uri,
+                'client_id': credentials.client_id,
+                'client_secret': credentials.client_secret,
+                'scopes': credentials.scopes,
+                'expiry': credentials.expiry.isoformat() if credentials.expiry else None
+            }
+
+            # Update user with OAuth token
+            db_session = db_session_factory()
+            try:
+                db_user = db_session.merge(user)
+                db_user.set_google_oauth_token(token_data)
+                db_session.commit()
+                logger.info(f"Google Workspace OAuth completed for user {user.id}")
+            finally:
+                db_session.close()
+
+            # Redirect to settings page with success message
+            frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+            return redirect(f"{frontend_url}/settings?success=google_workspace_connected")
+
+        except Exception as e:
+            logger.error(f"Failed to complete Google Workspace OAuth: {e}")
+            frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+            return redirect(f"{frontend_url}/settings?error=oauth_failed")
 
     return auth_bp
