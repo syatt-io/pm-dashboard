@@ -20,6 +20,8 @@ def app():
     mock_user.email = 'test@example.com'
     mock_user.has_fireflies_api_key.return_value = False
     mock_user.validate_fireflies_api_key.return_value = False
+    mock_user.has_google_oauth_token.return_value = False
+    mock_user.has_notion_api_key.return_value = False
     mock_user.to_dict.return_value = {'id': 123, 'email': 'test@example.com'}
     mock_auth_service.get_current_user.return_value = mock_user
     app.auth_service = mock_auth_service

@@ -43,8 +43,9 @@ jobs:
         JIRA_USERNAME: test@example.com
         JIRA_API_TOKEN: test-token
         ENCRYPTION_KEY: test-encryption-key-32-bytes-long!
+        JWT_SECRET_KEY: test-jwt-secret-key
       run: |
-        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term
+        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term --ignore=tests/integration/
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
@@ -152,5 +153,6 @@ jobs:
         JIRA_USERNAME: test@example.com
         JIRA_API_TOKEN: test-token
         ENCRYPTION_KEY: test-encryption-key-32-bytes-long!
+        JWT_SECRET_KEY: test-jwt-secret-key
       run: |
         pytest tests/integration/ -v
