@@ -814,13 +814,13 @@ class SlackTodoBot:
                 logger.warning(f"No email found for Slack user {slack_user_id}")
                 return None
 
-            # Look up app user by email
+            # Look up app user by email using shared engine
             from src.models.user import User
+            from src.utils.database import get_engine
             from sqlalchemy.orm import sessionmaker
-            from config.settings import settings
-            from sqlalchemy import create_engine
 
-            engine = create_engine(settings.agent.database_url)
+            # Use the shared global engine instead of creating a new one
+            engine = get_engine()
             Session = sessionmaker(bind=engine)
             session = Session()
 
