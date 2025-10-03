@@ -39,10 +39,14 @@ interface UserSettings {
     name: string;
     role: string;
     has_fireflies_key: boolean;
+    has_google_oauth: boolean;
+    has_notion_key: boolean;
   };
   settings: {
     has_fireflies_key: boolean;
     fireflies_key_valid: boolean;
+    has_google_oauth: boolean;
+    has_notion_key: boolean;
   };
 }
 
@@ -64,6 +68,20 @@ export const Settings = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
   const [deleteDialog, setDeleteDialog] = useState(false);
   const [validationResult, setValidationResult] = useState<{ valid: boolean; message: string } | null>(null);
+
+  // Notion state
+  const [notionApiKey, setNotionApiKey] = useState('');
+  const [showNotionKey, setShowNotionKey] = useState(false);
+  const [savingNotion, setSavingNotion] = useState(false);
+  const [deletingNotion, setDeletingNotion] = useState(false);
+  const [validatingNotion, setValidatingNotion] = useState(false);
+  const [deleteNotionDialog, setDeleteNotionDialog] = useState(false);
+  const [notionValidationResult, setNotionValidationResult] = useState<{ valid: boolean; message: string } | null>(null);
+
+  // Google OAuth state
+  const [googleOAuthToken, setGoogleOAuthToken] = useState('');
+  const [deletingGoogle, setDeletingGoogle] = useState(false);
+  const [deleteGoogleDialog, setDeleteGoogleDialog] = useState(false);
 
   // Load user settings on component mount
   useEffect(() => {
@@ -209,6 +227,145 @@ export const Settings = () => {
 
   const handleOpenFirefliesHelp = () => {
     window.open('https://docs.fireflies.ai/fundamentals/authorization', '_blank');
+  };
+
+  // Notion handlers
+  const validateNotionKey = async (keyToValidate?: string) => {
+    const keyValue = keyToValidate || notionApiKey;
+    if (!keyValue.trim()) {
+      setNotionValidationResult({ valid: false, message: 'API key is required' });
+      return false;
+    }
+
+    try {
+      setValidatingNotion(true);
+      setNotionValidationResult(null);
+
+      const response = await fetch(getApiUrl('/api/user/notion-key/validate'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ api_key: keyValue }),
+      });
+
+      const data = await response.json();
+      const isValid = data.valid;
+
+      setNotionValidationResult({
+        valid: isValid,
+        message: data.message || (isValid ? 'API key format is valid' : 'API key format is invalid')
+      });
+
+      return isValid;
+    } catch (error) {
+      setNotionValidationResult({ valid: false, message: 'Failed to validate API key' });
+      return false;
+    } finally {
+      setValidatingNotion(false);
+    }
+  };
+
+  const saveNotionKey = async () => {
+    if (!notionApiKey.trim()) {
+      showSnackbar('API key is required', 'error');
+      return;
+    }
+
+    // Validate first
+    const isValid = await validateNotionKey();
+    if (!isValid) {
+      showSnackbar('Please enter a valid Notion API key', 'error');
+      return;
+    }
+
+    try {
+      setSavingNotion(true);
+
+      const response = await fetch(getApiUrl('/api/user/notion-key'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ api_key: notionApiKey }),
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (data.success) {
+        showSnackbar(data.message || 'Notion API key saved successfully', 'success');
+        setNotionApiKey('');
+        setNotionValidationResult(null);
+        await loadSettings();
+      } else {
+        throw new globalThis.Error(data.error || 'Failed to save API key');
+      }
+    } catch (error) {
+      showSnackbar('Failed to save Notion API key', 'error');
+    } finally {
+      setSavingNotion(false);
+    }
+  };
+
+  const deleteNotionKey = async () => {
+    try {
+      setDeletingNotion(true);
+
+      const response = await fetch(getApiUrl('/api/user/notion-key'), {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (data.success) {
+        showSnackbar(data.message || 'Notion API key deleted successfully', 'success');
+        setDeleteNotionDialog(false);
+        await loadSettings();
+      } else {
+        throw new globalThis.Error(data.error || 'Failed to delete API key');
+      }
+    } catch (error) {
+      showSnackbar('Failed to delete Notion API key', 'error');
+    } finally {
+      setDeletingNotion(false);
+    }
+  };
+
+  const handleOpenNotionHelp = () => {
+    window.open('https://developers.notion.com/docs/create-a-notion-integration', '_blank');
+  };
+
+  // Google OAuth handlers
+  const deleteGoogleOAuth = async () => {
+    try {
+      setDeletingGoogle(true);
+
+      const response = await fetch(getApiUrl('/api/user/google-oauth'), {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (data.success) {
+        showSnackbar(data.message || 'Google OAuth token deleted successfully', 'success');
+        setDeleteGoogleDialog(false);
+        await loadSettings();
+      } else {
+        throw new globalThis.Error(data.error || 'Failed to delete OAuth token');
+      }
+    } catch (error) {
+      showSnackbar('Failed to delete Google OAuth token', 'error');
+    } finally {
+      setDeletingGoogle(false);
+    }
+  };
+
+  const handleOpenGoogleHelp = () => {
+    window.open('https://console.cloud.google.com/apis/credentials', '_blank');
   };
 
   if (loading) {
@@ -387,6 +544,204 @@ export const Settings = () => {
         </CardContent>
       </Card>
 
+      {/* Notion Integration */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">
+              📝 Notion Integration
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Launch />}
+              onClick={handleOpenNotionHelp}
+            >
+              Get API Key
+            </Button>
+          </Box>
+
+          {/* Current Status */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Current Status
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Chip
+                icon={settings.settings.has_notion_key ? <CheckCircle /> : <ErrorIcon />}
+                label={settings.settings.has_notion_key ? 'API Key Configured' : 'No API Key'}
+                color={settings.settings.has_notion_key ? 'success' : 'error'}
+                size="small"
+              />
+            </Box>
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* API Key Management */}
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Configure your Notion API key to access your pages and databases
+          </Typography>
+
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Notion API Key"
+              type={showNotionKey ? 'text' : 'password'}
+              value={notionApiKey}
+              onChange={(e) => {
+                setNotionApiKey(e.target.value);
+                setNotionValidationResult(null);
+              }}
+              placeholder="secret_..."
+              helperText="Your API key will be encrypted and stored securely"
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowNotionKey(!showNotionKey)}
+                      edge="end"
+                    >
+                      {showNotionKey ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{ mb: 2 }}
+            />
+
+            {/* Validation Result */}
+            {notionValidationResult && (
+              <Alert
+                severity={notionValidationResult.valid ? 'success' : 'error'}
+                sx={{ mb: 2 }}
+              >
+                {notionValidationResult.message}
+              </Alert>
+            )}
+
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                onClick={() => validateNotionKey()}
+                disabled={!notionApiKey.trim() || validatingNotion}
+                startIcon={validatingNotion ? <CircularProgress size={16} /> : <CheckCircle />}
+              >
+                {validatingNotion ? 'Validating...' : 'Validate'}
+              </Button>
+
+              <Button
+                variant="contained"
+                onClick={saveNotionKey}
+                disabled={!notionApiKey.trim() || savingNotion}
+                startIcon={savingNotion ? <CircularProgress size={16} /> : <Save />}
+              >
+                {savingNotion ? 'Saving...' : 'Save API Key'}
+              </Button>
+
+              {settings.settings.has_notion_key && (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDeleteNotionDialog(true)}
+                  startIcon={<Delete />}
+                >
+                  Delete API Key
+                </Button>
+              )}
+            </Box>
+          </Box>
+
+          {/* Help Text */}
+          <Alert severity="info" sx={{ mt: 3 }}>
+            <Typography variant="body2">
+              <strong>How to get your Notion API key:</strong>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              1. Go to <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer">My Integrations</a><br />
+              2. Click "+ New integration"<br />
+              3. Give it a name and select your workspace<br />
+              4. Copy the "Internal Integration Token"<br />
+              5. Share the pages/databases you want to access with your integration
+            </Typography>
+          </Alert>
+        </CardContent>
+      </Card>
+
+      {/* Google Workspace Integration */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">
+              📊 Google Workspace Integration
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Launch />}
+              onClick={handleOpenGoogleHelp}
+            >
+              Setup OAuth
+            </Button>
+          </Box>
+
+          {/* Current Status */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Current Status
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Chip
+                icon={settings.settings.has_google_oauth ? <CheckCircle /> : <ErrorIcon />}
+                label={settings.settings.has_google_oauth ? 'OAuth Configured' : 'No OAuth Token'}
+                color={settings.settings.has_google_oauth ? 'success' : 'error'}
+                size="small"
+              />
+            </Box>
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* OAuth Management */}
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Connect your Google account to access Docs and Sheets
+          </Typography>
+
+          <Box sx={{ mt: 2 }}>
+            {!settings.settings.has_google_oauth ? (
+              <Alert severity="warning">
+                Google OAuth setup requires configuring OAuth credentials in Google Cloud Console.
+                This feature will be available once OAuth flow is implemented.
+              </Alert>
+            ) : (
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDeleteGoogleDialog(true)}
+                  startIcon={<Delete />}
+                >
+                  Disconnect Google Account
+                </Button>
+              </Box>
+            )}
+          </Box>
+
+          {/* Help Text */}
+          <Alert severity="info" sx={{ mt: 3 }}>
+            <Typography variant="body2">
+              <strong>Google Workspace Integration:</strong>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              This integration allows the app to read and write Google Docs and Sheets on your behalf.
+              You will need to authorize access through Google OAuth.
+            </Typography>
+          </Alert>
+        </CardContent>
+      </Card>
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
         <DialogTitle>Delete Fireflies API Key</DialogTitle>
@@ -405,6 +760,50 @@ export const Settings = () => {
             startIcon={deleting ? <CircularProgress size={16} /> : <Delete />}
           >
             {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Notion Key Dialog */}
+      <Dialog open={deleteNotionDialog} onClose={() => setDeleteNotionDialog(false)}>
+        <DialogTitle>Delete Notion API Key</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete your Notion API key?
+            You will no longer be able to access your Notion pages and databases until you add a new key.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteNotionDialog(false)}>Cancel</Button>
+          <Button
+            onClick={deleteNotionKey}
+            color="error"
+            disabled={deletingNotion}
+            startIcon={deletingNotion ? <CircularProgress size={16} /> : <Delete />}
+          >
+            {deletingNotion ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Google OAuth Dialog */}
+      <Dialog open={deleteGoogleDialog} onClose={() => setDeleteGoogleDialog(false)}>
+        <DialogTitle>Disconnect Google Account</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to disconnect your Google account?
+            You will no longer be able to access Google Docs and Sheets until you reconnect.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteGoogleDialog(false)}>Cancel</Button>
+          <Button
+            onClick={deleteGoogleOAuth}
+            color="error"
+            disabled={deletingGoogle}
+            startIcon={deletingGoogle ? <CircularProgress size={16} /> : <Delete />}
+          >
+            {deletingGoogle ? 'Disconnecting...' : 'Disconnect'}
           </Button>
         </DialogActions>
       </Dialog>

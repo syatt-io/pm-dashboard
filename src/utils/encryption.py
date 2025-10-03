@@ -140,6 +140,66 @@ def validate_fireflies_api_key(api_key: str) -> bool:
         return False
 
 
+def validate_google_oauth_token(token_data: dict) -> bool:
+    """Validate a Google OAuth token by making a test request."""
+    if not token_data or not isinstance(token_data, dict):
+        return False
+
+    try:
+        # Try different import paths to handle both local and production environments
+        try:
+            from src.integrations.google_workspace import GoogleWorkspaceClient
+        except ImportError:
+            try:
+                from integrations.google_workspace import GoogleWorkspaceClient
+            except ImportError:
+                # Add current directory to path if needed
+                import sys
+                import os
+                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                if current_dir not in sys.path:
+                    sys.path.insert(0, current_dir)
+                from integrations.google_workspace import GoogleWorkspaceClient
+
+        return GoogleWorkspaceClient.validate_oauth_token(token_data)
+    except ImportError as e:
+        logger.error(f"Failed to import GoogleWorkspaceClient: {e}")
+        return False
+    except Exception as e:
+        logger.info(f"OAuth token validation failed: {e}")
+        return False
+
+
+def validate_notion_api_key(api_key: str) -> bool:
+    """Validate a Notion API key by making a test request."""
+    if not api_key or not api_key.strip():
+        return False
+
+    try:
+        # Try different import paths to handle both local and production environments
+        try:
+            from src.integrations.notion import NotionClient
+        except ImportError:
+            try:
+                from integrations.notion import NotionClient
+            except ImportError:
+                # Add current directory to path if needed
+                import sys
+                import os
+                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                if current_dir not in sys.path:
+                    sys.path.insert(0, current_dir)
+                from integrations.notion import NotionClient
+
+        return NotionClient.validate_api_key(api_key.strip())
+    except ImportError as e:
+        logger.error(f"Failed to import NotionClient: {e}")
+        return False
+    except Exception as e:
+        logger.info(f"API key validation failed: {e}")
+        return False
+
+
 if __name__ == "__main__":
     # Utility for generating encryption keys
     print("Generated encryption key (add to .env as ENCRYPTION_KEY):")

@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 import enum
 import logging
+import json
 
 from .base import Base
 
@@ -31,6 +32,10 @@ class User(Base):
     last_login = Column(DateTime)
     is_active = Column(Boolean, default=True)
     fireflies_api_key_encrypted = Column(Text, nullable=True)
+    google_oauth_token_encrypted = Column(Text, nullable=True)
+    notion_api_key_encrypted = Column(Text, nullable=True)
+    google_credentials_updated_at = Column(DateTime, nullable=True)
+    notion_credentials_updated_at = Column(DateTime, nullable=True)
 
     # Relationships
     # todos = relationship("TodoItem", back_populates="user", cascade="all, delete-orphan")
@@ -53,7 +58,9 @@ class User(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'is_active': self.is_active,
-            'has_fireflies_key': self.has_fireflies_api_key()
+            'has_fireflies_key': self.has_fireflies_api_key(),
+            'has_google_oauth': self.has_google_oauth_token(),
+            'has_notion_key': self.has_notion_api_key()
         }
 
     def has_role(self, role):
@@ -154,6 +161,117 @@ class User(Base):
         except Exception as e:
             logger.error(f"Failed to validate API key for user {self.id}: {e}")
             return False
+
+    # Google Workspace OAuth methods
+    def has_google_oauth_token(self):
+        """Check if user has configured Google OAuth credentials."""
+        return bool(self.google_oauth_token_encrypted)
+
+    def set_google_oauth_token(self, token_data: dict):
+        """Set and encrypt the user's Google OAuth token."""
+        if not token_data:
+            self.google_oauth_token_encrypted = None
+            self.google_credentials_updated_at = None
+            return
+
+        try:
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import encrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import encrypt_api_key
+                except ImportError:
+                    from utils.encryption import encrypt_api_key
+
+            # Convert token dict to JSON string before encryption
+            token_json = json.dumps(token_data)
+            self.google_oauth_token_encrypted = encrypt_api_key(token_json)
+            self.google_credentials_updated_at = datetime.now(timezone.utc)
+            logger.info(f"Google OAuth token set for user {self.id}")
+        except Exception as e:
+            logger.error(f"Failed to encrypt Google OAuth token for user {self.id}: {e}")
+            raise
+
+    def get_google_oauth_token(self) -> dict:
+        """Get and decrypt the user's Google OAuth token."""
+        if not self.google_oauth_token_encrypted:
+            return {}
+
+        try:
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import decrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import decrypt_api_key
+                except ImportError:
+                    from utils.encryption import decrypt_api_key
+
+            token_json = decrypt_api_key(self.google_oauth_token_encrypted)
+            return json.loads(token_json) if token_json else {}
+        except Exception as e:
+            logger.error(f"Failed to decrypt Google OAuth token for user {self.id}: {e}")
+            return {}
+
+    def clear_google_oauth_token(self):
+        """Clear the user's Google OAuth token."""
+        self.google_oauth_token_encrypted = None
+        self.google_credentials_updated_at = None
+        logger.info(f"Google OAuth token cleared for user {self.id}")
+
+    # Notion API methods
+    def has_notion_api_key(self):
+        """Check if user has configured a Notion API key."""
+        return bool(self.notion_api_key_encrypted)
+
+    def set_notion_api_key(self, api_key: str):
+        """Set and encrypt the user's Notion API key."""
+        if not api_key or not api_key.strip():
+            self.notion_api_key_encrypted = None
+            self.notion_credentials_updated_at = None
+            return
+
+        try:
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import encrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import encrypt_api_key
+                except ImportError:
+                    from utils.encryption import encrypt_api_key
+            self.notion_api_key_encrypted = encrypt_api_key(api_key.strip())
+            self.notion_credentials_updated_at = datetime.now(timezone.utc)
+            logger.info(f"Notion API key set for user {self.id}")
+        except Exception as e:
+            logger.error(f"Failed to encrypt Notion API key for user {self.id}: {e}")
+            raise
+
+    def get_notion_api_key(self) -> str:
+        """Get and decrypt the user's Notion API key."""
+        if not self.notion_api_key_encrypted:
+            return ""
+
+        try:
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import decrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import decrypt_api_key
+                except ImportError:
+                    from utils.encryption import decrypt_api_key
+            return decrypt_api_key(self.notion_api_key_encrypted)
+        except Exception as e:
+            logger.error(f"Failed to decrypt Notion API key for user {self.id}: {e}")
+            return ""
+
+    def clear_notion_api_key(self):
+        """Clear the user's Notion API key."""
+        self.notion_api_key_encrypted = None
+        self.notion_credentials_updated_at = None
+        logger.info(f"Notion API key cleared for user {self.id}")
 
 
 class UserWatchedProject(Base):
