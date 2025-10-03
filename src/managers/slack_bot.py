@@ -814,18 +814,26 @@ class SlackTodoBot:
                 logger.warning(f"No email found for Slack user {slack_user_id}")
                 return None
 
-            # Look up app user by email using shared database session
+            # Look up app user by email
             from src.models.user import User
-            from src.utils.database import session_scope
+            from sqlalchemy.orm import sessionmaker
+            from config.settings import settings
+            from sqlalchemy import create_engine
 
-            with session_scope() as db_session:
-                user = db_session.query(User).filter(User.email == email).first()
+            engine = create_engine(settings.agent.database_url)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+
+            try:
+                user = session.query(User).filter(User.email == email).first()
                 if user:
                     logger.info(f"Mapped Slack user {slack_user_id} ({email}) to app user {user.id}")
                     return user.id
                 else:
                     logger.warning(f"No app user found with email {email}")
                     return None
+            finally:
+                session.close()
 
         except Exception as e:
             logger.error(f"Error mapping Slack user to app user: {e}")
@@ -1654,15 +1662,12 @@ class SlackTodoBot:
                 }
 
             # Create the feedback
-            feedback_id = str(uuid.uuid4())
-            feedback_status = 'draft'
-
             feedback = FeedbackItem(
-                id=feedback_id,
+                id=str(uuid.uuid4()),
                 user_id=app_user_id,
                 recipient=recipient,
                 content=content,
-                status=feedback_status,
+                status='draft',
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
@@ -1678,7 +1683,7 @@ class SlackTodoBot:
             return {
                 "text": f"✅ Feedback saved{recipient_str}! 🔒 (Private to you)\n\n"
                        f"💬 *{content}*\n\n"
-                       f"_ID: {feedback_id[:8]} | Status: {feedback_status}_\n"
+                       f"_ID: {feedback.id[:8]} | Status: {feedback.status}_\n"
                        f"💡 View all your feedback at {settings.web.base_url}/feedback"
             }
 
