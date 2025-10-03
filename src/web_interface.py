@@ -97,6 +97,14 @@ db_session_factory = get_session_factory()
 auth_service = AuthService(db_session_factory)
 app.auth_service = auth_service
 
+# Start the scheduler for nightly jobs (Tempo sync, reminders, etc.)
+logger.info("Starting TODO scheduler...")
+start_scheduler()
+
+# Register cleanup on application shutdown
+import atexit
+atexit.register(stop_scheduler)
+
 # Register auth blueprint
 auth_blueprint = create_auth_blueprint(db_session_factory)
 app.register_blueprint(auth_blueprint)
