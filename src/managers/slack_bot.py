@@ -1662,12 +1662,15 @@ class SlackTodoBot:
                 }
 
             # Create the feedback
+            feedback_id = str(uuid.uuid4())
+            feedback_status = 'draft'
+
             feedback = FeedbackItem(
-                id=str(uuid.uuid4()),
+                id=feedback_id,
                 user_id=app_user_id,
                 recipient=recipient,
                 content=content,
-                status='draft',
+                status=feedback_status,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
@@ -1678,12 +1681,12 @@ class SlackTodoBot:
                 db_session.add(feedback)
                 db_session.commit()
 
-            # Format response
+            # Format response using local variables (not the detached object)
             recipient_str = f" for *{recipient}*" if recipient else ""
             return {
                 "text": f"✅ Feedback saved{recipient_str}! 🔒 (Private to you)\n\n"
                        f"💬 *{content}*\n\n"
-                       f"_ID: {feedback.id[:8]} | Status: {feedback.status}_\n"
+                       f"_ID: {feedback_id[:8]} | Status: {feedback_status}_\n"
                        f"💡 View all your feedback at {settings.web.base_url}/feedback"
             }
 
