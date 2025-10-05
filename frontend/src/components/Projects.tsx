@@ -1000,6 +1000,185 @@ const ProjectDetailDialog = ({
   );
 };
 
+const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }) => {
+  const notify = useNotify();
+  const [forecasts, setForecasts] = useState<{[projectKey: string]: any[]}>({});
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState<{[projectKey: string]: boolean}>({});
+  const [editedForecasts, setEditedForecasts] = useState<{[projectKey: string]: any[]}>({});
+
+  // Load forecasts when tab becomes active
+  useEffect(() => {
+    if (activeProjects.length > 0) {
+      loadForecasts();
+    }
+  }, [activeProjects]);
+
+  const loadForecasts = async () => {
+    setLoading(true);
+    try {
+      const forecastData: {[projectKey: string]: any[]} = {};
+
+      for (const project of activeProjects) {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_BASE_URL}/api/jira/project-forecasts/${project.key}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          forecastData[project.key] = data.data.forecasts;
+        }
+      }
+
+      setForecasts(forecastData);
+      setEditedForecasts(JSON.parse(JSON.stringify(forecastData))); // Deep copy
+    } catch (error) {
+      notify('Error loading forecasts', { type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForecastChange = (projectKey: string, monthIndex: number, value: string) => {
+    const updated = { ...editedForecasts };
+    if (!updated[projectKey]) return;
+
+    updated[projectKey] = [...updated[projectKey]];
+    updated[projectKey][monthIndex] = {
+      ...updated[projectKey][monthIndex],
+      forecasted_hours: parseFloat(value) || 0
+    };
+
+    setEditedForecasts(updated);
+  };
+
+  const hasChanges = (projectKey: string) => {
+    if (!forecasts[projectKey] || !editedForecasts[projectKey]) return false;
+    return JSON.stringify(forecasts[projectKey]) !== JSON.stringify(editedForecasts[projectKey]);
+  };
+
+  const handleSave = async (projectKey: string) => {
+    setSaving({ ...saving, [projectKey]: true });
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/api/jira/project-forecasts/${projectKey}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          forecasts: editedForecasts[projectKey]
+        })
+      });
+
+      if (response.ok) {
+        notify('Forecasts saved successfully', { type: 'success' });
+        // Update the original forecasts to match edited
+        setForecasts({
+          ...forecasts,
+          [projectKey]: JSON.parse(JSON.stringify(editedForecasts[projectKey]))
+        });
+      } else {
+        notify('Error saving forecasts', { type: 'error' });
+      }
+    } catch (error) {
+      notify('Error saving forecasts', { type: 'error' });
+    } finally {
+      setSaving({ ...saving, [projectKey]: false });
+    }
+  };
+
+  const getMonthName = (monthYear: string) => {
+    const date = new Date(monthYear);
+    return date.toLocaleString('default', { month: 'short', year: 'numeric' });
+  };
+
+  if (loading) {
+    return <CircularProgress />;
+  }
+
+  if (activeProjects.length === 0) {
+    return (
+      <Alert severity="info">
+        No active projects found. Please activate projects in the "All Projects" tab to manage forecasts.
+      </Alert>
+    );
+  }
+
+  return (
+    <Box>
+      <Alert severity="info" sx={{ mb: 2 }}>
+        Manage forecasted hours for the next 6 months for all active projects. Changes are saved per project.
+      </Alert>
+
+      {activeProjects.map((project) => (
+        <Box key={project.key} sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
+              {project.name} ({project.key})
+            </Typography>
+            <MuiButton
+              variant="contained"
+              size="small"
+              color="primary"
+              disabled={!hasChanges(project.key) || saving[project.key]}
+              onClick={() => handleSave(project.key)}
+              startIcon={saving[project.key] ? <CircularProgress size={16} /> : null}
+            >
+              {saving[project.key] ? 'Saving...' : 'Save Forecasts'}
+            </MuiButton>
+          </Box>
+
+          <TableContainer component={Paper} sx={{ mb: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Month</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Forecasted Hours</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Actual Hours</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {editedForecasts[project.key]?.map((forecast, index) => (
+                  <TableRow key={forecast.month_year}>
+                    <TableCell>{getMonthName(forecast.month_year)}</TableCell>
+                    <TableCell>
+                      <input
+                        type="number"
+                        value={forecast.forecasted_hours}
+                        onChange={(e) => handleForecastChange(project.key, index, e.target.value)}
+                        style={{
+                          width: '100px',
+                          padding: '6px',
+                          border: hasChanges(project.key) ? '2px solid #ff9800' : '1px solid #ccc',
+                          borderRadius: '4px',
+                          backgroundColor: hasChanges(project.key) ? '#fff3e0' : 'white'
+                        }}
+                        step="0.5"
+                        min="0"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {forecast.actual_monthly_hours.toFixed(1)}h
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
+      ))}
+    </Box>
+  );
+};
+
 export const ProjectList = () => {
   const notify = useNotify();
   const dataProvider = useDataProvider();
@@ -1229,6 +1408,7 @@ export const ProjectList = () => {
             <Tab label={`📌 My Projects (${watchedProjects.length})`} />
             <Tab label={`⚙️ Active Projects (${activeProjects.length})`} />
             <Tab label={`📋 All Projects (${allProjects.length})`} />
+            <Tab label="📊 Monthly Forecasts" />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
@@ -1319,10 +1499,11 @@ export const ProjectList = () => {
                           <TableCell>Key</TableCell>
                           <TableCell>Type</TableCell>
                           <TableCell>Project Type</TableCell>
-                          {workType === 'project-based' && <TableCell>Forecasted Hours/Month</TableCell>}
+                          {workType === 'project-based' && <TableCell>{currentMonth} Forecast</TableCell>}
                           {workType === 'growth-support' && <TableCell>Retainer Hours</TableCell>}
                           <TableCell>{currentMonth} Hours</TableCell>
                           {workType === 'project-based' && <TableCell>Total Hours</TableCell>}
+                          {workType === 'project-based' && <TableCell>Cumulative Hours</TableCell>}
                           <TableCell>Watch</TableCell>
                           <TableCell>Save</TableCell>
                         </TableRow>
@@ -1418,6 +1599,13 @@ export const ProjectList = () => {
                                 />
                               </TableCell>
                             )}
+                            {workType === 'project-based' && (
+                              <TableCell>
+                                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                  {`${(project.cumulative_hours || 0).toFixed(1)}h`}
+                                </Typography>
+                              </TableCell>
+                            )}
                             <TableCell>
                               <WatchToggle record={project} />
                             </TableCell>
@@ -1479,6 +1667,10 @@ export const ProjectList = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            <MonthlyForecastsPanel activeProjects={activeProjects} />
           </TabPanel>
         </CardContent>
       </Card>

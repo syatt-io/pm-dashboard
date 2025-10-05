@@ -334,3 +334,91 @@ def update_project(project_key):
     except Exception as e:
         logger.error(f"Error updating project {project_key}: {e}")
         return error_response(str(e), status_code=500)
+
+
+@jira_bp.route('/project-forecasts/<project_key>', methods=['GET'])
+def get_project_forecasts(project_key):
+    """Get monthly forecasts for a project (rolling 6 months from current month)."""
+    try:
+        from sqlalchemy import text
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+
+        engine = get_engine()
+        now = datetime.now()
+        current_month = datetime(now.year, now.month, 1).date()
+
+        # Calculate 6 months forward
+        months = []
+        for i in range(6):
+            month = (datetime(now.year, now.month, 1) + relativedelta(months=i)).date()
+            months.append(month)
+
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT month_year, forecasted_hours, actual_monthly_hours
+                FROM project_monthly_forecast
+                WHERE project_key = :project_key
+                AND month_year >= :start_month
+                ORDER BY month_year ASC
+            """), {
+                "project_key": project_key,
+                "start_month": current_month
+            })
+
+            existing_forecasts = {row[0]: {"forecasted_hours": float(row[1]) if row[1] else 0, "actual_monthly_hours": float(row[2]) if row[2] else 0} for row in result}
+
+        # Build response with all 6 months
+        forecasts = []
+        for month in months:
+            forecast_data = existing_forecasts.get(month, {"forecasted_hours": 0, "actual_monthly_hours": 0})
+            forecasts.append({
+                "month_year": month.isoformat(),
+                "forecasted_hours": forecast_data["forecasted_hours"],
+                "actual_monthly_hours": forecast_data["actual_monthly_hours"]
+            })
+
+        return success_response(data={'forecasts': forecasts})
+
+    except Exception as e:
+        logger.error(f"Error fetching forecasts for project {project_key}: {e}")
+        return error_response(str(e), status_code=500)
+
+
+@jira_bp.route('/project-forecasts/<project_key>', methods=['PUT'])
+def update_project_forecasts(project_key):
+    """Update monthly forecasts for a project."""
+    try:
+        data = request.json
+        forecasts = data.get('forecasts', [])
+
+        from sqlalchemy import text
+        engine = get_engine()
+
+        with engine.connect() as conn:
+            for forecast in forecasts:
+                month_year = forecast.get('month_year')
+                forecasted_hours = forecast.get('forecasted_hours', 0)
+
+                conn.execute(text("""
+                    INSERT INTO project_monthly_forecast
+                        (project_key, month_year, forecasted_hours, updated_at)
+                    VALUES
+                        (:project_key, :month_year, :forecasted_hours, NOW())
+                    ON CONFLICT (project_key, month_year)
+                    DO UPDATE SET
+                        forecasted_hours = :forecasted_hours,
+                        updated_at = NOW()
+                """), {
+                    "project_key": project_key,
+                    "month_year": month_year,
+                    "forecasted_hours": forecasted_hours
+                })
+
+            conn.commit()
+
+        return success_response(message='Forecasts updated successfully')
+
+    except Exception as e:
+        logger.error(f"Error updating forecasts for project {project_key}: {e}")
+        return error_response(str(e), status_code=500)
