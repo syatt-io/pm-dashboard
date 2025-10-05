@@ -68,33 +68,54 @@ def get_jira_projects():
         enhanced_projects = []
         try:
             with engine.connect() as conn:
+                # Get current month for joining with monthly forecast
+                from datetime import datetime
+                now = datetime.now()
+                current_month = datetime(now.year, now.month, 1).date()
+
                 for project in jira_projects:
                     enhanced_project = project.copy()
                     try:
-                        # Get local project data (may fail if table doesn't exist)
-                        result = conn.execute(text(
-                            "SELECT forecasted_hours_month, is_active, project_work_type, total_hours, current_month_hours, cumulative_hours, slack_channel, weekly_meeting_day FROM projects WHERE key = :key"
-                        ), {"key": project["key"]}).fetchone()
+                        # Get local project data joined with current month forecast
+                        result = conn.execute(text("""
+                            SELECT
+                                p.is_active,
+                                p.project_work_type,
+                                p.total_hours,
+                                p.cumulative_hours,
+                                p.slack_channel,
+                                p.weekly_meeting_day,
+                                p.retainer_hours,
+                                pmf.forecasted_hours,
+                                pmf.actual_monthly_hours
+                            FROM projects p
+                            LEFT JOIN project_monthly_forecast pmf
+                                ON p.key = pmf.project_key
+                                AND pmf.month_year = :current_month
+                            WHERE p.key = :key
+                        """), {"key": project["key"], "current_month": current_month}).fetchone()
 
                         if result:
-                            enhanced_project["forecasted_hours_month"] = float(result[0]) if result[0] else 0
-                            enhanced_project["is_active"] = bool(result[1]) if result[1] is not None else True
-                            enhanced_project["project_work_type"] = result[2] if result[2] else 'project-based'
-                            enhanced_project["total_hours"] = float(result[3]) if result[3] else 0
-                            enhanced_project["current_month_hours"] = float(result[4]) if result[4] else 0
-                            enhanced_project["cumulative_hours"] = float(result[5]) if result[5] else 0
-                            enhanced_project["slack_channel"] = result[6] if result[6] else None
-                            enhanced_project["weekly_meeting_day"] = result[7] if result[7] else None
+                            enhanced_project["is_active"] = bool(result[0]) if result[0] is not None else True
+                            enhanced_project["project_work_type"] = result[1] if result[1] else 'project-based'
+                            enhanced_project["total_hours"] = float(result[2]) if result[2] else 0
+                            enhanced_project["cumulative_hours"] = float(result[3]) if result[3] else 0
+                            enhanced_project["slack_channel"] = result[4] if result[4] else None
+                            enhanced_project["weekly_meeting_day"] = result[5] if result[5] else None
+                            enhanced_project["retainer_hours"] = float(result[6]) if result[6] else 0
+                            enhanced_project["forecasted_hours_month"] = float(result[7]) if result[7] else 0
+                            enhanced_project["current_month_hours"] = float(result[8]) if result[8] else 0
                         else:
                             # No database record - use defaults
-                            enhanced_project["forecasted_hours_month"] = 0
                             enhanced_project["is_active"] = True
                             enhanced_project["project_work_type"] = 'project-based'
                             enhanced_project["total_hours"] = 0
-                            enhanced_project["current_month_hours"] = 0
                             enhanced_project["cumulative_hours"] = 0
                             enhanced_project["slack_channel"] = None
                             enhanced_project["weekly_meeting_day"] = None
+                            enhanced_project["retainer_hours"] = 0
+                            enhanced_project["forecasted_hours_month"] = 0
+                            enhanced_project["current_month_hours"] = 0
                     except Exception:
                         # Projects table doesn't exist or query failed - use defaults
                         enhanced_project["forecasted_hours_month"] = 0
@@ -235,7 +256,12 @@ def update_project(project_key):
 
         # Connect to database
         from sqlalchemy import text
+        from datetime import datetime
         engine = get_engine()
+
+        # Get current month for forecast table
+        now = datetime.now()
+        current_month = datetime(now.year, now.month, 1).date()
 
         with engine.connect() as conn:
             # Check if project exists in local DB
@@ -250,9 +276,9 @@ def update_project(project_key):
                 conn.execute(text("""
                     UPDATE projects
                     SET is_active = :is_active,
-                        forecasted_hours_month = :forecasted_hours_month,
                         project_work_type = :project_work_type,
                         total_hours = :total_hours,
+                        retainer_hours = :retainer_hours,
                         name = :name,
                         slack_channel = :slack_channel,
                         weekly_meeting_day = :weekly_meeting_day,
@@ -261,9 +287,9 @@ def update_project(project_key):
                 """), {
                     "key": project_key,
                     "is_active": data.get('is_active', True),
-                    "forecasted_hours_month": data.get('forecasted_hours_month', 0),
                     "project_work_type": data.get('project_work_type', 'ongoing'),
                     "total_hours": data.get('total_hours', 0),
+                    "retainer_hours": data.get('retainer_hours', 0),
                     "name": data.get('name', existing[1] if existing else 'Unknown'),
                     "slack_channel": data.get('slack_channel'),
                     "weekly_meeting_day": data.get('weekly_meeting_day')
@@ -271,17 +297,34 @@ def update_project(project_key):
             else:
                 # Insert new project
                 conn.execute(text("""
-                    INSERT INTO projects (key, name, is_active, forecasted_hours_month, project_work_type, total_hours, slack_channel, weekly_meeting_day)
-                    VALUES (:key, :name, :is_active, :forecasted_hours_month, :project_work_type, :total_hours, :slack_channel, :weekly_meeting_day)
+                    INSERT INTO projects (key, name, is_active, project_work_type, total_hours, retainer_hours, slack_channel, weekly_meeting_day)
+                    VALUES (:key, :name, :is_active, :project_work_type, :total_hours, :retainer_hours, :slack_channel, :weekly_meeting_day)
                 """), {
                     "key": project_key,
                     "name": data.get('name', 'Unknown'),
                     "is_active": data.get('is_active', True),
-                    "forecasted_hours_month": data.get('forecasted_hours_month', 0),
                     "project_work_type": data.get('project_work_type', 'ongoing'),
                     "total_hours": data.get('total_hours', 0),
+                    "retainer_hours": data.get('retainer_hours', 0),
                     "slack_channel": data.get('slack_channel'),
                     "weekly_meeting_day": data.get('weekly_meeting_day')
+                })
+
+            # Upsert forecasted hours for current month if provided
+            if 'forecasted_hours_month' in data:
+                conn.execute(text("""
+                    INSERT INTO project_monthly_forecast
+                        (project_key, month_year, forecasted_hours, updated_at)
+                    VALUES
+                        (:project_key, :month_year, :forecasted_hours, NOW())
+                    ON CONFLICT (project_key, month_year)
+                    DO UPDATE SET
+                        forecasted_hours = :forecasted_hours,
+                        updated_at = NOW()
+                """), {
+                    "project_key": project_key,
+                    "month_year": current_month,
+                    "forecasted_hours": data.get('forecasted_hours_month', 0)
                 })
 
             conn.commit()

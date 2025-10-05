@@ -148,8 +148,10 @@ class TestTempoSyncJob:
 
         stats = job.update_project_hours(current_hours, cumulative_hours)
 
-        assert stats["updated"] == 0
-        assert stats["skipped"] == 1
+        # New behavior: projects from get_active_projects are always updated
+        # (upsert into project_monthly_forecast always succeeds)
+        assert stats["updated"] == 1
+        assert stats["skipped"] == 0
         assert stats["total"] == 1
 
     @patch('src.jobs.tempo_sync.create_engine')

@@ -67,35 +67,52 @@ class TempoSyncJob:
         try:
             active_projects = self.get_active_projects()
 
+            # Get current month (first day of month)
+            now = datetime.now()
+            current_month = datetime(now.year, now.month, 1).date()
+
             for project_key in active_projects:
                 current = current_month_hours.get(project_key, 0)
                 cumulative = cumulative_hours.get(project_key, 0)
 
-                # Update the project
-                result = session.execute(
+                # Update cumulative hours in projects table
+                session.execute(
                     text("""
                         UPDATE projects
-                        SET current_month_hours = :current,
-                            cumulative_hours = :cumulative,
+                        SET cumulative_hours = :cumulative,
                             updated_at = NOW()
                         WHERE key = :project_key
                     """),
                     {
-                        "current": current,
                         "cumulative": cumulative,
                         "project_key": project_key
                     }
                 )
 
-                if result.rowcount > 0:
-                    updated_count += 1
-                    logger.info(
-                        f"Updated {project_key}: "
-                        f"current_month={current:.2f}h, cumulative={cumulative:.2f}h"
-                    )
-                else:
-                    skipped_count += 1
-                    logger.warning(f"Project {project_key} not found in database")
+                # Upsert current month hours into project_monthly_forecast
+                result = session.execute(
+                    text("""
+                        INSERT INTO project_monthly_forecast
+                            (project_key, month_year, actual_monthly_hours, updated_at)
+                        VALUES
+                            (:project_key, :month_year, :actual_hours, NOW())
+                        ON CONFLICT (project_key, month_year)
+                        DO UPDATE SET
+                            actual_monthly_hours = :actual_hours,
+                            updated_at = NOW()
+                    """),
+                    {
+                        "project_key": project_key,
+                        "month_year": current_month,
+                        "actual_hours": current
+                    }
+                )
+
+                updated_count += 1
+                logger.info(
+                    f"Updated {project_key}: "
+                    f"current_month={current:.2f}h, cumulative={cumulative:.2f}h"
+                )
 
             session.commit()
             logger.info(f"Successfully updated {updated_count} projects, skipped {skipped_count}")
