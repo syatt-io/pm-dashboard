@@ -218,3 +218,30 @@ class TestNotificationTriggers:
         data = response.get_json()
         assert data['success'] is False
         assert 'not running' in data['error'].lower()
+
+    @patch('src.routes.scheduler.get_scheduler')
+    def test_tempo_sync_success(self, mock_get, client):
+        """Test triggering Tempo sync."""
+        mock_scheduler = MagicMock()
+        mock_scheduler.sync_tempo_hours = MagicMock()
+        mock_get.return_value = mock_scheduler
+
+        response = client.post('/api/scheduler/tempo-sync')
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert 'tempo sync' in data['message'].lower()
+        mock_scheduler.sync_tempo_hours.assert_called_once()
+
+    @patch('src.routes.scheduler.get_scheduler')
+    def test_tempo_sync_scheduler_not_running(self, mock_get, client):
+        """Test tempo sync when scheduler not running."""
+        mock_get.return_value = None
+
+        response = client.post('/api/scheduler/tempo-sync')
+
+        assert response.status_code == 500
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'not running' in data['error'].lower()

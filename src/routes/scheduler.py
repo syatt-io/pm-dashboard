@@ -131,3 +131,20 @@ def trigger_hours_report():
     except Exception as e:
         logger.error(f"Error triggering hours report: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@scheduler_bp.route("/scheduler/tempo-sync", methods=["POST"])
+def trigger_tempo_sync():
+    """Manually trigger Tempo hours sync."""
+    try:
+        scheduler = get_scheduler()
+        if not scheduler:
+            return jsonify({'success': False, 'error': 'Scheduler not running'}), 500
+
+        # Run the sync
+        scheduler.sync_tempo_hours()
+
+        return jsonify({'success': True, 'message': 'Tempo sync completed successfully'})
+    except Exception as e:
+        logger.error(f"Error triggering Tempo sync: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
