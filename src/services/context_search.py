@@ -56,7 +56,7 @@ class ContextSearchService:
             ContextSearchResults with aggregated results
         """
         if sources is None:
-            sources = ['slack', 'fireflies', 'jira']
+            sources = ['slack', 'fireflies', 'jira', 'notion']
 
         all_results = []
 
@@ -72,6 +72,10 @@ class ContextSearchService:
         if 'jira' in sources:
             jira_results = await self._search_jira(query, days_back)
             all_results.extend(jira_results)
+
+        if 'notion' in sources:
+            notion_results = await self._search_notion(query, days_back, user_id)
+            all_results.extend(notion_results)
 
         # Sort by date (most recent first)
         all_results.sort(key=lambda x: x.date, reverse=True)
@@ -251,6 +255,114 @@ class ContextSearchService:
 
         except Exception as e:
             self.logger.error(f"Error searching Jira: {e}")
+            return []
+
+    async def _search_notion(self, query: str, days_back: int, user_id: Optional[int] = None) -> List[SearchResult]:
+        """Search Notion pages and databases."""
+        try:
+            # Get user's Notion API key if user_id provided
+            api_key = None
+            if user_id:
+                from src.models.user import User
+                from src.utils.database import session_scope
+
+                with session_scope() as db_session:
+                    user = db_session.query(User).filter_by(id=user_id).first()
+                    if user and user.has_notion_api_key():
+                        api_key = user.get_notion_api_key()
+
+            if not api_key:
+                self.logger.warning("No Notion API key available for user")
+                return []
+
+            from src.integrations.notion import NotionClient
+
+            client = NotionClient(api_key)
+
+            # Search pages
+            pages = client.search_pages(query, limit=50)
+
+            results = []
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+
+            for page in pages:
+                # Extract page metadata
+                page_id = page.get('id', '')
+                properties = page.get('properties', {})
+
+                # Get title from different possible locations
+                title = 'Untitled'
+                if 'title' in properties:
+                    title_prop = properties['title']
+                    if isinstance(title_prop, dict) and 'title' in title_prop:
+                        title_items = title_prop['title']
+                        if title_items and len(title_items) > 0:
+                            title = title_items[0].get('plain_text', 'Untitled')
+                elif 'Name' in properties:
+                    name_prop = properties['Name']
+                    if isinstance(name_prop, dict) and 'title' in name_prop:
+                        title_items = name_prop['title']
+                        if title_items and len(title_items) > 0:
+                            title = title_items[0].get('plain_text', 'Untitled')
+
+                # Get last edited time
+                last_edited = page.get('last_edited_time', '')
+                if last_edited:
+                    try:
+                        page_date = datetime.fromisoformat(last_edited.replace('Z', '+00:00'))
+                    except:
+                        page_date = datetime.now()
+                else:
+                    page_date = datetime.now()
+
+                # Skip if too old
+                if page_date < cutoff_date:
+                    continue
+
+                # Get page URL
+                page_url = page.get('url', f"https://notion.so/{page_id.replace('-', '')}")
+
+                # Create snippet from page preview or properties
+                snippet_parts = []
+
+                # Try to get content preview
+                if 'excerpt' in page:
+                    snippet_parts.append(page['excerpt'])
+
+                # Add property values to snippet
+                for prop_name, prop_value in properties.items():
+                    if prop_name in ['title', 'Name']:
+                        continue  # Skip title, already used
+
+                    if isinstance(prop_value, dict):
+                        # Handle different property types
+                        if 'rich_text' in prop_value and prop_value['rich_text']:
+                            text = prop_value['rich_text'][0].get('plain_text', '')
+                            if text:
+                                snippet_parts.append(f"{prop_name}: {text}")
+                        elif 'select' in prop_value and prop_value['select']:
+                            text = prop_value['select'].get('name', '')
+                            if text:
+                                snippet_parts.append(f"{prop_name}: {text}")
+
+                snippet = ' | '.join(snippet_parts[:3])  # Limit to 3 properties
+                if not snippet:
+                    snippet = f"Notion page: {title}"
+
+                results.append(SearchResult(
+                    source='notion',
+                    title=title,
+                    content=snippet[:300],
+                    date=page_date,
+                    url=page_url,
+                    relevance_score=0.8
+                ))
+
+            self.logger.info(f"Found {len(results)} Notion pages for query: {query}")
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Error searching Notion: {e}")
             return []
 
     def _extract_snippet(self, text: str, query: str, max_length: int = 300) -> str:

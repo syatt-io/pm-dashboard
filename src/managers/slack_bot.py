@@ -1776,7 +1776,8 @@ class SlackTodoBot:
                            "*Sources Searched:*\n"
                            "• 💬 Slack messages and threads\n"
                            "• 🎙️ Fireflies meeting transcripts\n"
-                           "• 📋 Jira issues and comments\n\n"
+                           "• 📋 Jira issues and comments\n"
+                           "• 📝 Notion pages and databases\n\n"
                            "*Examples:*\n"
                            "• `/find-context authentication flow` - Find context about auth\n"
                            "• `/find-context payment gateway --days 180` - Search last 6 months\n"
@@ -1882,7 +1883,8 @@ class SlackTodoBot:
                 source_emoji = {
                     'slack': '💬',
                     'fireflies': '🎙️',
-                    'jira': '📋'
+                    'jira': '📋',
+                    'notion': '📝'
                 }.get(result.source, '📄')
 
                 # Format date
