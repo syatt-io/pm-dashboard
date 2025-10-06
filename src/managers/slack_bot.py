@@ -297,6 +297,59 @@ class SlackTodoBot:
                 logger.error(f"Error handling /feedforward command: {e}")
                 respond(f"❌ Error processing feedback command: {str(e)}")
 
+        @self.app.command("/find-context")
+        def handle_find_context_command(ack, respond, command):
+            """Handle /find-context slash command for searching across all sources."""
+            ack()
+
+            try:
+                user_id = command.get('user_id')
+                text = command.get('text', '').strip()
+
+                if not text or text == 'help':
+                    respond(self._get_find_context_help_message())
+                    return
+
+                # Parse command: /find-context <topic> [--days 180]
+                args = text.split()
+                if len(args) < 1:
+                    respond("❌ Please provide a search topic: `/find-context authentication flow`")
+                    return
+
+                # Extract --days parameter if present
+                days = 90  # Default to 90 days
+                query_parts = []
+                i = 0
+                while i < len(args):
+                    if args[i] == '--days' and i + 1 < len(args):
+                        try:
+                            days = int(args[i + 1])
+                            if days < 1 or days > 365:
+                                respond("❌ Days must be between 1 and 365")
+                                return
+                            i += 2
+                            continue
+                        except ValueError:
+                            respond("❌ Invalid days value. Must be a number.")
+                            return
+                    query_parts.append(args[i])
+                    i += 1
+
+                query = ' '.join(query_parts)
+                if not query:
+                    respond("❌ Please provide a search topic")
+                    return
+
+                # Show searching message
+                respond(f"🔍 Searching for *{query}* across Slack, Fireflies, and Jira (last {days} days)...\n_This may take a moment_")
+
+                # Perform the search
+                respond(self._find_context(user_id, query, days))
+
+            except Exception as e:
+                logger.error(f"Error handling /find-context command: {e}")
+                respond(f"❌ Error processing search: {str(e)}")
+
     def _register_listeners(self):
         """Register message listeners."""
 
@@ -365,7 +418,8 @@ class SlackTodoBot:
                            "`/agenda <project-key> [days]` - Generate project agenda\n"
                            "`/dadjoke [about <topic>] [for <person>]` - Get a dad joke\n"
                            "`/learning <text>` - Save a team learning\n"
-                           "`/feedback [@user] <text>` - Save private feedback\n\n"
+                           "`/feedback [@user] <text>` - Save private feedback\n"
+                           "`/find-context <topic> [--days N]` - Search across all sources\n\n"
                            "*Examples:*\n"
                            "• `/todos list me` - My TODOs\n"
                            "• `/todo Fix login bug` - Quick create\n"
@@ -1701,3 +1755,187 @@ class SlackTodoBot:
             return response.get("ok", False) and not response.get("user", {}).get("deleted", False)
         except SlackApiError:
             return False
+
+    def _get_find_context_help_message(self) -> Dict[str, Any]:
+        """Get help message for find-context command."""
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "🔍 Context Search Help"
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Find Historical Context Across All Sources*\n\n"
+                           "`/find-context <topic>` - Search with default 90-day window\n"
+                           "`/find-context <topic> --days <N>` - Search with custom timeframe\n\n"
+                           "*Sources Searched:*\n"
+                           "• 💬 Slack messages and threads\n"
+                           "• 🎙️ Fireflies meeting transcripts\n"
+                           "• 📋 Jira issues and comments\n\n"
+                           "*Examples:*\n"
+                           "• `/find-context authentication flow` - Find context about auth\n"
+                           "• `/find-context payment gateway --days 180` - Search last 6 months\n"
+                           "• `/find-context API refactor --days 30` - Recent discussions only"
+                }
+            },
+            {
+                "type": "context",
+                "elements": [{
+                    "type": "plain_text",
+                    "text": "💡 Results include AI-generated summary, key people, and timeline"
+                }]
+            }
+        ]
+
+        return {"blocks": blocks}
+
+    def _find_context(self, user_id: str, query: str, days: int) -> Dict[str, Any]:
+        """Execute context search and format results."""
+        try:
+            import asyncio
+            from src.services.context_search import ContextSearchService
+
+            # Map Slack user to app user for Fireflies access
+            app_user_id = self._map_slack_user_to_app_user(user_id)
+
+            # Create search service
+            search_service = ContextSearchService()
+
+            # Perform search
+            results = asyncio.run(search_service.search(
+                query=query,
+                days_back=days,
+                user_id=app_user_id
+            ))
+
+            if not results.results:
+                return {
+                    "text": f"🔍 No results found for *{query}* in the last {days} days.\n"
+                           f"Try expanding the search window or using different keywords."
+                }
+
+            # Build response blocks
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"🔍 Context Search: {query}"
+                    }
+                }
+            ]
+
+            # Add summary if available
+            if results.summary:
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*📝 Summary:*\n{results.summary}"
+                    }
+                })
+
+            # Add key people if available
+            if results.key_people:
+                people_str = ", ".join(results.key_people)
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*👥 Key People:* {people_str}"
+                    }
+                })
+
+            # Add timeline if available
+            if results.timeline:
+                timeline_text = "\n".join([
+                    f"• *{item['date']}*: {item['event']}"
+                    for item in results.timeline
+                ])
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*📅 Timeline:*\n{timeline_text}"
+                    }
+                })
+
+            # Add divider
+            blocks.append({"type": "divider"})
+
+            # Add top results (limit to 5 for brevity)
+            blocks.append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*🔗 Top {min(5, len(results.results))} Results:*"
+                }
+            })
+
+            for i, result in enumerate(results.results[:5], 1):
+                # Format source emoji
+                source_emoji = {
+                    'slack': '💬',
+                    'fireflies': '🎙️',
+                    'jira': '📋'
+                }.get(result.source, '📄')
+
+                # Format date
+                date_str = result.date.strftime('%Y-%m-%d')
+
+                # Build result text
+                result_text = f"{source_emoji} *{result.title}*\n"
+                result_text += f"_{date_str}_ • _{result.author or 'Unknown'}_\n"
+                result_text += f"{result.content[:150]}..."
+
+                # Add URL if available
+                if result.url:
+                    result_text += f"\n<{result.url}|View Source>"
+
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": result_text
+                    }
+                })
+
+            # Add footer with stats
+            total_results = len(results.results)
+            source_counts = {}
+            for result in results.results:
+                source_counts[result.source] = source_counts.get(result.source, 0) + 1
+
+            stats_text = f"Found {total_results} results: "
+            stats_parts = []
+            if source_counts.get('slack'):
+                stats_parts.append(f"{source_counts['slack']} Slack")
+            if source_counts.get('fireflies'):
+                stats_parts.append(f"{source_counts['fireflies']} Fireflies")
+            if source_counts.get('jira'):
+                stats_parts.append(f"{source_counts['jira']} Jira")
+            stats_text += ", ".join(stats_parts)
+
+            blocks.append({
+                "type": "context",
+                "elements": [{
+                    "type": "plain_text",
+                    "text": stats_text
+                }]
+            })
+
+            return {"blocks": blocks}
+
+        except Exception as e:
+            logger.error(f"Error executing context search: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                "text": f"❌ Error executing search: {str(e)}\n"
+                       f"Please try again or contact support if the issue persists."
+            }
