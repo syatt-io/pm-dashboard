@@ -1018,32 +1018,38 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
   const loadForecasts = async () => {
     setLoading(true);
     try {
-      const forecastData: {[projectKey: string]: any[]} = {};
-      let headers: string[] = [];
+      const token = localStorage.getItem('auth_token');
+      const projectKeys = activeProjects.map(p => p.key);
 
-      for (const project of activeProjects) {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API_BASE_URL}/api/jira/project-forecasts/${project.key}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+      // Batch request for all projects
+      const response = await fetch(`${API_BASE_URL}/api/jira/project-forecasts/batch`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ project_keys: projectKeys }),
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          forecastData[project.key] = data.data.forecasts;
+      if (response.ok) {
+        const data = await response.json();
+        const forecastData = data.data.forecasts;
 
-          // Get month headers from first project
-          if (headers.length === 0 && data.data.forecasts.length > 0) {
-            headers = data.data.forecasts.map((f: any) => getMonthName(f.month_year));
+        // Get month headers from first project with data
+        let headers: string[] = [];
+        for (const projectKey of projectKeys) {
+          if (forecastData[projectKey] && forecastData[projectKey].length > 0) {
+            headers = forecastData[projectKey].map((f: any) => getMonthName(f.month_year));
+            break;
           }
         }
-      }
 
-      setMonthHeaders(headers);
-      setForecasts(forecastData);
-      setEditedForecasts(JSON.parse(JSON.stringify(forecastData))); // Deep copy
+        setMonthHeaders(headers);
+        setForecasts(forecastData);
+        setEditedForecasts(JSON.parse(JSON.stringify(forecastData))); // Deep copy
+      } else {
+        notify('Error loading forecasts', { type: 'error' });
+      }
     } catch (error) {
       notify('Error loading forecasts', { type: 'error' });
     } finally {

@@ -228,3 +228,54 @@ def test_update_project_creates_new(client, mocker):
     })
 
     assert response.status_code == 200
+
+
+def test_get_project_forecasts_batch_success(client, mocker):
+    """Test successfully getting batch forecasts for multiple projects."""
+    from datetime import datetime
+
+    mock_engine = mocker.patch('src.routes.jira.get_engine')
+    mock_conn = Mock()
+    mock_engine.return_value.connect.return_value.__enter__.return_value = mock_conn
+
+    # Mock database results for multiple projects
+    current_month = datetime(2025, 10, 1).date()
+    mock_conn.execute.return_value = [
+        ('PROJ1', current_month, 40.0, 35.5),
+        ('PROJ2', current_month, 60.0, 50.0),
+    ]
+
+    response = client.post('/api/jira/project-forecasts/batch', json={
+        'project_keys': ['PROJ1', 'PROJ2']
+    })
+
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data['success'] is True
+    assert 'forecasts' in data['data']
+    assert 'PROJ1' in data['data']['forecasts']
+    assert 'PROJ2' in data['data']['forecasts']
+    # Each project should have 6 months of forecasts
+    assert len(data['data']['forecasts']['PROJ1']) == 6
+    assert len(data['data']['forecasts']['PROJ2']) == 6
+
+
+def test_get_project_forecasts_batch_missing_keys(client, mocker):
+    """Test batch forecast endpoint requires project_keys."""
+    response = client.post('/api/jira/project-forecasts/batch', json={})
+
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data['success'] is False
+    assert 'required' in data['error'].lower()
+
+
+def test_get_project_forecasts_batch_empty_keys(client, mocker):
+    """Test batch forecast endpoint with empty project_keys."""
+    response = client.post('/api/jira/project-forecasts/batch', json={
+        'project_keys': []
+    })
+
+    assert response.status_code == 400
+    data = response.get_json()
+    assert data['success'] is False

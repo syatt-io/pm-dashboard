@@ -336,6 +336,76 @@ def update_project(project_key):
         return error_response(str(e), status_code=500)
 
 
+@jira_bp.route('/project-forecasts/batch', methods=['POST'])
+def get_project_forecasts_batch():
+    """Get monthly forecasts for multiple projects in a single request (rolling 6 months from current month)."""
+    try:
+        from sqlalchemy import text
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+
+        data = request.json
+        project_keys = data.get('project_keys', [])
+
+        if not project_keys:
+            return error_response('project_keys is required', status_code=400)
+
+        engine = get_engine()
+        now = datetime.now()
+        current_month = datetime(now.year, now.month, 1).date()
+
+        # Calculate 6 months forward
+        months = []
+        for i in range(6):
+            month = (datetime(now.year, now.month, 1) + relativedelta(months=i)).date()
+            months.append(month)
+
+        # Fetch all forecasts in a single query
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT project_key, month_year, forecasted_hours, actual_monthly_hours
+                FROM project_monthly_forecast
+                WHERE project_key = ANY(:project_keys)
+                AND month_year >= :start_month
+                ORDER BY project_key, month_year ASC
+            """), {
+                "project_keys": project_keys,
+                "start_month": current_month
+            })
+
+            # Group by project_key
+            forecasts_by_project = {}
+            for row in result:
+                project_key = row[0]
+                month_year = row[1]
+                if project_key not in forecasts_by_project:
+                    forecasts_by_project[project_key] = {}
+                forecasts_by_project[project_key][month_year] = {
+                    "forecasted_hours": float(row[2]) if row[2] else 0,
+                    "actual_monthly_hours": float(row[3]) if row[3] else 0
+                }
+
+        # Build response with all 6 months for each project
+        response_data = {}
+        for project_key in project_keys:
+            forecasts = []
+            existing_forecasts = forecasts_by_project.get(project_key, {})
+            for month in months:
+                forecast_data = existing_forecasts.get(month, {"forecasted_hours": 0, "actual_monthly_hours": 0})
+                forecasts.append({
+                    "month_year": month.isoformat(),
+                    "forecasted_hours": forecast_data["forecasted_hours"],
+                    "actual_monthly_hours": forecast_data["actual_monthly_hours"]
+                })
+            response_data[project_key] = forecasts
+
+        return success_response(data={'forecasts': response_data})
+
+    except Exception as e:
+        logger.error(f"Error fetching batch forecasts: {e}")
+        return error_response(str(e), status_code=500)
+
+
 @jira_bp.route('/project-forecasts/<project_key>', methods=['GET'])
 def get_project_forecasts(project_key):
     """Get monthly forecasts for a project (rolling 6 months from current month)."""
