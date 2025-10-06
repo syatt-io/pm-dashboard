@@ -56,7 +56,7 @@ class ContextSearchService:
             ContextSearchResults with aggregated results
         """
         if sources is None:
-            sources = ['fireflies', 'jira']  # Slack and Notion disabled due to API/deployment limitations
+            sources = ['slack', 'fireflies', 'jira']  # Notion disabled (requires Node.js)
 
         all_results = []
 
@@ -92,16 +92,98 @@ class ContextSearchService:
         )
 
     async def _search_slack(self, query: str, days_back: int) -> List[SearchResult]:
-        """Search Slack messages across channels.
+        """Search Slack messages across channels using conversations.history.
 
-        Note: Bot tokens cannot use search.messages API. This requires a user token
-        with search:read scope. For now, we skip Slack search.
+        Note: Bot tokens cannot use search.messages API, so we use conversations.history
+        to search through channels the bot is a member of.
         """
-        self.logger.warning(
-            "Slack search requires a user token with search:read scope. "
-            "Bot tokens cannot use the search.messages API. Skipping Slack search."
-        )
-        return []
+        try:
+            from config.settings import settings
+            from slack_sdk import WebClient
+
+            client = WebClient(token=settings.notifications.slack_bot_token)
+
+            # Calculate timestamp for X days ago
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            oldest_timestamp = str(int(cutoff_date.timestamp()))
+
+            results = []
+            query_lower = query.lower()
+
+            # Get list of channels the bot is in
+            channels_response = client.conversations_list(
+                exclude_archived=True,
+                types="public_channel,private_channel",
+                limit=100
+            )
+
+            if not channels_response.get('ok'):
+                self.logger.error(f"Failed to list Slack channels: {channels_response.get('error')}")
+                return []
+
+            channels = channels_response.get('channels', [])
+            self.logger.info(f"Searching {len(channels)} Slack channels for query: {query}")
+
+            # Search through each channel
+            for channel in channels[:20]:  # Limit to 20 channels to avoid rate limits
+                channel_id = channel['id']
+                channel_name = channel['name']
+
+                try:
+                    # Get message history
+                    history = client.conversations_history(
+                        channel=channel_id,
+                        oldest=oldest_timestamp,
+                        limit=100  # Limit messages per channel
+                    )
+
+                    if not history.get('ok'):
+                        continue
+
+                    messages = history.get('messages', [])
+
+                    # Filter messages that match query
+                    for message in messages:
+                        text = message.get('text', '').lower()
+
+                        # Skip if query not in message text
+                        if query_lower not in text:
+                            continue
+
+                        # Parse timestamp
+                        ts = float(message.get('ts', 0))
+                        message_date = datetime.fromtimestamp(ts)
+
+                        # Get user info
+                        user_id = message.get('user', 'Unknown')
+
+                        # Build permalink
+                        permalink_response = client.chat_getPermalink(
+                            channel=channel_id,
+                            message_ts=message.get('ts')
+                        )
+                        permalink = permalink_response.get('permalink', '') if permalink_response.get('ok') else ''
+
+                        results.append(SearchResult(
+                            source='slack',
+                            title=f"#{channel_name}",
+                            content=message.get('text', ''),
+                            date=message_date,
+                            url=permalink,
+                            author=user_id,
+                            relevance_score=0.8
+                        ))
+
+                except Exception as e:
+                    self.logger.warning(f"Error searching channel {channel_name}: {e}")
+                    continue
+
+            self.logger.info(f"Found {len(results)} Slack messages for query: {query}")
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Error searching Slack: {e}")
+            return []
 
     async def _search_fireflies(self, query: str, days_back: int, user_id: Optional[int] = None) -> List[SearchResult]:
         """Search Fireflies meeting transcripts."""

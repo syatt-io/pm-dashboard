@@ -341,7 +341,7 @@ class SlackTodoBot:
                     return
 
                 # Show searching message
-                respond(f"🔍 Searching for *{query}* across Fireflies and Jira (last {days} days)...\n_This may take a moment_")
+                respond(f"🔍 Searching for *{query}* across Slack, Fireflies, and Jira (last {days} days)...\n_This may take a moment_")
 
                 # Perform the search
                 respond(self._find_context(user_id, query, days))
@@ -1774,6 +1774,7 @@ class SlackTodoBot:
                            "`/find-context <topic>` - Search with default 90-day window\n"
                            "`/find-context <topic> --days <N>` - Search with custom timeframe\n\n"
                            "*Sources Searched:*\n"
+                           "• 💬 Slack messages (channels bot is in)\n"
                            "• 🎙️ Fireflies meeting transcripts\n"
                            "• 📋 Jira issues and comments\n\n"
                            "*Examples:*\n"
