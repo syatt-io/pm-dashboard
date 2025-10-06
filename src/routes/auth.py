@@ -436,4 +436,152 @@ def create_auth_blueprint(db_session_factory):
             frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
             return redirect(f"{frontend_url}/settings?error=oauth_failed")
 
+    @auth_bp.route('/api/auth/slack/authorize', methods=['GET'])
+    @auth_required
+    def slack_authorize(user):
+        """Initiate Slack OAuth flow for search access."""
+        try:
+            # Get Slack OAuth credentials from environment
+            client_id = os.getenv('SLACK_CLIENT_ID')
+            redirect_uri = os.getenv('SLACK_REDIRECT_URI')
+
+            if not all([client_id, redirect_uri]):
+                return jsonify({
+                    'error': 'Slack OAuth is not configured. Please contact your administrator.'
+                }), 500
+
+            # Define scopes for Slack search
+            scopes = ['search:read']
+
+            # Generate state parameter for security
+            state = secrets.token_urlsafe(32)
+            session[f'slack_oauth_state_{user.id}'] = state
+            session[f'slack_oauth_user_id'] = user.id  # Store user ID for callback
+
+            # Generate authorization URL
+            authorization_url = (
+                f"https://slack.com/oauth/v2/authorize"
+                f"?client_id={client_id}"
+                f"&scope={','.join(scopes)}"
+                f"&redirect_uri={redirect_uri}"
+                f"&state={state}"
+                f"&user_scope={','.join(scopes)}"  # User-level token
+            )
+
+            logger.info(f"Slack OAuth initiated for user {user.id}")
+            return jsonify({
+                'authorization_url': authorization_url
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to initiate Slack OAuth: {e}")
+            return jsonify({'error': 'Failed to start authorization'}), 500
+
+    @auth_bp.route('/api/auth/slack/callback', methods=['GET'])
+    def slack_callback():
+        """Handle Slack OAuth callback."""
+        try:
+            import requests
+
+            # Get Slack OAuth credentials from environment
+            client_id = os.getenv('SLACK_CLIENT_ID')
+            client_secret = os.getenv('SLACK_CLIENT_SECRET')
+            redirect_uri = os.getenv('SLACK_REDIRECT_URI')
+
+            if not all([client_id, client_secret, redirect_uri]):
+                return jsonify({'error': 'OAuth not configured'}), 500
+
+            # Get authorization code and state from callback
+            code = request.args.get('code')
+            state = request.args.get('state')
+            error = request.args.get('error')
+
+            if error:
+                logger.warning(f"Slack OAuth callback error: {error}")
+                # Redirect to settings with error
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=slack_oauth_denied")
+
+            if not code or not state:
+                return jsonify({'error': 'Invalid callback parameters'}), 400
+
+            # Get user ID from session (stored during authorize)
+            user_id = session.get('slack_oauth_user_id')
+            if not user_id:
+                logger.error("No user_id in session during Slack OAuth callback")
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=slack_oauth_failed")
+
+            # Verify state parameter
+            expected_state = session.get(f'slack_oauth_state_{user_id}')
+            if not expected_state or expected_state != state:
+                logger.warning(f"Slack OAuth state mismatch for user {user_id}")
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=slack_oauth_failed")
+
+            # Clear state and user_id from session
+            session.pop(f'slack_oauth_state_{user_id}', None)
+            session.pop('slack_oauth_user_id', None)
+
+            # Exchange code for access token
+            token_response = requests.post(
+                'https://slack.com/api/oauth.v2.access',
+                data={
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'code': code,
+                    'redirect_uri': redirect_uri
+                }
+            )
+
+            token_data = token_response.json()
+
+            if not token_data.get('ok'):
+                logger.error(f"Slack OAuth token exchange failed: {token_data.get('error')}")
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=slack_oauth_failed")
+
+            # Extract user token (not team/bot token)
+            authed_user = token_data.get('authed_user', {})
+            access_token = authed_user.get('access_token')
+
+            if not access_token:
+                logger.error("No user access token in Slack OAuth response")
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=slack_oauth_failed")
+
+            # Store tokens in user's database record
+            token_info = {
+                'access_token': access_token,
+                'token_type': authed_user.get('token_type', 'user'),
+                'scope': authed_user.get('scope', ''),
+                'team_id': token_data.get('team', {}).get('id'),
+                'team_name': token_data.get('team', {}).get('name'),
+                'user_id': authed_user.get('id')
+            }
+
+            # Update user with OAuth token
+            db_session = db_session_factory()
+            try:
+                from src.models.user import User
+                user = db_session.query(User).filter_by(id=user_id).first()
+                if not user:
+                    logger.error(f"User {user_id} not found during Slack OAuth callback")
+                    raise ValueError("User not found")
+
+                user.set_slack_user_token(token_info)
+                db_session.commit()
+                logger.info(f"Slack OAuth completed for user {user_id}")
+            finally:
+                db_session.close()
+
+            # Redirect to settings page with success message
+            frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+            return redirect(f"{frontend_url}/settings?success=slack_connected")
+
+        except Exception as e:
+            logger.error(f"Failed to complete Slack OAuth: {e}")
+            frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+            return redirect(f"{frontend_url}/settings?error=slack_oauth_failed")
+
     return auth_bp

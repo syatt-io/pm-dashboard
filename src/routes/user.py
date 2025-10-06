@@ -338,3 +338,27 @@ def validate_notion_api_key_endpoint(user):
             'valid': False,
             'error': 'Failed to validate API key'
         }), 500
+
+
+# Slack user token endpoints
+@user_bp.route("/slack-token", methods=["DELETE"])
+@auth_required
+def delete_slack_user_token(user):
+    """Delete user's Slack user token."""
+    try:
+        with session_scope() as db_session:
+            db_user = db_session.merge(user)
+            db_user.clear_slack_user_token()
+
+        logger.info(f"Slack user token deleted for user {user.id}")
+        return jsonify({
+            'success': True,
+            'message': 'Slack connection removed successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error deleting Slack user token for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

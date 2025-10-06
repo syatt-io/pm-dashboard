@@ -34,8 +34,10 @@ class User(Base):
     fireflies_api_key_encrypted = Column(Text, nullable=True)
     google_oauth_token_encrypted = Column(Text, nullable=True)
     notion_api_key_encrypted = Column(Text, nullable=True)
+    slack_user_token_encrypted = Column(Text, nullable=True)
     google_credentials_updated_at = Column(DateTime, nullable=True)
     notion_credentials_updated_at = Column(DateTime, nullable=True)
+    slack_credentials_updated_at = Column(DateTime, nullable=True)
 
     # Relationships
     # todos = relationship("TodoItem", back_populates="user", cascade="all, delete-orphan")
@@ -60,7 +62,8 @@ class User(Base):
             'is_active': self.is_active,
             'has_fireflies_key': self.has_fireflies_api_key(),
             'has_google_oauth': self.has_google_oauth_token(),
-            'has_notion_key': self.has_notion_api_key()
+            'has_notion_key': self.has_notion_api_key(),
+            'has_slack_user_token': self.has_slack_user_token()
         }
 
     def has_role(self, role):
@@ -272,6 +275,64 @@ class User(Base):
         self.notion_api_key_encrypted = None
         self.notion_credentials_updated_at = None
         logger.info(f"Notion API key cleared for user {self.id}")
+
+    # Slack User OAuth methods
+    def has_slack_user_token(self):
+        """Check if user has configured Slack user OAuth credentials."""
+        return bool(self.slack_user_token_encrypted)
+
+    def set_slack_user_token(self, token_data: dict):
+        """Set and encrypt the user's Slack user token."""
+        if not token_data:
+            self.slack_user_token_encrypted = None
+            self.slack_credentials_updated_at = None
+            return
+
+        try:
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import encrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import encrypt_api_key
+                except ImportError:
+                    from utils.encryption import encrypt_api_key
+
+            # Convert token dict to JSON string before encryption
+            token_json = json.dumps(token_data)
+            self.slack_user_token_encrypted = encrypt_api_key(token_json)
+            self.slack_credentials_updated_at = datetime.now(timezone.utc)
+            logger.info(f"Slack user token set for user {self.id}")
+        except Exception as e:
+            logger.error(f"Failed to encrypt Slack user token for user {self.id}: {e}")
+            raise
+
+    def get_slack_user_token(self) -> dict:
+        """Get and decrypt the user's Slack user token."""
+        if not self.slack_user_token_encrypted:
+            return {}
+
+        try:
+            # Try different import paths to handle both local and production environments
+            try:
+                from ..utils.encryption import decrypt_api_key
+            except ImportError:
+                try:
+                    from src.utils.encryption import decrypt_api_key
+                except ImportError:
+                    from utils.encryption import decrypt_api_key
+
+            token_json = decrypt_api_key(self.slack_user_token_encrypted)
+            return json.loads(token_json) if token_json else {}
+        except Exception as e:
+            logger.error(f"Failed to decrypt Slack user token for user {self.id}: {e}")
+            return {}
+
+    def clear_slack_user_token(self):
+        """Clear the user's Slack user token."""
+        self.slack_user_token_encrypted = None
+        self.slack_credentials_updated_at = None
+        logger.info(f"Slack user token cleared for user {self.id}")
 
 
 class UserWatchedProject(Base):

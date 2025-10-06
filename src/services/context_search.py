@@ -62,7 +62,7 @@ class ContextSearchService:
 
         # Search each source
         if 'slack' in sources:
-            slack_results = await self._search_slack(query, days_back)
+            slack_results = await self._search_slack(query, days_back, user_id)
             all_results.extend(slack_results)
 
         if 'fireflies' in sources:
@@ -91,8 +91,88 @@ class ContextSearchService:
             timeline=timeline
         )
 
-    async def _search_slack(self, query: str, days_back: int) -> List[SearchResult]:
-        """Search Slack messages across channels using conversations.history.
+    async def _search_slack(self, query: str, days_back: int, user_id: Optional[int] = None) -> List[SearchResult]:
+        """Search Slack messages across channels.
+
+        If user has OAuth token, use search.messages API for better results.
+        Otherwise fall back to conversations.history with bot token.
+        """
+        # Try to use user's Slack OAuth token first
+        if user_id:
+            try:
+                from src.models.user import User
+                from src.utils.database import session_scope
+
+                with session_scope() as db_session:
+                    user = db_session.query(User).filter_by(id=user_id).first()
+                    if user and user.has_slack_user_token():
+                        token_data = user.get_slack_user_token()
+                        user_token = token_data.get('access_token')
+
+                        if user_token:
+                            # Use search.messages API with user token
+                            return await self._search_slack_with_user_token(query, days_back, user_token)
+            except Exception as e:
+                self.logger.warning(f"Failed to use user Slack token, falling back to bot token: {e}")
+
+        # Fall back to bot token with conversations.history
+        return await self._search_slack_with_bot_token(query, days_back)
+
+    async def _search_slack_with_user_token(self, query: str, days_back: int, user_token: str) -> List[SearchResult]:
+        """Search Slack using user token and search.messages API."""
+        try:
+            from slack_sdk import WebClient
+
+            client = WebClient(token=user_token)
+
+            # Calculate timestamp for X days ago
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+            oldest_timestamp = cutoff_date.timestamp()
+
+            # Use Slack's search API (user token only)
+            response = client.search_messages(
+                query=query,
+                sort='timestamp',
+                sort_dir='desc',
+                count=100
+            )
+
+            results = []
+            if response.get('messages'):
+                for match in response['messages']['matches']:
+                    # Parse timestamp
+                    ts = float(match.get('ts', 0))
+                    message_date = datetime.fromtimestamp(ts)
+
+                    # Skip if too old
+                    if ts < oldest_timestamp:
+                        continue
+
+                    # Get channel name
+                    channel_name = match.get('channel', {}).get('name', 'unknown')
+
+                    # Build permalink
+                    permalink = match.get('permalink', '')
+
+                    results.append(SearchResult(
+                        source='slack',
+                        title=f"#{channel_name}",
+                        content=match.get('text', ''),
+                        date=message_date,
+                        url=permalink,
+                        author=match.get('username', 'Unknown'),
+                        relevance_score=0.9  # Higher score for real search API
+                    ))
+
+            self.logger.info(f"Found {len(results)} Slack messages via user token for query: {query}")
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Error searching Slack with user token: {e}")
+            return []
+
+    async def _search_slack_with_bot_token(self, query: str, days_back: int) -> List[SearchResult]:
+        """Search Slack using bot token and conversations.history.
 
         Note: Bot tokens cannot use search.messages API, so we use conversations.history
         to search through channels the bot is a member of.
