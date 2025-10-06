@@ -476,7 +476,10 @@ class TodoScheduler:
                     f"{stats['projects_updated']} projects updated in {stats['duration_seconds']:.2f}s"
                 )
 
-                # Send notification about sync completion
+                # Get project hours summary from database
+                project_summary = self._get_project_hours_summary()
+
+                # Send notification about sync completion with project status
                 summary_body = f"✅ *Tempo Hours Sync Completed*\n\n"
                 summary_body += f"• Projects Updated: {stats['projects_updated']}\n"
                 summary_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
@@ -484,6 +487,17 @@ class TodoScheduler:
 
                 if stats.get('unique_projects_tracked', 0) > 0:
                     summary_body += f"• Unique Projects Tracked: {stats['unique_projects_tracked']}\n"
+
+                # Add project hours summary if available
+                if project_summary:
+                    summary_body += f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary:*\n"
+
+                    for project in project_summary:
+                        status_emoji = project['emoji']
+                        summary_body += f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
+                        summary_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
+                        summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                        summary_body += f"  • Usage: {project['percentage']:.1f}%\n"
 
                 # Only send notification if in production
                 import os
@@ -511,6 +525,63 @@ class TodoScheduler:
 
         except Exception as e:
             logger.error(f"Error in scheduled Tempo sync: {e}")
+
+    def _get_project_hours_summary(self):
+        """Get summary of actual vs forecasted hours for current month."""
+        try:
+            from sqlalchemy import text
+            from src.utils.database import get_engine
+
+            engine = get_engine()
+            now = datetime.now()
+            current_month = datetime(now.year, now.month, 1).date()
+
+            with engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT
+                        p.key,
+                        p.name,
+                        pmf.forecasted_hours,
+                        pmf.actual_monthly_hours
+                    FROM projects p
+                    INNER JOIN project_monthly_forecast pmf
+                        ON p.key = pmf.project_key
+                    WHERE p.is_active = true
+                        AND pmf.month_year = :current_month
+                        AND pmf.forecasted_hours > 0
+                    ORDER BY p.name
+                """), {"current_month": current_month})
+
+                projects = []
+                for row in result:
+                    forecasted = float(row[2]) if row[2] else 0
+                    actual = float(row[3]) if row[3] else 0
+
+                    if forecasted > 0:
+                        percentage = (actual / forecasted) * 100
+
+                        # Color coding based on usage
+                        if percentage >= 100:
+                            emoji = "🔴"  # Red - over budget
+                        elif percentage >= 80:
+                            emoji = "🟡"  # Yellow - close to budget
+                        else:
+                            emoji = "🟢"  # Green - well within budget
+
+                        projects.append({
+                            'key': row[0],
+                            'name': row[1],
+                            'forecasted_hours': forecasted,
+                            'actual_hours': actual,
+                            'percentage': percentage,
+                            'emoji': emoji
+                        })
+
+                return projects
+
+        except Exception as e:
+            logger.error(f"Error getting project hours summary: {e}")
+            return []
 
 
 # Global scheduler instance
