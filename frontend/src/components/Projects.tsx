@@ -1102,7 +1102,9 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
   };
 
   const getMonthName = (monthYear: string) => {
-    const date = new Date(monthYear);
+    // Parse ISO date string (YYYY-MM-DD) without timezone issues
+    const [year, month] = monthYear.split('-').map(Number);
+    const date = new Date(year, month - 1, 1); // month is 0-indexed
     return date.toLocaleString('default', { month: 'short', year: 'numeric' });
   };
 
@@ -1555,26 +1557,11 @@ export const ProjectList = () => {
                             </TableCell>
                             {(workType === 'project-based' || workType === 'growth-support') && (
                               <TableCell>
-                                {project.forecasted_hours_month !== undefined ? (
-                                  <input
-                                    type="number"
-                                    value={getProjectValue(project, 'forecasted_hours_month')}
-                                    onChange={(e) => {
-                                      handleFieldChange(project.key, 'forecasted_hours_month', e.target.value);
-                                    }}
-                                    style={{
-                                      width: '80px',
-                                      padding: '4px',
-                                      border: hasUnsavedChanges(project.key) ? '2px solid #ff9800' : '1px solid #ccc',
-                                      borderRadius: '4px',
-                                      backgroundColor: hasUnsavedChanges(project.key) ? '#fff3e0' : 'white'
-                                    }}
-                                    step="0.1"
-                                    min="0"
-                                  />
-                                ) : (
-                                  <Typography variant="body2" color="text.secondary">-</Typography>
-                                )}
+                                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                                  {project.forecasted_hours_month !== undefined && project.forecasted_hours_month > 0
+                                    ? `${project.forecasted_hours_month.toFixed(1)}h`
+                                    : '-'}
+                                </Typography>
                               </TableCell>
                             )}
                             <TableCell>
