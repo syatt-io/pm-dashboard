@@ -114,6 +114,12 @@ export const dataProvider: DataProvider = {
                 queryParams.append('limit', perPage.toString());
                 queryParams.append('offset', ((page - 1) * perPage).toString());
                 break;
+            case 'feedback':
+                url = `${API_URL}/feedback`;
+                // Add filter params for feedback
+                if (filter.status) queryParams.append('status', filter.status);
+                if (filter.recipient) queryParams.append('recipient', filter.recipient);
+                break;
             case 'settings':
                 // Settings is not really a list, but React Admin expects list data
                 // We'll return a single item representing user settings
@@ -201,6 +207,9 @@ export const dataProvider: DataProvider = {
             case 'learnings':
                 url = `${API_URL}/learnings/${params.id}`;
                 break;
+            case 'feedback':
+                url = `${API_URL}/feedback/${params.id}`;
+                break;
             default:
                 return Promise.reject(new Error(`Unknown resource: ${resource}`));
         }
@@ -282,6 +291,9 @@ export const dataProvider: DataProvider = {
             case 'learnings':
                 url = `${API_URL}/learnings`;
                 break;
+            case 'feedback':
+                url = `${API_URL}/feedback`;
+                break;
             default:
                 return Promise.reject(new Error(`Create not supported for resource: ${resource}`));
         }
@@ -293,6 +305,11 @@ export const dataProvider: DataProvider = {
             if (resource === 'learnings' && json.learning) {
                 return {
                     data: { id: json.learning.id, ...json.learning },
+                };
+            }
+            if (resource === 'feedback' && json.data) {
+                return {
+                    data: { id: json.data.id, ...json.data },
                 };
             }
             return {
@@ -315,6 +332,9 @@ export const dataProvider: DataProvider = {
                 break;
             case 'learnings':
                 url = `${API_URL}/learnings/${params.id}`;
+                break;
+            case 'feedback':
+                url = `${API_URL}/feedback/${params.id}`;
                 break;
             default:
                 return Promise.reject(new Error(`Update not supported for resource: ${resource}`));
@@ -355,6 +375,9 @@ export const dataProvider: DataProvider = {
                 break;
             case 'learnings':
                 url = `${API_URL}/learnings/${params.id}`;
+                break;
+            case 'feedback':
+                url = `${API_URL}/feedback/${params.id}`;
                 break;
             default:
                 return Promise.reject(new Error(`Delete not supported for resource: ${resource}`));
