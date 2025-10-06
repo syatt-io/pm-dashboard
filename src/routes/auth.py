@@ -304,6 +304,7 @@ def create_auth_blueprint(db_session_factory):
             # Generate state parameter for security
             state = secrets.token_urlsafe(32)
             session[f'oauth_state_{user.id}'] = state
+            session[f'oauth_user_id'] = user.id  # Store user ID for callback
 
             # Generate authorization URL
             authorization_url, _ = flow.authorization_url(
@@ -348,21 +349,23 @@ def create_auth_blueprint(db_session_factory):
             if not code or not state:
                 return jsonify({'error': 'Invalid callback parameters'}), 400
 
-            # Get current user from token
-            token = request.cookies.get('auth_token')
-            if not token:
-                return jsonify({'error': 'Not authenticated'}), 401
-
-            user = auth_service.get_current_user(token)
+            # Get user ID from session (stored during authorize)
+            user_id = session.get('oauth_user_id')
+            if not user_id:
+                logger.error("No user_id in session during OAuth callback")
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=oauth_failed")
 
             # Verify state parameter
-            expected_state = session.get(f'oauth_state_{user.id}')
+            expected_state = session.get(f'oauth_state_{user_id}')
             if not expected_state or expected_state != state:
-                logger.warning(f"OAuth state mismatch for user {user.id}")
-                return jsonify({'error': 'Invalid state parameter'}), 400
+                logger.warning(f"OAuth state mismatch for user {user_id}")
+                frontend_url = os.getenv('WEB_BASE_URL', 'http://localhost:3000')
+                return redirect(f"{frontend_url}/settings?error=oauth_failed")
 
-            # Clear state from session
-            session.pop(f'oauth_state_{user.id}', None)
+            # Clear state and user_id from session
+            session.pop(f'oauth_state_{user_id}', None)
+            session.pop('oauth_user_id', None)
 
             # Define scopes
             scopes = [
@@ -402,10 +405,15 @@ def create_auth_blueprint(db_session_factory):
             # Update user with OAuth token
             db_session = db_session_factory()
             try:
-                db_user = db_session.merge(user)
-                db_user.set_google_oauth_token(token_data)
+                from src.models.user import User
+                user = db_session.query(User).filter_by(id=user_id).first()
+                if not user:
+                    logger.error(f"User {user_id} not found during OAuth callback")
+                    raise ValueError("User not found")
+
+                user.set_google_oauth_token(token_data)
                 db_session.commit()
-                logger.info(f"Google Workspace OAuth completed for user {user.id}")
+                logger.info(f"Google Workspace OAuth completed for user {user_id}")
             finally:
                 db_session.close()
 
