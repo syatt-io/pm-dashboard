@@ -324,8 +324,8 @@ def validate_notion_api_key_endpoint(user):
                 'error': 'API key is required'
             }), 400
 
-        # Basic format check - Notion API keys start with "secret_"
-        is_valid = api_key.startswith('secret_') and len(api_key) > 20
+        # Basic format check - Notion API keys can start with "secret_" (old format) or "ntn_" (new Internal Integration format)
+        is_valid = (api_key.startswith('secret_') or api_key.startswith('ntn_')) and len(api_key) > 20
 
         return jsonify({
             'valid': is_valid,
