@@ -41,6 +41,7 @@ interface UserSettings {
     has_fireflies_key: boolean;
     has_google_oauth: boolean;
     has_notion_key: boolean;
+    has_slack_user_token: boolean;
   };
   settings: {
     has_fireflies_key: boolean;
@@ -83,6 +84,10 @@ export const Settings = () => {
   const [deletingGoogle, setDeletingGoogle] = useState(false);
   const [deleteGoogleDialog, setDeleteGoogleDialog] = useState(false);
 
+  // Slack OAuth state
+  const [deletingSlack, setDeletingSlack] = useState(false);
+  const [deleteSlackDialog, setDeleteSlackDialog] = useState(false);
+
   // Load user settings on component mount
   useEffect(() => {
     loadSettings();
@@ -100,10 +105,15 @@ export const Settings = () => {
       loadSettings(); // Reload settings to show updated connection status
       // Clean URL
       window.history.replaceState({}, '', '/settings');
+    } else if (success === 'slack_connected') {
+      showSnackbar('Slack connected successfully!', 'success');
+      loadSettings(); // Reload settings to show updated connection status
+      // Clean URL
+      window.history.replaceState({}, '', '/settings');
     } else if (error) {
       const errorMessages: { [key: string]: string } = {
-        'oauth_denied': 'Google authorization was denied',
-        'oauth_failed': 'Failed to complete Google authorization',
+        'oauth_denied': 'Authorization was denied',
+        'oauth_failed': 'Failed to complete authorization',
       };
       showSnackbar(errorMessages[error] || 'An error occurred', 'error');
       // Clean URL
@@ -415,6 +425,62 @@ export const Settings = () => {
 
   const handleOpenGoogleHelp = () => {
     window.open('https://console.cloud.google.com/apis/credentials', '_blank');
+  };
+
+  // Slack OAuth handlers
+  const handleSlackAuthorize = async () => {
+    try {
+      // Call backend to get authorization URL
+      const response = await fetch(getApiUrl('/api/auth/slack/authorize'), {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to initiate OAuth flow');
+      }
+
+      const data = await response.json();
+
+      // Redirect to Slack OAuth consent screen
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error('No authorization URL returned');
+      }
+    } catch (error) {
+      console.error('Error initiating Slack OAuth:', error);
+      showSnackbar('Failed to start Slack authorization', 'error');
+    }
+  };
+
+  const deleteSlackToken = async () => {
+    try {
+      setDeletingSlack(true);
+
+      const response = await fetch(getApiUrl('/api/user/slack-token'), {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (data.success) {
+        showSnackbar(data.message || 'Slack connection removed successfully', 'success');
+        setDeleteSlackDialog(false);
+        await loadSettings();
+      } else {
+        throw new globalThis.Error(data.error || 'Failed to disconnect Slack');
+      }
+    } catch (error) {
+      showSnackbar('Failed to disconnect Slack', 'error');
+    } finally {
+      setDeletingSlack(false);
+    }
+  };
+
+  const handleOpenSlackHelp = () => {
+    window.open('https://api.slack.com/apps', '_blank');
   };
 
   if (loading) {
@@ -801,6 +867,87 @@ export const Settings = () => {
         </CardContent>
       </Card>
 
+      {/* Slack Integration */}
+      <Card sx={{ mt: 3 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">
+              💬 Slack Integration
+            </Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Launch />}
+              onClick={handleOpenSlackHelp}
+            >
+              Setup OAuth
+            </Button>
+          </Box>
+
+          {/* Current Status */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Current Status
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              <Chip
+                icon={settings.user.has_slack_user_token ? <CheckCircle /> : <ErrorIcon />}
+                label={settings.user.has_slack_user_token ? 'Connected' : 'Not Connected'}
+                color={settings.user.has_slack_user_token ? 'success' : 'error'}
+                size="small"
+              />
+            </Box>
+          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* OAuth Management */}
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Connect your Slack account for better search results in /find-context
+          </Typography>
+
+          <Box sx={{ mt: 2 }}>
+            {!settings.user.has_slack_user_token ? (
+              <>
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <strong>Enhanced Search:</strong> Connecting your Slack account enables the powerful search.messages API
+                  for much better results in the /find-context command, instead of the limited bot-only search.
+                </Alert>
+                <Button
+                  variant="contained"
+                  onClick={() => handleSlackAuthorize()}
+                  startIcon={<Launch />}
+                >
+                  Connect Slack Account
+                </Button>
+              </>
+            ) : (
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => setDeleteSlackDialog(true)}
+                  startIcon={<Delete />}
+                >
+                  Disconnect Slack
+                </Button>
+              </Box>
+            )}
+          </Box>
+
+          {/* Help Text */}
+          <Alert severity="info" sx={{ mt: 3 }}>
+            <Typography variant="body2">
+              <strong>Slack Search Integration:</strong>
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              This integration allows the /find-context Slack command to search your messages using Slack's powerful search API.
+              Without this connection, searches are limited to channels the bot has been added to.
+            </Typography>
+          </Alert>
+        </CardContent>
+      </Card>
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
         <DialogTitle>Delete Fireflies API Key</DialogTitle>
@@ -863,6 +1010,28 @@ export const Settings = () => {
             startIcon={deletingGoogle ? <CircularProgress size={16} /> : <Delete />}
           >
             {deletingGoogle ? 'Disconnecting...' : 'Disconnect'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Slack OAuth Dialog */}
+      <Dialog open={deleteSlackDialog} onClose={() => setDeleteSlackDialog(false)}>
+        <DialogTitle>Disconnect Slack</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to disconnect your Slack account?
+            The /find-context command will use limited bot-only search until you reconnect.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteSlackDialog(false)}>Cancel</Button>
+          <Button
+            onClick={deleteSlackToken}
+            color="error"
+            disabled={deletingSlack}
+            startIcon={deletingSlack ? <CircularProgress size={16} /> : <Delete />}
+          >
+            {deletingSlack ? 'Disconnecting...' : 'Disconnect'}
           </Button>
         </DialogActions>
       </Dialog>
