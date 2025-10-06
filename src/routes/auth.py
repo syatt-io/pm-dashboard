@@ -281,10 +281,15 @@ def create_auth_blueprint(db_session_factory):
                 }), 500
 
             # Define scopes for Google Workspace access
+            # Include OpenID and other scopes that Google automatically adds
             scopes = [
+                'openid',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile',
                 'https://www.googleapis.com/auth/drive.readonly',
                 'https://www.googleapis.com/auth/documents.readonly',
-                'https://www.googleapis.com/auth/spreadsheets.readonly'
+                'https://www.googleapis.com/auth/spreadsheets.readonly',
+                'https://www.googleapis.com/auth/analytics.readonly'  # May be auto-added by Google
             ]
 
             # Create OAuth flow
@@ -367,11 +372,16 @@ def create_auth_blueprint(db_session_factory):
             session.pop(f'oauth_state_{user_id}', None)
             session.pop('oauth_user_id', None)
 
-            # Define scopes
+            # Define scopes (must match the authorize endpoint)
+            # Include OpenID and other scopes that Google automatically adds
             scopes = [
+                'openid',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile',
                 'https://www.googleapis.com/auth/drive.readonly',
                 'https://www.googleapis.com/auth/documents.readonly',
-                'https://www.googleapis.com/auth/spreadsheets.readonly'
+                'https://www.googleapis.com/auth/spreadsheets.readonly',
+                'https://www.googleapis.com/auth/analytics.readonly'  # May be auto-added by Google
             ]
 
             # Exchange code for tokens
