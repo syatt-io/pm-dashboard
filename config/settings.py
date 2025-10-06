@@ -68,7 +68,7 @@ class AgentConfig:
     run_schedule: str = "0 8,17 * * *"  # Cron expression
     debug_mode: bool = False
     log_level: str = "INFO"
-    database_url: str = "sqlite:///pm_agent.db"
+    database_url: str = "sqlite:///database/pm_agent.db"
 
 
 class Settings:
@@ -155,7 +155,7 @@ class Settings:
             run_schedule=os.getenv("AGENT_RUN_SCHEDULE", "0 8,17 * * *"),
             debug_mode=os.getenv("DEBUG_MODE", "false").lower() == "true",
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            database_url=os.getenv("DATABASE_URL", "sqlite:///pm_agent.db")
+            database_url=os.getenv("DATABASE_URL", "sqlite:///database/pm_agent.db")
         )
 
     @staticmethod

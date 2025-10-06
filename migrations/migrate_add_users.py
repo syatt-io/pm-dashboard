@@ -31,7 +31,7 @@ class User(Base):
     last_login = Column(DateTime)
     is_active = Column(Boolean, default=True)
 
-DATABASE_URL = "sqlite:///pm_agent.db"
+DATABASE_URL = "sqlite:///database/pm_agent.db"
 
 def migrate():
     """Add user table and update existing tables with user_id."""

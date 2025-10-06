@@ -83,7 +83,7 @@ async def sync_all_projects():
 
 def update_database(september_hours):
     """Update database with September hours from Jira."""
-    conn = sqlite3.connect('pm_agent.db')
+    conn = sqlite3.connect('../database/pm_agent.db')
     cursor = conn.cursor()
 
     updated = 0

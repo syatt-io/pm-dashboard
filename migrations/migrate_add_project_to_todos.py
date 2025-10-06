@@ -7,7 +7,7 @@ import sqlite3
 
 def add_project_column():
     """Add project_key column to todo_items table."""
-    conn = sqlite3.connect('pm_agent.db')
+    conn = sqlite3.connect('../database/pm_agent.db')
     cursor = conn.cursor()
 
     try:

@@ -9,7 +9,7 @@ import os
 
 def clear_meeting_connections():
     """Clear all meeting-project connections from the database."""
-    db_path = "pm_agent.db"
+    db_path = "../database/pm_agent.db"
 
     if not os.path.exists(db_path):
         print(f"Database {db_path} not found")

@@ -1,7 +1,7 @@
 # Autonomous PM Agent - Project Documentation
 
 ## Project Overview
-This is an Autonomous PM Agent that processes Fireflies.ai meeting transcripts, extracts action items using GPT-4, and creates Jira tickets via Model Context Protocol (MCP). The system provides both automated and interactive modes for ticket creation.
+This is an Autonomous PM Agent that processes Fireflies.ai meeting transcripts, extracts action items using AI, and creates Jira tickets via Model Context Protocol (MCP). The system provides both automated and interactive modes for ticket creation.
 
 ## Architecture
 
@@ -158,6 +158,10 @@ colima start
 ### 5. Database Schema Mismatch
 **Problem**: Missing columns after updates
 **Fix**: Run migration script or delete `pm_agent.db` and restart
+
+### 6. Jira Tempo Hours Missing
+**Problem**: Missing hours when summed, compared to Tempo UI
+**Fix**: Refer to /Users/msamimi/syatt/projects/dev-learnings/Jira-integrations/TEMPO_API_INTEGRATION_GUIDE.md for how this was solved
 
 ## Project Structure
 ```

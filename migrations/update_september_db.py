@@ -43,7 +43,7 @@ september_hours = {
 
 def update_database():
     """Update database with correct September hours."""
-    conn = sqlite3.connect('pm_agent.db')
+    conn = sqlite3.connect('../database/pm_agent.db')
     cursor = conn.cursor()
 
     updated = 0

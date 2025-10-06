@@ -34,6 +34,7 @@ ENV/
 
 # Database
 pm_agent.db
+database/*.db
 *.sqlite
 *.sqlite3
 *.db
