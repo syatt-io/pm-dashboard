@@ -1004,8 +1004,9 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
   const notify = useNotify();
   const [forecasts, setForecasts] = useState<{[projectKey: string]: any[]}>({});
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState<{[projectKey: string]: boolean}>({});
+  const [saving, setSaving] = useState(false);
   const [editedForecasts, setEditedForecasts] = useState<{[projectKey: string]: any[]}>({});
+  const [monthHeaders, setMonthHeaders] = useState<string[]>([]);
 
   // Load forecasts when tab becomes active
   useEffect(() => {
@@ -1018,6 +1019,7 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
     setLoading(true);
     try {
       const forecastData: {[projectKey: string]: any[]} = {};
+      let headers: string[] = [];
 
       for (const project of activeProjects) {
         const token = localStorage.getItem('auth_token');
@@ -1031,9 +1033,15 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
         if (response.ok) {
           const data = await response.json();
           forecastData[project.key] = data.data.forecasts;
+
+          // Get month headers from first project
+          if (headers.length === 0 && data.data.forecasts.length > 0) {
+            headers = data.data.forecasts.map((f: any) => getMonthName(f.month_year));
+          }
         }
       }
 
+      setMonthHeaders(headers);
       setForecasts(forecastData);
       setEditedForecasts(JSON.parse(JSON.stringify(forecastData))); // Deep copy
     } catch (error) {
@@ -1056,40 +1064,40 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
     setEditedForecasts(updated);
   };
 
-  const hasChanges = (projectKey: string) => {
-    if (!forecasts[projectKey] || !editedForecasts[projectKey]) return false;
-    return JSON.stringify(forecasts[projectKey]) !== JSON.stringify(editedForecasts[projectKey]);
+  const hasAnyChanges = () => {
+    return JSON.stringify(forecasts) !== JSON.stringify(editedForecasts);
   };
 
-  const handleSave = async (projectKey: string) => {
-    setSaving({ ...saving, [projectKey]: true });
+  const handleSaveAll = async () => {
+    setSaving(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_BASE_URL}/api/jira/project-forecasts/${projectKey}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          forecasts: editedForecasts[projectKey]
-        })
+      const promises = activeProjects.map(async (project) => {
+        const response = await fetch(`${API_BASE_URL}/api/jira/project-forecasts/${project.key}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            forecasts: editedForecasts[project.key]
+          })
+        });
+        return response.ok;
       });
 
-      if (response.ok) {
-        notify('Forecasts saved successfully', { type: 'success' });
-        // Update the original forecasts to match edited
-        setForecasts({
-          ...forecasts,
-          [projectKey]: JSON.parse(JSON.stringify(editedForecasts[projectKey]))
-        });
+      const results = await Promise.all(promises);
+
+      if (results.every(r => r)) {
+        notify('All forecasts saved successfully', { type: 'success' });
+        setForecasts(JSON.parse(JSON.stringify(editedForecasts)));
       } else {
-        notify('Error saving forecasts', { type: 'error' });
+        notify('Some forecasts failed to save', { type: 'error' });
       }
     } catch (error) {
       notify('Error saving forecasts', { type: 'error' });
     } finally {
-      setSaving({ ...saving, [projectKey]: false });
+      setSaving(false);
     }
   };
 
@@ -1112,69 +1120,70 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
 
   return (
     <Box>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        Manage forecasted hours for the next 6 months for all active projects. Changes are saved per project.
-      </Alert>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Alert severity="info" sx={{ flex: 1, mr: 2 }}>
+          Manage forecasted hours for the next 6 months for active projects.
+        </Alert>
+        <MuiButton
+          variant="contained"
+          size="medium"
+          color="primary"
+          disabled={!hasAnyChanges() || saving}
+          onClick={handleSaveAll}
+          startIcon={saving ? <CircularProgress size={16} /> : null}
+          sx={{ minWidth: '150px' }}
+        >
+          {saving ? 'Saving...' : 'Save All'}
+        </MuiButton>
+      </Box>
 
-      {activeProjects.map((project) => (
-        <Box key={project.key} sx={{ mb: 4 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-              {project.name} ({project.key})
-            </Typography>
-            <MuiButton
-              variant="contained"
-              size="small"
-              color="primary"
-              disabled={!hasChanges(project.key) || saving[project.key]}
-              onClick={() => handleSave(project.key)}
-              startIcon={saving[project.key] ? <CircularProgress size={16} /> : null}
-            >
-              {saving[project.key] ? 'Saving...' : 'Save Forecasts'}
-            </MuiButton>
-          </Box>
-
-          <TableContainer component={Paper} sx={{ mb: 2 }}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Month</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Forecasted Hours</TableCell>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Actual Hours</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {editedForecasts[project.key]?.map((forecast, index) => (
-                  <TableRow key={forecast.month_year}>
-                    <TableCell>{getMonthName(forecast.month_year)}</TableCell>
-                    <TableCell>
-                      <input
-                        type="number"
-                        value={forecast.forecasted_hours}
-                        onChange={(e) => handleForecastChange(project.key, index, e.target.value)}
-                        style={{
-                          width: '100px',
-                          padding: '6px',
-                          border: hasChanges(project.key) ? '2px solid #ff9800' : '1px solid #ccc',
-                          borderRadius: '4px',
-                          backgroundColor: hasChanges(project.key) ? '#fff3e0' : 'white'
-                        }}
-                        step="0.5"
-                        min="0"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {forecast.actual_monthly_hours.toFixed(1)}h
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold', minWidth: '200px' }}>Project</TableCell>
+              {monthHeaders.map((month, idx) => (
+                <TableCell key={idx} sx={{ fontWeight: 'bold', textAlign: 'center', minWidth: '120px' }}>
+                  {month}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {activeProjects.map((project) => (
+              <TableRow key={project.key}>
+                <TableCell>
+                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                    {project.name}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {project.key}
+                  </Typography>
+                </TableCell>
+                {editedForecasts[project.key]?.map((forecast, monthIndex) => (
+                  <TableCell key={monthIndex} sx={{ textAlign: 'center' }}>
+                    <input
+                      type="number"
+                      value={forecast.forecasted_hours}
+                      onChange={(e) => handleForecastChange(project.key, monthIndex, e.target.value)}
+                      style={{
+                        width: '80px',
+                        padding: '6px',
+                        border: hasAnyChanges() ? '2px solid #ff9800' : '1px solid #ccc',
+                        borderRadius: '4px',
+                        backgroundColor: hasAnyChanges() ? '#fff3e0' : 'white',
+                        textAlign: 'center'
+                      }}
+                      step="0.5"
+                      min="0"
+                    />
+                  </TableCell>
                 ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };
