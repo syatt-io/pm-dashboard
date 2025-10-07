@@ -1,7 +1,8 @@
 """Context search service for finding information across all integrated sources."""
 
 import logging
-from typing import List, Dict, Any, Optional
+import re
+from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 
@@ -36,6 +37,100 @@ class ContextSearchService:
     def __init__(self):
         """Initialize the context search service."""
         self.logger = logging.getLogger(__name__)
+        self._project_keywords_cache = None
+        self._project_keywords_cache_time = None
+
+    def _get_project_keywords(self) -> Dict[str, List[str]]:
+        """Get project keywords from database with caching.
+
+        Returns:
+            Dict mapping project_key to list of keywords
+        """
+        # Cache for 5 minutes
+        if (self._project_keywords_cache and self._project_keywords_cache_time and
+            (datetime.now() - self._project_keywords_cache_time).total_seconds() < 300):
+            return self._project_keywords_cache
+
+        try:
+            from src.utils.database import get_engine
+            from sqlalchemy import text
+
+            engine = get_engine()
+            project_keywords = {}
+
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT project_key, keyword FROM project_keywords"))
+                for row in result:
+                    project_key = row[0]
+                    keyword = row[1]
+                    if project_key not in project_keywords:
+                        project_keywords[project_key] = []
+                    project_keywords[project_key].append(keyword.lower())
+
+            self._project_keywords_cache = project_keywords
+            self._project_keywords_cache_time = datetime.now()
+            self.logger.info(f"Loaded {len(project_keywords)} project keyword mappings")
+            return project_keywords
+
+        except Exception as e:
+            self.logger.error(f"Error loading project keywords: {e}")
+            return {}
+
+    def _detect_project_and_expand_query(self, query: str) -> Tuple[Optional[str], Set[str]]:
+        """Detect project key in query and expand with related keywords.
+
+        Args:
+            query: Original search query
+
+        Returns:
+            Tuple of (detected_project_key, expanded_keywords_set)
+        """
+        project_keywords = self._get_project_keywords()
+
+        # Extract potential project keys (uppercase words 2-5 chars)
+        potential_keys = re.findall(r'\b[A-Z]{2,5}\b', query.upper())
+
+        detected_project = None
+        all_keywords = set()
+
+        # Check if any potential key exists in our mapping
+        for key in potential_keys:
+            if key in project_keywords:
+                detected_project = key
+                # Add project key and all related keywords
+                all_keywords.add(key.lower())
+                all_keywords.update(project_keywords[key])
+                self.logger.info(f"Detected project {key} with {len(project_keywords[key])} keywords")
+                break
+
+        # Tokenize the query into individual keywords (min 3 chars, exclude common words)
+        query_words = re.findall(r'\b\w{3,}\b', query.lower())
+        stop_words = {'the', 'and', 'for', 'from', 'with', 'about', 'that', 'this', 'have', 'has'}
+        query_keywords = {w for w in query_words if w not in stop_words}
+
+        # Combine query keywords with project keywords
+        all_keywords.update(query_keywords)
+
+        self.logger.info(f"Expanded query '{query}' to {len(all_keywords)} keywords: {list(all_keywords)[:10]}...")
+        return detected_project, all_keywords
+
+    def _score_text_match(self, text: str, keywords: Set[str]) -> Tuple[int, float]:
+        """Score how well text matches the keywords.
+
+        Args:
+            text: Text to score
+            keywords: Set of keywords to match
+
+        Returns:
+            Tuple of (match_count, relevance_score)
+        """
+        text_lower = text.lower()
+        matches = sum(1 for keyword in keywords if keyword in text_lower)
+
+        # Score is percentage of keywords matched
+        relevance_score = matches / len(keywords) if keywords else 0.0
+
+        return matches, relevance_score
 
     async def search(
         self,
@@ -49,36 +144,39 @@ class ContextSearchService:
         Args:
             query: Search query/topic
             days_back: How many days back to search
-            sources: List of sources to search ('slack', 'fireflies', 'jira')
+            sources: List of sources to search ('slack', 'fireflies', 'jira', 'notion')
             user_id: User ID for accessing user-specific credentials
 
         Returns:
             ContextSearchResults with aggregated results
         """
         if sources is None:
-            sources = ['slack', 'fireflies', 'jira']  # Notion disabled (requires Node.js)
+            sources = ['slack', 'fireflies', 'jira', 'notion']
+
+        # Detect project and expand query with keywords
+        detected_project, keywords = self._detect_project_and_expand_query(query)
 
         all_results = []
 
-        # Search each source
+        # Search each source with enhanced keyword matching
         if 'slack' in sources:
-            slack_results = await self._search_slack(query, days_back, user_id)
+            slack_results = await self._search_slack(query, days_back, user_id, keywords)
             all_results.extend(slack_results)
 
         if 'fireflies' in sources:
-            fireflies_results = await self._search_fireflies(query, days_back, user_id)
+            fireflies_results = await self._search_fireflies(query, days_back, user_id, keywords)
             all_results.extend(fireflies_results)
 
         if 'jira' in sources:
-            jira_results = await self._search_jira(query, days_back)
+            jira_results = await self._search_jira(query, days_back, detected_project, keywords)
             all_results.extend(jira_results)
 
         if 'notion' in sources:
-            notion_results = await self._search_notion(query, days_back, user_id)
+            notion_results = await self._search_notion(query, days_back, user_id, keywords)
             all_results.extend(notion_results)
 
-        # Sort by date (most recent first)
-        all_results.sort(key=lambda x: x.date, reverse=True)
+        # Sort by relevance score first, then by date
+        all_results.sort(key=lambda x: (x.relevance_score, x.date), reverse=True)
 
         # Generate AI summary and insights
         summary, key_people, timeline = await self._generate_insights(query, all_results)
@@ -91,12 +189,15 @@ class ContextSearchService:
             timeline=timeline
         )
 
-    async def _search_slack(self, query: str, days_back: int, user_id: Optional[int] = None) -> List[SearchResult]:
+    async def _search_slack(self, query: str, days_back: int, user_id: Optional[int] = None, keywords: Set[str] = None) -> List[SearchResult]:
         """Search Slack messages across channels.
 
         If user has OAuth token, use search.messages API for better results.
         Otherwise fall back to conversations.history with bot token.
         """
+        if keywords is None:
+            keywords = set(query.lower().split())
+
         # Try to use user's Slack OAuth token first
         if user_id:
             try:
@@ -111,14 +212,14 @@ class ContextSearchService:
 
                         if user_token:
                             # Use search.messages API with user token
-                            return await self._search_slack_with_user_token(query, days_back, user_token)
+                            return await self._search_slack_with_user_token(query, days_back, user_token, keywords)
             except Exception as e:
                 self.logger.warning(f"Failed to use user Slack token, falling back to bot token: {e}")
 
         # Fall back to bot token with conversations.history
-        return await self._search_slack_with_bot_token(query, days_back)
+        return await self._search_slack_with_bot_token(query, days_back, keywords)
 
-    async def _search_slack_with_user_token(self, query: str, days_back: int, user_token: str) -> List[SearchResult]:
+    async def _search_slack_with_user_token(self, query: str, days_back: int, user_token: str, keywords: Set[str]) -> List[SearchResult]:
         """Search Slack using user token and search.messages API."""
         try:
             from slack_sdk import WebClient
@@ -130,6 +231,7 @@ class ContextSearchService:
             oldest_timestamp = cutoff_date.timestamp()
 
             # Use Slack's search API (user token only)
+            # Use original query for Slack search, then filter with keywords
             response = client.search_messages(
                 query=query,
                 sort='timestamp',
@@ -150,6 +252,14 @@ class ContextSearchService:
 
                     # Get channel name
                     channel_name = match.get('channel', {}).get('name', 'unknown')
+                    message_text = match.get('text', '')
+
+                    # Score message by keyword matches
+                    match_count, relevance_score = self._score_text_match(message_text, keywords)
+
+                    # Skip messages with very low relevance (less than 20% keyword match)
+                    if relevance_score < 0.2:
+                        continue
 
                     # Build permalink
                     permalink = match.get('permalink', '')
@@ -157,11 +267,11 @@ class ContextSearchService:
                     results.append(SearchResult(
                         source='slack',
                         title=f"#{channel_name}",
-                        content=match.get('text', ''),
+                        content=message_text,
                         date=message_date,
                         url=permalink,
                         author=match.get('username', 'Unknown'),
-                        relevance_score=0.9  # Higher score for real search API
+                        relevance_score=relevance_score + 0.1  # Boost for OAuth search
                     ))
 
             self.logger.info(f"Found {len(results)} Slack messages via user token for query: {query}")
@@ -171,7 +281,7 @@ class ContextSearchService:
             self.logger.error(f"Error searching Slack with user token: {e}")
             return []
 
-    async def _search_slack_with_bot_token(self, query: str, days_back: int) -> List[SearchResult]:
+    async def _search_slack_with_bot_token(self, query: str, days_back: int, keywords: Set[str]) -> List[SearchResult]:
         """Search Slack using bot token and conversations.history.
 
         Note: Bot tokens cannot use search.messages API, so we use conversations.history
@@ -188,13 +298,12 @@ class ContextSearchService:
             oldest_timestamp = str(int(cutoff_date.timestamp()))
 
             results = []
-            query_lower = query.lower()
 
             # Get list of channels the bot is in
             channels_response = client.conversations_list(
                 exclude_archived=True,
                 types="public_channel,private_channel",
-                limit=100
+                limit=200  # Increased from 100 to get more coverage
             )
 
             if not channels_response.get('ok'):
@@ -202,10 +311,10 @@ class ContextSearchService:
                 return []
 
             channels = channels_response.get('channels', [])
-            self.logger.info(f"Searching {len(channels)} Slack channels for query: {query}")
+            self.logger.info(f"Searching {len(channels)} Slack channels with {len(keywords)} keywords")
 
-            # Search through each channel
-            for channel in channels[:20]:  # Limit to 20 channels to avoid rate limits
+            # Search through ALL channels the bot has access to (removed 20 channel limit)
+            for channel in channels:
                 channel_id = channel['id']
                 channel_name = channel['name']
 
@@ -222,12 +331,15 @@ class ContextSearchService:
 
                     messages = history.get('messages', [])
 
-                    # Filter messages that match query
+                    # Filter messages by keyword matching
                     for message in messages:
-                        text = message.get('text', '').lower()
+                        message_text = message.get('text', '')
 
-                        # Skip if query not in message text
-                        if query_lower not in text:
+                        # Score message by keyword matches
+                        match_count, relevance_score = self._score_text_match(message_text, keywords)
+
+                        # Require at least 2 keyword matches OR 30% keyword match
+                        if match_count < 2 and relevance_score < 0.3:
                             continue
 
                         # Parse timestamp
@@ -238,35 +350,41 @@ class ContextSearchService:
                         user_id = message.get('user', 'Unknown')
 
                         # Build permalink
-                        permalink_response = client.chat_getPermalink(
-                            channel=channel_id,
-                            message_ts=message.get('ts')
-                        )
-                        permalink = permalink_response.get('permalink', '') if permalink_response.get('ok') else ''
+                        try:
+                            permalink_response = client.chat_getPermalink(
+                                channel=channel_id,
+                                message_ts=message.get('ts')
+                            )
+                            permalink = permalink_response.get('permalink', '') if permalink_response.get('ok') else ''
+                        except Exception:
+                            permalink = ''
 
                         results.append(SearchResult(
                             source='slack',
                             title=f"#{channel_name}",
-                            content=message.get('text', ''),
+                            content=message_text,
                             date=message_date,
                             url=permalink,
                             author=user_id,
-                            relevance_score=0.8
+                            relevance_score=relevance_score
                         ))
 
                 except Exception as e:
                     self.logger.warning(f"Error searching channel {channel_name}: {e}")
                     continue
 
-            self.logger.info(f"Found {len(results)} Slack messages for query: {query}")
+            self.logger.info(f"Found {len(results)} Slack messages for query with keywords: {list(keywords)[:5]}")
             return results
 
         except Exception as e:
             self.logger.error(f"Error searching Slack: {e}")
             return []
 
-    async def _search_fireflies(self, query: str, days_back: int, user_id: Optional[int] = None) -> List[SearchResult]:
+    async def _search_fireflies(self, query: str, days_back: int, user_id: Optional[int] = None, keywords: Set[str] = None) -> List[SearchResult]:
         """Search Fireflies meeting transcripts."""
+        if keywords is None:
+            keywords = set(query.lower().split())
+
         try:
             from src.integrations.fireflies import FirefliesClient
             from config.settings import settings
@@ -296,7 +414,6 @@ class ContextSearchService:
             meetings = client.get_recent_meetings(days_back=days_back)
 
             results = []
-            query_lower = query.lower()
 
             for meeting in meetings:
                 # Get full transcript
@@ -304,30 +421,41 @@ class ContextSearchService:
                 if not transcript:
                     continue
 
-                # Search in transcript
-                transcript_text = transcript.transcript.lower()
-                if query_lower in transcript_text or query_lower in meeting.get('title', '').lower():
-                    # Extract relevant snippet
-                    snippet = self._extract_snippet(transcript.transcript, query, max_length=300)
+                # Search in transcript with keyword matching
+                meeting_title = meeting.get('title', '')
+                combined_text = f"{meeting_title} {transcript.transcript}"
 
-                    results.append(SearchResult(
-                        source='fireflies',
-                        title=meeting.get('title', 'Untitled Meeting'),
-                        content=snippet,
-                        date=transcript.date,
-                        author=', '.join(transcript.attendees[:3]) if transcript.attendees else None,
-                        relevance_score=0.9  # Meeting transcripts are very valuable
-                    ))
+                # Score by keyword matches
+                match_count, relevance_score = self._score_text_match(combined_text, keywords)
 
-            self.logger.info(f"Found {len(results)} Fireflies meetings for query: {query}")
+                # Require at least 2 keyword matches OR 30% match
+                if match_count < 2 and relevance_score < 0.3:
+                    continue
+
+                # Extract relevant snippet around keywords
+                snippet = self._extract_snippet(transcript.transcript, ' '.join(keywords), max_length=300)
+
+                results.append(SearchResult(
+                    source='fireflies',
+                    title=meeting_title or 'Untitled Meeting',
+                    content=snippet,
+                    date=transcript.date,
+                    author=', '.join(transcript.attendees[:3]) if transcript.attendees else None,
+                    relevance_score=relevance_score + 0.1  # Meeting transcripts are valuable
+                ))
+
+            self.logger.info(f"Found {len(results)} Fireflies meetings with keyword matches")
             return results
 
         except Exception as e:
             self.logger.error(f"Error searching Fireflies: {e}")
             return []
 
-    async def _search_jira(self, query: str, days_back: int) -> List[SearchResult]:
-        """Search Jira issues and comments."""
+    async def _search_jira(self, query: str, days_back: int, project_key: Optional[str] = None, keywords: Set[str] = None) -> List[SearchResult]:
+        """Search Jira issues and comments with project filtering."""
+        if keywords is None:
+            keywords = set(query.lower().split())
+
         try:
             from src.integrations.jira_mcp import JiraMCPClient
             from config.settings import settings
@@ -341,8 +469,17 @@ class ContextSearchService:
             # Calculate date filter
             cutoff_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
 
-            # JQL query to search summary, description, and comments
-            jql = f'text ~ "{query}" AND updated >= {cutoff_date} ORDER BY updated DESC'
+            # Build JQL query with project filter if detected
+            # Use individual keywords for better matching
+            keyword_queries = [f'text ~ "{kw}"' for kw in list(keywords)[:5]]  # Limit to 5 keywords
+            keyword_jql = ' OR '.join(keyword_queries) if keyword_queries else f'text ~ "{query}"'
+
+            # Add project filter if project key detected
+            project_filter = f' AND project = {project_key}' if project_key else ''
+
+            jql = f'({keyword_jql}){project_filter} AND updated >= {cutoff_date} ORDER BY updated DESC'
+
+            self.logger.info(f"Jira search JQL: {jql}")
 
             # Search issues
             issues = jira_client.search_issues(jql, max_results=50)
@@ -358,6 +495,11 @@ class ContextSearchService:
                 # Create snippet from summary + description
                 summary = fields.get('summary', '')
                 description = fields.get('description', '')
+                combined_text = f"{summary} {description}"
+
+                # Score by keyword matches
+                match_count, relevance_score = self._score_text_match(combined_text, keywords)
+
                 snippet = f"{summary}\n{description[:200]}..." if description else summary
 
                 results.append(SearchResult(
@@ -367,28 +509,124 @@ class ContextSearchService:
                     date=updated_date,
                     url=f"{settings.jira.url}/browse/{issue['key']}",
                     author=fields.get('reporter', {}).get('displayName', 'Unknown'),
-                    relevance_score=0.85
+                    relevance_score=relevance_score
                 ))
 
-            self.logger.info(f"Found {len(results)} Jira issues for query: {query}")
+            project_msg = f" in project {project_key}" if project_key else ""
+            self.logger.info(f"Found {len(results)} Jira issues{project_msg}")
             return results
 
         except Exception as e:
             self.logger.error(f"Error searching Jira: {e}")
             return []
 
-    async def _search_notion(self, query: str, days_back: int, user_id: Optional[int] = None) -> List[SearchResult]:
-        """Search Notion pages and databases.
+    async def _search_notion(self, query: str, days_back: int, user_id: Optional[int] = None, keywords: Set[str] = None) -> List[SearchResult]:
+        """Search Notion pages and databases using the Notion API."""
+        if keywords is None:
+            keywords = set(query.lower().split())
 
-        Note: Notion integration requires Node.js/npx to be installed in the backend
-        environment for the MCP server. This is not currently available in production.
-        For now, we skip Notion search.
-        """
-        self.logger.warning(
-            "Notion search requires Node.js/npx in the backend environment. "
-            "This is not available in the current deployment. Skipping Notion search."
-        )
-        return []
+        try:
+            # Get user's Notion API key
+            if not user_id:
+                self.logger.info("No user_id provided for Notion search, skipping")
+                return []
+
+            from src.models.user import User
+            from src.utils.database import session_scope
+
+            api_key = None
+            with session_scope() as db_session:
+                user = db_session.query(User).filter_by(id=user_id).first()
+                if user and user.has_notion_api_key():
+                    api_key = user.get_notion_api_key()
+
+            if not api_key:
+                self.logger.info("No Notion API key found for user, skipping Notion search")
+                return []
+
+            # Use Notion API to search
+            import requests
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Notion-Version": "2022-06-28",
+                "Content-Type": "application/json"
+            }
+
+            # Calculate date filter
+            cutoff_date = datetime.now() - timedelta(days=days_back)
+
+            # Search Notion with query
+            search_payload = {
+                "query": query,
+                "filter": {
+                    "value": "page",
+                    "property": "object"
+                },
+                "sort": {
+                    "direction": "descending",
+                    "timestamp": "last_edited_time"
+                }
+            }
+
+            response = requests.post(
+                "https://api.notion.com/v1/search",
+                headers=headers,
+                json=search_payload,
+                timeout=10
+            )
+
+            if not response.ok:
+                self.logger.error(f"Notion API error: {response.status_code} - {response.text}")
+                return []
+
+            data = response.json()
+            results = []
+
+            for page in data.get('results', []):
+                # Get last edited time
+                last_edited = page.get('last_edited_time', '')
+                if last_edited:
+                    page_date = datetime.fromisoformat(last_edited.replace('Z', '+00:00'))
+
+                    # Skip if too old
+                    if page_date < cutoff_date:
+                        continue
+                else:
+                    page_date = datetime.now()
+
+                # Get page title
+                title_property = page.get('properties', {}).get('title', {})
+                title_content = title_property.get('title', [])
+                title = title_content[0].get('plain_text', 'Untitled') if title_content else 'Untitled'
+
+                # Get page URL
+                url = page.get('url', '')
+
+                # For content, we'd need to fetch the page content separately
+                # For now, just use the title for keyword matching
+                match_count, relevance_score = self._score_text_match(title, keywords)
+
+                # Skip pages with very low relevance
+                if relevance_score < 0.2:
+                    continue
+
+                results.append(SearchResult(
+                    source='notion',
+                    title=title,
+                    content=f"Notion page: {title}",
+                    date=page_date,
+                    url=url,
+                    author=None,
+                    relevance_score=relevance_score
+                ))
+
+            self.logger.info(f"Found {len(results)} Notion pages")
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Error searching Notion: {e}")
+            return []
 
     def _extract_snippet(self, text: str, query: str, max_length: int = 300) -> str:
         """Extract a relevant snippet from text around the query."""
