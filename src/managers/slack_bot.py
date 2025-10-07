@@ -1885,10 +1885,13 @@ class SlackTodoBot:
                 # Format date
                 date_str = result.date.strftime('%Y-%m-%d')
 
-                # Build result text with citation number
+                # Build result text with citation number - simplified format
                 result_text = f"*[{i}]* {source_emoji} *{result.title}*\n"
-                result_text += f"_{date_str}_ • _{result.author or 'Unknown'}_\n"
-                result_text += f"{result.content[:150]}..."
+                result_text += f"_{date_str}_"
+
+                # Add author if available
+                if result.author:
+                    result_text += f" • _{result.author}_"
 
                 # Add URL if available
                 if result.url:

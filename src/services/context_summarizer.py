@@ -36,7 +36,7 @@ class ContextSummarizer:
     def __init__(self):
         """Initialize summarizer with OpenAI client."""
         self.client = AsyncOpenAI(api_key=settings.ai.api_key)
-        self.model = "gpt-4o-mini"  # Fast and cost-effective
+        self.model = settings.ai.model  # Use configured model from OPENAI_MODEL env variable
 
     async def summarize(
         self,
@@ -101,15 +101,15 @@ class ContextSummarizer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that creates concise, accurate summaries with inline citations."
+                        "content": "You are an expert technical analyst that creates comprehensive, detailed summaries from project documentation. Your summaries should be thorough enough that engineers can spec and build features without needing to reference source material. Extract ALL relevant technical details, decisions, requirements, and context."
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                temperature=0.3,  # Lower temperature for more factual summaries
-                max_tokens=1500
+                temperature=0.2,  # Very low temperature for maximum factual accuracy
+                max_tokens=4000  # Increased from 1500 to allow comprehensive summaries
             )
 
             # Extract response
@@ -160,17 +160,42 @@ class ContextSummarizer:
 CONTEXT FROM SEARCH RESULTS:
 {context_text}
 
+GOAL:
+Create a COMPREHENSIVE summary that provides ALL the context needed to understand and work on this topic. The reader should NOT need to reference the source material. Think deeply about the topic and extract every relevant detail.
+
 TASK:
-Generate a concise summary that:
-1. Answers the query directly using information from the sources
-2. Uses inline citations [1], [2], etc. after each claim
-3. Highlights the most relevant information first
-4. Identifies key people mentioned
-5. Creates a timeline of significant events (if applicable)
+Generate a detailed, thorough summary that:
+1. **Provides complete context**: What is being discussed? What's the background?
+2. **Extracts ALL technical details**: Requirements, specifications, implementations, integrations, APIs, data structures, UI elements, business logic
+3. **Captures decisions made**: What was decided? Why? What alternatives were considered?
+4. **Identifies blockers and issues**: What problems exist? What's being tested? What's pending?
+5. **Includes specific examples**: Ticket numbers, URLs, specific features mentioned, code references
+6. **Documents requirements**: What needs to be built? What are the acceptance criteria?
+7. **Notes dependencies**: What depends on what? What needs to happen first?
+8. **Preserves technical accuracy**: Use exact terminology, keep technical details precise
+9. **Uses inline citations [1], [2]** after EVERY claim to maintain traceability
+10. **Organizes information logically**: Most important/relevant first, then supporting details
+
+FOR JIRA TICKETS:
+- Include ticket numbers, status, and assignees
+- Extract ALL requirements and acceptance criteria from descriptions AND comments
+- Note any blockers, dependencies, or related tickets mentioned
+- Capture implementation details discussed in comments
+
+FOR MEETINGS (Fireflies):
+- Capture decisions made and rationale
+- Note action items and owners
+- Extract technical discussions and specifications mentioned
+- Include any demos or reviews discussed
+
+FOR SLACK CONVERSATIONS:
+- Capture questions asked and answers provided
+- Note any decisions or consensus reached
+- Extract technical details shared in discussions
 
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 SUMMARY:
-[Your summary here with inline citations [1], [2], etc.]
+[Comprehensive multi-paragraph summary with inline citations [1], [2], etc. Include ALL relevant details organized logically. Aim for 400-800 words if needed to be thorough.]
 
 KEY_PEOPLE:
 - Person Name 1
@@ -182,12 +207,16 @@ TIMELINE:
 CONFIDENCE: high|medium|low
 
 GUIDELINES:
-- Keep summary under 300 words
-- Use direct quotes sparingly, prioritize paraphrasing
-- Only cite sources that support each specific claim
-- Confidence = high if sources are direct/recent, medium if partial, low if sparse
+- Be COMPREHENSIVE - include ALL pertinent details from sources
+- Aim for 400-800 words for complex topics (longer is better if information-dense)
+- Organize into logical paragraphs by topic/theme
+- Use precise technical terminology
+- Cite sources [1], [2] after every factual claim
+- If a Jira ticket is mentioned, include its key and status
+- Confidence = high if sources are direct/recent/complete, medium if partial, low if sparse
 - If no timeline is relevant, write "TIMELINE: None"
 - If no people are mentioned, write "KEY_PEOPLE: None"
+- Think step-by-step through the sources to ensure you don't miss any important details
 """
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:

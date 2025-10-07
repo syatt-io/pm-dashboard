@@ -1,5 +1,20 @@
 # Autonomous PM Agent - Project Documentation
 
+## ⚠️ CRITICAL PRODUCTION WARNING ⚠️
+
+**NEVER override production environment variables with placeholder values (YOUR_API_KEY, etc.) without explicit permission!**
+
+When working with `.do/app.yaml` or any production configuration files:
+- NEVER change actual API tokens/secrets to placeholders
+- NEVER commit changes that replace real values with "YOUR_*" placeholders
+- If you need to reference environment variables in documentation, use the local `.env.example` file
+- Production secrets should only be updated via DigitalOcean App Platform console or `doctl` CLI
+- Always verify environment variable changes won't break production deployments
+
+**This is critical**: Replacing production secrets with placeholders can cause complete service outages and require emergency secret rotation across all services (Slack, Jira, Google OAuth, etc.), wasting significant time and potentially exposing the application to security risks.
+
+---
+
 ## Project Overview
 This is an Autonomous PM Agent that processes Fireflies.ai meeting transcripts, extracts action items using AI, and creates Jira tickets via Model Context Protocol (MCP). The system provides both automated and interactive modes for ticket creation.
 
