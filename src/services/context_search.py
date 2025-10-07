@@ -894,22 +894,19 @@ class ContextSearchService:
                 api_token=settings.jira.api_token
             )
 
-            # Calculate date filter
-            cutoff_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+            # Build JQL query - SIMPLE project filter only
+            # The fuzzy search operators (~) cause 410 Gone errors via REST API
+            # Instead we just filter by project and date, then use semantic matching after retrieval
+            # This is similar to how Fireflies works - pre-filter by project, then semantic match
 
-            # Build JQL query with keyword OR logic for better recall
-            # Combine all keywords for JQL search
-            all_keywords = list(project_keywords | topic_keywords)
-            if all_keywords:
-                keyword_queries = [f'text ~ "{kw}"' for kw in all_keywords[:10]]  # Limit to 10 keywords
-                keyword_jql = ' OR '.join(keyword_queries)
+            # Use -Xd format for date (Jira relative date syntax) instead of absolute dates
+            # This matches what the digest feature uses successfully
+            if project_key:
+                jql = f'project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC'
             else:
-                keyword_jql = f'text ~ "{query}"'
-
-            # Add project filter if project key detected
-            project_filter = f' AND project = {project_key}' if project_key else ''
-
-            jql = f'({keyword_jql}){project_filter} AND updated >= {cutoff_date} ORDER BY updated DESC'
+                # No project detected - skip Jira search entirely (too broad)
+                self.logger.info("Skipping Jira search - no project detected")
+                return []
 
             self.logger.info(f"Jira search JQL: {jql}")
 
@@ -926,7 +923,12 @@ class ContextSearchService:
 
                 # Create snippet from summary + description + comments
                 summary = fields.get('summary', '')
-                description = fields.get('description', '')
+                description_raw = fields.get('description', '')
+                # Handle ADF format for description
+                if isinstance(description_raw, dict):
+                    description = self._extract_text_from_adf(description_raw)
+                else:
+                    description = description_raw or ''
 
                 # Extract and combine comment bodies
                 comments = fields.get('comments', [])

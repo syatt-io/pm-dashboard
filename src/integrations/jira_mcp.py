@@ -145,20 +145,21 @@ class JiraMCPClient:
             List of issue dictionaries (with comments in fields if expand_comments=True)
         """
         try:
-            # Try direct Jira API call first
+            # Try direct Jira API call first (multi-word keywords filtered out at JQL build time)
             if self.jira_url and self.username and self.api_token:
                 import base64
                 auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
 
-                # Build params - use specific fields instead of *all to avoid 410 errors
+                # Build params for new /search/jql endpoint (old /search was deprecated)
+                # This endpoint returns minimal data, so we need to fetch full issue details after
                 params = {
                     "jql": jql,
-                    "maxResults": max_results,
-                    "fields": "summary,description,updated,status,assignee,reporter,created,labels,priority"
+                    "maxResults": max_results
                 }
 
+                # Step 1: Get issue IDs using new /search/jql endpoint
                 response = await self.client.get(
-                    f"{self.jira_url}/rest/api/3/search",
+                    f"{self.jira_url}/rest/api/3/search/jql",
                     params=params,
                     headers={
                         "Authorization": f"Basic {auth_string}",
@@ -167,7 +168,37 @@ class JiraMCPClient:
                 )
                 response.raise_for_status()
 
-                result = response.json()
+                search_result = response.json()
+                issue_ids = [issue.get('id') for issue in search_result.get('issues', [])]
+
+                if not issue_ids:
+                    return []
+
+                # Step 2: Fetch full issue details for each ID using /issue endpoint
+                # The /search/jql endpoint doesn't support fields parameter
+                # So we need to fetch each issue individually (or use bulk GET if available)
+                issues = []
+                for issue_id in issue_ids:
+                    try:
+                        issue_response = await self.client.get(
+                            f"{self.jira_url}/rest/api/3/issue/{issue_id}",
+                            params={
+                                "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project,comment"
+                            },
+                            headers={
+                                "Authorization": f"Basic {auth_string}",
+                                "Accept": "application/json"
+                            }
+                        )
+                        issue_response.raise_for_status()
+                        issue_data = issue_response.json()
+                        issues.append(issue_data)
+                    except Exception as e:
+                        logger.warning(f"Failed to fetch issue {issue_id}: {e}")
+                        continue
+
+                # Create result dict that matches the original structure
+                result = {"issues": issues}
 
                 # If comments requested, fetch them separately (Jira API requires separate calls)
                 issues = result.get("issues", [])
