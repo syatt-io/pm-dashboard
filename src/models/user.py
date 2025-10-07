@@ -26,6 +26,7 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False)
     name = Column(String(255), nullable=False)
     google_id = Column(String(255), unique=True, nullable=False)
+    slack_user_id = Column(String(50), unique=True, nullable=True)  # Slack user ID for mapping
     role = Column(Enum(UserRole), default=UserRole.NO_ACCESS, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

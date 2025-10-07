@@ -853,38 +853,32 @@ class SlackTodoBot:
             return None
 
     def _map_slack_user_to_app_user(self, slack_user_id: str) -> Optional[int]:
-        """Map Slack user to app user by email.
+        """Map Slack user to app user by slack_user_id.
 
         Args:
             slack_user_id: Slack user ID
 
         Returns:
-            App user ID if found, None otherwise
+            App user ID if found, None otherwise (falls back to global credentials)
         """
         try:
-            # Get Slack user's email
-            email = self._get_user_email(slack_user_id)
-            if not email:
-                logger.warning(f"No email found for Slack user {slack_user_id}")
-                return None
-
-            # Look up app user by email using shared engine
             from src.models.user import User
             from src.utils.database import get_engine
             from sqlalchemy.orm import sessionmaker
 
-            # Use the shared global engine instead of creating a new one
+            # Use the shared global engine
             engine = get_engine()
             Session = sessionmaker(bind=engine)
             session = Session()
 
             try:
-                user = session.query(User).filter(User.email == email).first()
+                # Look up user by Slack user ID
+                user = session.query(User).filter(User.slack_user_id == slack_user_id).first()
                 if user:
-                    logger.info(f"Mapped Slack user {slack_user_id} ({email}) to app user {user.id}")
+                    logger.info(f"Mapped Slack user {slack_user_id} to app user {user.id} ({user.email})")
                     return user.id
                 else:
-                    logger.warning(f"No app user found with email {email}")
+                    logger.info(f"No app user found for Slack user {slack_user_id}. Using global credentials.")
                     return None
             finally:
                 session.close()

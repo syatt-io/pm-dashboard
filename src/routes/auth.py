@@ -560,7 +560,7 @@ def create_auth_blueprint(db_session_factory):
                 'user_id': authed_user.get('id')
             }
 
-            # Update user with OAuth token
+            # Update user with OAuth token and Slack user ID
             db_session = db_session_factory()
             try:
                 from src.models.user import User
@@ -568,6 +568,12 @@ def create_auth_blueprint(db_session_factory):
                 if not user:
                     logger.error(f"User {user_id} not found during Slack OAuth callback")
                     raise ValueError("User not found")
+
+                # Store the Slack user ID for command mapping
+                slack_user_id = authed_user.get('id')
+                if slack_user_id:
+                    user.slack_user_id = slack_user_id
+                    logger.info(f"Stored Slack user ID {slack_user_id} for user {user_id}")
 
                 user.set_slack_user_token(token_info)
                 db_session.commit()
