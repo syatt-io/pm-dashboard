@@ -1471,7 +1471,7 @@ class SlackTodoBot:
             return {
                 "text": f"✅ Learning saved{category_str}!\n\n"
                        f"💡 *{content}*\n"
-                       f"_ID: {learning.id[:8]}_"
+                       f"_ID: {learning.id}_"
             }
 
         except Exception as e:
