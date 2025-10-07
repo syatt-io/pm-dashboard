@@ -133,21 +133,37 @@ class JiraMCPClient:
             logger.error(f"Error fetching ticket {ticket_key}: {e}")
             return {"success": False, "error": str(e)}
 
-    async def search_tickets(self, jql: str, max_results: int = 50) -> List[Dict[str, Any]]:
-        """Search tickets using JQL."""
+    async def search_tickets(self, jql: str, max_results: int = 50, expand_comments: bool = False) -> List[Dict[str, Any]]:
+        """Search tickets using JQL.
+
+        Args:
+            jql: JQL query string
+            max_results: Maximum number of results to return
+            expand_comments: If True, fetch and include comments for each issue
+
+        Returns:
+            List of issue dictionaries (with comments in fields if expand_comments=True)
+        """
         try:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
                 auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
 
+                # Build params with optional comment expansion
+                params = {
+                    "jql": jql,
+                    "maxResults": max_results,
+                    "fields": "*all"
+                }
+
+                # Add comment expansion if requested
+                if expand_comments:
+                    params["expand"] = "renderedFields"  # Gets rendered comment bodies
+
                 response = await self.client.get(
-                    f"{self.jira_url}/rest/api/3/search/jql",
-                    params={
-                        "jql": jql,
-                        "maxResults": max_results,
-                        "fields": "*all"
-                    },
+                    f"{self.jira_url}/rest/api/3/search",
+                    params=params,
                     headers={
                         "Authorization": f"Basic {auth_string}",
                         "Accept": "application/json"
@@ -156,8 +172,36 @@ class JiraMCPClient:
                 response.raise_for_status()
 
                 result = response.json()
-                logger.info(f"Retrieved {len(result.get('issues', []))} tickets via direct API for JQL: {jql}")
-                return result.get("issues", [])
+
+                # If comments requested, fetch them separately (Jira API requires separate calls)
+                issues = result.get("issues", [])
+                if expand_comments and issues:
+                    # Fetch comments for each issue
+                    for issue in issues:
+                        issue_key = issue.get("key")
+                        try:
+                            comments_response = await self.client.get(
+                                f"{self.jira_url}/rest/api/3/issue/{issue_key}/comment",
+                                headers={
+                                    "Authorization": f"Basic {auth_string}",
+                                    "Accept": "application/json"
+                                }
+                            )
+                            comments_response.raise_for_status()
+                            comments_data = comments_response.json()
+
+                            # Add comments to issue fields
+                            if "fields" not in issue:
+                                issue["fields"] = {}
+                            issue["fields"]["comments"] = comments_data.get("comments", [])
+                        except Exception as e:
+                            logger.warning(f"Error fetching comments for {issue_key}: {e}")
+                            if "fields" not in issue:
+                                issue["fields"] = {}
+                            issue["fields"]["comments"] = []
+
+                logger.info(f"Retrieved {len(issues)} tickets via direct API for JQL: {jql}{' with comments' if expand_comments else ''}")
+                return issues
 
             # Fallback to MCP
             mcp_request = {
@@ -181,6 +225,14 @@ class JiraMCPClient:
         except Exception as e:
             logger.error(f"Error searching tickets: {e}")
             return []
+
+    async def search_issues(self, jql: str, max_results: int = 50, expand_comments: bool = False) -> Dict[str, Any]:
+        """Alias for search_tickets that returns result in dict format with 'issues' key.
+
+        This maintains backward compatibility with existing code.
+        """
+        issues = await self.search_tickets(jql, max_results, expand_comments)
+        return {"issues": issues}
 
     async def add_comment(self, ticket_key: str, comment: str) -> Dict[str, Any]:
         """Add a comment to a ticket."""

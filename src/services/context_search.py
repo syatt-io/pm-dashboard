@@ -894,8 +894,8 @@ class ContextSearchService:
 
             self.logger.info(f"Jira search JQL: {jql}")
 
-            # Search issues
-            issues = jira_client.search_issues(jql, max_results=50)
+            # Search issues with comments expanded
+            issues = await jira_client.search_issues(jql, max_results=50, expand_comments=True)
 
             results = []
             for issue in issues.get('issues', []):
@@ -905,10 +905,24 @@ class ContextSearchService:
                 updated_str = fields.get('updated', '')
                 updated_date = datetime.fromisoformat(updated_str.replace('Z', '+00:00')) if updated_str else datetime.now()
 
-                # Create snippet from summary + description
+                # Create snippet from summary + description + comments
                 summary = fields.get('summary', '')
                 description = fields.get('description', '')
-                combined_text = f"{summary} {description}"
+
+                # Extract and combine comment bodies
+                comments = fields.get('comments', [])
+                comment_text = ""
+                if comments:
+                    comment_bodies = []
+                    for comment in comments[:10]:  # Limit to 10 most recent comments to avoid token explosion
+                        body = comment.get('body', '')
+                        if isinstance(body, dict):
+                            # Handle ADF (Atlassian Document Format) - extract text content
+                            body = self._extract_text_from_adf(body)
+                        comment_bodies.append(body)
+                    comment_text = " ".join(comment_bodies)
+
+                combined_text = f"{summary} {description} {comment_text}"
 
                 # Score with hybrid semantic matching
                 proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(combined_text, query, project_keywords, topic_keywords, debug)
@@ -1077,6 +1091,36 @@ class ContextSearchService:
             snippet = snippet + '...'
 
         return snippet
+
+    def _extract_text_from_adf(self, adf_content: Dict[str, Any]) -> str:
+        """Extract plain text from Atlassian Document Format (ADF) JSON.
+
+        Args:
+            adf_content: ADF JSON structure
+
+        Returns:
+            Plain text extracted from ADF content
+        """
+        if not isinstance(adf_content, dict):
+            return str(adf_content)
+
+        text_parts = []
+
+        # Handle different ADF node types
+        node_type = adf_content.get('type', '')
+
+        # Direct text nodes
+        if node_type == 'text':
+            text_parts.append(adf_content.get('text', ''))
+
+        # Recurse into content array
+        if 'content' in adf_content and isinstance(adf_content['content'], list):
+            for child in adf_content['content']:
+                text_parts.append(self._extract_text_from_adf(child))
+
+        # Join with spaces and clean up
+        text = ' '.join(filter(None, text_parts))
+        return text.strip()
 
     async def _generate_insights(
         self,
