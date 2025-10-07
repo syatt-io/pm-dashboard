@@ -2,9 +2,11 @@
 
 import logging
 import re
+import hashlib
 from typing import List, Dict, Any, Optional, Set, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,8 @@ class ContextSearchService:
         self.logger = logging.getLogger(__name__)
         self._project_keywords_cache = None
         self._project_keywords_cache_time = None
+        self._embedding_cache = {}  # Cache embeddings: hash(text) -> (embedding, timestamp)
+        self._embedding_cache_ttl = 3600  # 1 hour cache TTL
 
     def _get_project_keywords(self) -> Dict[str, List[str]]:
         """Get project keywords from database with caching.
@@ -113,6 +117,85 @@ class ContextSearchService:
         self.logger.info(f"Query '{query}' → Project keywords: {list(project_keywords)[:5]}, Topic keywords: {list(topic_keywords)}")
         return detected_project, project_keywords, topic_keywords
 
+    def _get_text_hash(self, text: str) -> str:
+        """Generate a hash for text to use as cache key."""
+        return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+    def _get_embedding(self, text: str) -> Optional[List[float]]:
+        """Get embedding for text with caching.
+
+        Args:
+            text: Text to embed
+
+        Returns:
+            Embedding vector or None if error
+        """
+        if not text or not text.strip():
+            return None
+
+        # Truncate long text to ~8000 chars (OpenAI limit is ~8191 tokens)
+        text = text[:8000]
+
+        # Check cache
+        text_hash = self._get_text_hash(text)
+        if text_hash in self._embedding_cache:
+            cached_embedding, cached_time = self._embedding_cache[text_hash]
+            # Check if cache is still valid
+            if (datetime.now() - cached_time).total_seconds() < self._embedding_cache_ttl:
+                return cached_embedding
+            else:
+                # Remove stale cache entry
+                del self._embedding_cache[text_hash]
+
+        try:
+            from openai import OpenAI
+            from config.settings import settings
+
+            client = OpenAI(api_key=settings.ai.api_key)
+
+            response = client.embeddings.create(
+                model="text-embedding-3-small",  # Fast, cheap, good quality
+                input=text
+            )
+
+            embedding = response.data[0].embedding
+
+            # Cache the embedding
+            self._embedding_cache[text_hash] = (embedding, datetime.now())
+
+            return embedding
+
+        except Exception as e:
+            self.logger.error(f"Error getting embedding: {e}")
+            return None
+
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """Calculate cosine similarity between two vectors.
+
+        Args:
+            vec1: First vector
+            vec2: Second vector
+
+        Returns:
+            Similarity score between -1 and 1 (higher is more similar)
+        """
+        try:
+            v1 = np.array(vec1)
+            v2 = np.array(vec2)
+
+            dot_product = np.dot(v1, v2)
+            norm1 = np.linalg.norm(v1)
+            norm2 = np.linalg.norm(v2)
+
+            if norm1 == 0 or norm2 == 0:
+                return 0.0
+
+            return float(dot_product / (norm1 * norm2))
+
+        except Exception as e:
+            self.logger.error(f"Error calculating cosine similarity: {e}")
+            return 0.0
+
     def _score_text_match(self, text: str, keywords: Set[str]) -> Tuple[int, float]:
         """Score how well text matches the keywords.
 
@@ -168,6 +251,72 @@ class ContextSearchService:
 
         return project_matches, topic_matches, relevance_score, passes_threshold
 
+    def _score_text_match_semantic(
+        self,
+        text: str,
+        query: str,
+        project_keywords: Set[str],
+        topic_keywords: Set[str]
+    ) -> Tuple[int, float, float, bool]:
+        """Hybrid scoring: keyword matching for project, semantic similarity for topic.
+
+        Args:
+            text: Text to score
+            query: Original query string (for embedding)
+            project_keywords: Project-related keywords
+            topic_keywords: Topic keywords (used to build topic query for embedding)
+
+        Returns:
+            Tuple of (project_matches, semantic_similarity, relevance_score, passes_threshold)
+        """
+        text_lower = text.lower()
+
+        # 1. Project keyword matching (fast, exact)
+        project_matches = sum(1 for kw in project_keywords if kw in text_lower)
+
+        # Must have at least 1 project match
+        if project_matches == 0:
+            return 0, 0.0, 0.0, False
+
+        # 2. Semantic similarity for topic (understands meaning)
+        # Build topic query from topic keywords
+        topic_query = ' '.join(topic_keywords) if topic_keywords else query
+
+        # Get embeddings
+        query_embedding = self._get_embedding(topic_query)
+        text_embedding = self._get_embedding(text)
+
+        if query_embedding is None or text_embedding is None:
+            # Fallback to keyword matching if embedding fails
+            self.logger.warning("Embedding failed, falling back to keyword matching")
+            topic_matches = sum(1 for kw in topic_keywords if kw in text_lower)
+            if topic_matches == 0:
+                return project_matches, 0.0, 0.0, False
+
+            # Keyword-based scoring as fallback
+            total_keywords = len(project_keywords) + len(topic_keywords) * 3
+            weighted_matches = project_matches + (topic_matches * 3)
+            relevance_score = weighted_matches / total_keywords if total_keywords > 0 else 0.0
+            passes_threshold = relevance_score >= 0.3
+            return project_matches, 0.0, relevance_score, passes_threshold
+
+        # Calculate semantic similarity (0-1, where 1 is identical)
+        semantic_similarity = self._cosine_similarity(query_embedding, text_embedding)
+
+        # Normalize to 0-1 range (cosine similarity is -1 to 1, but usually 0-1 for text)
+        semantic_similarity = max(0.0, semantic_similarity)
+
+        # 3. Combined scoring
+        # Project match: binary (has match or not) - weight 0.2
+        # Semantic similarity: continuous 0-1 - weight 0.8
+        relevance_score = (0.2 if project_matches > 0 else 0.0) + (0.8 * semantic_similarity)
+
+        # Passes threshold if semantic similarity >= 0.4 (40% similar)
+        # This is more lenient than exact keyword matching to allow semantic matches
+        passes_threshold = semantic_similarity >= 0.4
+
+        return project_matches, semantic_similarity, relevance_score, passes_threshold
+
     async def search(
         self,
         query: str,
@@ -194,7 +343,7 @@ class ContextSearchService:
 
         all_results = []
 
-        # Search each source with two-tier keyword matching
+        # Search each source with hybrid semantic + keyword matching
         if 'slack' in sources:
             slack_results = await self._search_slack(query, days_back, user_id, project_keywords, topic_keywords)
             all_results.extend(slack_results)
@@ -314,12 +463,12 @@ class ContextSearchService:
                     channel_name = match.get('channel', {}).get('name', 'unknown')
                     message_text = match.get('text', '')
 
-                    # Score message with two-tier matching
-                    proj_matches, topic_matches, relevance_score, passes = self._score_text_match_two_tier(
-                        message_text, project_keywords, topic_keywords
+                    # Score message with hybrid semantic matching
+                    proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
+                        message_text, query, project_keywords, topic_keywords
                     )
 
-                    # Skip messages that don't pass threshold (must have both project AND topic match)
+                    # Skip messages that don't pass threshold
                     if not passes:
                         continue
 
@@ -336,7 +485,7 @@ class ContextSearchService:
                         relevance_score=relevance_score + 0.1  # Boost for OAuth search
                     ))
 
-            self.logger.info(f"Found {len(results)} Slack messages via user token (two-tier match)")
+            self.logger.info(f"Found {len(results)} Slack messages via user token (semantic match)")
             return results
 
         except Exception as e:
@@ -403,12 +552,12 @@ class ContextSearchService:
                     for message in messages:
                         message_text = message.get('text', '')
 
-                        # Score message with two-tier matching
-                        proj_matches, topic_matches, relevance_score, passes = self._score_text_match_two_tier(
-                            message_text, project_keywords, topic_keywords
+                        # Score message with hybrid semantic matching
+                        proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
+                            message_text, query, project_keywords, topic_keywords
                         )
 
-                        # Skip messages that don't pass threshold (must have both project AND topic match)
+                        # Skip messages that don't pass threshold
                         if not passes:
                             continue
 
@@ -443,7 +592,7 @@ class ContextSearchService:
                     self.logger.warning(f"Error searching channel {channel_name}: {e}")
                     continue
 
-            self.logger.info(f"Found {len(results)} Slack messages with two-tier matching")
+            self.logger.info(f"Found {len(results)} Slack messages with semantic matching")
             return results
 
         except Exception as e:
@@ -500,16 +649,16 @@ class ContextSearchService:
                 if not transcript:
                     continue
 
-                # Search in transcript with two-tier keyword matching
+                # Search in transcript with hybrid semantic matching
                 meeting_title = meeting.get('title', '')
                 combined_text = f"{meeting_title} {transcript.transcript}"
 
-                # Score with two-tier matching
-                proj_matches, topic_matches, relevance_score, passes = self._score_text_match_two_tier(
-                    combined_text, project_keywords, topic_keywords
+                # Score with hybrid semantic matching (keywords for project, embeddings for topic)
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
+                    combined_text, query, project_keywords, topic_keywords
                 )
 
-                # Skip meetings that don't pass threshold (must have both project AND topic match)
+                # Skip meetings that don't pass threshold
                 if not passes:
                     continue
 
@@ -526,7 +675,7 @@ class ContextSearchService:
                     relevance_score=relevance_score + 0.1  # Meeting transcripts are valuable
                 ))
 
-            self.logger.info(f"Found {len(results)} Fireflies meetings with two-tier matching")
+            self.logger.info(f"Found {len(results)} Fireflies meetings with semantic matching")
             return results
 
         except Exception as e:
@@ -592,12 +741,12 @@ class ContextSearchService:
                 description = fields.get('description', '')
                 combined_text = f"{summary} {description}"
 
-                # Score with two-tier matching
-                proj_matches, topic_matches, relevance_score, passes = self._score_text_match_two_tier(
-                    combined_text, project_keywords, topic_keywords
+                # Score with hybrid semantic matching
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
+                    combined_text, query, project_keywords, topic_keywords
                 )
 
-                # Skip issues that don't pass threshold (must have both project AND topic match)
+                # Skip issues that don't pass threshold
                 if not passes:
                     continue
 
@@ -614,7 +763,7 @@ class ContextSearchService:
                 ))
 
             project_msg = f" in project {project_key}" if project_key else ""
-            self.logger.info(f"Found {len(results)} Jira issues{project_msg} with two-tier matching")
+            self.logger.info(f"Found {len(results)} Jira issues{project_msg} with semantic matching")
             return results
 
         except Exception as e:
@@ -713,13 +862,13 @@ class ContextSearchService:
                 # Get page URL
                 url = page.get('url', '')
 
-                # Score with two-tier matching
+                # Score with hybrid semantic matching
                 # For now, just use title since fetching full content requires separate API call
-                proj_matches, topic_matches, relevance_score, passes = self._score_text_match_two_tier(
-                    title, project_keywords, topic_keywords
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
+                    title, query, project_keywords, topic_keywords
                 )
 
-                # Skip pages that don't pass threshold (must have both project AND topic match)
+                # Skip pages that don't pass threshold
                 if not passes:
                     continue
 
@@ -733,7 +882,7 @@ class ContextSearchService:
                     relevance_score=relevance_score
                 ))
 
-            self.logger.info(f"Found {len(results)} Notion pages with two-tier matching")
+            self.logger.info(f"Found {len(results)} Notion pages with semantic matching")
             return results
 
         except Exception as e:

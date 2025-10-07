@@ -10,6 +10,9 @@ langchain_openai==0.3.34
 openai>=1.0.0
 anthropic==0.69.0
 
+# Data Science (for embeddings/semantic search)
+numpy>=1.24.0
+
 # Authentication
 google-auth==2.41.1
 google-auth-oauthlib>=1.2.2
