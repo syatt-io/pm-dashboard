@@ -99,10 +99,10 @@ class ContextSummarizer:
             logger.info(f"📊 Processing {len(results)} results into summary")
 
         try:
-            # Call OpenAI
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+            # Build API parameters - some models don't support temperature/max_completion_tokens
+            api_params = {
+                "model": self.model,
+                "messages": [
                     {
                         "role": "system",
                         "content": "You are an expert technical analyst that creates comprehensive, detailed summaries from project documentation. Write in a casual, conversational tone - like you're explaining things to a teammate over coffee, not writing formal documentation. Your summaries should be thorough enough that engineers can spec and build features without needing to reference source material. Extract ALL relevant technical details, decisions, requirements, and context."
@@ -111,10 +111,17 @@ class ContextSummarizer:
                         "role": "user",
                         "content": prompt
                     }
-                ],
-                temperature=0.2,  # Very low temperature for maximum factual accuracy
-                max_completion_tokens=4000  # Increased from 1500 to allow comprehensive summaries
-            )
+                ]
+            }
+
+            # Only add temperature and max_completion_tokens for models that support them
+            # Reasoning models like gpt-5/o1 don't support these parameters
+            if not self.model.startswith('o1') and not self.model.startswith('gpt-5'):
+                api_params["temperature"] = 0.2  # Very low temperature for maximum factual accuracy
+                api_params["max_completion_tokens"] = 4000  # Increased from 1500 to allow comprehensive summaries
+
+            # Call OpenAI
+            response = await self.client.chat.completions.create(**api_params)
 
             # Extract response
             ai_response = response.choices[0].message.content
