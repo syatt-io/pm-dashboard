@@ -101,7 +101,7 @@ class ContextSummarizer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert technical analyst that creates comprehensive, detailed summaries from project documentation. Your summaries should be thorough enough that engineers can spec and build features without needing to reference source material. Extract ALL relevant technical details, decisions, requirements, and context."
+                        "content": "You are an expert technical analyst that creates comprehensive, detailed summaries from project documentation. Write in a casual, conversational tone - like you're explaining things to a teammate over coffee, not writing formal documentation. Your summaries should be thorough enough that engineers can spec and build features without needing to reference source material. Extract ALL relevant technical details, decisions, requirements, and context."
                     },
                     {
                         "role": "user",
@@ -211,6 +211,7 @@ GUIDELINES:
 - Aim for 400-800 words for complex topics (longer is better if information-dense)
 - Organize into logical paragraphs by topic/theme
 - Use precise technical terminology
+- Write in a casual, conversational tone - avoid formal/corporate language
 - Cite sources [1], [2] after every factual claim
 - If a Jira ticket is mentioned, include its key and status
 - Confidence = high if sources are direct/recent/complete, medium if partial, low if sparse
