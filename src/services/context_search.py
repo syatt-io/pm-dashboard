@@ -870,7 +870,7 @@ class ContextSearchService:
             from config.settings import settings
 
             jira_client = JiraMCPClient(
-                url=settings.jira.url,
+                jira_url=settings.jira.url,
                 username=settings.jira.username,
                 api_token=settings.jira.api_token
             )
@@ -979,8 +979,9 @@ class ContextSearchService:
                 "Content-Type": "application/json"
             }
 
-            # Calculate date filter
-            cutoff_date = datetime.now() - timedelta(days=days_back)
+            # Calculate date filter (timezone-aware for Notion API)
+            from datetime import timezone
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
             # Search Notion with query
             search_payload = {
