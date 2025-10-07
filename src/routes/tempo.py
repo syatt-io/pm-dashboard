@@ -221,21 +221,31 @@ def sync_hours():
         # Process current month data only
         current_month_hours, _ = process_worklogs(current_month_worklogs, active_projects)
 
-        # Update database - only update current_month_hours
+        # Update database - upsert into project_monthly_forecast table
         # The nightly job handles cumulative_hours updates
+        from datetime import date
+        current_month = date.today().replace(day=1)
+
         with engine.connect() as conn:
             for project in active_projects:
                 try:
                     project_key = project['key']
                     current_hours = current_month_hours.get(project_key, 0)
 
-                    # Update only current month hours for all projects
+                    # Upsert into project_monthly_forecast table (same as nightly job)
                     conn.execute(text("""
-                        UPDATE projects
-                        SET current_month_hours = :hours,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE key = :key
-                    """), {"hours": current_hours, "key": project_key})
+                        INSERT INTO project_monthly_forecast
+                            (project_key, month_year, actual_monthly_hours)
+                        VALUES (:project_key, :month_year, :actual_hours)
+                        ON CONFLICT (project_key, month_year)
+                        DO UPDATE SET
+                            actual_monthly_hours = :actual_hours,
+                            updated_at = NOW()
+                    """), {
+                        "project_key": project_key,
+                        "month_year": current_month,
+                        "actual_hours": current_hours
+                    })
 
                     logger.info(f"Updated {project_key} with {current_hours:.2f} current month hours")
                     projects_updated += 1
