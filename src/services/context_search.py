@@ -470,12 +470,12 @@ class ContextSearchService:
 
         relevance_score = project_signal + semantic_signal + bm25_signal
 
-        # LOWERED THRESHOLDS: Passes if semantic >= 0.30 OR BM25 >= 0.25 OR (project match AND semantic >= 0.25)
+        # LOWERED THRESHOLDS: Passes if semantic >= 0.20 OR BM25 >= 0.20 OR (project match AND semantic >= 0.15)
         # This allows semantic matching to work even without project keywords
         passes_threshold = (
-            semantic_similarity >= 0.30 or  # Lowered from 0.4
-            bm25_score >= 0.25 or  # Lowered from 0.3
-            (project_matches > 0 and semantic_similarity >= 0.25)  # Project bonus
+            semantic_similarity >= 0.20 or  # Lowered from 0.30 - allows more semantic matches
+            bm25_score >= 0.20 or  # Lowered from 0.25 - allows more keyword matches
+            (project_matches > 0 and semantic_similarity >= 0.15)  # Project bonus with lower threshold
         )
 
         if debug:
