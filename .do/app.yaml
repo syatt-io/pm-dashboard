@@ -83,6 +83,13 @@ services:
         type: SECRET
       - key: SLACK_CHANNEL
         value: "#mikes-minion"
+      - key: SLACK_CLIENT_ID
+        value: "294377965571.9556844644626"
+      - key: SLACK_CLIENT_SECRET
+        value: "9ca83dc6256e3b5189f42e25d6578d4b"
+        type: SECRET
+      - key: SLACK_REDIRECT_URI
+        value: "https://agent-pm-tsbbb.ondigitalocean.app/api/auth/slack/callback"
 
       # Tempo (optional)
       - key: TEMPO_API_TOKEN
