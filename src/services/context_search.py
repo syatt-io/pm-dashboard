@@ -196,6 +196,124 @@ class ContextSearchService:
             self.logger.error(f"Error calculating cosine similarity: {e}")
             return 0.0
 
+    def _tokenize(self, text: str) -> List[str]:
+        """Tokenize text into words for BM25.
+
+        Args:
+            text: Text to tokenize
+
+        Returns:
+            List of lowercase tokens (words with length > 2)
+        """
+        import re
+        # Lowercase and split on non-alphanumeric characters, filter short words
+        return [word for word in re.findall(r'\b\w+\b', text.lower()) if len(word) > 2]
+
+    def _bm25_score(
+        self,
+        query_tokens: List[str],
+        doc_tokens: List[str],
+        avg_doc_length: float,
+        total_docs: int,
+        term_doc_freq: Dict[str, int],
+        k1: float = 1.5,
+        b: float = 0.75
+    ) -> float:
+        """Calculate BM25 score for a document given a query.
+
+        BM25 is a probabilistic retrieval function that ranks documents based on
+        the query terms appearing in each document.
+
+        Args:
+            query_tokens: Tokenized query terms
+            doc_tokens: Tokenized document terms
+            avg_doc_length: Average length of all documents in the corpus
+            total_docs: Total number of documents in the corpus
+            term_doc_freq: Dictionary mapping terms to document frequency
+            k1: Term frequency saturation parameter (default: 1.5)
+            b: Length normalization parameter (default: 0.75)
+
+        Returns:
+            BM25 score (higher is better)
+        """
+        score = 0.0
+        doc_length = len(doc_tokens)
+
+        # Count term frequencies in document
+        doc_term_freq = {}
+        for token in doc_tokens:
+            doc_term_freq[token] = doc_term_freq.get(token, 0) + 1
+
+        # Calculate IDF and term scores for each query term
+        for query_term in query_tokens:
+            if query_term not in doc_term_freq:
+                continue
+
+            # Term frequency in document
+            tf = doc_term_freq[query_term]
+
+            # Document frequency (how many docs contain this term)
+            df = term_doc_freq.get(query_term, 0)
+
+            # IDF: Inverse document frequency
+            idf = np.log((total_docs - df + 0.5) / (df + 0.5) + 1.0)
+
+            # BM25 formula for this term
+            numerator = tf * (k1 + 1)
+            denominator = tf + k1 * (1 - b + b * (doc_length / avg_doc_length))
+
+            score += idf * (numerator / denominator)
+
+        return score
+
+    def _reciprocal_rank_fusion(
+        self,
+        rankings: List[List[Tuple[Any, float]]],
+        k: int = 60
+    ) -> List[Tuple[Any, float]]:
+        """Combine multiple ranking lists using Reciprocal Rank Fusion (RRF).
+
+        RRF is a simple but effective method for combining multiple rankings.
+        It assigns a score to each item based on its rank in each list.
+
+        Args:
+            rankings: List of ranking lists, each is list of (item, score) tuples
+            k: Constant for RRF formula (default: 60, as in original paper)
+
+        Returns:
+            Combined ranking as list of (item, rrf_score) tuples, sorted descending
+        """
+        # Collect all unique items
+        all_items = set()
+        for ranking in rankings:
+            for item, _ in ranking:
+                all_items.add(item)
+
+        # Calculate RRF score for each item
+        rrf_scores = {}
+        for item in all_items:
+            rrf_score = 0.0
+
+            # For each ranking list
+            for ranking in rankings:
+                # Find rank of item in this list (1-indexed)
+                rank = None
+                for i, (ranked_item, _) in enumerate(ranking, start=1):
+                    if ranked_item == item:
+                        rank = i
+                        break
+
+                # Add RRF score: 1 / (k + rank)
+                if rank is not None:
+                    rrf_score += 1.0 / (k + rank)
+
+            rrf_scores[item] = rrf_score
+
+        # Sort by RRF score descending
+        sorted_items = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+
+        return sorted_items
+
     def _score_text_match(self, text: str, keywords: Set[str]) -> Tuple[int, float]:
         """Score how well text matches the keywords.
 
@@ -306,14 +424,45 @@ class ContextSearchService:
         # Normalize to 0-1 range (cosine similarity is -1 to 1, but usually 0-1 for text)
         semantic_similarity = max(0.0, semantic_similarity)
 
-        # 3. Combined scoring
-        # Project match: binary (has match or not) - weight 0.2
-        # Semantic similarity: continuous 0-1 - weight 0.8
-        relevance_score = (0.2 if project_matches > 0 else 0.0) + (0.8 * semantic_similarity)
+        # 3. Calculate BM25 score for keyword quality
+        # Tokenize query and text for BM25
+        query_tokens = self._tokenize(topic_query)
+        doc_tokens = self._tokenize(text)
 
-        # Passes threshold if semantic similarity >= 0.4 (40% similar)
-        # This is more lenient than exact keyword matching to allow semantic matches
-        passes_threshold = semantic_similarity >= 0.4
+        # Use approximate corpus statistics (good enough for relative ranking)
+        avg_doc_length = 500.0  # Approximate average document length
+        total_docs = 1000  # Approximate corpus size
+
+        # Estimate term document frequency (how many docs contain each term)
+        # For simplicity, assume common terms appear in 10% of docs
+        term_doc_freq = {token: 100 for token in set(query_tokens + doc_tokens)}
+
+        # Calculate BM25 score
+        bm25_raw = self._bm25_score(
+            query_tokens=query_tokens,
+            doc_tokens=doc_tokens,
+            avg_doc_length=avg_doc_length,
+            total_docs=total_docs,
+            term_doc_freq=term_doc_freq
+        )
+
+        # Normalize BM25 score to 0-1 range (typical BM25 scores are 0-10+)
+        # Using sigmoid-like normalization: score / (score + 5)
+        bm25_score = bm25_raw / (bm25_raw + 5.0) if bm25_raw > 0 else 0.0
+
+        # 4. Combined scoring with triple signals
+        # Project match: binary (has match or not) - weight 0.15
+        # Semantic similarity: continuous 0-1 - weight 0.60
+        # BM25 keyword quality: continuous 0-1 - weight 0.25
+        project_signal = 0.15 if project_matches > 0 else 0.0
+        semantic_signal = 0.60 * semantic_similarity
+        bm25_signal = 0.25 * bm25_score
+
+        relevance_score = project_signal + semantic_signal + bm25_signal
+
+        # Passes threshold if EITHER semantic similarity >= 0.4 OR BM25 score >= 0.3
+        # This allows both semantic matches AND strong keyword matches
+        passes_threshold = (semantic_similarity >= 0.4) or (bm25_score >= 0.3)
 
         return project_matches, semantic_similarity, relevance_score, passes_threshold
 
