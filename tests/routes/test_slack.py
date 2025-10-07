@@ -45,7 +45,7 @@ class TestSlackEvents:
 
     def test_slack_events_not_configured(self, client):
         """Test Slack events when bot not configured."""
-        init_slack_routes(None)
+        init_slack_routes(None, None)
 
         response = client.post('/slack/events', json={
             'type': 'event_callback',
@@ -58,7 +58,7 @@ class TestSlackEvents:
 
     def test_slack_events_with_bot(self, client, mock_slack_bot):
         """Test Slack events with configured bot."""
-        init_slack_routes(mock_slack_bot)
+        init_slack_routes(mock_slack_bot, "test-signing-secret")
         mock_slack_bot.get_handler().handle.return_value = ('', 200)
 
         response = client.post('/slack/events', json={
@@ -71,7 +71,7 @@ class TestSlackEvents:
 
     def test_slack_commands_not_configured(self, client):
         """Test Slack commands when bot not configured."""
-        init_slack_routes(None)
+        init_slack_routes(None, None)
 
         response = client.post('/slack/commands', data={
             'command': '/todo',
@@ -84,7 +84,7 @@ class TestSlackEvents:
 
     def test_slack_commands_with_bot(self, client, mock_slack_bot):
         """Test Slack commands with configured bot."""
-        init_slack_routes(mock_slack_bot)
+        init_slack_routes(mock_slack_bot, "test-signing-secret")
         mock_slack_bot.get_handler().handle.return_value = ('', 200)
 
         response = client.post('/slack/commands', data={
@@ -97,7 +97,7 @@ class TestSlackEvents:
 
     def test_slack_interactive_not_configured(self, client):
         """Test Slack interactive when bot not configured."""
-        init_slack_routes(None)
+        init_slack_routes(None, None)
 
         response = client.post('/slack/interactive', json={
             'type': 'button_click',
@@ -110,7 +110,7 @@ class TestSlackEvents:
 
     def test_slack_interactive_with_bot(self, client, mock_slack_bot):
         """Test Slack interactive with configured bot."""
-        init_slack_routes(mock_slack_bot)
+        init_slack_routes(mock_slack_bot, "test-signing-secret")
         mock_slack_bot.get_handler().handle.return_value = ('', 200)
 
         response = client.post('/slack/interactive', json={
@@ -128,7 +128,7 @@ class TestSlackDigest:
     @patch('src.routes.slack.asyncio.run')
     def test_slack_digest_success(self, mock_async, client, mock_slack_bot):
         """Test triggering Slack digest."""
-        init_slack_routes(mock_slack_bot)
+        init_slack_routes(mock_slack_bot, "test-signing-secret")
 
         response = client.post('/api/slack/digest', json={
             'channel': '#general'
@@ -142,7 +142,7 @@ class TestSlackDigest:
     @patch('src.routes.slack.asyncio.run')
     def test_slack_digest_no_channel(self, mock_async, client, mock_slack_bot):
         """Test Slack digest without channel."""
-        init_slack_routes(mock_slack_bot)
+        init_slack_routes(mock_slack_bot, "test-signing-secret")
 
         response = client.post('/api/slack/digest', json={})
 
@@ -152,7 +152,7 @@ class TestSlackDigest:
 
     def test_slack_digest_not_configured(self, client):
         """Test Slack digest when bot not configured."""
-        init_slack_routes(None)
+        init_slack_routes(None, None)
 
         response = client.post('/api/slack/digest', json={})
 
@@ -163,7 +163,7 @@ class TestSlackDigest:
     @patch('src.routes.slack.asyncio.run')
     def test_slack_digest_error(self, mock_async, client, mock_slack_bot):
         """Test Slack digest error handling."""
-        init_slack_routes(mock_slack_bot)
+        init_slack_routes(mock_slack_bot, "test-signing-secret")
         mock_async.side_effect = Exception("Digest error")
 
         response = client.post('/api/slack/digest', json={})
