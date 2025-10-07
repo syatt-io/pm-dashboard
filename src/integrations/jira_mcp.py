@@ -174,11 +174,11 @@ class JiraMCPClient:
                 if not issue_ids:
                     return []
 
-                # Step 2: Fetch full issue details for each ID using /issue endpoint
+                # Step 2: Fetch full issue details for each ID using /issue endpoint in parallel
                 # The /search/jql endpoint doesn't support fields parameter
-                # So we need to fetch each issue individually (or use bulk GET if available)
-                issues = []
-                for issue_id in issue_ids:
+                import asyncio
+
+                async def fetch_issue(issue_id: str):
                     try:
                         issue_response = await self.client.get(
                             f"{self.jira_url}/rest/api/3/issue/{issue_id}",
@@ -191,11 +191,14 @@ class JiraMCPClient:
                             }
                         )
                         issue_response.raise_for_status()
-                        issue_data = issue_response.json()
-                        issues.append(issue_data)
+                        return issue_response.json()
                     except Exception as e:
                         logger.warning(f"Failed to fetch issue {issue_id}: {e}")
-                        continue
+                        return None
+
+                # Fetch all issues in parallel
+                issue_results = await asyncio.gather(*[fetch_issue(issue_id) for issue_id in issue_ids])
+                issues = [issue for issue in issue_results if issue is not None]
 
                 # Create result dict that matches the original structure
                 result = {"issues": issues}
