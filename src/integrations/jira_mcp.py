@@ -150,16 +150,12 @@ class JiraMCPClient:
                 import base64
                 auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
 
-                # Build params with optional comment expansion
+                # Build params - use specific fields instead of *all to avoid 410 errors
                 params = {
                     "jql": jql,
                     "maxResults": max_results,
-                    "fields": "*all"
+                    "fields": "summary,description,updated,status,assignee,reporter,created,labels,priority"
                 }
-
-                # Add comment expansion if requested
-                if expand_comments:
-                    params["expand"] = "renderedFields"  # Gets rendered comment bodies
 
                 response = await self.client.get(
                     f"{self.jira_url}/rest/api/3/search",

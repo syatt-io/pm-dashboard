@@ -113,7 +113,7 @@ class ContextSummarizer:
                     }
                 ],
                 temperature=0.2,  # Very low temperature for maximum factual accuracy
-                max_tokens=4000  # Increased from 1500 to allow comprehensive summaries
+                max_completion_tokens=4000  # Increased from 1500 to allow comprehensive summaries
             )
 
             # Extract response

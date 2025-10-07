@@ -825,14 +825,23 @@ class ContextSearchService:
             results = []
 
             for meeting in meetings:
-                # Get full transcript
+                meeting_title = meeting.get('title', '').lower()
+
+                # PRE-FILTER: Only process meetings where title contains project keywords
+                # This dramatically speeds up search by avoiding unnecessary semantic analysis
+                if project_keywords:
+                    # Check if meeting title contains any project keyword
+                    has_project_match = any(keyword.lower() in meeting_title for keyword in project_keywords)
+                    if not has_project_match:
+                        continue  # Skip this meeting entirely
+
+                # Get full transcript (only for meetings that passed pre-filter)
                 transcript = client.get_meeting_transcript(meeting['id'])
                 if not transcript:
                     continue
 
                 # Search in transcript with hybrid semantic matching
-                meeting_title = meeting.get('title', '')
-                combined_text = f"{meeting_title} {transcript.transcript}"
+                combined_text = f"{meeting.get('title', '')} {transcript.transcript}"
 
                 # Score with hybrid semantic matching (keywords for project, embeddings for topic)
                 proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(combined_text, query, project_keywords, topic_keywords, debug)
