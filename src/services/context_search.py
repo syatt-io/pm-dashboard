@@ -538,8 +538,16 @@ class ContextSearchService:
         # Sort by relevance score first, then by date
         all_results.sort(key=lambda x: (x.relevance_score, x.date), reverse=True)
 
-        # Generate AI summary and insights
-        summary, key_people, timeline = await self._generate_insights(query, all_results)
+        # Build project context for AI summarization
+        project_context = None
+        if detected_project and project_keywords:
+            project_context = {
+                'project_key': detected_project,
+                'keywords': list(project_keywords)
+            }
+
+        # Generate AI summary and insights with project context
+        summary, key_people, timeline = await self._generate_insights(query, all_results, project_context)
 
         return ContextSearchResults(
             query=query,
@@ -1125,7 +1133,8 @@ class ContextSearchService:
     async def _generate_insights(
         self,
         query: str,
-        results: List[SearchResult]
+        results: List[SearchResult],
+        project_context: Optional[Dict[str, Any]] = None
     ) -> tuple[Optional[str], List[str], List[Dict[str, Any]]]:
         """Generate AI-powered insights from search results using ContextSummarizer."""
         try:
@@ -1134,9 +1143,9 @@ class ContextSearchService:
             if not results:
                 return None, [], []
 
-            # Use the new AI summarizer
+            # Use the new AI summarizer with project context
             summarizer = ContextSummarizer()
-            summarized = await summarizer.summarize(query, results[:20], debug=True)
+            summarized = await summarizer.summarize(query, results[:20], debug=True, project_context=project_context)
 
             # Convert timeline format to match expected format
             timeline = [

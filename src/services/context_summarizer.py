@@ -1,6 +1,6 @@
 """AI-powered context summarization with citations."""
 import logging
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from dataclasses import dataclass
 from datetime import datetime
 from openai import AsyncOpenAI
@@ -42,7 +42,8 @@ class ContextSummarizer:
         self,
         query: str,
         results: List[Any],
-        debug: bool = False
+        debug: bool = False,
+        project_context: Optional[Dict[str, Any]] = None
     ) -> SummarizedContext:
         """Generate AI summary with inline citations.
 
@@ -50,6 +51,7 @@ class ContextSummarizer:
             query: The original search query
             results: List of ContextSearchResult objects
             debug: Enable debug logging
+            project_context: Optional dict with 'project_key' and 'keywords' for domain context
 
         Returns:
             SummarizedContext with summary, citations, key people, and timeline
@@ -87,8 +89,8 @@ class ContextSummarizer:
                 f"Content: {result.content}\n"
             )
 
-        # Build prompt for LLM
-        prompt = self._build_summarization_prompt(query, context_blocks)
+        # Build prompt for LLM with optional project context
+        prompt = self._build_summarization_prompt(query, context_blocks, project_context)
 
         if debug:
             logger.info(f"📝 Summarization prompt: {len(prompt)} chars")
@@ -143,20 +145,33 @@ class ContextSummarizer:
                 confidence="low"
             )
 
-    def _build_summarization_prompt(self, query: str, context_blocks: List[str]) -> str:
+    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None) -> str:
         """Build the LLM prompt for summarization.
 
         Args:
             query: Original search query
             context_blocks: Formatted context with citation numbers
+            project_context: Optional dict with project_key and keywords for domain context
 
         Returns:
             Complete prompt for LLM
         """
         context_text = "\n\n".join(context_blocks)
 
-        return f"""You are helping summarize search results for the query: "{query}"
+        # Build project context section if provided
+        domain_context = ""
+        if project_context and project_context.get('project_key') and project_context.get('keywords'):
+            project_key = project_context['project_key']
+            keywords = project_context['keywords']
+            keywords_str = ", ".join(sorted(keywords)[:15])  # Limit to 15 most relevant
+            domain_context = f"""
+DOMAIN CONTEXT:
+This query relates to the "{project_key}" project. Related terms and concepts for this project include: {keywords_str}.
+These keywords provide context for understanding project-specific acronyms, terminology, and abbreviations that may appear in the results.
+"""
 
+        return f"""You are helping summarize search results for the query: "{query}"
+{domain_context}
 CONTEXT FROM SEARCH RESULTS:
 {context_text}
 
