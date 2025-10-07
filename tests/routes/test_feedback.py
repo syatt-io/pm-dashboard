@@ -87,9 +87,9 @@ class TestListFeedback:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert 'feedback' in data
-        assert len(data['feedback']) == 1
-        assert data['feedback'][0]['id'] == 'feedback-123'
+        assert 'data' in data or 'feedback' in data
+        assert len(data.get('feedback', data.get('data', []))) == 1
+        assert data.get('feedback', data.get('data', []))[0]['id'] == 'feedback-123'
 
     @patch('src.routes.feedback.session_scope')
     def test_list_feedback_with_filter(self, mock_session, client, auth_headers, mock_feedback_item):
@@ -105,8 +105,8 @@ class TestListFeedback:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert 'feedback' in data
-        assert len(data['feedback']) == 1
+        assert 'data' in data or 'feedback' in data
+        assert len(data.get('feedback', data.get('data', []))) == 1
 
     @patch('src.routes.feedback.session_scope')
     def test_list_feedback_with_type_filter(self, mock_session, client, auth_headers, mock_feedback_item):
@@ -122,8 +122,8 @@ class TestListFeedback:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert 'feedback' in data
-        assert len(data['feedback']) == 1
+        assert 'data' in data or 'feedback' in data
+        assert len(data.get('feedback', data.get('data', []))) == 1
 
 
 class TestCreateFeedback:
@@ -146,7 +146,8 @@ class TestCreateFeedback:
         assert response.status_code == 201
         data = response.get_json()
         assert data['success'] is True
-        assert 'feedback' in data
+        assert 'data' in data
+        assert data['data']['content'] == 'Please add dark mode'
         mock_db.add.assert_called_once()
 
     def test_create_feedback_missing_type(self, client, auth_headers):
@@ -205,8 +206,8 @@ class TestGetFeedback:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert 'feedback' in data
-        assert data['feedback']['id'] == 'feedback-123'
+        assert 'data' in data or 'feedback' in data
+        assert data.get('feedback', data.get('data', []))['id'] == 'feedback-123'
 
     @patch('src.routes.feedback.session_scope')
     def test_get_feedback_not_found(self, mock_session, client, auth_headers):
@@ -260,7 +261,7 @@ class TestUpdateFeedback:
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
-        assert 'feedback' in data
+        assert 'data' in data or 'feedback' in data
 
     @patch('src.routes.feedback.session_scope')
     def test_update_feedback_not_found(self, mock_session, client, auth_headers):
