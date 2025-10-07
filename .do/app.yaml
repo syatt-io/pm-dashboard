@@ -45,12 +45,12 @@ services:
 
       # Google OAuth
       - key: GOOGLE_CLIENT_ID
-        value: YOUR_GOOGLE_CLIENT_ID
+        value: "557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com"
         type: SECRET
 
       # React App Google Client ID (same value)
       - key: REACT_APP_GOOGLE_CLIENT_ID
-        value: YOUR_GOOGLE_CLIENT_ID
+        value: "557251748262-oi3pqm1o265eblprbau8n2kq7kkrmgai.apps.googleusercontent.com"
         type: SECRET
 
       # Fireflies API
