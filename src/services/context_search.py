@@ -1082,7 +1082,38 @@ class ContextSearchService:
         query: str,
         results: List[SearchResult]
     ) -> tuple[Optional[str], List[str], List[Dict[str, Any]]]:
-        """Generate AI-powered insights from search results."""
+        """Generate AI-powered insights from search results using ContextSummarizer."""
+        try:
+            from src.services.context_summarizer import ContextSummarizer
+
+            if not results:
+                return None, [], []
+
+            # Use the new AI summarizer
+            summarizer = ContextSummarizer()
+            summarized = await summarizer.summarize(query, results[:20], debug=True)
+
+            # Convert timeline format to match expected format
+            timeline = [
+                {"date": item["date"], "event": item["event"]}
+                for item in summarized.timeline
+            ] if summarized.timeline else []
+
+            self.logger.info(f"✅ Generated AI summary with {len(summarized.citations)} citations")
+
+            return summarized.summary, summarized.key_people, timeline
+
+        except Exception as e:
+            self.logger.error(f"Error generating insights: {e}")
+            # Fallback to no summary if AI fails
+            return None, [], []
+
+    async def _generate_insights_old(
+        self,
+        query: str,
+        results: List[SearchResult]
+    ) -> tuple[Optional[str], List[str], List[Dict[str, Any]]]:
+        """OLD METHOD - Generate AI-powered insights from search results."""
         try:
             from langchain_openai import ChatOpenAI
             from config.settings import settings

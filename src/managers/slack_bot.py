@@ -1824,13 +1824,15 @@ class SlackTodoBot:
                 }
             ]
 
-            # Add summary if available
+            # Add AI-generated summary with citations if available
             if results.summary:
+                # Format summary with emphasis on being AI-generated
+                summary_text = f"*🤖 AI Summary:*\n{results.summary}\n\n_Note: Numbers in [brackets] are citations to sources below._"
                 blocks.append({
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"*📝 Summary:*\n{results.summary}"
+                        "text": summary_text
                     }
                 })
 
@@ -1883,8 +1885,8 @@ class SlackTodoBot:
                 # Format date
                 date_str = result.date.strftime('%Y-%m-%d')
 
-                # Build result text
-                result_text = f"{source_emoji} *{result.title}*\n"
+                # Build result text with citation number
+                result_text = f"*[{i}]* {source_emoji} *{result.title}*\n"
                 result_text += f"_{date_str}_ • _{result.author or 'Unknown'}_\n"
                 result_text += f"{result.content[:150]}..."
 
