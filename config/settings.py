@@ -84,9 +84,8 @@ class Settings:
 
     @staticmethod
     def _load_fireflies_config() -> FirefliesConfig:
-        api_key = os.getenv("FIREFLIES_API_KEY")
-        if not api_key:
-            raise ValueError("FIREFLIES_API_KEY not set in environment")
+        # Fireflies API key is now optional (stored per-user)
+        api_key = os.getenv("FIREFLIES_API_KEY", "")
 
         return FirefliesConfig(
             api_key=api_key,
