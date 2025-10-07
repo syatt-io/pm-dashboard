@@ -316,8 +316,9 @@ class SlackTodoBot:
                     respond("❌ Please provide a search topic: `/find-context authentication flow`")
                     return
 
-                # Extract --days parameter if present
+                # Extract --days and --detail parameters if present
                 days = 90  # Default to 90 days
+                detail_level = "normal"  # Default detail level
                 query_parts = []
                 i = 0
                 while i < len(args):
@@ -332,6 +333,14 @@ class SlackTodoBot:
                         except ValueError:
                             respond("❌ Invalid days value. Must be a number.")
                             return
+                    elif args[i] == '--detail' and i + 1 < len(args):
+                        detail = args[i + 1].lower()
+                        if detail not in ['brief', 'normal', 'detailed']:
+                            respond("❌ Invalid detail level. Use: brief, normal, or detailed")
+                            return
+                        detail_level = detail
+                        i += 2
+                        continue
                     query_parts.append(args[i])
                     i += 1
 
@@ -341,10 +350,11 @@ class SlackTodoBot:
                     return
 
                 # Show searching message
-                respond(f"🔍 Searching for *{query}* across Slack, Fireflies, and Jira (last {days} days)...\n_This may take a moment_")
+                detail_msg = "" if detail_level == "normal" else f" [{detail_level} summary]"
+                respond(f"🔍 Searching for *{query}* across Slack, Fireflies, and Jira (last {days} days{detail_msg})...\n_This may take a moment_")
 
                 # Perform the search
-                respond(self._find_context(user_id, query, days))
+                respond(self._find_context(user_id, query, days, detail_level))
 
             except Exception as e:
                 logger.error(f"Error handling /find-context command: {e}")
@@ -1788,7 +1798,7 @@ class SlackTodoBot:
 
         return {"blocks": blocks}
 
-    def _find_context(self, user_id: str, query: str, days: int) -> Dict[str, Any]:
+    def _find_context(self, user_id: str, query: str, days: int, detail_level: str = "normal") -> Dict[str, Any]:
         """Execute context search and format results."""
         try:
             import asyncio
@@ -1804,7 +1814,8 @@ class SlackTodoBot:
             results = asyncio.run(search_service.search(
                 query=query,
                 days_back=days,
-                user_id=app_user_id
+                user_id=app_user_id,
+                detail_level=detail_level
             ))
 
             if not results.results:

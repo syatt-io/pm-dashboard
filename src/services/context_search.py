@@ -492,7 +492,8 @@ class ContextSearchService:
         days_back: int = 90,
         sources: List[str] = None,
         user_id: Optional[int] = None,
-        debug: bool = True  # Enable debug logging by default for now
+        debug: bool = True,  # Enable debug logging by default for now
+        detail_level: str = "normal"
     ) -> ContextSearchResults:
         """Search for context across all sources.
 
@@ -502,6 +503,7 @@ class ContextSearchService:
             sources: List of sources to search ('slack', 'fireflies', 'jira', 'notion')
             user_id: User ID for accessing user-specific credentials
             debug: Enable debug logging for scoring
+            detail_level: Summary detail level - 'brief', 'normal', or 'detailed'
 
         Returns:
             ContextSearchResults with aggregated results
@@ -546,8 +548,8 @@ class ContextSearchService:
                 'keywords': list(project_keywords)
             }
 
-        # Generate AI summary and insights with project context
-        summary, key_people, timeline = await self._generate_insights(query, all_results, project_context)
+        # Generate AI summary and insights with project context and detail level
+        summary, key_people, timeline = await self._generate_insights(query, all_results, project_context, detail_level)
 
         return ContextSearchResults(
             query=query,
@@ -1134,7 +1136,8 @@ class ContextSearchService:
         self,
         query: str,
         results: List[SearchResult],
-        project_context: Optional[Dict[str, Any]] = None
+        project_context: Optional[Dict[str, Any]] = None,
+        detail_level: str = "normal"
     ) -> tuple[Optional[str], List[str], List[Dict[str, Any]]]:
         """Generate AI-powered insights from search results using ContextSummarizer."""
         try:
@@ -1143,9 +1146,9 @@ class ContextSearchService:
             if not results:
                 return None, [], []
 
-            # Use the new AI summarizer with project context
+            # Use the new AI summarizer with project context and detail level
             summarizer = ContextSummarizer()
-            summarized = await summarizer.summarize(query, results[:20], debug=True, project_context=project_context)
+            summarized = await summarizer.summarize(query, results[:20], debug=True, project_context=project_context, detail_level=detail_level)
 
             # Convert timeline format to match expected format
             timeline = [

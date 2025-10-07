@@ -43,7 +43,8 @@ class ContextSummarizer:
         query: str,
         results: List[Any],
         debug: bool = False,
-        project_context: Optional[Dict[str, Any]] = None
+        project_context: Optional[Dict[str, Any]] = None,
+        detail_level: str = "normal"
     ) -> SummarizedContext:
         """Generate AI summary with inline citations.
 
@@ -52,6 +53,7 @@ class ContextSummarizer:
             results: List of ContextSearchResult objects
             debug: Enable debug logging
             project_context: Optional dict with 'project_key' and 'keywords' for domain context
+            detail_level: Detail level - 'brief', 'normal', or 'detailed' (default: 'normal')
 
         Returns:
             SummarizedContext with summary, citations, key people, and timeline
@@ -89,8 +91,8 @@ class ContextSummarizer:
                 f"Content: {result.content}\n"
             )
 
-        # Build prompt for LLM with optional project context
-        prompt = self._build_summarization_prompt(query, context_blocks, project_context)
+        # Build prompt for LLM with optional project context and detail level
+        prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level)
 
         if debug:
             logger.info(f"📝 Summarization prompt: {len(prompt)} chars")
@@ -145,13 +147,14 @@ class ContextSummarizer:
                 confidence="low"
             )
 
-    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None) -> str:
+    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None, detail_level: str = "normal") -> str:
         """Build the LLM prompt for summarization.
 
         Args:
             query: Original search query
             context_blocks: Formatted context with citation numbers
             project_context: Optional dict with project_key and keywords for domain context
+            detail_level: Detail level - 'brief', 'normal', or 'detailed'
 
         Returns:
             Complete prompt for LLM
@@ -169,6 +172,14 @@ DOMAIN CONTEXT:
 This query relates to the "{project_key}" project. Related terms and concepts for this project include: {keywords_str}.
 These keywords provide context for understanding project-specific acronyms, terminology, and abbreviations that may appear in the results.
 """
+
+        # Configure detail level instructions
+        detail_instructions = {
+            "brief": "Keep your summary concise (150-300 words). Focus on the most critical information only.",
+            "normal": "Aim for 400-800 words for complex topics (longer is better if information-dense).",
+            "detailed": "Be as thorough as possible (800-1500 words). Include ALL relevant details, examples, and context."
+        }
+        detail_instruction = detail_instructions.get(detail_level, detail_instructions["normal"])
 
         return f"""You are helping summarize search results for the query: "{query}"
 {domain_context}
@@ -223,7 +234,7 @@ CONFIDENCE: high|medium|low
 
 GUIDELINES:
 - Be COMPREHENSIVE - include ALL pertinent details from sources
-- Aim for 400-800 words for complex topics (longer is better if information-dense)
+- {detail_instruction}
 - Organize into logical paragraphs by topic/theme
 - Use precise technical terminology
 - Write in a casual, conversational tone - avoid formal/corporate language
