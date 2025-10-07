@@ -25,12 +25,13 @@ def get_engine():
         if is_production and 'postgresql' in db_url:
             _engine = create_engine(
                 db_url,
-                pool_size=1,  # Minimal pool per worker (4 workers × 1 = 4 base connections)
-                max_overflow=1,  # Minimal overflow (4 workers × 1 = 4 burst = 8 total max)
+                pool_size=0,  # No persistent connections per worker
+                max_overflow=2,  # Only 2 connections max per worker (4 workers × 2 = 8 total max)
                 pool_pre_ping=True,  # Verify connections before using
-                pool_recycle=1800,  # Recycle connections after 30 minutes
+                pool_recycle=600,  # Recycle connections after 10 minutes (shorter)
+                pool_timeout=5,  # Wait max 5 seconds for a connection
                 connect_args={
-                    "connect_timeout": 10,
+                    "connect_timeout": 5,  # Faster connection timeout
                     "options": "-c statement_timeout=30000"  # 30 second statement timeout
                 },
                 echo=False  # Disable SQL logging in production
