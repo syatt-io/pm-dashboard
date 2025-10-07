@@ -353,8 +353,30 @@ class SlackTodoBot:
                 detail_msg = "" if detail_level == "normal" else f" [{detail_level} summary]"
                 respond(f"🔍 Searching for *{query}* across Slack, Fireflies, and Jira (last {days} days{detail_msg})...\n_This may take a moment_")
 
-                # Perform the search
-                respond(self._find_context(user_id, query, days, detail_level))
+                # Perform the search asynchronously to avoid timeout
+                # Get channel_id for posting results
+                channel_id = command.get('channel_id')
+
+                # Run search in background thread
+                import threading
+                def run_search():
+                    try:
+                        result = self._find_context(user_id, query, days, detail_level)
+                        # Post result using chat.postMessage instead of respond()
+                        self.app.client.chat_postMessage(
+                            channel=channel_id,
+                            **result
+                        )
+                    except Exception as e:
+                        logger.error(f"Error in background search: {e}")
+                        self.app.client.chat_postMessage(
+                            channel=channel_id,
+                            text=f"❌ Search failed: {str(e)}"
+                        )
+
+                thread = threading.Thread(target=run_search)
+                thread.daemon = True
+                thread.start()
 
             except Exception as e:
                 logger.error(f"Error handling /find-context command: {e}")
