@@ -462,10 +462,9 @@ def create_auth_blueprint(db_session_factory):
             authorization_url = (
                 f"https://slack.com/oauth/v2/authorize"
                 f"?client_id={client_id}"
-                f"&scope={','.join(scopes)}"
                 f"&redirect_uri={redirect_uri}"
                 f"&state={state}"
-                f"&user_scope={','.join(scopes)}"  # User-level token
+                f"&user_scope={','.join(scopes)}"  # User-level token only
             )
 
             logger.info(f"Slack OAuth initiated for user {user.id}")
