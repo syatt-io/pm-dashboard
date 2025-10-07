@@ -35,7 +35,7 @@ class ContextSummarizer:
 
     def __init__(self):
         """Initialize summarizer with OpenAI client."""
-        self.client = AsyncOpenAI(api_key=settings.openai.api_key)
+        self.client = AsyncOpenAI(api_key=settings.ai.api_key)
         self.model = "gpt-4o-mini"  # Fast and cost-effective
 
     async def summarize(
