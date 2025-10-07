@@ -374,7 +374,8 @@ class ContextSearchService:
         text: str,
         query: str,
         project_keywords: Set[str],
-        topic_keywords: Set[str]
+        topic_keywords: Set[str],
+        debug: bool = False
     ) -> Tuple[int, float, float, bool]:
         """Hybrid scoring: keyword matching for project, semantic similarity for topic.
 
@@ -383,18 +384,16 @@ class ContextSearchService:
             query: Original query string (for embedding)
             project_keywords: Project-related keywords
             topic_keywords: Topic keywords (used to build topic query for embedding)
+            debug: Enable debug logging for scoring
 
         Returns:
             Tuple of (project_matches, semantic_similarity, relevance_score, passes_threshold)
         """
         text_lower = text.lower()
+        text_preview = text[:200] + "..." if len(text) > 200 else text
 
-        # 1. Project keyword matching (fast, exact)
+        # 1. Project keyword matching (optional bonus)
         project_matches = sum(1 for kw in project_keywords if kw in text_lower)
-
-        # Must have at least 1 project match
-        if project_matches == 0:
-            return 0, 0.0, 0.0, False
 
         # 2. Semantic similarity for topic (understands meaning)
         # Build topic query from topic keywords
@@ -408,14 +407,25 @@ class ContextSearchService:
             # Fallback to keyword matching if embedding fails
             self.logger.warning("Embedding failed, falling back to keyword matching")
             topic_matches = sum(1 for kw in topic_keywords if kw in text_lower)
-            if topic_matches == 0:
+
+            # If no matches at all, reject
+            if topic_matches == 0 and project_matches == 0:
+                if debug:
+                    self.logger.info(f"❌ REJECTED (no keywords): {text_preview}")
                 return project_matches, 0.0, 0.0, False
 
             # Keyword-based scoring as fallback
             total_keywords = len(project_keywords) + len(topic_keywords) * 3
             weighted_matches = project_matches + (topic_matches * 3)
             relevance_score = weighted_matches / total_keywords if total_keywords > 0 else 0.0
-            passes_threshold = relevance_score >= 0.3
+            passes_threshold = relevance_score >= 0.25  # Lowered from 0.3
+
+            if debug:
+                self.logger.info(
+                    f"{'✅ PASSED' if passes_threshold else '❌ REJECTED'} (keyword fallback): "
+                    f"score={relevance_score:.3f}, proj={project_matches}, topic={topic_matches} | {text_preview}"
+                )
+
             return project_matches, 0.0, relevance_score, passes_threshold
 
         # Calculate semantic similarity (0-1, where 1 is identical)
@@ -451,18 +461,28 @@ class ContextSearchService:
         bm25_score = bm25_raw / (bm25_raw + 5.0) if bm25_raw > 0 else 0.0
 
         # 4. Combined scoring with triple signals
-        # Project match: binary (has match or not) - weight 0.15
-        # Semantic similarity: continuous 0-1 - weight 0.60
+        # Project match: optional bonus - weight 0.10 (reduced from 0.15)
+        # Semantic similarity: continuous 0-1 - weight 0.65 (increased from 0.60)
         # BM25 keyword quality: continuous 0-1 - weight 0.25
-        project_signal = 0.15 if project_matches > 0 else 0.0
-        semantic_signal = 0.60 * semantic_similarity
+        project_signal = 0.10 if project_matches > 0 else 0.0
+        semantic_signal = 0.65 * semantic_similarity
         bm25_signal = 0.25 * bm25_score
 
         relevance_score = project_signal + semantic_signal + bm25_signal
 
-        # Passes threshold if EITHER semantic similarity >= 0.4 OR BM25 score >= 0.3
-        # This allows both semantic matches AND strong keyword matches
-        passes_threshold = (semantic_similarity >= 0.4) or (bm25_score >= 0.3)
+        # LOWERED THRESHOLDS: Passes if semantic >= 0.30 OR BM25 >= 0.25 OR (project match AND semantic >= 0.25)
+        # This allows semantic matching to work even without project keywords
+        passes_threshold = (
+            semantic_similarity >= 0.30 or  # Lowered from 0.4
+            bm25_score >= 0.25 or  # Lowered from 0.3
+            (project_matches > 0 and semantic_similarity >= 0.25)  # Project bonus
+        )
+
+        if debug:
+            self.logger.info(
+                f"{'✅ PASSED' if passes_threshold else '❌ REJECTED'}: "
+                f"score={relevance_score:.3f} (sem={semantic_similarity:.3f}, bm25={bm25_score:.3f}, proj={project_matches}) | {text_preview}"
+            )
 
         return project_matches, semantic_similarity, relevance_score, passes_threshold
 
@@ -471,7 +491,8 @@ class ContextSearchService:
         query: str,
         days_back: int = 90,
         sources: List[str] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        debug: bool = True  # Enable debug logging by default for now
     ) -> ContextSearchResults:
         """Search for context across all sources.
 
@@ -480,6 +501,7 @@ class ContextSearchService:
             days_back: How many days back to search
             sources: List of sources to search ('slack', 'fireflies', 'jira', 'notion')
             user_id: User ID for accessing user-specific credentials
+            debug: Enable debug logging for scoring
 
         Returns:
             ContextSearchResults with aggregated results
@@ -490,23 +512,27 @@ class ContextSearchService:
         # Detect project and expand query with keywords (two-tier: project + topic)
         detected_project, project_keywords, topic_keywords = self._detect_project_and_expand_query(query)
 
+        self.logger.info(f"🔍 SEARCH DEBUG: query='{query}', project={detected_project}")
+        self.logger.info(f"  Project keywords: {project_keywords}")
+        self.logger.info(f"  Topic keywords: {topic_keywords}")
+
         all_results = []
 
         # Search each source with hybrid semantic + keyword matching
         if 'slack' in sources:
-            slack_results = await self._search_slack(query, days_back, user_id, project_keywords, topic_keywords)
+            slack_results = await self._search_slack(query, days_back, user_id, project_keywords, topic_keywords, debug)
             all_results.extend(slack_results)
 
         if 'fireflies' in sources:
-            fireflies_results = await self._search_fireflies(query, days_back, user_id, project_keywords, topic_keywords)
+            fireflies_results = await self._search_fireflies(query, days_back, user_id, project_keywords, topic_keywords, debug)
             all_results.extend(fireflies_results)
 
         if 'jira' in sources:
-            jira_results = await self._search_jira(query, days_back, detected_project, project_keywords, topic_keywords)
+            jira_results = await self._search_jira(query, days_back, detected_project, project_keywords, topic_keywords, debug)
             all_results.extend(jira_results)
 
         if 'notion' in sources:
-            notion_results = await self._search_notion(query, days_back, user_id, project_keywords, topic_keywords)
+            notion_results = await self._search_notion(query, days_back, user_id, project_keywords, topic_keywords, debug)
             all_results.extend(notion_results)
 
         # Sort by relevance score first, then by date
@@ -530,7 +556,7 @@ class ContextSearchService:
         user_id: Optional[int] = None,
         project_keywords: Set[str] = None,
         topic_keywords: Set[str] = None
-    ) -> List[SearchResult]:
+    , debug: bool = False) -> List[SearchResult]:
         """Search Slack messages across channels with two-tier keyword matching.
 
         If user has OAuth token, use search.messages API for better results.
@@ -569,7 +595,7 @@ class ContextSearchService:
         user_token: str,
         project_keywords: Set[str],
         topic_keywords: Set[str]
-    ) -> List[SearchResult]:
+    , debug: bool = False) -> List[SearchResult]:
         """Search Slack using user token and search.messages API with two-tier matching."""
         try:
             from slack_sdk import WebClient
@@ -613,9 +639,7 @@ class ContextSearchService:
                     message_text = match.get('text', '')
 
                     # Score message with hybrid semantic matching
-                    proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
-                        message_text, query, project_keywords, topic_keywords
-                    )
+                    proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(message_text, query, project_keywords, topic_keywords, debug)
 
                     # Skip messages that don't pass threshold
                     if not passes:
@@ -647,7 +671,7 @@ class ContextSearchService:
         days_back: int,
         project_keywords: Set[str],
         topic_keywords: Set[str]
-    ) -> List[SearchResult]:
+    , debug: bool = False) -> List[SearchResult]:
         """Search Slack using bot token and conversations.history with two-tier matching.
 
         Note: Bot tokens cannot use search.messages API, so we use conversations.history
@@ -702,9 +726,7 @@ class ContextSearchService:
                         message_text = message.get('text', '')
 
                         # Score message with hybrid semantic matching
-                        proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
-                            message_text, query, project_keywords, topic_keywords
-                        )
+                        proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(message_text, query, project_keywords, topic_keywords, debug)
 
                         # Skip messages that don't pass threshold
                         if not passes:
@@ -755,7 +777,7 @@ class ContextSearchService:
         user_id: Optional[int] = None,
         project_keywords: Set[str] = None,
         topic_keywords: Set[str] = None
-    ) -> List[SearchResult]:
+    , debug: bool = False) -> List[SearchResult]:
         """Search Fireflies meeting transcripts with two-tier matching."""
         if project_keywords is None:
             project_keywords = set()
@@ -803,9 +825,7 @@ class ContextSearchService:
                 combined_text = f"{meeting_title} {transcript.transcript}"
 
                 # Score with hybrid semantic matching (keywords for project, embeddings for topic)
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
-                    combined_text, query, project_keywords, topic_keywords
-                )
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(combined_text, query, project_keywords, topic_keywords, debug)
 
                 # Skip meetings that don't pass threshold
                 if not passes:
@@ -838,7 +858,7 @@ class ContextSearchService:
         project_key: Optional[str] = None,
         project_keywords: Set[str] = None,
         topic_keywords: Set[str] = None
-    ) -> List[SearchResult]:
+    , debug: bool = False) -> List[SearchResult]:
         """Search Jira issues and comments with project filtering and two-tier matching."""
         if project_keywords is None:
             project_keywords = set()
@@ -891,9 +911,7 @@ class ContextSearchService:
                 combined_text = f"{summary} {description}"
 
                 # Score with hybrid semantic matching
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
-                    combined_text, query, project_keywords, topic_keywords
-                )
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(combined_text, query, project_keywords, topic_keywords, debug)
 
                 # Skip issues that don't pass threshold
                 if not passes:
@@ -926,7 +944,7 @@ class ContextSearchService:
         user_id: Optional[int] = None,
         project_keywords: Set[str] = None,
         topic_keywords: Set[str] = None
-    ) -> List[SearchResult]:
+    , debug: bool = False) -> List[SearchResult]:
         """Search Notion pages and databases using the Notion API with two-tier matching."""
         if project_keywords is None:
             project_keywords = set()
@@ -1013,9 +1031,7 @@ class ContextSearchService:
 
                 # Score with hybrid semantic matching
                 # For now, just use title since fetching full content requires separate API call
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
-                    title, query, project_keywords, topic_keywords
-                )
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(title, query, project_keywords, topic_keywords, debug)
 
                 # Skip pages that don't pass threshold
                 if not passes:
