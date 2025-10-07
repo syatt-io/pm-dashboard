@@ -142,21 +142,12 @@ analyzer = TranscriptAnalyzer()
 notifier = NotificationManager(settings.notifications)
 todo_manager = TodoManager()
 
-# Initialize Slack bot if tokens are available
-slack_bot = None
-if settings.notifications.slack_bot_token:
-    try:
-        slack_bot = SlackTodoBot(
-            bot_token=settings.notifications.slack_bot_token,
-            signing_secret=getattr(settings.notifications, 'slack_signing_secret', 'dummy_secret')
-        )
-        logger.info("Slack bot initialized successfully")
-    except Exception as e:
-        logger.warning(f"Failed to initialize Slack bot: {e}")
-        slack_bot = None
-
-# Initialize Slack routes with bot instance
-init_slack_routes(slack_bot)
+# Initialize Slack routes with config (lazy initialization - bot created on first use)
+init_slack_routes(
+    bot_token=settings.notifications.slack_bot_token,
+    signing_secret=getattr(settings.notifications, 'slack_signing_secret', 'dummy_secret')
+)
+logger.info("Slack routes initialized (bot will be created on first use)")
 
 # Initialize Projects routes with notifier
 init_projects_routes(notifier)
