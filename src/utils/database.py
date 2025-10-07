@@ -25,8 +25,8 @@ def get_engine():
         if is_production and 'postgresql' in db_url:
             _engine = create_engine(
                 db_url,
-                pool_size=2,  # Small pool per worker (4 workers × 2 = 8 base connections)
-                max_overflow=3,  # Allow small bursts (4 workers × 3 = 12 max connections)
+                pool_size=1,  # Minimal pool per worker (4 workers × 1 = 4 base connections)
+                max_overflow=1,  # Minimal overflow (4 workers × 1 = 4 burst = 8 total max)
                 pool_pre_ping=True,  # Verify connections before using
                 pool_recycle=1800,  # Recycle connections after 30 minutes
                 connect_args={
