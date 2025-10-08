@@ -41,7 +41,14 @@ class ProjectKeywordSync:
             # Fetch all projects
             logger.info("Fetching Jira projects for keyword mapping...")
             projects_response = await jira_client.get_projects()
-            projects = projects_response.get('projects', [])
+
+            # Handle both dict and list responses
+            if isinstance(projects_response, dict):
+                projects = projects_response.get('projects', [])
+            elif isinstance(projects_response, list):
+                projects = projects_response
+            else:
+                projects = []
 
             if not projects:
                 logger.warning("No Jira projects found")
