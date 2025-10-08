@@ -126,7 +126,7 @@ class ContextSearchService:
         """
         project_keywords_map = self._get_project_keywords()
 
-        # Extract potential project keys (uppercase words 2-5 chars)
+        # Extract potential project keys (uppercase words 2-5 chars like "BC", "SUBS")
         potential_keys = re.findall(r'\b[A-Z]{2,5}\b', query.upper())
 
         detected_project = None
@@ -141,6 +141,23 @@ class ContextSearchService:
                 project_keywords.update(project_keywords_map[key])
                 self.logger.info(f"Detected project {key} with {len(project_keywords_map[key])} related keywords")
                 break
+
+        # If no project key found yet, try matching query words against keyword mappings
+        # This handles queries like "beauchamp's cart" where "beauchamp" maps to BC project
+        if not detected_project:
+            query_words = re.findall(r'\b\w{3,}\b', query.lower())
+
+            # Check each word against all project keyword mappings
+            for project_key, keywords in project_keywords_map.items():
+                for word in query_words:
+                    if word in keywords:
+                        detected_project = project_key
+                        project_keywords.add(project_key.lower())
+                        project_keywords.update(keywords)
+                        self.logger.info(f"Detected project {project_key} via keyword '{word}' (from {len(keywords)} keywords)")
+                        break
+                if detected_project:
+                    break
 
         # Tokenize the query into topic keywords (min 3 chars, exclude common words and project terms)
         query_words = re.findall(r'\b\w{3,}\b', query.lower())
@@ -944,9 +961,10 @@ class ContextSearchService:
             if project_key:
                 jql = f'project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC'
             else:
-                # No project detected - skip Jira search (auto-sync should populate keywords)
-                self.logger.info("Skipping Jira search - no project detected. Run project keyword sync to enable auto-detection.")
-                return []
+                # No project detected - search all projects (semantic matching will filter)
+                # This ensures we don't miss results when keyword mapping hasn't populated yet
+                jql = f'updated >= -{days_back}d ORDER BY updated DESC'
+                self.logger.info("Searching all Jira projects - no specific project detected")
 
             self.logger.info(f"Jira search JQL: {jql}")
 
