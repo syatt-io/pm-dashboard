@@ -260,6 +260,19 @@ FOR SLACK CONVERSATIONS:
 - Note any decisions or consensus reached
 - Extract technical details shared in discussions
 
+FOR GITHUB (PRs & Commits):
+- Extract implementation details from PR descriptions
+- Note what was built, fixed, or changed
+- Capture technical approach and code changes mentioned
+- Include PR status (merged, open, closed) and dates
+- Extract any requirements or specs discussed in PR comments
+
+FOR NOTION PAGES:
+- Extract documentation and specifications
+- Capture project overviews and architecture decisions
+- Note any roadmaps, timelines, or planning documents
+- Include design decisions and rationale
+
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS (DO NOT SKIP ANY SECTIONS):
 
 TLDR:
