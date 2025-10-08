@@ -90,6 +90,14 @@ CORS(app, origins=cors_origins, supports_credentials=True,
 # Initialize database once at startup
 init_database()
 
+# Run project_keywords migration (auto-detects PostgreSQL vs SQLite)
+try:
+    from scripts.run_migration import run_migration
+    run_migration()
+    logger.info("✅ Project keywords migration completed")
+except Exception as e:
+    logger.warning(f"Project keywords migration skipped or failed: {e}")
+
 # Get session factory for auth services
 db_session_factory = get_session_factory()
 
