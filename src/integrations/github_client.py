@@ -341,9 +341,19 @@ class GitHubClient:
                 first_keyword,  # "beauchamp"
                 f"{first_keyword}-store",  # "beauchamp-store"
                 f"{first_keyword}s",  # "beauchamps"
+                f"{first_keyword}s-store",  # "beauchamps-store"
                 f"{first_keyword}-api",
                 f"{first_keyword}-frontend"
             ])
+
+            # Also try variants of all keywords, not just first one
+            for kw in project_keywords[1:]:
+                if len(kw) >= 4:  # Only consider meaningful keywords
+                    candidates.extend([
+                        kw,
+                        f"{kw}-store",
+                        f"{kw}s"
+                    ])
 
         # Special case for "ethel" middleware repo (shared across projects)
         candidates.append("ethel")
