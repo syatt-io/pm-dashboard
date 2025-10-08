@@ -184,8 +184,8 @@ class GitHubClient:
         """Search for pull requests."""
         query_parts = []
 
-        # Add keyword search
-        keyword_query = " OR ".join(query_keywords[:5])  # Limit to 5 keywords
+        # Add keyword search (without OR - GitHub handles space-separated terms better)
+        keyword_query = " ".join(query_keywords[:5])  # Limit to 5 keywords
         if keyword_query:
             query_parts.append(keyword_query)
 
