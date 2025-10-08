@@ -2249,15 +2249,45 @@ class SlackTodoBot:
         Returns:
             Formatted summary with better paragraph spacing
         """
-        # Split into paragraphs (AI typically uses single newlines)
-        paragraphs = summary.split('\n')
+        # Split by double newlines first (if AI already formatted well)
+        if '\n\n' in summary:
+            # AI already added paragraph breaks - just clean up
+            paragraphs = [p.strip() for p in summary.split('\n\n') if p.strip()]
+            return '\n\n'.join(paragraphs)
 
-        # Filter out empty paragraphs and add spacing
-        formatted_paragraphs = []
-        for para in paragraphs:
-            para = para.strip()
+        # Otherwise split by single newlines and group
+        lines = [line.strip() for line in summary.split('\n') if line.strip()]
+
+        # Group consecutive non-empty lines into paragraphs
+        # (Assume each sentence ending with period is part of same paragraph)
+        paragraphs = []
+        current_para = []
+
+        for line in lines:
+            current_para.append(line)
+            # If line ends with period and next line exists, might be paragraph break
+            # For now, just join all lines with spaces and let AI formatting win
+
+        if current_para:
+            # Join everything with single space, then split by double spaces
+            full_text = ' '.join(current_para)
+            # Normalize spacing
+            import re
+            full_text = re.sub(r'\s+', ' ', full_text)
+            # Split into sentences (rough heuristic)
+            sentences = re.split(r'(\. )', full_text)
+
+            # Group sentences into paragraphs of ~3-5 sentences
+            para = []
+            for i, part in enumerate(sentences):
+                para.append(part)
+                # Every ~4 sentences or at period boundary, make new paragraph
+                if part == '. ' and len(para) >= 8:  # ~4 sentences (text + period)
+                    paragraphs.append(''.join(para).strip())
+                    para = []
+
             if para:
-                formatted_paragraphs.append(para)
+                paragraphs.append(''.join(para).strip())
 
         # Join with double newlines for Slack spacing
-        return '\n\n'.join(formatted_paragraphs)
+        return '\n\n'.join(paragraphs) if paragraphs else summary

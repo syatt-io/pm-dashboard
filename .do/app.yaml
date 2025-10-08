@@ -82,6 +82,16 @@ services:
       - key: TEMPO_API_TOKEN
         type: SECRET
 
+      # GitHub App (for context search)
+      - key: GITHUB_APP_ID
+        type: SECRET
+      - key: GITHUB_APP_PRIVATE_KEY
+        type: SECRET
+      - key: GITHUB_APP_INSTALLATION_ID
+        type: SECRET
+      - key: GITHUB_ORGANIZATION
+        value: syatt-io
+
     health_check:
       http_path: /api/health
       initial_delay_seconds: 30
