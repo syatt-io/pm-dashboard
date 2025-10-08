@@ -1065,6 +1065,15 @@ class ContextSearchService:
                 settings.github.installation_id
             ])
 
+            # Debug logging to diagnose GitHub auth issue
+            self.logger.info(f"🔍 GitHub auth check:")
+            self.logger.info(f"  api_token: {'SET' if settings.github.api_token else 'NOT SET'} (len={len(settings.github.api_token) if settings.github.api_token else 0})")
+            self.logger.info(f"  app_id: {settings.github.app_id or 'NOT SET'}")
+            self.logger.info(f"  private_key: {'SET' if settings.github.private_key else 'NOT SET'} (len={len(settings.github.private_key) if settings.github.private_key else 0})")
+            self.logger.info(f"  installation_id: {settings.github.installation_id or 'NOT SET'}")
+            self.logger.info(f"  organization: {settings.github.organization or 'NOT SET'}")
+            self.logger.info(f"  has_token={has_token}, has_app={has_app}")
+
             if not (has_token or has_app):
                 self.logger.info("GitHub authentication not configured - skipping GitHub search")
                 return []
