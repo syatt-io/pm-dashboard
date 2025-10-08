@@ -64,6 +64,13 @@ class PineconeConfig:
 
 
 @dataclass
+class GitHubConfig:
+    """GitHub API configuration."""
+    api_token: str
+    organization: str = ""  # Optional: filter to org repos only
+
+
+@dataclass
 class WebConfig:
     """Web interface configuration."""
     base_url: str = "http://localhost:3030"
@@ -87,6 +94,7 @@ class Settings:
     def __init__(self):
         self.fireflies = self._load_fireflies_config()
         self.jira = self._load_jira_config()
+        self.github = self._load_github_config()
         self.notifications = self._load_notification_config()
         self.ai = self._load_ai_config()
         self.agent = self._load_agent_config()
@@ -117,6 +125,15 @@ class Settings:
             username=username,
             api_token=api_token,
             default_project=os.getenv("JIRA_DEFAULT_PROJECT")
+        )
+
+    @staticmethod
+    def _load_github_config() -> GitHubConfig:
+        api_token = os.getenv("GITHUB_API_TOKEN", "")
+
+        return GitHubConfig(
+            api_token=api_token,
+            organization=os.getenv("GITHUB_ORGANIZATION", "")
         )
 
     @staticmethod

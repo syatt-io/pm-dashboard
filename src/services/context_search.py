@@ -563,7 +563,7 @@ class ContextSearchService:
             ContextSearchResults with aggregated results
         """
         if sources is None:
-            sources = ['slack', 'fireflies', 'jira', 'notion']
+            sources = ['slack', 'fireflies', 'jira', 'github', 'notion']
 
         # Detect project and expand query with keywords (two-tier: project + topic)
         detected_project, project_keywords, topic_keywords = self._detect_project_and_expand_query(query)
@@ -586,6 +586,10 @@ class ContextSearchService:
         if 'jira' in sources:
             jira_results = await self._search_jira(query, days_back, detected_project, project_keywords, topic_keywords, debug)
             all_results.extend(jira_results)
+
+        if 'github' in sources:
+            github_results = await self._search_github(query, days_back, detected_project, project_keywords, topic_keywords, debug)
+            all_results.extend(github_results)
 
         if 'notion' in sources:
             notion_results = await self._search_notion(query, days_back, user_id, project_keywords, topic_keywords, debug)
@@ -1030,6 +1034,123 @@ class ContextSearchService:
 
         except Exception as e:
             self.logger.error(f"Error searching Jira: {e}")
+            return []
+
+    async def _search_github(
+        self,
+        query: str,
+        days_back: int,
+        project_key: Optional[str] = None,
+        project_keywords: Set[str] = None,
+        topic_keywords: Set[str] = None,
+        debug: bool = False
+    ) -> List[SearchResult]:
+        """Search GitHub PRs and commits with semantic matching."""
+        if project_keywords is None:
+            project_keywords = set()
+        if topic_keywords is None:
+            topic_keywords = set(query.lower().split())
+
+        try:
+            from src.integrations.github_client import GitHubClient
+            from config.settings import settings
+
+            if not settings.github.api_token:
+                self.logger.info("GitHub API token not configured - skipping GitHub search")
+                return []
+
+            github_client = GitHubClient(
+                api_token=settings.github.api_token,
+                organization=settings.github.organization
+            )
+
+            # Auto-detect repo name from project keywords
+            repo_name = None
+            if project_key and project_keywords:
+                repo_name = github_client.detect_repo_name(project_key, list(project_keywords))
+                self.logger.info(f"Detected GitHub repo: {repo_name}")
+
+            # Search PRs and commits
+            all_keywords = list(project_keywords | topic_keywords)
+            github_data = await github_client.search_prs_and_commits(
+                query_keywords=all_keywords,
+                repo_name=repo_name,
+                days_back=days_back
+            )
+
+            results = []
+
+            # Process PRs
+            for pr in github_data.get("prs", []):
+                # Combine title and body for scoring
+                combined_text = f"{pr['title']} {pr.get('body', '')}"
+
+                # Score with semantic matching
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
+                    combined_text, query, project_keywords, topic_keywords, debug
+                )
+
+                if not passes:
+                    continue
+
+                # Parse date
+                created_at = pr.get("created_at", "")
+                try:
+                    pr_date = datetime.fromisoformat(created_at.replace('Z', '+00:00')) if created_at else datetime.now()
+                except:
+                    pr_date = datetime.now()
+
+                # Create snippet from PR body
+                snippet = f"PR #{pr['number']}: {pr['title']}\n{pr.get('body', '')[:300]}..."
+
+                results.append(SearchResult(
+                    source='github',
+                    title=f"PR #{pr['number']}: {pr['title']} [{pr['repo']}]",
+                    content=snippet,
+                    date=pr_date,
+                    url=pr.get('url'),
+                    author=pr.get('user'),
+                    relevance_score=relevance_score
+                ))
+
+            # Process commits
+            for commit in github_data.get("commits", []):
+                # Score commit message
+                commit_message = commit.get("message", "")
+
+                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
+                    commit_message, query, project_keywords, topic_keywords, debug
+                )
+
+                if not passes:
+                    continue
+
+                # Parse date
+                commit_date_str = commit.get("date", "")
+                try:
+                    commit_date = datetime.fromisoformat(commit_date_str.replace('Z', '+00:00')) if commit_date_str else datetime.now()
+                except:
+                    commit_date = datetime.now()
+
+                # Create snippet from commit message
+                first_line = commit_message.split('\n')[0][:100]
+                snippet = f"Commit: {first_line}\n{commit_message[:300]}..."
+
+                results.append(SearchResult(
+                    source='github',
+                    title=f"Commit: {first_line} [{commit['repo']}]",
+                    content=snippet,
+                    date=commit_date,
+                    url=commit.get('url'),
+                    author=commit.get('author'),
+                    relevance_score=relevance_score
+                ))
+
+            self.logger.info(f"Found {len(results)} GitHub PRs/commits with semantic matching")
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Error searching GitHub: {e}")
             return []
 
     async def _search_notion(

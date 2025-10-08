@@ -26,7 +26,8 @@ class Citation:
 class SummarizedContext:
     """AI-generated summary with inline citations."""
     tldr: str  # 2-3 sentence executive summary
-    summary: str  # Main comprehensive summary with inline [1], [2] citations
+    project_context: str  # Structured project context (requirements, decisions, status, etc.)
+    summary: str  # Main comprehensive narrative summary with inline [1], [2] citations
     open_questions: List[str]  # Unanswered questions or gaps
     action_items: List[str]  # Extracted action items
     citations: List[Citation]  # Ordered list of citations
@@ -66,6 +67,7 @@ class ContextSummarizer:
         if not results:
             return SummarizedContext(
                 tldr="No results found.",
+                project_context="",
                 summary="No results found.",
                 open_questions=[],
                 action_items=[],
@@ -155,6 +157,7 @@ class ContextSummarizer:
 
             return SummarizedContext(
                 tldr=summary_data['tldr'],
+                project_context=summary_data['project_context'],
                 summary=summary_data['summary'],
                 open_questions=summary_data['open_questions'],
                 action_items=summary_data['action_items'],
@@ -169,6 +172,7 @@ class ContextSummarizer:
             # Fallback to basic summary
             return SummarizedContext(
                 tldr=f"Found {len(results)} results for '{query}'. AI summary failed.",
+                project_context="",
                 summary=f"Found {len(results)} results related to '{query}'. "
                         f"Unable to generate AI summary. Error: {str(e)}",
                 open_questions=[],
@@ -256,33 +260,28 @@ FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 TLDR:
 [2-3 sentences that capture the essence - the absolute must-know information. Make it punchy and actionable.]
 
-SUMMARY:
-[Comprehensive multi-paragraph summary with inline citations [1], [2], etc. Include ALL relevant details organized logically. Aim for 400-800 words if needed to be thorough.]
+PROJECT_CONTEXT:
+• Project start date: [if found in sources]
+• Current status: [if found]
+• Known requirements: [bulleted list if found]
+• Completed work: [bulleted list if found]
+• Pending/needs scoping: [bulleted list if found]
+• Key decisions: [bulleted list if found]
+• Blockers/risks: [bulleted list if found]
+• Key people: [names if found]
+• Important dates: [timeline if found]
+• Open questions: [questions if found]
+• Action items: [action items if found]
+(Only include bullet points that have relevant information from the sources. Skip empty categories.)
 
-OPEN_QUESTIONS:
-- What specific question/gap remains? [cite relevant source if applicable]
-- What information is missing or unclear?
-(Write "None" if everything is clear)
-
-ACTION_ITEMS:
-- Specific action that needs to be taken [citation if mentioned in source]
-- Next steps identified in discussions
-(Write "None" if no action items found)
+DETAILED_SUMMARY:
+[Comprehensive multi-paragraph narrative summary with inline citations [1], [2], etc. Include ALL relevant technical details organized logically. Aim for 400-800 words if needed to be thorough. This should complement the PROJECT_CONTEXT section with narrative flow and technical specifics.]
 
 KEY_QUOTES:
-For each citation you reference in the summary, extract the single most important quote:
+For each citation you reference in the detailed summary, extract the single most important quote:
 [1]: "Exact quote from source 1 that's most relevant"
 [2]: "Exact quote from source 2 that's most relevant"
-(Only include quotes for citations you actually used in SUMMARY)
-
-KEY_PEOPLE:
-- Person Name 1
-- Person Name 2
-(Write "None" if no people mentioned)
-
-TIMELINE:
-- YYYY-MM-DD: Event description [citation]
-(Write "None" if no timeline)
+(Only include quotes for citations you actually used in DETAILED_SUMMARY)
 
 CONFIDENCE: high|medium|low
 
@@ -311,6 +310,7 @@ GUIDELINES:
         # Default values
         result = {
             'tldr': '',
+            'project_context': '',
             'summary': '',
             'open_questions': [],
             'action_items': [],
@@ -323,12 +323,9 @@ GUIDELINES:
         # Split response into sections
         sections = {
             'TLDR:': 'tldr',
-            'SUMMARY:': 'summary',
-            'OPEN_QUESTIONS:': 'open_questions',
-            'ACTION_ITEMS:': 'action_items',
+            'PROJECT_CONTEXT:': 'project_context',
+            'DETAILED_SUMMARY:': 'summary',
             'KEY_QUOTES:': 'key_quotes',
-            'KEY_PEOPLE:': 'key_people',
-            'TIMELINE:': 'timeline',
             'CONFIDENCE:': 'confidence'
         }
 
@@ -353,23 +350,11 @@ GUIDELINES:
                     break
             else:
                 # Not a header, add to current section
-                if current_section in ['summary', 'tldr']:
+                if current_section in ['summary', 'tldr', 'project_context']:
                     if result[current_section]:
-                        result[current_section] += ' ' + line
+                        result[current_section] += '\n' + line
                     else:
                         result[current_section] = line
-
-                elif current_section == 'open_questions':
-                    if line.lower() != 'none' and line.startswith('-'):
-                        question = line[1:].strip()
-                        if question:
-                            result['open_questions'].append(question)
-
-                elif current_section == 'action_items':
-                    if line.lower() != 'none' and line.startswith('-'):
-                        action = line[1:].strip()
-                        if action:
-                            result['action_items'].append(action)
 
                 elif current_section == 'key_quotes':
                     # Parse "[1]: Quote text" format
@@ -380,24 +365,6 @@ GUIDELINES:
                             citation_num = int(match.group(1))
                             quote = match.group(2).strip()
                             result['key_quotes'][citation_num] = quote
-
-                elif current_section == 'key_people':
-                    if line.lower() != 'none' and line.startswith('-'):
-                        person = line[1:].strip()
-                        if person:
-                            result['key_people'].append(person)
-
-                elif current_section == 'timeline':
-                    if line.lower() != 'none' and line.startswith('-'):
-                        # Parse "- YYYY-MM-DD: Event description"
-                        timeline_parts = line[1:].split(':', 1)
-                        if len(timeline_parts) == 2:
-                            date_str = timeline_parts[0].strip()
-                            event = timeline_parts[1].strip()
-                            result['timeline'].append({
-                                'date': date_str,
-                                'event': event
-                            })
 
         # Ensure confidence is valid
         if result['confidence'] not in ['high', 'medium', 'low']:
