@@ -485,6 +485,87 @@ class SlackTodoBot:
                 logger.error(f"Error showing quotes: {e}")
                 say(f"❌ Error: {str(e)}")
 
+        @self.app.action("context_show_sources")
+        def handle_show_sources(ack, body, say):
+            """Handle 'Show Sources' button click - display all citations inline."""
+            ack()
+
+            try:
+                session_id = body['actions'][0]['value'].split(':')[1]
+
+                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
+                    say("❌ Search session expired. Please run `/find-context` again.")
+                    return
+
+                session = self._search_sessions[session_id]
+                results = session['results']
+                citations = getattr(results, 'citations', []) or []
+
+                if not citations:
+                    say("No sources/citations available for this search.")
+                    return
+
+                # Build sources display
+                blocks = [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f"📚 Sources & Citations: {session['query']}"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"Showing all {len(citations)} sources with citations:"
+                        }
+                    },
+                    {"type": "divider"}
+                ]
+
+                # Show all citations
+                for citation in citations:
+                    # Format source emoji
+                    source_emoji = {
+                        'slack': '💬',
+                        'fireflies': '🎙️',
+                        'jira': '📋',
+                        'github': '💻',
+                        'notion': '📝'
+                    }.get(citation.source, '📄')
+
+                    # Format date
+                    date_str = citation.date.strftime('%Y-%m-%d')
+
+                    # Build citation text
+                    citation_text = f"*[{citation.id}]* {source_emoji} *{citation.title}*\n"
+                    citation_text += f"_{date_str}_ • _{citation.author}_"
+
+                    # Add key quote if available
+                    if citation.key_quote:
+                        # Truncate long quotes
+                        quote = citation.key_quote[:200] + "..." if len(citation.key_quote) > 200 else citation.key_quote
+                        citation_text += f"\n💡 _{quote}_"
+
+                    # Add URL if available
+                    if citation.url:
+                        citation_text += f"\n<{citation.url}|View Full Source>"
+
+                    blocks.append({
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": citation_text
+                        }
+                    })
+
+                say(blocks=blocks)
+
+            except Exception as e:
+                logger.error(f"Error showing sources: {e}")
+                say(f"❌ Error: {str(e)}")
+
         @self.app.action("context_expand_search")
         def handle_expand_search(ack, body, say):
             """Handle 'Expand Search' button click."""
@@ -1997,7 +2078,7 @@ class SlackTodoBot:
                 }
             ]
 
-            # Add TL;DR section (new!)
+            # Add TL;DR section
             if hasattr(results, 'tldr') and results.tldr:
                 blocks.append({
                     "type": "section",
@@ -2008,9 +2089,20 @@ class SlackTodoBot:
                 })
                 blocks.append({"type": "divider"})
 
-            # Add full AI summary with citations
+            # Add PROJECT_CONTEXT section (structured information)
+            if hasattr(results, 'project_context') and results.project_context:
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*📋 Project Context*\n{results.project_context}"
+                    }
+                })
+                blocks.append({"type": "divider"})
+
+            # Add DETAILED_SUMMARY (narrative flow)
             if results.summary:
-                summary_text = f"*📝 Full Context*\n{results.summary}\n\n_Numbers in [brackets] are citations - see sources below for quotes._"
+                summary_text = f"*📝 Detailed Summary*\n{results.summary}\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
                 blocks.append({
                     "type": "section",
                     "text": {
@@ -2019,100 +2111,8 @@ class SlackTodoBot:
                     }
                 })
 
-            # Add action items (new!)
-            if hasattr(results, 'action_items') and results.action_items:
-                actions_text = "\n".join([f"• {item}" for item in results.action_items])
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*✅ Action Items*\n{actions_text}"
-                    }
-                })
-
-            # Add open questions (new!)
-            if hasattr(results, 'open_questions') and results.open_questions:
-                questions_text = "\n".join([f"• {q}" for q in results.open_questions])
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*❓ Open Questions*\n{questions_text}"
-                    }
-                })
-
-            # Add key people if available
-            if results.key_people:
-                people_str = ", ".join(results.key_people)
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*👥 Key People:* {people_str}"
-                    }
-                })
-
-            # Add timeline if available
-            if results.timeline:
-                timeline_text = "\n".join([
-                    f"• *{item['date']}*: {item['event']}"
-                    for item in results.timeline
-                ])
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*📅 Timeline:*\n{timeline_text}"
-                    }
-                })
-
-            # Add divider
+            # Add divider before footer
             blocks.append({"type": "divider"})
-
-            # Add citations/sources with enhanced display
-            citations = getattr(results, 'citations', []) or []
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*📚 Sources & Citations* ({min(10, len(citations))} shown)"
-                }
-            })
-
-            # Show top 10 citations (increased from 5 for better coverage)
-            for citation in citations[:10]:
-                # Format source emoji
-                source_emoji = {
-                    'slack': '💬',
-                    'fireflies': '🎙️',
-                    'jira': '📋',
-                    'notion': '📝'
-                }.get(citation.source, '📄')
-
-                # Format date
-                date_str = citation.date.strftime('%Y-%m-%d')
-
-                # Build citation text with enhanced format
-                citation_text = f"*[{citation.id}]* {source_emoji} *{citation.title}*\n"
-                citation_text += f"_{date_str}_ • _{citation.author}_"
-
-                # Add key quote if available (new!)
-                if citation.key_quote:
-                    # Truncate long quotes
-                    quote = citation.key_quote[:200] + "..." if len(citation.key_quote) > 200 else citation.key_quote
-                    citation_text += f"\n💡 _{quote}_"
-
-                # Add URL if available
-                if citation.url:
-                    citation_text += f"\n<{citation.url}|View Full Source>"
-
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": citation_text
-                    }
-                })
 
             # Add footer with stats
             total_results = len(results.results)
@@ -2120,7 +2120,9 @@ class SlackTodoBot:
             for result in results.results:
                 source_counts[result.source] = source_counts.get(result.source, 0) + 1
 
-            stats_text = f"Found {total_results} results: "
+            # Count citations for display
+            citations = getattr(results, 'citations', []) or []
+            stats_text = f"Found {total_results} results"
             stats_parts = []
             if source_counts.get('slack'):
                 stats_parts.append(f"{source_counts['slack']} Slack")
@@ -2128,7 +2130,11 @@ class SlackTodoBot:
                 stats_parts.append(f"{source_counts['fireflies']} Fireflies")
             if source_counts.get('jira'):
                 stats_parts.append(f"{source_counts['jira']} Jira")
-            stats_text += ", ".join(stats_parts)
+            if source_counts.get('github'):
+                stats_parts.append(f"{source_counts['github']} GitHub")
+            if stats_parts:
+                stats_text += f": {', '.join(stats_parts)}"
+            stats_text += f" • {len(citations)} sources with citations"
 
             blocks.append({
                 "type": "context",
@@ -2180,10 +2186,11 @@ class SlackTodoBot:
                         "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": "🔍 Show More Details"
+                            "text": "📚 Show Sources"
                         },
-                        "value": f"show_details:{session_id}",
-                        "action_id": "context_show_details"
+                        "value": f"show_sources:{session_id}",
+                        "action_id": "context_show_sources",
+                        "style": "primary"
                     },
                     {
                         "type": "button",
