@@ -23,20 +23,26 @@ def get_engine():
 
         # PostgreSQL-specific settings for production
         if is_production and 'postgresql' in db_url:
+            # Connection pool settings for production
+            # With 25 max connections in DB, we need to leave room for:
+            # - Admin connections (5)
+            # - Other services/jobs (5)
+            # - Web app connections (15)
+            # Formula: pool_size=3, max_overflow=2 per worker × 4 workers = 20 max connections
             _engine = create_engine(
                 db_url,
-                pool_size=0,  # No persistent connections per worker
-                max_overflow=2,  # Only 2 connections max per worker (4 workers × 2 = 8 total max)
-                pool_pre_ping=True,  # Verify connections before using
-                pool_recycle=600,  # Recycle connections after 10 minutes (shorter)
-                pool_timeout=5,  # Wait max 5 seconds for a connection
+                pool_size=3,  # 3 persistent connections per worker
+                max_overflow=2,  # Allow 2 extra connections per worker under load
+                pool_pre_ping=True,  # Verify connections before using (prevents stale connections)
+                pool_recycle=300,  # Recycle connections after 5 minutes (prevent stale connections)
+                pool_timeout=10,  # Wait max 10 seconds for a connection
                 connect_args={
-                    "connect_timeout": 5,  # Faster connection timeout
+                    "connect_timeout": 10,  # Connection timeout
                     "options": "-c statement_timeout=30000"  # 30 second statement timeout
                 },
                 echo=False  # Disable SQL logging in production
             )
-            logger.info("Database engine initialized for production (PostgreSQL) with connection pooling")
+            logger.info("Database engine initialized for production (PostgreSQL) with connection pooling: pool_size=3, max_overflow=2")
         else:
             # Development or SQLite configuration
             connect_args = {}
