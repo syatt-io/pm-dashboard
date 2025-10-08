@@ -1099,16 +1099,28 @@ class ContextSearchService:
                     repo_name = detected_name
                     self.logger.info(f"✅ Detected GitHub repo: {repo_name} (verified accessible)")
                 else:
-                    # Try to find best match from accessible repos
+                    # Try to find best match from accessible repos using fuzzy matching
                     project_key_lower = project_key.lower()
-                    for repo in accessible_repos:
-                        if project_key_lower in repo.lower() or any(kw in repo.lower() for kw in project_keywords):
-                            repo_name = repo
-                            self.logger.info(f"✅ Matched GitHub repo: {repo_name} from accessible list")
-                            break
+                    matches = []
 
-                    if not repo_name:
-                        self.logger.warning(f"⚠️ Detected repo '{detected_name}' not accessible. Available: {accessible_repos[:5]}")
+                    for repo in accessible_repos:
+                        repo_lower = repo.lower()
+                        # Check if project key or any keyword matches
+                        if project_key_lower in repo_lower:
+                            matches.append((repo, len(project_key_lower)))  # Prioritize longer matches
+                        else:
+                            for kw in project_keywords:
+                                if kw and len(kw) >= 3 and kw in repo_lower:  # At least 3 chars to avoid false positives
+                                    matches.append((repo, len(kw)))
+                                    break
+
+                    if matches:
+                        # Pick the match with the longest matching keyword (more specific)
+                        repo_name = max(matches, key=lambda x: x[1])[0]
+                        self.logger.info(f"✅ Matched GitHub repo: {repo_name} (fuzzy match from project keywords)")
+                    else:
+                        self.logger.warning(f"⚠️ No matching repo found for project {project_key}. "
+                                          f"Detected: '{detected_name}', Available: {accessible_repos[:10]}")
             elif not accessible_repos:
                 self.logger.warning("No accessible repositories found for GitHub App")
 
