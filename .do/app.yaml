@@ -94,8 +94,8 @@ services:
 
     health_check:
       http_path: /api/health
-      initial_delay_seconds: 30
+      initial_delay_seconds: 60
       period_seconds: 10
-      timeout_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
       failure_threshold: 3
