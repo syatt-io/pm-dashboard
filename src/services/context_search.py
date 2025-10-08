@@ -862,7 +862,7 @@ class ContextSearchService:
 
                 # Extract relevant snippet around topic keywords (more important)
                 snippet_query = ' '.join(topic_keywords) if topic_keywords else ' '.join(project_keywords)
-                snippet = self._extract_snippet(transcript.transcript, snippet_query, max_length=1500)  # Increased from 300 for better context
+                snippet = self._extract_snippet(transcript.transcript, snippet_query, max_length=800)  # Balanced: enough context without exceeding AI limits
 
                 results.append(SearchResult(
                     source='fireflies',
@@ -1172,8 +1172,9 @@ class ContextSearchService:
                 return None
 
             # Use the new AI summarizer with project context and detail level
+            # Limit to 12 results to avoid context length issues (12 × ~800 chars = ~9600 chars < 8K token limit)
             summarizer = ContextSummarizer()
-            summarized = await summarizer.summarize(query, results[:20], debug=True, project_context=project_context, detail_level=detail_level)
+            summarized = await summarizer.summarize(query, results[:12], debug=True, project_context=project_context, detail_level=detail_level)
 
             # Convert timeline format to match expected format
             summarized.timeline = [
