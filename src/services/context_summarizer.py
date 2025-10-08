@@ -138,12 +138,17 @@ class ContextSummarizer:
             # Extract response
             ai_response = response.choices[0].message.content
 
+            if debug:
+                logger.info(f"🤖 RAW AI RESPONSE:\n{ai_response[:500]}...")
+                logger.info(f"📏 Full response length: {len(ai_response)} chars")
+
             # Parse structured response
             summary_data = self._parse_ai_response(ai_response)
 
             if debug:
                 logger.info(f"✅ Generated summary: {len(summary_data['summary'])} chars")
                 logger.info(f"  TL;DR: {summary_data['tldr'][:100]}...")
+                logger.info(f"  PROJECT_CONTEXT: {len(summary_data['project_context'])} chars")
                 logger.info(f"  Open questions: {len(summary_data['open_questions'])}")
                 logger.info(f"  Action items: {len(summary_data['action_items'])}")
                 logger.info(f"  Key quotes: {len(summary_data['key_quotes'])}")
