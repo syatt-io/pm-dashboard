@@ -117,7 +117,7 @@ class ContextSummarizer:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert technical analyst that creates comprehensive, structured summaries from project documentation.\n\nCRITICAL FORMATTING REQUIREMENTS - YOU WILL BE REJECTED IF YOU DO NOT FOLLOW THIS:\n1. You MUST include EXACTLY these sections in this order: TLDR, PROJECT_CONTEXT, DETAILED_SUMMARY, KEY_QUOTES, CONFIDENCE\n2. Each section header must be EXACTLY as specified with colon at the end\n3. PROJECT_CONTEXT must have ALL the bullet categories shown in the prompt, even if you write \"None found\"\n4. NEVER skip the PROJECT_CONTEXT section - it is MANDATORY\n5. DETAILED_SUMMARY is separate from PROJECT_CONTEXT - you need BOTH\n\nWrite in a casual, conversational tone - like you're explaining things to a teammate over coffee. Your summaries should be thorough enough that engineers can spec and build features without needing to reference source material. The PROJECT_CONTEXT section provides structured bullets for quick scanning, while DETAILED_SUMMARY provides narrative depth. Extract ALL relevant technical details, decisions, requirements, and context."
+                        "content": "You are an expert technical analyst helping engineers understand project context.\n\nYour goal: Provide a clear, comprehensive answer to the user's query using the search results provided.\n\nGuidelines:\n- Write in a casual, conversational tone - like explaining to a teammate\n- Include ALL relevant technical details (requirements, decisions, blockers, examples)\n- Use inline citations [1], [2] after claims to show sources\n- Organize information in whatever structure makes most sense for THIS query\n- Use markdown formatting (headings, lists, code blocks) as appropriate\n- Be thorough enough that the reader doesn't need to check sources\n- Include specific examples: ticket numbers, URLs, dates, names\n- Lead with the most important/actionable information\n\nThe format should adapt to the query:\n- Status checks → Timeline + current state + blockers\n- Bug investigations → Problem + impact + context + related work  \n- Feature exploration → Requirements + decisions + implementation details\n- General questions → Whatever structure best answers the question\n\nYou decide what structure works best. Just make it clear, thorough, and useful."
                     },
                     {
                         "role": "user",
@@ -222,184 +222,93 @@ These keywords provide context for understanding project-specific acronyms, term
         }
         detail_instruction = detail_instructions.get(detail_level, detail_instructions["normal"])
 
-        return f"""You are helping summarize search results for the query: "{query}"
+        return f"""Query: "{query}"
 {domain_context}
-CONTEXT FROM SEARCH RESULTS:
+SEARCH RESULTS:
 {context_text}
 
-GOAL:
-Create a COMPREHENSIVE summary that provides ALL the context needed to understand and work on this topic. The reader should NOT need to reference the source material. Think deeply about the topic and extract every relevant detail.
+---
 
-TASK:
-Generate a detailed, thorough summary that:
-1. **Provides complete context**: What is being discussed? What's the background?
-2. **Extracts ALL technical details**: Requirements, specifications, implementations, integrations, APIs, data structures, UI elements, business logic
-3. **Captures decisions made**: What was decided? Why? What alternatives were considered?
-4. **Identifies blockers and issues**: What problems exist? What's being tested? What's pending?
-5. **Includes specific examples**: Ticket numbers, URLs, specific features mentioned, code references
-6. **Documents requirements**: What needs to be built? What are the acceptance criteria?
-7. **Notes dependencies**: What depends on what? What needs to happen first?
-8. **Preserves technical accuracy**: Use exact terminology, keep technical details precise
-9. **Uses inline citations [1], [2]** after EVERY claim to maintain traceability
-10. **Organizes information logically**: Most important/relevant first, then supporting details
+Answer the user's query using the search results above. Be comprehensive and thorough.
 
-FOR JIRA TICKETS:
-- Include ticket numbers, status, and assignees
-- Extract ALL requirements and acceptance criteria from descriptions AND comments
-- Note any blockers, dependencies, or related tickets mentioned
-- Capture implementation details discussed in comments
+CRITICAL REQUIREMENTS:
+1. Use inline citations [1], [2] after every claim to show which source it came from
+2. Include ALL relevant technical details from the sources
+3. {detail_instruction}
+4. Organize the information in whatever structure best answers THIS specific query
 
-FOR MEETINGS (Fireflies):
-- Capture decisions made and rationale
-- Note action items and owners
-- Extract technical discussions and specifications mentioned
-- Include any demos or reviews discussed
+What to extract from different source types:
 
-FOR SLACK CONVERSATIONS:
-- Capture questions asked and answers provided
-- Note any decisions or consensus reached
-- Extract technical details shared in discussions
+JIRA TICKETS:
+- Ticket numbers, status, assignees
+- Requirements and acceptance criteria (from description AND comments)
+- Blockers, dependencies, related tickets
+- Implementation details from comments
 
-FOR GITHUB (PRs & Commits):
-- Extract implementation details from PR descriptions
-- Note what was built, fixed, or changed
-- Capture technical approach and code changes mentioned
-- Include PR status (merged, open, closed) and dates
-- Extract any requirements or specs discussed in PR comments
+MEETINGS (Fireflies):
+- Decisions made and rationale
+- Action items and owners
+- Technical discussions and specs
+- Demos or reviews mentioned
 
-FOR NOTION PAGES:
-- Extract documentation and specifications
-- Capture project overviews and architecture decisions
-- Note any roadmaps, timelines, or planning documents
-- Include design decisions and rationale
+SLACK:
+- Questions asked and answers given
+- Decisions or consensus reached
+- Technical details shared
 
-FORMAT YOUR RESPONSE EXACTLY LIKE THIS (DO NOT SKIP ANY SECTIONS):
+GITHUB (PRs & Commits):
+- What was built, fixed, or changed
+- Technical approach and implementation
+- PR status and dates
+- Requirements discussed in PR comments
 
-TLDR:
-[2-3 sentences that capture the essence - the absolute must-know information. Make it punchy and actionable.]
+NOTION:
+- Documentation and specifications
+- Architecture decisions
+- Roadmaps and timelines
+- Design rationale
 
-PROJECT_CONTEXT:
-• Known requirements:
-  - [requirement 1 with citation [X]]
-  - [requirement 2 with citation [X]]
-  (or "None found" if no requirements in sources)
-• Completed work:
-  - [completed item 1 with citation [X]]
-  - [completed item 2 with citation [X]]
-  (or "None found" if no completed work in sources)
-• Key decisions:
-  - [decision 1 with citation [X]]
-  - [decision 2 with citation [X]]
-  (or "None found" if no decisions in sources)
-• Key people: [names with roles] or "None found"
-• Open questions:
-  - [question 1 with citation [X]]
-  - [question 2 with citation [X]]
-  (or "None found" if no questions in sources)
-• Action items:
-  - [action 1 with citation [X]]
-  - [action 2 with citation [X]]
-  (or "None found" if no actions in sources)
-
-IMPORTANT: You MUST include the PROJECT_CONTEXT section with ALL categories above, even if some say "None found". This provides structure. Use proper indentation: bullet items start with "•", sub-items start with "  -" (2 spaces + dash).
-
-DETAILED_SUMMARY:
-[Comprehensive multi-paragraph narrative summary with inline citations [1], [2], etc. Include ALL relevant technical details organized logically. Aim for 400-800 words if needed to be thorough. This provides narrative flow and technical depth beyond the structured PROJECT_CONTEXT.
-
-FORMATTING: Separate each paragraph with a blank line for readability. Each paragraph should focus on one main topic or theme.]
-
-KEY_QUOTES:
-For each citation you reference in the detailed summary, extract the single most important quote:
-[1]: "Exact quote from source 1 that's most relevant"
-[2]: "Exact quote from source 2 that's most relevant"
-(Only include quotes for citations you actually used in DETAILED_SUMMARY)
-
-CONFIDENCE: high|medium|low
-
-GUIDELINES:
-- Be COMPREHENSIVE - include ALL pertinent details from sources
-- {detail_instruction}
-- Organize into logical paragraphs by topic/theme - SEPARATE EACH PARAGRAPH WITH A BLANK LINE
-- Each paragraph should be 3-5 sentences focused on one main idea
-- Use precise technical terminology
-- Write in a casual, conversational tone - avoid formal/corporate language
-- Cite sources [1], [2] after every factual claim
-- Extract the EXACT quotes that matter most for KEY_QUOTES section
-- If a Jira ticket is mentioned, include its key and status
-- Confidence = high if sources are direct/recent/complete, medium if partial, low if sparse
-- Think step-by-step through the sources to ensure you don't miss any important details
+Remember:
+- Be thorough enough that the reader doesn't need to check sources
+- Use specific examples: ticket numbers, URLs, dates, names
+- Write conversationally, like explaining to a teammate
+- Lead with the most important/actionable info
+- Use markdown formatting as appropriate (headings, lists, code blocks)
 """
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
-        """Parse the structured AI response.
+        """Parse the flexible AI response.
+
+        With the new flexible format, the AI can structure the response however it wants.
+        We just need to extract citations if they're present in [1], [2] format.
 
         Args:
             response: Raw AI response text
 
         Returns:
-            Dict with tldr, summary, open_questions, action_items, key_quotes, key_people, timeline, confidence
+            Dict with summary and extracted metadata
         """
+        import re
+
         # Default values
         result = {
-            'tldr': '',
-            'project_context': '',
-            'summary': '',
-            'open_questions': [],
-            'action_items': [],
-            'key_quotes': {},  # Maps citation number to quote
-            'key_people': [],
-            'timeline': [],
-            'confidence': 'medium'
+            'tldr': '',  # No longer used, kept for backwards compatibility
+            'project_context': '',  # No longer used, kept for backwards compatibility
+            'summary': response.strip(),  # The entire response IS the summary
+            'open_questions': [],  # Not extracted anymore
+            'action_items': [],  # Not extracted anymore
+            'key_quotes': {},  # Extract inline citations if present
+            'key_people': [],  # Not extracted anymore
+            'timeline': [],  # Not extracted anymore
+            'confidence': 'medium'  # Default confidence
         }
 
-        # Split response into sections
-        sections = {
-            'TLDR:': 'tldr',
-            'PROJECT_CONTEXT:': 'project_context',
-            'DETAILED_SUMMARY:': 'summary',
-            'KEY_QUOTES:': 'key_quotes',
-            'CONFIDENCE:': 'confidence'
-        }
-
-        current_section = None
-        lines = response.split('\n')
-
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-
-            # Check if this is a section header
-            for header, section_key in sections.items():
-                if line.upper().startswith(header):
-                    current_section = section_key
-                    # Extract content if it's on the same line
-                    remainder = line[len(header):].strip()
-                    if remainder and section_key == 'confidence':
-                        result['confidence'] = remainder.lower()
-                    elif remainder and section_key in ['summary', 'tldr', 'project_context']:
-                        result[section_key] = remainder
-                    break
-            else:
-                # Not a header, add to current section
-                if current_section in ['summary', 'tldr', 'project_context']:
-                    if result[current_section]:
-                        result[current_section] += '\n' + line
-                    else:
-                        result[current_section] = line
-
-                elif current_section == 'key_quotes':
-                    # Parse "[1]: Quote text" format
-                    if line.lower() != 'none' and line.startswith('['):
-                        import re
-                        match = re.match(r'\[(\d+)\]:\s*"?([^"]*)"?', line)
-                        if match:
-                            citation_num = int(match.group(1))
-                            quote = match.group(2).strip()
-                            result['key_quotes'][citation_num] = quote
-
-        # Ensure confidence is valid
-        if result['confidence'] not in ['high', 'medium', 'low']:
-            result['confidence'] = 'medium'
+        # Extract inline citations [1], [2] etc. and try to find corresponding quotes
+        # Look for patterns like [1]: "quote" or [1] "quote" in the text
+        citation_pattern = re.compile(r'\[(\d+)\][\s:]*["]([^"]+)["]')
+        for match in citation_pattern.finditer(response):
+            citation_num = int(match.group(1))
+            quote = match.group(2).strip()
+            result['key_quotes'][citation_num] = quote
 
         return result

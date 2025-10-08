@@ -2094,38 +2094,11 @@ class SlackTodoBot:
                 }
             ]
 
-            # Add TL;DR section
-            if hasattr(results, 'tldr') and results.tldr:
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*⚡ TL;DR*\n{results.tldr}"
-                    }
-                })
-                blocks.append({"type": "divider"})
-
-            # Add PROJECT_CONTEXT section (structured information)
-            has_attr = hasattr(results, 'project_context')
-            has_content = results.project_context if has_attr else None
-            logger.info(f"🔍 PROJECT_CONTEXT check: hasattr={has_attr}, content_length={len(has_content) if has_content else 0}, is_truthy={bool(has_content)}")
-
-            if hasattr(results, 'project_context') and results.project_context:
-                logger.info(f"✅ Adding PROJECT_CONTEXT block to Slack message")
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*📋 Project Context*\n{results.project_context}"
-                    }
-                })
-                blocks.append({"type": "divider"})
-
-            # Add DETAILED_SUMMARY (narrative flow)
+            # Add AI summary (flexible format - AI decides structure)
             if results.summary:
                 # Format summary for better readability
                 formatted_summary = self._format_summary_for_slack(results.summary)
-                summary_text = f"*📝 Detailed Summary*\n\n{formatted_summary}\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
+                summary_text = f"{formatted_summary}\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
                 blocks.append({
                     "type": "section",
                     "text": {
