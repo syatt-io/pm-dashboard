@@ -490,7 +490,7 @@ class ContextSearchService:
 
         # 3. Calculate BM25 score for keyword quality
         # Tokenize query and text for BM25
-        query_tokens = self._tokenize(topic_query)
+        query_tokens = self._tokenize(semantic_query)
         doc_tokens = self._tokenize(text)
 
         # Use approximate corpus statistics (good enough for relative ranking)
