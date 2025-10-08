@@ -90,13 +90,21 @@ CORS(app, origins=cors_origins, supports_credentials=True,
 # Initialize database once at startup
 init_database()
 
-# Run project_keywords migration (auto-detects PostgreSQL vs SQLite)
-try:
-    from scripts.run_migration import run_migration
-    run_migration()
-    logger.info("✅ Project keywords migration completed")
-except Exception as e:
-    logger.warning(f"Project keywords migration skipped or failed: {e}")
+# Defer project_keywords migration to background thread to avoid blocking startup
+import threading
+
+def run_migration_background():
+    """Run migration in background thread to not block startup."""
+    try:
+        from scripts.run_migration import run_migration
+        run_migration()
+        logger.info("✅ Project keywords migration completed")
+    except Exception as e:
+        logger.warning(f"Project keywords migration skipped or failed: {e}")
+
+# Start migration in background
+migration_thread = threading.Thread(target=run_migration_background, daemon=True)
+migration_thread.start()
 
 # Get session factory for auth services
 db_session_factory = get_session_factory()

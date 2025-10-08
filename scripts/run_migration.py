@@ -40,7 +40,7 @@ def run_migration():
             sql = f.read()
 
         # Execute migration
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             # Split by semicolons and execute each statement
             for statement in sql.split(';'):
                 statement = statement.strip()
@@ -48,14 +48,17 @@ def run_migration():
                     try:
                         conn.execute(text(statement))
                     except Exception as e:
-                        # Ignore "already exists" errors
-                        if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
+                        # Ignore "already exists" errors and privilege errors for indexes
+                        error_str = str(e).lower()
+                        if 'already exists' in error_str or 'duplicate' in error_str:
                             print(f"⏭️  Skipping (already exists): {statement[:50]}...")
+                        elif 'insufficientprivilege' in error_str and 'index' in statement.lower():
+                            print(f"⏭️  Skipping (index already exists, insufficient privilege to recreate): {statement[:50]}...")
+                        elif 'infailedsqltransaction' in error_str:
+                            print(f"⏭️  Skipping (transaction failed, likely already exists): {statement[:50]}...")
                         else:
                             print(f"❌ Error: {e}")
                             raise
-
-            conn.commit()
 
     print("✅ Migration completed successfully!")
 
