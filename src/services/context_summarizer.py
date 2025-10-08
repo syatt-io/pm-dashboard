@@ -266,40 +266,29 @@ TLDR:
 [2-3 sentences that capture the essence - the absolute must-know information. Make it punchy and actionable.]
 
 PROJECT_CONTEXT:
-• Project start date: [date or "Not found"]
-• Current status: [status or "Not found"]
 • Known requirements:
   - [requirement 1 with citation [X]]
   - [requirement 2 with citation [X]]
-  - (or "None found" if no requirements in sources)
+  (or "None found" if no requirements in sources)
 • Completed work:
   - [completed item 1 with citation [X]]
   - [completed item 2 with citation [X]]
-  - (or "None found" if no completed work in sources)
-• Pending/needs scoping:
-  - [pending item 1 with citation [X]]
-  - [pending item 2 with citation [X]]
-  - (or "None found" if nothing pending in sources)
+  (or "None found" if no completed work in sources)
 • Key decisions:
   - [decision 1 with citation [X]]
   - [decision 2 with citation [X]]
-  - (or "None found" if no decisions in sources)
-• Blockers/risks:
-  - [blocker 1 with citation [X]]
-  - [blocker 2 with citation [X]]
-  - (or "None found" if no blockers in sources)
-• Key people: [names with roles] or "Not found"
-• Important dates: [dates with events] or "Not found"
+  (or "None found" if no decisions in sources)
+• Key people: [names with roles] or "None found"
 • Open questions:
   - [question 1 with citation [X]]
   - [question 2 with citation [X]]
-  - (or "None found" if no questions in sources)
+  (or "None found" if no questions in sources)
 • Action items:
   - [action 1 with citation [X]]
   - [action 2 with citation [X]]
-  - (or "None found" if no actions in sources)
+  (or "None found" if no actions in sources)
 
-IMPORTANT: You MUST include the PROJECT_CONTEXT section with ALL categories above, even if some say "None found" or "Not found". This provides structure.
+IMPORTANT: You MUST include the PROJECT_CONTEXT section with ALL categories above, even if some say "None found". This provides structure. Use proper indentation: bullet items start with "•", sub-items start with "  -" (2 spaces + dash).
 
 DETAILED_SUMMARY:
 [Comprehensive multi-paragraph narrative summary with inline citations [1], [2], etc. Include ALL relevant technical details organized logically. Aim for 400-800 words if needed to be thorough. This provides narrative flow and technical depth beyond the structured PROJECT_CONTEXT.
