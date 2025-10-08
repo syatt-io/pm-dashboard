@@ -294,7 +294,9 @@ def run_database_migrations():
         logger.warning(f"Migration failed: {e}")
 
 # Run migrations on startup
-run_database_migrations()
+# TEMPORARILY DISABLED: Causing health check failures due to blocking each gunicorn worker
+# TODO: Move migrations to a separate pre-deployment step or run only in master process
+# run_database_migrations()
 
 
 
