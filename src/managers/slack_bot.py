@@ -1857,15 +1857,47 @@ class SlackTodoBot:
                 }
             ]
 
-            # Add AI-generated summary with citations if available
+            # Add TL;DR section (new!)
+            if hasattr(results, 'tldr') and results.tldr:
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*⚡ TL;DR*\n{results.tldr}"
+                    }
+                })
+                blocks.append({"type": "divider"})
+
+            # Add full AI summary with citations
             if results.summary:
-                # Format summary with emphasis on being AI-generated
-                summary_text = f"*🤖 AI Summary:*\n{results.summary}\n\n_Note: Numbers in [brackets] are citations to sources below._"
+                summary_text = f"*📝 Full Context*\n{results.summary}\n\n_Numbers in [brackets] are citations - see sources below for quotes._"
                 blocks.append({
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
                         "text": summary_text
+                    }
+                })
+
+            # Add action items (new!)
+            if hasattr(results, 'action_items') and results.action_items:
+                actions_text = "\n".join([f"• {item}" for item in results.action_items])
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*✅ Action Items*\n{actions_text}"
+                    }
+                })
+
+            # Add open questions (new!)
+            if hasattr(results, 'open_questions') and results.open_questions:
+                questions_text = "\n".join([f"• {q}" for q in results.open_questions])
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*❓ Open Questions*\n{questions_text}"
                     }
                 })
 
@@ -1897,44 +1929,47 @@ class SlackTodoBot:
             # Add divider
             blocks.append({"type": "divider"})
 
-            # Add top results (limit to 5 for brevity)
+            # Add citations/sources with enhanced display
             blocks.append({
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🔗 Top {min(5, len(results.results))} Results:*"
+                    "text": f"*📚 Sources & Citations* ({min(10, len(results.citations))} shown)"
                 }
             })
 
-            for i, result in enumerate(results.results[:5], 1):
+            # Show top 10 citations (increased from 5 for better coverage)
+            for citation in results.citations[:10]:
                 # Format source emoji
                 source_emoji = {
                     'slack': '💬',
                     'fireflies': '🎙️',
                     'jira': '📋',
                     'notion': '📝'
-                }.get(result.source, '📄')
+                }.get(citation.source, '📄')
 
                 # Format date
-                date_str = result.date.strftime('%Y-%m-%d')
+                date_str = citation.date.strftime('%Y-%m-%d')
 
-                # Build result text with citation number - simplified format
-                result_text = f"*[{i}]* {source_emoji} *{result.title}*\n"
-                result_text += f"_{date_str}_"
+                # Build citation text with enhanced format
+                citation_text = f"*[{citation.id}]* {source_emoji} *{citation.title}*\n"
+                citation_text += f"_{date_str}_ • _{citation.author}_"
 
-                # Add author if available
-                if result.author:
-                    result_text += f" • _{result.author}_"
+                # Add key quote if available (new!)
+                if citation.key_quote:
+                    # Truncate long quotes
+                    quote = citation.key_quote[:200] + "..." if len(citation.key_quote) > 200 else citation.key_quote
+                    citation_text += f"\n💡 _{quote}_"
 
                 # Add URL if available
-                if result.url:
-                    result_text += f"\n<{result.url}|View Source>"
+                if citation.url:
+                    citation_text += f"\n<{citation.url}|View Full Source>"
 
                 blocks.append({
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": result_text
+                        "text": citation_text
                     }
                 })
 

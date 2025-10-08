@@ -18,12 +18,17 @@ class Citation:
     url: str
     date: datetime
     author: str
+    content: str  # Full content for reference
+    key_quote: Optional[str] = None  # Most relevant excerpt (extracted by AI)
 
 
 @dataclass
 class SummarizedContext:
     """AI-generated summary with inline citations."""
-    summary: str  # Main summary with inline [1], [2] citations
+    tldr: str  # 2-3 sentence executive summary
+    summary: str  # Main comprehensive summary with inline [1], [2] citations
+    open_questions: List[str]  # Unanswered questions or gaps
+    action_items: List[str]  # Extracted action items
     citations: List[Citation]  # Ordered list of citations
     key_people: List[str]  # Key people involved
     timeline: List[Dict[str, str]]  # [{"date": "2024-01-15", "event": "..."}]
@@ -60,7 +65,10 @@ class ContextSummarizer:
         """
         if not results:
             return SummarizedContext(
+                tldr="No results found.",
                 summary="No results found.",
+                open_questions=[],
+                action_items=[],
                 citations=[],
                 key_people=[],
                 timeline=[],
@@ -72,14 +80,16 @@ class ContextSummarizer:
         citations = []
 
         for i, result in enumerate(results, 1):
-            # Create citation
+            # Create citation with content
             citation = Citation(
                 id=i,
                 source=result.source,
                 title=result.title,
                 url=result.url,
                 date=result.date,
-                author=result.author or "Unknown"
+                author=result.author or "Unknown",
+                content=result.content,
+                key_quote=None  # Will be extracted by AI
             )
             citations.append(citation)
 
@@ -131,11 +141,23 @@ class ContextSummarizer:
 
             if debug:
                 logger.info(f"✅ Generated summary: {len(summary_data['summary'])} chars")
+                logger.info(f"  TL;DR: {summary_data['tldr'][:100]}...")
+                logger.info(f"  Open questions: {len(summary_data['open_questions'])}")
+                logger.info(f"  Action items: {len(summary_data['action_items'])}")
+                logger.info(f"  Key quotes: {len(summary_data['key_quotes'])}")
                 logger.info(f"  Key people: {summary_data['key_people']}")
                 logger.info(f"  Timeline events: {len(summary_data['timeline'])}")
 
+            # Add key quotes to citations
+            for citation in citations:
+                if citation.id in summary_data['key_quotes']:
+                    citation.key_quote = summary_data['key_quotes'][citation.id]
+
             return SummarizedContext(
+                tldr=summary_data['tldr'],
                 summary=summary_data['summary'],
+                open_questions=summary_data['open_questions'],
+                action_items=summary_data['action_items'],
                 citations=citations,
                 key_people=summary_data['key_people'],
                 timeline=summary_data['timeline'],
@@ -146,8 +168,11 @@ class ContextSummarizer:
             logger.error(f"Error generating summary: {e}")
             # Fallback to basic summary
             return SummarizedContext(
+                tldr=f"Found {len(results)} results for '{query}'. AI summary failed.",
                 summary=f"Found {len(results)} results related to '{query}'. "
                         f"Unable to generate AI summary. Error: {str(e)}",
+                open_questions=[],
+                action_items=[],
                 citations=citations,
                 key_people=[],
                 timeline=[],
@@ -227,15 +252,37 @@ FOR SLACK CONVERSATIONS:
 - Extract technical details shared in discussions
 
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+
+TLDR:
+[2-3 sentences that capture the essence - the absolute must-know information. Make it punchy and actionable.]
+
 SUMMARY:
 [Comprehensive multi-paragraph summary with inline citations [1], [2], etc. Include ALL relevant details organized logically. Aim for 400-800 words if needed to be thorough.]
+
+OPEN_QUESTIONS:
+- What specific question/gap remains? [cite relevant source if applicable]
+- What information is missing or unclear?
+(Write "None" if everything is clear)
+
+ACTION_ITEMS:
+- Specific action that needs to be taken [citation if mentioned in source]
+- Next steps identified in discussions
+(Write "None" if no action items found)
+
+KEY_QUOTES:
+For each citation you reference in the summary, extract the single most important quote:
+[1]: "Exact quote from source 1 that's most relevant"
+[2]: "Exact quote from source 2 that's most relevant"
+(Only include quotes for citations you actually used in SUMMARY)
 
 KEY_PEOPLE:
 - Person Name 1
 - Person Name 2
+(Write "None" if no people mentioned)
 
 TIMELINE:
 - YYYY-MM-DD: Event description [citation]
+(Write "None" if no timeline)
 
 CONFIDENCE: high|medium|low
 
@@ -246,10 +293,9 @@ GUIDELINES:
 - Use precise technical terminology
 - Write in a casual, conversational tone - avoid formal/corporate language
 - Cite sources [1], [2] after every factual claim
+- Extract the EXACT quotes that matter most for KEY_QUOTES section
 - If a Jira ticket is mentioned, include its key and status
 - Confidence = high if sources are direct/recent/complete, medium if partial, low if sparse
-- If no timeline is relevant, write "TIMELINE: None"
-- If no people are mentioned, write "KEY_PEOPLE: None"
 - Think step-by-step through the sources to ensure you don't miss any important details
 """
 
@@ -260,11 +306,15 @@ GUIDELINES:
             response: Raw AI response text
 
         Returns:
-            Dict with summary, key_people, timeline, confidence
+            Dict with tldr, summary, open_questions, action_items, key_quotes, key_people, timeline, confidence
         """
         # Default values
         result = {
+            'tldr': '',
             'summary': '',
+            'open_questions': [],
+            'action_items': [],
+            'key_quotes': {},  # Maps citation number to quote
             'key_people': [],
             'timeline': [],
             'confidence': 'medium'
@@ -272,7 +322,11 @@ GUIDELINES:
 
         # Split response into sections
         sections = {
+            'TLDR:': 'tldr',
             'SUMMARY:': 'summary',
+            'OPEN_QUESTIONS:': 'open_questions',
+            'ACTION_ITEMS:': 'action_items',
+            'KEY_QUOTES:': 'key_quotes',
             'KEY_PEOPLE:': 'key_people',
             'TIMELINE:': 'timeline',
             'CONFIDENCE:': 'confidence'
@@ -294,16 +348,38 @@ GUIDELINES:
                     remainder = line[len(header):].strip()
                     if remainder and section_key == 'confidence':
                         result['confidence'] = remainder.lower()
-                    elif remainder and section_key == 'summary':
-                        result['summary'] = remainder
+                    elif remainder and section_key in ['summary', 'tldr']:
+                        result[section_key] = remainder
                     break
             else:
                 # Not a header, add to current section
-                if current_section == 'summary':
-                    if result['summary']:
-                        result['summary'] += ' ' + line
+                if current_section in ['summary', 'tldr']:
+                    if result[current_section]:
+                        result[current_section] += ' ' + line
                     else:
-                        result['summary'] = line
+                        result[current_section] = line
+
+                elif current_section == 'open_questions':
+                    if line.lower() != 'none' and line.startswith('-'):
+                        question = line[1:].strip()
+                        if question:
+                            result['open_questions'].append(question)
+
+                elif current_section == 'action_items':
+                    if line.lower() != 'none' and line.startswith('-'):
+                        action = line[1:].strip()
+                        if action:
+                            result['action_items'].append(action)
+
+                elif current_section == 'key_quotes':
+                    # Parse "[1]: Quote text" format
+                    if line.lower() != 'none' and line.startswith('['):
+                        import re
+                        match = re.match(r'\[(\d+)\]:\s*"?([^"]*)"?', line)
+                        if match:
+                            citation_num = int(match.group(1))
+                            quote = match.group(2).strip()
+                            result['key_quotes'][citation_num] = quote
 
                 elif current_section == 'key_people':
                     if line.lower() != 'none' and line.startswith('-'):
