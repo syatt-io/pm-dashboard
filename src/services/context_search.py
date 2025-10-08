@@ -1125,7 +1125,10 @@ class ContextSearchService:
                 self.logger.warning("No accessible repositories found for GitHub App")
 
             # Search PRs and commits
+            # Prioritize topic keywords (more specific to the query) over short project keywords
             all_keywords = list(project_keywords | topic_keywords)
+            # Sort by length descending to prioritize longer, more specific keywords
+            all_keywords.sort(key=len, reverse=True)
             github_data = await github_client.search_prs_and_commits(
                 query_keywords=all_keywords,
                 repo_name=repo_name,
