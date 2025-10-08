@@ -914,9 +914,9 @@ class ContextSearchService:
             if project_key:
                 jql = f'project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC'
             else:
-                # No project detected - skip Jira search entirely (too broad)
-                self.logger.info("Skipping Jira search - no project detected")
-                return []
+                # No project detected - search all projects (will filter with semantic matching)
+                jql = f'updated >= -{days_back}d ORDER BY updated DESC'
+                self.logger.info("Searching all Jira projects - no specific project detected")
 
             self.logger.info(f"Jira search JQL: {jql}")
 
