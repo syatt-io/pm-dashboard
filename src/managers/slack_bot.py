@@ -2030,7 +2030,9 @@ class SlackTodoBot:
                            "*Sources Searched:*\n"
                            "• 💬 Slack messages (channels bot is in)\n"
                            "• 🎙️ Fireflies meeting transcripts\n"
-                           "• 📋 Jira issues and comments\n\n"
+                           "• 📋 Jira issues and comments\n"
+                           "• 🔧 GitHub PRs and commits\n"
+                           "• 📝 Notion pages and docs\n\n"
                            "*Examples:*\n"
                            "• `/find-context authentication flow` - Find context about auth\n"
                            "• `/find-context payment gateway --days 180` - Search last 6 months\n"
@@ -2153,6 +2155,8 @@ class SlackTodoBot:
                 stats_parts.append(f"{source_counts['jira']} Jira")
             if source_counts.get('github'):
                 stats_parts.append(f"{source_counts['github']} GitHub")
+            if source_counts.get('notion'):
+                stats_parts.append(f"{source_counts['notion']} Notion")
             if stats_parts:
                 stats_text += f": {', '.join(stats_parts)}"
             stats_text += f" • {len(citations)} sources with citations"

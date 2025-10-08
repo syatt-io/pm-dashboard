@@ -1,4 +1,4 @@
-"""Celery tasks for vector ingestion - background processing of Slack, Jira, Fireflies."""
+"""Celery tasks for vector ingestion - background processing of Slack, Jira, Fireflies, GitHub, and Notion."""
 
 import logging
 from datetime import datetime, timedelta

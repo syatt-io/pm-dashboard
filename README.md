@@ -1,6 +1,6 @@
 # Autonomous PM Agent
 
-An intelligent project management system that automatically processes meeting transcripts, generates weekly digests, tracks time, and manages action items across your organization. Built with AI-powered analysis and seamless integrations with Fireflies.ai, Jira, Slack, and Tempo.
+An intelligent project management system that automatically processes meeting transcripts, generates weekly digests, tracks time, and manages action items across your organization. Built with AI-powered analysis and seamless integrations with Fireflies.ai, Jira, Slack, GitHub, Notion, and Tempo.
 
 ## 🚀 Key Features
 
