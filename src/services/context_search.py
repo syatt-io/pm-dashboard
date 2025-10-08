@@ -31,6 +31,11 @@ class ContextSearchResults:
     summary: Optional[str] = None
     key_people: List[str] = None
     timeline: List[Dict[str, Any]] = None
+    tldr: Optional[str] = None
+    open_questions: List[str] = None
+    action_items: List[str] = None
+    citations: List[Any] = None  # List of Citation objects from summarizer
+    confidence: str = "medium"
 
 
 class ContextSearchService:
@@ -549,14 +554,19 @@ class ContextSearchService:
             }
 
         # Generate AI summary and insights with project context and detail level
-        summary, key_people, timeline = await self._generate_insights(query, all_results, project_context, detail_level)
+        summarized = await self._generate_insights(query, all_results, project_context, detail_level)
 
         return ContextSearchResults(
             query=query,
             results=all_results,
-            summary=summary,
-            key_people=key_people,
-            timeline=timeline
+            summary=summarized.summary if summarized else None,
+            key_people=summarized.key_people if summarized else [],
+            timeline=summarized.timeline if summarized else [],
+            tldr=summarized.tldr if summarized else None,
+            open_questions=summarized.open_questions if summarized else [],
+            action_items=summarized.action_items if summarized else [],
+            citations=summarized.citations if summarized else [],
+            confidence=summarized.confidence if summarized else "low"
         )
 
     async def _search_slack(
@@ -1149,32 +1159,36 @@ class ContextSearchService:
         results: List[SearchResult],
         project_context: Optional[Dict[str, Any]] = None,
         detail_level: str = "normal"
-    ) -> tuple[Optional[str], List[str], List[Dict[str, Any]]]:
-        """Generate AI-powered insights from search results using ContextSummarizer."""
+    ):
+        """Generate AI-powered insights from search results using ContextSummarizer.
+
+        Returns:
+            SummarizedContext object with all fields, or None if no results
+        """
         try:
-            from src.services.context_summarizer import ContextSummarizer
+            from src.services.context_summarizer import ContextSummarizer, SummarizedContext
 
             if not results:
-                return None, [], []
+                return None
 
             # Use the new AI summarizer with project context and detail level
             summarizer = ContextSummarizer()
             summarized = await summarizer.summarize(query, results[:20], debug=True, project_context=project_context, detail_level=detail_level)
 
             # Convert timeline format to match expected format
-            timeline = [
+            summarized.timeline = [
                 {"date": item["date"], "event": item["event"]}
                 for item in summarized.timeline
             ] if summarized.timeline else []
 
             self.logger.info(f"✅ Generated AI summary with {len(summarized.citations)} citations")
 
-            return summarized.summary, summarized.key_people, timeline
+            return summarized
 
         except Exception as e:
             self.logger.error(f"Error generating insights: {e}")
             # Fallback to no summary if AI fails
-            return None, [], []
+            return None
 
     async def _generate_insights_old(
         self,
