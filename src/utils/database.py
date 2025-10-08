@@ -23,6 +23,7 @@ def get_engine():
 
         # PostgreSQL-specific settings for production
         if is_production and 'postgresql' in db_url:
+            logger.info(f"PRODUCTION MODE DETECTED - FLASK_ENV={os.getenv('FLASK_ENV')}, db_url contains postgresql={('postgresql' in db_url)}")
             # Connection pool settings for production
             # With 25 max connections in DB, we need to leave room for:
             # - Admin connections (5)
@@ -42,7 +43,7 @@ def get_engine():
                 },
                 echo=False  # Disable SQL logging in production
             )
-            logger.info("Database engine initialized for production (PostgreSQL) with connection pooling: pool_size=3, max_overflow=2")
+            logger.info(f"Database engine initialized for production (PostgreSQL) with connection pooling: pool_size={_engine.pool.size()}, max_overflow={_engine.pool.overflow()}")
         else:
             # Development or SQLite configuration
             connect_args = {}
