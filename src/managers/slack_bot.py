@@ -16,7 +16,7 @@ from config.settings import settings
 from src.managers.todo_manager import TodoManager
 from src.managers.learning_manager import LearningManager
 from src.managers.notifications import NotificationContent
-from src.utils.redis_session import get_redis_session_manager
+from src.utils.db_session import get_db_session_manager
 
 
 logger = logging.getLogger(__name__)
@@ -36,9 +36,9 @@ class SlackTodoBot:
         self.learning_manager = LearningManager()
         self.handler = SlackRequestHandler(self.app)
 
-        # Initialize Redis session manager for interactive buttons
-        self.session_manager = get_redis_session_manager()
-        logger.info(f"Slack bot initialized with Redis session manager (healthy: {self.session_manager.health_check()})")
+        # Initialize database session manager for interactive buttons
+        self.session_manager = get_db_session_manager()
+        logger.info(f"Slack bot initialized with database session manager (healthy: {self.session_manager.health_check()})")
 
         self._register_commands()
         self._register_listeners()
@@ -2161,11 +2161,11 @@ class SlackTodoBot:
             # Add interactive follow-up buttons
             blocks.append({"type": "divider"})
 
-            # Store search context for follow-ups (using Redis session storage)
+            # Store search context for follow-ups (using database session storage)
             import hashlib
             session_id = hashlib.md5(f"{user_id}:{query}:{int(time.time())}".encode()).hexdigest()[:12]
 
-            # Store session in Redis (TTL: 1 hour)
+            # Store session in database (TTL: 1 hour)
             session_data = {
                 'query': query,
                 'results': results,
@@ -2176,9 +2176,9 @@ class SlackTodoBot:
 
             success = self.session_manager.set(session_id, session_data)
             if not success:
-                logger.warning(f"Failed to store session {session_id} in Redis - buttons may not work")
+                logger.warning(f"Failed to store session {session_id} in database - buttons may not work")
             else:
-                logger.info(f"Stored session {session_id} in Redis for user {user_id}")
+                logger.info(f"Stored session {session_id} in database for user {user_id}")
 
             blocks.append({
                 "type": "section",
