@@ -54,6 +54,16 @@ class AIConfig:
 
 
 @dataclass
+class PineconeConfig:
+    """Pinecone vector database configuration."""
+    api_key: str
+    environment: str
+    index_name: str = "agent-pm-context"
+    dimension: int = 1536  # text-embedding-3-small dimension
+    metric: str = "cosine"
+
+
+@dataclass
 class WebConfig:
     """Web interface configuration."""
     base_url: str = "http://localhost:3030"
@@ -81,6 +91,7 @@ class Settings:
         self.ai = self._load_ai_config()
         self.agent = self._load_agent_config()
         self.web = self._load_web_config()
+        self.pinecone = self._load_pinecone_config()
 
     @staticmethod
     def _load_fireflies_config() -> FirefliesConfig:
@@ -164,6 +175,24 @@ class Settings:
             port=int(os.getenv("WEB_PORT", "3030")),
             host=os.getenv("WEB_HOST", "127.0.0.1"),
             debug=os.getenv("WEB_DEBUG", "true").lower() == "true"
+        )
+
+    @staticmethod
+    def _load_pinecone_config() -> PineconeConfig:
+        api_key = os.getenv("PINECONE_API_KEY")
+        if not api_key:
+            # Pinecone is optional - if not configured, vector search won't be available
+            return PineconeConfig(
+                api_key="",
+                environment=""
+            )
+
+        return PineconeConfig(
+            api_key=api_key,
+            environment=os.getenv("PINECONE_ENVIRONMENT", "us-east-1-aws"),
+            index_name=os.getenv("PINECONE_INDEX_NAME", "agent-pm-context"),
+            dimension=int(os.getenv("PINECONE_DIMENSION", "1536")),
+            metric=os.getenv("PINECONE_METRIC", "cosine")
         )
 
 

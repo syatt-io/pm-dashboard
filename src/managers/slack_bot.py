@@ -1973,6 +1973,13 @@ class SlackTodoBot:
                 detail_level=detail_level
             ))
 
+            # Debug logging
+            logger.info(f"🔍 Search completed for '{query}':")
+            logger.info(f"  - Results found: {len(results.results) if results.results else 0}")
+            logger.info(f"  - Has summary: {bool(results.summary)}")
+            logger.info(f"  - Has citations: {bool(getattr(results, 'citations', None))}")
+            logger.info(f"  - Has tldr: {bool(getattr(results, 'tldr', None))}")
+
             if not results.results:
                 return {
                     "text": f"🔍 No results found for *{query}* in the last {days} days.\n"
@@ -2063,16 +2070,17 @@ class SlackTodoBot:
             blocks.append({"type": "divider"})
 
             # Add citations/sources with enhanced display
+            citations = getattr(results, 'citations', []) or []
             blocks.append({
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*📚 Sources & Citations* ({min(10, len(results.citations))} shown)"
+                    "text": f"*📚 Sources & Citations* ({min(10, len(citations))} shown)"
                 }
             })
 
             # Show top 10 citations (increased from 5 for better coverage)
-            for citation in results.citations[:10]:
+            for citation in citations[:10]:
                 # Format source emoji
                 source_emoji = {
                     'slack': '💬',

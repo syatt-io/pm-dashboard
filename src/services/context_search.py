@@ -423,7 +423,7 @@ class ContextSearchService:
             total_keywords = len(project_keywords) + len(topic_keywords) * 3
             weighted_matches = project_matches + (topic_matches * 3)
             relevance_score = weighted_matches / total_keywords if total_keywords > 0 else 0.0
-            passes_threshold = relevance_score >= 0.25  # Lowered from 0.3
+            passes_threshold = relevance_score >= 0.15  # Lowered from 0.25 - more forgiving
 
             if debug:
                 self.logger.info(
@@ -475,12 +475,12 @@ class ContextSearchService:
 
         relevance_score = project_signal + semantic_signal + bm25_signal
 
-        # LOWERED THRESHOLDS: Passes if semantic >= 0.20 OR BM25 >= 0.20 OR (project match AND semantic >= 0.15)
+        # VERY LOW THRESHOLDS: Passes if semantic >= 0.15 OR BM25 >= 0.15 OR (project match AND semantic >= 0.10)
         # This allows semantic matching to work even without project keywords
         passes_threshold = (
-            semantic_similarity >= 0.20 or  # Lowered from 0.30 - allows more semantic matches
-            bm25_score >= 0.20 or  # Lowered from 0.25 - allows more keyword matches
-            (project_matches > 0 and semantic_similarity >= 0.15)  # Project bonus with lower threshold
+            semantic_similarity >= 0.15 or  # Lowered from 0.20 - allows more semantic matches
+            bm25_score >= 0.15 or  # Lowered from 0.20 - allows more keyword matches
+            (project_matches > 0 and semantic_similarity >= 0.10)  # Project bonus with lower threshold
         )
 
         if debug:
