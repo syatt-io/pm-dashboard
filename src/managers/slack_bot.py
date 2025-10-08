@@ -2104,7 +2104,12 @@ class SlackTodoBot:
                 blocks.append({"type": "divider"})
 
             # Add PROJECT_CONTEXT section (structured information)
+            has_attr = hasattr(results, 'project_context')
+            has_content = results.project_context if has_attr else None
+            logger.info(f"🔍 PROJECT_CONTEXT check: hasattr={has_attr}, content_length={len(has_content) if has_content else 0}, is_truthy={bool(has_content)}")
+
             if hasattr(results, 'project_context') and results.project_context:
+                logger.info(f"✅ Adding PROJECT_CONTEXT block to Slack message")
                 blocks.append({
                     "type": "section",
                     "text": {
