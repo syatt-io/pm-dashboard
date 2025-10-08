@@ -302,7 +302,9 @@ PROJECT_CONTEXT:
 IMPORTANT: You MUST include the PROJECT_CONTEXT section with ALL categories above, even if some say "None found" or "Not found". This provides structure.
 
 DETAILED_SUMMARY:
-[Comprehensive multi-paragraph narrative summary with inline citations [1], [2], etc. Include ALL relevant technical details organized logically. Aim for 400-800 words if needed to be thorough. This provides narrative flow and technical depth beyond the structured PROJECT_CONTEXT.]
+[Comprehensive multi-paragraph narrative summary with inline citations [1], [2], etc. Include ALL relevant technical details organized logically. Aim for 400-800 words if needed to be thorough. This provides narrative flow and technical depth beyond the structured PROJECT_CONTEXT.
+
+FORMATTING: Separate each paragraph with a blank line for readability. Each paragraph should focus on one main topic or theme.]
 
 KEY_QUOTES:
 For each citation you reference in the detailed summary, extract the single most important quote:
@@ -315,7 +317,8 @@ CONFIDENCE: high|medium|low
 GUIDELINES:
 - Be COMPREHENSIVE - include ALL pertinent details from sources
 - {detail_instruction}
-- Organize into logical paragraphs by topic/theme
+- Organize into logical paragraphs by topic/theme - SEPARATE EACH PARAGRAPH WITH A BLANK LINE
+- Each paragraph should be 3-5 sentences focused on one main idea
 - Use precise technical terminology
 - Write in a casual, conversational tone - avoid formal/corporate language
 - Cite sources [1], [2] after every factual claim

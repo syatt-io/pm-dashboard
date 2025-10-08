@@ -2121,7 +2121,9 @@ class SlackTodoBot:
 
             # Add DETAILED_SUMMARY (narrative flow)
             if results.summary:
-                summary_text = f"*📝 Detailed Summary*\n{results.summary}\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
+                # Format summary for better readability
+                formatted_summary = self._format_summary_for_slack(results.summary)
+                summary_text = f"*📝 Detailed Summary*\n\n{formatted_summary}\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
                 blocks.append({
                     "type": "section",
                     "text": {
@@ -2237,3 +2239,25 @@ class SlackTodoBot:
                 "text": f"❌ Error executing search: {str(e)}\n"
                        f"Please try again or contact support if the issue persists."
             }
+
+    def _format_summary_for_slack(self, summary: str) -> str:
+        """Format summary text for better readability in Slack.
+
+        Args:
+            summary: Raw summary text from AI
+
+        Returns:
+            Formatted summary with better paragraph spacing
+        """
+        # Split into paragraphs (AI typically uses single newlines)
+        paragraphs = summary.split('\n')
+
+        # Filter out empty paragraphs and add spacing
+        formatted_paragraphs = []
+        for para in paragraphs:
+            para = para.strip()
+            if para:
+                formatted_paragraphs.append(para)
+
+        # Join with double newlines for Slack spacing
+        return '\n\n'.join(formatted_paragraphs)
