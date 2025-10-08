@@ -1227,7 +1227,7 @@ class ContextSearchService:
         try:
             # Get user's Notion API key
             if not user_id:
-                self.logger.info("No user_id provided for Notion search, skipping")
+                self.logger.info("🔍 Notion: No user_id provided, skipping Notion search")
                 return []
 
             from src.models.user import User
@@ -1236,11 +1236,15 @@ class ContextSearchService:
             api_key = None
             with session_scope() as db_session:
                 user = db_session.query(User).filter_by(id=user_id).first()
+                self.logger.info(f"🔍 Notion: User lookup for user_id={user_id}, found={user is not None}")
                 if user and user.has_notion_api_key():
                     api_key = user.get_notion_api_key()
+                    self.logger.info("🔍 Notion: User has Notion API key configured")
+                elif user:
+                    self.logger.info("🔍 Notion: User found but no Notion API key configured")
 
             if not api_key:
-                self.logger.info("No Notion API key found for user, skipping Notion search")
+                self.logger.info("🔍 Notion: No Notion API key available, skipping Notion search")
                 return []
 
             # Use Notion API to search
@@ -1269,6 +1273,7 @@ class ContextSearchService:
                 }
             }
 
+            self.logger.info(f"🔍 Notion: Searching with query='{query}', days_back={days_back}")
             response = requests.post(
                 "https://api.notion.com/v1/search",
                 headers=headers,
@@ -1277,10 +1282,12 @@ class ContextSearchService:
             )
 
             if not response.ok:
-                self.logger.error(f"Notion API error: {response.status_code} - {response.text}")
+                self.logger.error(f"🔍 Notion API error: {response.status_code} - {response.text}")
                 return []
 
             data = response.json()
+            total_pages = len(data.get('results', []))
+            self.logger.info(f"🔍 Notion: API returned {total_pages} pages total")
             results = []
 
             for page in data.get('results', []):
