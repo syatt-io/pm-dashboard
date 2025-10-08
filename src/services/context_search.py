@@ -29,6 +29,7 @@ class ContextSearchResults:
     query: str
     results: List[SearchResult]
     summary: Optional[str] = None
+    project_context: Optional[str] = None  # Structured project context bullets
     key_people: List[str] = None
     timeline: List[Dict[str, Any]] = None
     tldr: Optional[str] = None
@@ -613,6 +614,7 @@ class ContextSearchService:
             query=query,
             results=all_results,
             summary=summarized.summary if summarized else None,
+            project_context=summarized.project_context if summarized else None,
             key_people=summarized.key_people if summarized else [],
             timeline=summarized.timeline if summarized else [],
             tldr=summarized.tldr if summarized else None,
