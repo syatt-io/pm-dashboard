@@ -3,6 +3,8 @@
 import logging
 import re
 import random
+import time
+import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from slack_sdk import WebClient
@@ -14,6 +16,7 @@ from config.settings import settings
 from src.managers.todo_manager import TodoManager
 from src.managers.learning_manager import LearningManager
 from src.managers.notifications import NotificationContent
+from src.utils.redis_session import get_redis_session_manager
 
 
 logger = logging.getLogger(__name__)
@@ -32,6 +35,10 @@ class SlackTodoBot:
         self.todo_manager = TodoManager()
         self.learning_manager = LearningManager()
         self.handler = SlackRequestHandler(self.app)
+
+        # Initialize Redis session manager for interactive buttons
+        self.session_manager = get_redis_session_manager()
+        logger.info(f"Slack bot initialized with Redis session manager (healthy: {self.session_manager.health_check()})")
 
         self._register_commands()
         self._register_listeners()
@@ -392,14 +399,13 @@ class SlackTodoBot:
                 session_id = body['actions'][0]['value'].split(':')[1]
                 user_id = body['user']['id']
 
-                # Retrieve session
-                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
-                    logger.warning(f"Session {session_id} not found. Available sessions: {available_sessions}. This may be due to multi-worker Gunicorn setup.")
-                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.\n\n_Note: Button interactions may not work reliably with multiple Gunicorn workers. Consider using Redis for session storage._")
+                # Retrieve session from Redis
+                session = self.session_manager.get(session_id)
+                if session is None:
+                    logger.warning(f"Session {session_id} not found in Redis")
+                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
                     return
 
-                session = self._search_sessions[session_id]
                 results = session['results']
 
                 # Show detailed view of top 3 citations
@@ -447,13 +453,13 @@ class SlackTodoBot:
             try:
                 session_id = body['actions'][0]['value'].split(':')[1]
 
-                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
-                    logger.warning(f"Session {session_id} not found for show_quotes. Available: {available_sessions}")
-                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.")
+                # Retrieve session from Redis
+                session = self.session_manager.get(session_id)
+                if session is None:
+                    logger.warning(f"Session {session_id} not found in Redis")
+                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
                     return
 
-                session = self._search_sessions[session_id]
                 results = session['results']
 
                 # Collect all citations with quotes
@@ -497,13 +503,13 @@ class SlackTodoBot:
             try:
                 session_id = body['actions'][0]['value'].split(':')[1]
 
-                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
-                    logger.warning(f"Session {session_id} not found for show_sources. Available: {available_sessions}")
-                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.")
+                # Retrieve session from Redis
+                session = self.session_manager.get(session_id)
+                if session is None:
+                    logger.warning(f"Session {session_id} not found in Redis")
+                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
                     return
 
-                session = self._search_sessions[session_id]
                 results = session['results']
                 citations = getattr(results, 'citations', []) or []
 
@@ -580,13 +586,13 @@ class SlackTodoBot:
             try:
                 session_id = body['actions'][0]['value'].split(':')[1]
 
-                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
-                    logger.warning(f"Session {session_id} not found for expand_search. Available: {available_sessions}")
-                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.")
+                # Retrieve session from Redis
+                session = self.session_manager.get(session_id)
+                if session is None:
+                    logger.warning(f"Session {session_id} not found in Redis")
+                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
                     return
 
-                session = self._search_sessions[session_id]
                 query = session['query']
                 current_days = session['days']
                 new_days = current_days * 2  # Double the search window
@@ -2155,16 +2161,12 @@ class SlackTodoBot:
             # Add interactive follow-up buttons
             blocks.append({"type": "divider"})
 
-            # Store search context for follow-ups (using search session ID)
+            # Store search context for follow-ups (using Redis session storage)
             import hashlib
-            import time
             session_id = hashlib.md5(f"{user_id}:{query}:{int(time.time())}".encode()).hexdigest()[:12]
 
-            # Cache the search results for 1 hour (in-memory for now, could move to Redis)
-            if not hasattr(self, '_search_sessions'):
-                self._search_sessions = {}
-
-            self._search_sessions[session_id] = {
+            # Store session in Redis (TTL: 1 hour)
+            session_data = {
                 'query': query,
                 'results': results,
                 'user_id': user_id,
@@ -2172,12 +2174,11 @@ class SlackTodoBot:
                 'days': days
             }
 
-            # Clean up old sessions (older than 1 hour)
-            cutoff = time.time() - 3600
-            self._search_sessions = {
-                k: v for k, v in self._search_sessions.items()
-                if v['created_at'] > cutoff
-            }
+            success = self.session_manager.set(session_id, session_data)
+            if not success:
+                logger.warning(f"Failed to store session {session_id} in Redis - buttons may not work")
+            else:
+                logger.info(f"Stored session {session_id} in Redis for user {user_id}")
 
             blocks.append({
                 "type": "section",
