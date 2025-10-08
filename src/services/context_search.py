@@ -49,6 +49,36 @@ class ContextSearchService:
         self._embedding_cache = {}  # Cache embeddings: hash(text) -> (embedding, timestamp)
         self._embedding_cache_ttl = 3600  # 1 hour cache TTL
 
+        # Auto-sync Jira project keywords on first use (runs in background)
+        self._sync_project_keywords_async()
+
+    def _sync_project_keywords_async(self):
+        """Sync Jira project keywords in background (non-blocking)."""
+        import asyncio
+        import threading
+
+        def sync_in_background():
+            try:
+                from src.services.project_keyword_sync import ProjectKeywordSync
+
+                sync_service = ProjectKeywordSync()
+                # Run async sync
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(sync_service.sync_if_needed())
+                loop.close()
+
+                if result.get('success') and not result.get('skipped'):
+                    self.logger.info(f"✅ Synced {result.get('keywords_created', 0)} keywords from {result.get('projects_synced', 0)} Jira projects")
+                elif result.get('skipped'):
+                    self.logger.info("⏭️ Skipped project keyword sync (already synced recently)")
+            except Exception as e:
+                self.logger.error(f"Error syncing project keywords: {e}")
+
+        # Run in background thread to avoid blocking
+        thread = threading.Thread(target=sync_in_background, daemon=True)
+        thread.start()
+
     def _get_project_keywords(self) -> Dict[str, List[str]]:
         """Get project keywords from database with caching.
 
@@ -914,9 +944,9 @@ class ContextSearchService:
             if project_key:
                 jql = f'project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC'
             else:
-                # No project detected - search all projects (will filter with semantic matching)
-                jql = f'updated >= -{days_back}d ORDER BY updated DESC'
-                self.logger.info("Searching all Jira projects - no specific project detected")
+                # No project detected - skip Jira search (auto-sync should populate keywords)
+                self.logger.info("Skipping Jira search - no project detected. Run project keyword sync to enable auto-detection.")
+                return []
 
             self.logger.info(f"Jira search JQL: {jql}")
 
