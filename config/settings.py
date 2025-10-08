@@ -65,9 +65,22 @@ class PineconeConfig:
 
 @dataclass
 class GitHubConfig:
-    """GitHub API configuration."""
-    api_token: str
-    organization: str = ""  # Optional: filter to org repos only
+    """GitHub API configuration.
+
+    Supports two authentication modes:
+    1. Personal Access Token (legacy): Set api_token
+    2. GitHub App (recommended): Set app_id, private_key, installation_id
+    """
+    # Personal Access Token (legacy)
+    api_token: str = ""
+
+    # GitHub App (recommended)
+    app_id: str = ""
+    private_key: str = ""
+    installation_id: str = ""
+
+    # Organization name (optional, for filtering)
+    organization: str = ""
 
 
 @dataclass
@@ -129,10 +142,43 @@ class Settings:
 
     @staticmethod
     def _load_github_config() -> GitHubConfig:
+        """Load GitHub configuration.
+
+        Supports two authentication modes:
+        1. Personal Access Token: GITHUB_API_TOKEN
+        2. GitHub App: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID
+        """
+        # Load GitHub App config (preferred)
+        app_id = os.getenv("GITHUB_APP_ID", "")
+        private_key_env = os.getenv("GITHUB_APP_PRIVATE_KEY", "")
+        installation_id = os.getenv("GITHUB_APP_INSTALLATION_ID", "")
+
+        # Handle private key - support both raw key and file path
+        private_key = ""
+        if private_key_env:
+            if private_key_env.startswith("-----BEGIN"):
+                # Raw PEM key in environment variable
+                private_key = private_key_env
+            elif os.path.isfile(private_key_env):
+                # Path to PEM file
+                with open(private_key_env, 'r') as f:
+                    private_key = f.read()
+            else:
+                # Try to interpret as base64-encoded key (for environment variables)
+                import base64
+                try:
+                    private_key = base64.b64decode(private_key_env).decode('utf-8')
+                except Exception:
+                    private_key = private_key_env  # Use as-is
+
+        # Load Personal Access Token (fallback)
         api_token = os.getenv("GITHUB_API_TOKEN", "")
 
         return GitHubConfig(
             api_token=api_token,
+            app_id=app_id,
+            private_key=private_key,
+            installation_id=installation_id,
             organization=os.getenv("GITHUB_ORGANIZATION", "")
         )
 

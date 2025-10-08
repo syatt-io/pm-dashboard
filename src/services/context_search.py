@@ -1055,13 +1055,24 @@ class ContextSearchService:
             from src.integrations.github_client import GitHubClient
             from config.settings import settings
 
-            if not settings.github.api_token:
-                self.logger.info("GitHub API token not configured - skipping GitHub search")
+            # Check if GitHub is configured (either token or app)
+            has_token = bool(settings.github.api_token)
+            has_app = all([
+                settings.github.app_id,
+                settings.github.private_key,
+                settings.github.installation_id
+            ])
+
+            if not (has_token or has_app):
+                self.logger.info("GitHub authentication not configured - skipping GitHub search")
                 return []
 
             github_client = GitHubClient(
                 api_token=settings.github.api_token,
-                organization=settings.github.organization
+                organization=settings.github.organization,
+                app_id=settings.github.app_id,
+                private_key=settings.github.private_key,
+                installation_id=settings.github.installation_id
             )
 
             # Auto-detect repo name from project keywords
