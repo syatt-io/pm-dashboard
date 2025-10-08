@@ -18,36 +18,44 @@ def run_migration():
 
     # Detect database type
     if 'postgresql' in str(engine.url):
-        migration_file = project_root / 'migrations' / 'create_project_keywords_table_postgres.sql'
+        migration_files = [
+            project_root / 'migrations' / 'create_project_keywords_table_postgres.sql',
+            project_root / 'migrations' / 'fix_project_keywords_columns.sql'
+        ]
         db_type = 'PostgreSQL'
     else:
-        migration_file = project_root / 'migrations' / 'create_project_keywords_table.sql'
+        migration_files = [
+            project_root / 'migrations' / 'create_project_keywords_table.sql'
+        ]
         db_type = 'SQLite'
 
-    print(f"Running migration for {db_type}...")
-    print(f"Migration file: {migration_file}")
+    print(f"Running migrations for {db_type}...")
 
-    # Read migration SQL
-    with open(migration_file, 'r') as f:
-        sql = f.read()
+    # Execute each migration file in order
+    for migration_file in migration_files:
+        print(f"Migration file: {migration_file}")
 
-    # Execute migration
-    with engine.connect() as conn:
-        # Split by semicolons and execute each statement
-        for statement in sql.split(';'):
-            statement = statement.strip()
-            if statement:
-                try:
-                    conn.execute(text(statement))
-                except Exception as e:
-                    # Ignore "already exists" errors
-                    if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
-                        print(f"⏭️  Skipping (already exists): {statement[:50]}...")
-                    else:
-                        print(f"❌ Error: {e}")
-                        raise
+        # Read migration SQL
+        with open(migration_file, 'r') as f:
+            sql = f.read()
 
-        conn.commit()
+        # Execute migration
+        with engine.connect() as conn:
+            # Split by semicolons and execute each statement
+            for statement in sql.split(';'):
+                statement = statement.strip()
+                if statement:
+                    try:
+                        conn.execute(text(statement))
+                    except Exception as e:
+                        # Ignore "already exists" errors
+                        if 'already exists' in str(e).lower() or 'duplicate' in str(e).lower():
+                            print(f"⏭️  Skipping (already exists): {statement[:50]}...")
+                        else:
+                            print(f"❌ Error: {e}")
+                            raise
+
+            conn.commit()
 
     print("✅ Migration completed successfully!")
 
