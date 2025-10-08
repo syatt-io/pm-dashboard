@@ -350,6 +350,35 @@ class GitHubClient:
 
         logger.info(f"GitHub repo candidates for {project_key}: {candidates[:5]}")
 
-        # For now, return the first keyword as best guess
-        # In production, we could call GitHub API to validate repos exist
-        return project_keywords[0] if project_keywords else project_key.lower()
+        # Return the first candidate as best guess
+        # TODO: Could call GitHub API to validate repos exist and pick best match
+        return candidates[0] if candidates else None
+
+    async def list_accessible_repos(self) -> List[str]:
+        """List all repositories accessible by the GitHub App.
+
+        Returns:
+            List of repository names (without org prefix)
+        """
+        headers = await self._get_auth_headers()
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/installation/repositories",
+                    headers=headers,
+                    timeout=10.0
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    repos = [repo["name"] for repo in data.get("repositories", [])]
+                    logger.info(f"GitHub App has access to {len(repos)} repositories: {repos[:10]}")
+                    return repos
+                else:
+                    logger.warning(f"Failed to list accessible repos: {response.status_code}")
+                    return []
+
+            except Exception as e:
+                logger.error(f"Error listing accessible repos: {e}")
+                return []

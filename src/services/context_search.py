@@ -1086,11 +1086,31 @@ class ContextSearchService:
                 installation_id=settings.github.installation_id
             )
 
-            # Auto-detect repo name from project keywords
+            # List accessible repos and auto-detect best match
+            accessible_repos = await github_client.list_accessible_repos()
+
             repo_name = None
-            if project_key and project_keywords:
-                repo_name = github_client.detect_repo_name(project_key, list(project_keywords))
-                self.logger.info(f"Detected GitHub repo: {repo_name}")
+            if project_key and project_keywords and accessible_repos:
+                # Get candidates from detection logic
+                detected_name = github_client.detect_repo_name(project_key, list(project_keywords))
+
+                # Check if detected name is in accessible repos
+                if detected_name in accessible_repos:
+                    repo_name = detected_name
+                    self.logger.info(f"✅ Detected GitHub repo: {repo_name} (verified accessible)")
+                else:
+                    # Try to find best match from accessible repos
+                    project_key_lower = project_key.lower()
+                    for repo in accessible_repos:
+                        if project_key_lower in repo.lower() or any(kw in repo.lower() for kw in project_keywords):
+                            repo_name = repo
+                            self.logger.info(f"✅ Matched GitHub repo: {repo_name} from accessible list")
+                            break
+
+                    if not repo_name:
+                        self.logger.warning(f"⚠️ Detected repo '{detected_name}' not accessible. Available: {accessible_repos[:5]}")
+            elif not accessible_repos:
+                self.logger.warning("No accessible repositories found for GitHub App")
 
             # Search PRs and commits
             all_keywords = list(project_keywords | topic_keywords)
