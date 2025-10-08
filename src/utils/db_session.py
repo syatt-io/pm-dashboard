@@ -257,7 +257,8 @@ class DatabaseSessionManager:
             session = self._SessionFactory()
             try:
                 # Simple query to test connection
-                session.execute("SELECT 1")
+                from sqlalchemy import text
+                session.execute(text("SELECT 1"))
                 return True
             finally:
                 session.close()
