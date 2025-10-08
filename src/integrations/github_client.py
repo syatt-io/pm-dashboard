@@ -374,6 +374,8 @@ class GitHubClient:
                     data = response.json()
                     repos = [repo["name"] for repo in data.get("repositories", [])]
                     logger.info(f"GitHub App has access to {len(repos)} repositories: {repos[:10]}")
+                    # Log all repos for debugging
+                    logger.info(f"All accessible repos: {sorted(repos)}")
                     return repos
                 else:
                     logger.warning(f"Failed to list accessible repos: {response.status_code}")
