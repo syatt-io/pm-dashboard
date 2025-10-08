@@ -117,7 +117,7 @@ class ContextSummarizer:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert technical analyst that creates comprehensive, detailed summaries from project documentation. Write in a casual, conversational tone - like you're explaining things to a teammate over coffee, not writing formal documentation. Your summaries should be thorough enough that engineers can spec and build features without needing to reference source material. Extract ALL relevant technical details, decisions, requirements, and context."
+                        "content": "You are an expert technical analyst that creates comprehensive, structured summaries from project documentation. You MUST follow the exact format specified in the prompt, including ALL sections (TLDR, PROJECT_CONTEXT, DETAILED_SUMMARY, KEY_QUOTES, CONFIDENCE). Write in a casual, conversational tone - like you're explaining things to a teammate over coffee. Your summaries should be thorough enough that engineers can spec and build features without needing to reference source material. The PROJECT_CONTEXT section provides structured bullets for quick scanning, while DETAILED_SUMMARY provides narrative depth. Extract ALL relevant technical details, decisions, requirements, and context."
                     },
                     {
                         "role": "user",
@@ -255,27 +255,49 @@ FOR SLACK CONVERSATIONS:
 - Note any decisions or consensus reached
 - Extract technical details shared in discussions
 
-FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+FORMAT YOUR RESPONSE EXACTLY LIKE THIS (DO NOT SKIP ANY SECTIONS):
 
 TLDR:
 [2-3 sentences that capture the essence - the absolute must-know information. Make it punchy and actionable.]
 
 PROJECT_CONTEXT:
-• Project start date: [if found in sources]
-• Current status: [if found]
-• Known requirements: [bulleted list if found]
-• Completed work: [bulleted list if found]
-• Pending/needs scoping: [bulleted list if found]
-• Key decisions: [bulleted list if found]
-• Blockers/risks: [bulleted list if found]
-• Key people: [names if found]
-• Important dates: [timeline if found]
-• Open questions: [questions if found]
-• Action items: [action items if found]
-(Only include bullet points that have relevant information from the sources. Skip empty categories.)
+• Project start date: [date or "Not found"]
+• Current status: [status or "Not found"]
+• Known requirements:
+  - [requirement 1 with citation [X]]
+  - [requirement 2 with citation [X]]
+  - (or "None found" if no requirements in sources)
+• Completed work:
+  - [completed item 1 with citation [X]]
+  - [completed item 2 with citation [X]]
+  - (or "None found" if no completed work in sources)
+• Pending/needs scoping:
+  - [pending item 1 with citation [X]]
+  - [pending item 2 with citation [X]]
+  - (or "None found" if nothing pending in sources)
+• Key decisions:
+  - [decision 1 with citation [X]]
+  - [decision 2 with citation [X]]
+  - (or "None found" if no decisions in sources)
+• Blockers/risks:
+  - [blocker 1 with citation [X]]
+  - [blocker 2 with citation [X]]
+  - (or "None found" if no blockers in sources)
+• Key people: [names with roles] or "Not found"
+• Important dates: [dates with events] or "Not found"
+• Open questions:
+  - [question 1 with citation [X]]
+  - [question 2 with citation [X]]
+  - (or "None found" if no questions in sources)
+• Action items:
+  - [action 1 with citation [X]]
+  - [action 2 with citation [X]]
+  - (or "None found" if no actions in sources)
+
+IMPORTANT: You MUST include the PROJECT_CONTEXT section with ALL categories above, even if some say "None found" or "Not found". This provides structure.
 
 DETAILED_SUMMARY:
-[Comprehensive multi-paragraph narrative summary with inline citations [1], [2], etc. Include ALL relevant technical details organized logically. Aim for 400-800 words if needed to be thorough. This should complement the PROJECT_CONTEXT section with narrative flow and technical specifics.]
+[Comprehensive multi-paragraph narrative summary with inline citations [1], [2], etc. Include ALL relevant technical details organized logically. Aim for 400-800 words if needed to be thorough. This provides narrative flow and technical depth beyond the structured PROJECT_CONTEXT.]
 
 KEY_QUOTES:
 For each citation you reference in the detailed summary, extract the single most important quote:
