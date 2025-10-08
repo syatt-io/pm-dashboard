@@ -34,7 +34,8 @@ class MeetingProjectLinker:
         self.analyzer = TranscriptAnalyzer()
 
         # Database setup
-        self.engine = create_engine(settings.agent.database_url)
+        from src.utils.database import get_engine
+        self.engine = get_engine()  # Use centralized engine with proper pool settings
         self.Session = sessionmaker(bind=self.engine)
 
     def _save_meeting_project_connections(self, meeting_id: str, meeting_title: str, meeting_date: datetime,

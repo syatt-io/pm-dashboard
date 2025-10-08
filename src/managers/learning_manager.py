@@ -4,10 +4,11 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, desc, or_, and_
+from sqlalchemy import desc, or_, and_
 
 from config.settings import settings
 from src.models.learning import Learning, Base
+from src.utils.database import get_engine
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class LearningManager:
 
     def __init__(self):
         """Initialize learning manager."""
-        self.engine = create_engine(settings.agent.database_url)
+        self.engine = get_engine()  # Use centralized engine with proper pool settings
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
 

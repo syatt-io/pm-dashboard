@@ -32,7 +32,8 @@ class TodoManager:
 
     def __init__(self):
         """Initialize TODO manager."""
-        self.engine = create_engine(settings.agent.database_url)
+        from src.utils.database import get_engine
+        self.engine = get_engine()  # Use centralized engine with proper pool settings
 
         # Try to create tables, but don't fail if we don't have permissions
         try:
