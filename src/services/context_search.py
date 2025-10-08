@@ -448,11 +448,13 @@ class ContextSearchService:
         project_matches = sum(1 for kw in project_keywords if kw in text_lower)
 
         # 2. Semantic similarity for topic (understands meaning)
-        # Build topic query from topic keywords
-        topic_query = ' '.join(topic_keywords) if topic_keywords else query
+        # Build semantic query from BOTH project and topic keywords
+        # This ensures keywords like "beauchamp" are used for semantic search even if detected as project
+        all_keywords = project_keywords | topic_keywords
+        semantic_query = ' '.join(all_keywords) if all_keywords else query
 
         # Get embeddings
-        query_embedding = self._get_embedding(topic_query)
+        query_embedding = self._get_embedding(semantic_query)
         text_embedding = self._get_embedding(text)
 
         if query_embedding is None or text_embedding is None:
