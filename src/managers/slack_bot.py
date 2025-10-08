@@ -394,7 +394,9 @@ class SlackTodoBot:
 
                 # Retrieve session
                 if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    say("❌ Search session expired. Please run `/find-context` again.")
+                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
+                    logger.warning(f"Session {session_id} not found. Available sessions: {available_sessions}. This may be due to multi-worker Gunicorn setup.")
+                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.\n\n_Note: Button interactions may not work reliably with multiple Gunicorn workers. Consider using Redis for session storage._")
                     return
 
                 session = self._search_sessions[session_id]
@@ -446,7 +448,9 @@ class SlackTodoBot:
                 session_id = body['actions'][0]['value'].split(':')[1]
 
                 if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    say("❌ Search session expired. Please run `/find-context` again.")
+                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
+                    logger.warning(f"Session {session_id} not found for show_quotes. Available: {available_sessions}")
+                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.")
                     return
 
                 session = self._search_sessions[session_id]
@@ -494,7 +498,9 @@ class SlackTodoBot:
                 session_id = body['actions'][0]['value'].split(':')[1]
 
                 if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    say("❌ Search session expired. Please run `/find-context` again.")
+                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
+                    logger.warning(f"Session {session_id} not found for show_sources. Available: {available_sessions}")
+                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.")
                     return
 
                 session = self._search_sessions[session_id]
@@ -575,7 +581,9 @@ class SlackTodoBot:
                 session_id = body['actions'][0]['value'].split(':')[1]
 
                 if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
-                    say("❌ Search session expired. Please run `/find-context` again.")
+                    available_sessions = list(self._search_sessions.keys()) if hasattr(self, '_search_sessions') else []
+                    logger.warning(f"Session {session_id} not found for expand_search. Available: {available_sessions}")
+                    say("❌ Search session expired or unavailable (multi-worker issue). Please run `/find-context` again.")
                     return
 
                 session = self._search_sessions[session_id]
