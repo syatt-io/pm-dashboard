@@ -862,7 +862,7 @@ class ContextSearchService:
 
                 # Extract relevant snippet around topic keywords (more important)
                 snippet_query = ' '.join(topic_keywords) if topic_keywords else ' '.join(project_keywords)
-                snippet = self._extract_snippet(transcript.transcript, snippet_query, max_length=300)
+                snippet = self._extract_snippet(transcript.transcript, snippet_query, max_length=1500)  # Increased from 300 for better context
 
                 results.append(SearchResult(
                     source='fireflies',
