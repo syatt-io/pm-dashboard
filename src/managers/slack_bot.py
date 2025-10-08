@@ -382,6 +382,139 @@ class SlackTodoBot:
                 logger.error(f"Error handling /find-context command: {e}")
                 respond(f"❌ Error processing search: {str(e)}")
 
+        # Register interactive button handlers for context search
+        @self.app.action("context_show_details")
+        def handle_show_details(ack, body, say):
+            """Handle 'Show More Details' button click."""
+            ack()
+
+            try:
+                session_id = body['actions'][0]['value'].split(':')[1]
+                user_id = body['user']['id']
+
+                # Retrieve session
+                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
+                    say("❌ Search session expired. Please run `/find-context` again.")
+                    return
+
+                session = self._search_sessions[session_id]
+                results = session['results']
+
+                # Show detailed view of top 3 citations
+                blocks = [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f"🔍 Detailed View: {session['query']}"
+                        }
+                    }
+                ]
+
+                for citation in results.citations[:3]:
+                    blocks.append({
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*[{citation.id}] {citation.title}*\n"
+                                   f"_{citation.date.strftime('%Y-%m-%d')} • {citation.author}_\n\n"
+                                   f"*Full Content:*\n{citation.content[:500]}..."
+                        }
+                    })
+                    if citation.url:
+                        blocks.append({
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"<{citation.url}|View Full Source>"
+                            }
+                        })
+                    blocks.append({"type": "divider"})
+
+                say(blocks=blocks)
+
+            except Exception as e:
+                logger.error(f"Error showing details: {e}")
+                say(f"❌ Error: {str(e)}")
+
+        @self.app.action("context_show_quotes")
+        def handle_show_quotes(ack, body, say):
+            """Handle 'Show All Quotes' button click."""
+            ack()
+
+            try:
+                session_id = body['actions'][0]['value'].split(':')[1]
+
+                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
+                    say("❌ Search session expired. Please run `/find-context` again.")
+                    return
+
+                session = self._search_sessions[session_id]
+                results = session['results']
+
+                # Collect all citations with quotes
+                quotes = []
+                for citation in results.citations:
+                    if citation.key_quote:
+                        quotes.append(f"*[{citation.id}]* {citation.title}\n💡 \"{citation.key_quote}\"")
+
+                if not quotes:
+                    say("No key quotes were extracted from the sources.")
+                    return
+
+                blocks = [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": f"💡 All Key Quotes: {session['query']}"
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "\n\n".join(quotes)
+                        }
+                    }
+                ]
+
+                say(blocks=blocks)
+
+            except Exception as e:
+                logger.error(f"Error showing quotes: {e}")
+                say(f"❌ Error: {str(e)}")
+
+        @self.app.action("context_expand_search")
+        def handle_expand_search(ack, body, say):
+            """Handle 'Expand Search' button click."""
+            ack()
+
+            try:
+                session_id = body['actions'][0]['value'].split(':')[1]
+
+                if not hasattr(self, '_search_sessions') or session_id not in self._search_sessions:
+                    say("❌ Search session expired. Please run `/find-context` again.")
+                    return
+
+                session = self._search_sessions[session_id]
+                query = session['query']
+                current_days = session['days']
+                new_days = current_days * 2  # Double the search window
+
+                if new_days > 365:
+                    new_days = 365
+
+                say(f"🔄 Expanding search to last {new_days} days...\n_This may take a moment_")
+
+                # Re-run search with expanded window
+                result = self._find_context(session['user_id'], query, new_days)
+                say(**result)
+
+            except Exception as e:
+                logger.error(f"Error expanding search: {e}")
+                say(f"❌ Error: {str(e)}")
+
     def _register_listeners(self):
         """Register message listeners."""
 
@@ -1995,6 +2128,74 @@ class SlackTodoBot:
                     "type": "plain_text",
                     "text": stats_text
                 }]
+            })
+
+            # Add interactive follow-up buttons
+            blocks.append({"type": "divider"})
+
+            # Store search context for follow-ups (using search session ID)
+            import hashlib
+            import time
+            session_id = hashlib.md5(f"{user_id}:{query}:{int(time.time())}".encode()).hexdigest()[:12]
+
+            # Cache the search results for 1 hour (in-memory for now, could move to Redis)
+            if not hasattr(self, '_search_sessions'):
+                self._search_sessions = {}
+
+            self._search_sessions[session_id] = {
+                'query': query,
+                'results': results,
+                'user_id': user_id,
+                'created_at': time.time(),
+                'days': days
+            }
+
+            # Clean up old sessions (older than 1 hour)
+            cutoff = time.time() - 3600
+            self._search_sessions = {
+                k: v for k, v in self._search_sessions.items()
+                if v['created_at'] > cutoff
+            }
+
+            blocks.append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*🎯 What would you like to explore?*"
+                }
+            })
+
+            blocks.append({
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🔍 Show More Details"
+                        },
+                        "value": f"show_details:{session_id}",
+                        "action_id": "context_show_details"
+                    },
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "💡 All Quotes"
+                        },
+                        "value": f"show_quotes:{session_id}",
+                        "action_id": "context_show_quotes"
+                    },
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🔄 Expand Search"
+                        },
+                        "value": f"expand_search:{session_id}",
+                        "action_id": "context_expand_search"
+                    }
+                ]
             })
 
             return {"blocks": blocks}
