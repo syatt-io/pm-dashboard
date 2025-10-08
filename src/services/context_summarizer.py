@@ -372,7 +372,7 @@ GUIDELINES:
                     remainder = line[len(header):].strip()
                     if remainder and section_key == 'confidence':
                         result['confidence'] = remainder.lower()
-                    elif remainder and section_key in ['summary', 'tldr']:
+                    elif remainder and section_key in ['summary', 'tldr', 'project_context']:
                         result[section_key] = remainder
                     break
             else:
