@@ -2098,7 +2098,17 @@ class SlackTodoBot:
             if results.summary:
                 # Format summary for better readability
                 formatted_summary = self._format_summary_for_slack(results.summary)
-                summary_text = f"{formatted_summary}\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
+
+                # Slack text blocks have a 3000 character limit
+                # Truncate summary to 2900 chars to leave room for citation note
+                MAX_SUMMARY_LENGTH = 2900
+                citation_note = "\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
+
+                if len(formatted_summary) > MAX_SUMMARY_LENGTH:
+                    formatted_summary = formatted_summary[:MAX_SUMMARY_LENGTH].rsplit(' ', 1)[0] + "..."
+                    logger.warning(f"Summary truncated from {len(results.summary)} to {len(formatted_summary)} chars")
+
+                summary_text = f"{formatted_summary}{citation_note}"
                 blocks.append({
                     "type": "section",
                     "text": {
