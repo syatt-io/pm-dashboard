@@ -738,14 +738,14 @@ def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
 
 
 @celery_app.task(name='src.tasks.vector_tasks.backfill_slack')
-def backfill_slack(days_back: int = 180) -> Dict[str, Any]:
+def backfill_slack(days_back: int = 365) -> Dict[str, Any]:
     """Manual task: Backfill all Slack messages from the last N days.
 
     NOT scheduled - trigger manually via console or Celery CLI:
     celery -A src.tasks.celery_app call src.tasks.vector_tasks.backfill_slack
 
     Args:
-        days_back: Number of days to backfill (default 180 = 6 months)
+        days_back: Number of days to backfill (default 365 = 12 months)
 
     Returns:
         Dict with backfill stats
@@ -856,14 +856,14 @@ def backfill_slack(days_back: int = 180) -> Dict[str, Any]:
 
 
 @celery_app.task(name='src.tasks.vector_tasks.backfill_jira')
-def backfill_jira(days_back: int = 180) -> Dict[str, Any]:
+def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
     """Manual task: Backfill all Jira issues from the last N days.
 
     NOT scheduled - trigger manually via console or Celery CLI:
     celery -A src.tasks.celery_app call src.tasks.vector_tasks.backfill_jira
 
     Args:
-        days_back: Number of days to backfill (default 180 = 6 months)
+        days_back: Number of days to backfill (default 365 = 12 months)
 
     Returns:
         Dict with backfill stats
