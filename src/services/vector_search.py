@@ -71,7 +71,8 @@ class VectorSearchService:
         top_k: int = 20,
         days_back: int = 90,
         sources: Optional[List[str]] = None,
-        user_email: Optional[str] = None
+        user_email: Optional[str] = None,
+        project_key: Optional[str] = None
     ) -> List[SearchResult]:
         """Perform hybrid vector + metadata search.
 
@@ -81,6 +82,7 @@ class VectorSearchService:
             days_back: Days to search back
             sources: Filter by sources (slack, fireflies, jira)
             user_email: User email for Fireflies permission filtering
+            project_key: Filter by project key (e.g., 'SUBS', 'BC')
 
         Returns:
             List of SearchResult objects
@@ -96,7 +98,7 @@ class VectorSearchService:
             return []
 
         # Build metadata filter
-        filter_conditions = self._build_filter(days_back, sources, user_email)
+        filter_conditions = self._build_filter(days_back, sources, user_email, project_key)
 
         try:
             # Query Pinecone with hybrid search
@@ -146,7 +148,8 @@ class VectorSearchService:
         self,
         days_back: int,
         sources: Optional[List[str]] = None,
-        user_email: Optional[str] = None
+        user_email: Optional[str] = None,
+        project_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """Build Pinecone metadata filter.
 
@@ -154,6 +157,7 @@ class VectorSearchService:
             days_back: Days to search back
             sources: Filter by sources
             user_email: User email for Fireflies permissions
+            project_key: Filter by project key (Jira only)
 
         Returns:
             Pinecone filter dict
@@ -165,6 +169,18 @@ class VectorSearchService:
         conditions.append({
             "timestamp_epoch": {"$gte": int(cutoff_date.timestamp())}
         })
+
+        # Project filter - only applies to Jira content
+        if project_key:
+            conditions.append({
+                "$or": [
+                    # Match Jira issues with this project_key
+                    {"project_key": project_key.upper()},
+                    # Allow non-Jira content (no project_key field) to pass through
+                    # This ensures Slack/Fireflies/Notion results are not excluded
+                    {"source": {"$in": ["slack", "fireflies", "notion", "github"]}}
+                ]
+            })
 
         # Source filter
         if sources:

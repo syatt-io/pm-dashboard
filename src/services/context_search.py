@@ -571,7 +571,8 @@ class ContextSearchService:
         sources: List[str] = None,
         user_id: Optional[int] = None,
         debug: bool = True,  # Enable debug logging by default for now
-        detail_level: str = "normal"
+        detail_level: str = "normal",
+        project: Optional[str] = None
     ) -> ContextSearchResults:
         """Search for context across all sources using vector database.
 
@@ -582,6 +583,7 @@ class ContextSearchService:
             user_id: User ID for accessing user-specific credentials and Fireflies permissions
             debug: Enable debug logging for scoring
             detail_level: Summary detail level - 'brief', 'normal', or 'detailed'
+            project: Filter by project key (e.g., 'SUBS', 'BC')
 
         Returns:
             ContextSearchResults with aggregated results from vector search
@@ -591,7 +593,9 @@ class ContextSearchService:
         if sources is None:
             sources = ['slack', 'fireflies', 'jira', 'github', 'notion']
 
-        self.logger.info(f"🔍 Vector search for: '{query}' (sources: {sources}, days: {days_back})")
+        # Log project filter if specified
+        project_msg = f" [project: {project}]" if project else ""
+        self.logger.info(f"🔍 Vector search for: '{query}'{project_msg} (sources: {sources}, days: {days_back})")
 
         # Get user email for Fireflies permission filtering
         user_email = None
@@ -613,13 +617,14 @@ class ContextSearchService:
                 confidence="low"
             )
 
-        # Perform semantic vector search
+        # Perform semantic vector search with project filter
         all_results = vector_search.search(
             query=query,
             days_back=days_back,
             top_k=50,  # Retrieve top 50 most relevant documents
             sources=sources,
-            user_email=user_email  # For Fireflies access filtering
+            user_email=user_email,  # For Fireflies access filtering
+            project_key=project  # Filter by project key
         )
 
         self.logger.info(f"✅ Vector search returned {len(all_results)} results")
