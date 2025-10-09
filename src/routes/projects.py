@@ -306,3 +306,210 @@ def send_daily_project_notifications():
     except Exception as e:
         logger.error(f"Error sending daily notifications: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# Project Resource Mappings Routes
+# ============================================================================
+
+@projects_bp.route('/project-resource-mappings', methods=['GET'])
+def get_all_project_resource_mappings():
+    """Get all project resource mappings."""
+    try:
+        from sqlalchemy import text
+        from src.utils.database import get_engine
+        import json
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT project_key, project_name, slack_channel_ids, notion_page_ids, github_repos
+                FROM project_resource_mappings
+                ORDER BY project_key
+            """))
+
+            mappings = []
+            for row in result:
+                project_key, project_name, slack_channel_ids, notion_page_ids, github_repos = row
+                mappings.append({
+                    'project_key': project_key,
+                    'project_name': project_name,
+                    'slack_channel_ids': json.loads(slack_channel_ids) if slack_channel_ids else [],
+                    'notion_page_ids': json.loads(notion_page_ids) if notion_page_ids else [],
+                    'github_repos': json.loads(github_repos) if github_repos else []
+                })
+
+        return jsonify({'success': True, 'mappings': mappings})
+
+    except Exception as e:
+        logger.error(f"Error getting project resource mappings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/project-resource-mappings/<project_key>', methods=['PUT'])
+def update_project_resource_mapping(project_key):
+    """Update project resource mapping."""
+    try:
+        data = request.json
+        from sqlalchemy import text
+        from src.utils.database import get_engine
+        import json
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            # Check if mapping exists
+            result = conn.execute(
+                text("SELECT project_key FROM project_resource_mappings WHERE project_key = :key"),
+                {"key": project_key}
+            )
+            exists = result.fetchone() is not None
+
+            if exists:
+                # Update existing mapping
+                conn.execute(text("""
+                    UPDATE project_resource_mappings
+                    SET slack_channel_ids = :slack_channels,
+                        notion_page_ids = :notion_pages,
+                        github_repos = :github_repos,
+                        updated_at = :updated_at
+                    WHERE project_key = :key
+                """), {
+                    'key': project_key,
+                    'slack_channels': json.dumps(data.get('slack_channel_ids', [])),
+                    'notion_pages': json.dumps(data.get('notion_page_ids', [])),
+                    'github_repos': json.dumps(data.get('github_repos', [])),
+                    'updated_at': datetime.now()
+                })
+            else:
+                # Insert new mapping
+                conn.execute(text("""
+                    INSERT INTO project_resource_mappings
+                    (project_key, project_name, slack_channel_ids, notion_page_ids, github_repos, created_at, updated_at)
+                    VALUES (:key, :name, :slack_channels, :notion_pages, :github_repos, :created_at, :updated_at)
+                """), {
+                    'key': project_key,
+                    'name': data.get('project_name', project_key),
+                    'slack_channels': json.dumps(data.get('slack_channel_ids', [])),
+                    'notion_pages': json.dumps(data.get('notion_page_ids', [])),
+                    'github_repos': json.dumps(data.get('github_repos', [])),
+                    'created_at': datetime.now(),
+                    'updated_at': datetime.now()
+                })
+
+            conn.commit()
+
+        return jsonify({'success': True, 'message': 'Resource mapping updated successfully'})
+
+    except Exception as e:
+        logger.error(f"Error updating project resource mapping: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/search/slack-channels', methods=['GET'])
+def search_slack_channels():
+    """Search for Slack channels by name."""
+    try:
+        query = request.args.get('q', '').lower()
+
+        from config.settings import settings
+        from slack_sdk import WebClient
+
+        slack_client = WebClient(token=settings.slack.bot_token)
+
+        # Get all channels (public and private that bot is member of)
+        response = slack_client.conversations_list(
+            types="public_channel,private_channel",
+            limit=1000
+        )
+
+        channels = []
+        for channel in response['channels']:
+            if query in channel['name'].lower():
+                channels.append({
+                    'id': channel['id'],
+                    'name': channel['name'],
+                    'is_private': channel.get('is_private', False),
+                    'num_members': channel.get('num_members', 0)
+                })
+
+        # Sort by name
+        channels.sort(key=lambda x: x['name'])
+
+        return jsonify({'success': True, 'channels': channels})
+
+    except Exception as e:
+        logger.error(f"Error searching Slack channels: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/search/notion-pages', methods=['GET'])
+def search_notion_pages():
+    """Search for Notion pages by title."""
+    try:
+        query = request.args.get('q', '').lower()
+
+        from src.integrations.notion_api import NotionAPIClient
+        from config.settings import settings
+
+        notion_client = NotionAPIClient(api_key=settings.notion.api_key)
+
+        # Get all pages from Notion
+        all_pages = notion_client.get_all_pages(days_back=365)
+
+        # Filter by query
+        pages = []
+        for page in all_pages:
+            title = page.get('title', 'Untitled')
+            if query in title.lower():
+                pages.append({
+                    'id': page.get('id'),
+                    'title': title,
+                    'url': page.get('url')
+                })
+
+        # Sort by title
+        pages.sort(key=lambda x: x['title'])
+
+        # Limit to 50 results
+        pages = pages[:50]
+
+        return jsonify({'success': True, 'pages': pages})
+
+    except Exception as e:
+        logger.error(f"Error searching Notion pages: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/search/github-repos', methods=['GET'])
+def search_github_repos():
+    """Get list of GitHub repos (from ingested data)."""
+    try:
+        from sqlalchemy import text
+        from src.utils.database import get_engine
+
+        # For now, return a simple list of repos from project_resource_mappings
+        # In the future, we could fetch from GitHub API or from Pinecone metadata
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT DISTINCT github_repos
+                FROM project_resource_mappings
+                WHERE github_repos IS NOT NULL AND github_repos != '[]'
+            """))
+
+            import json
+            repos_set = set()
+            for row in result:
+                github_repos = row[0]
+                if github_repos:
+                    repos = json.loads(github_repos)
+                    repos_set.update(repos)
+
+            # Convert to list and sort
+            repos = [{'name': repo} for repo in sorted(repos_set)]
+
+        return jsonify({'success': True, 'repos': repos})
+
+    except Exception as e:
+        logger.error(f"Error getting GitHub repos: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -57,6 +57,7 @@ import {
   Assessment as DigestIcon,
   GetApp as DownloadIcon,
 } from '@mui/icons-material';
+import { ResourceMappingCell } from './ResourceMappingCell';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -1209,6 +1210,13 @@ export const ProjectList = () => {
   const [projectDetailOpen, setProjectDetailOpen] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{[key: string]: Partial<Project>}>({});
 
+  // Resource mappings state
+  const [resourceMappings, setResourceMappings] = useState<{[projectKey: string]: {
+    slack_channel_ids: string[];
+    notion_page_ids: string[];
+    github_repos: string[];
+  }}>({});
+
   const loadWatchedProjects = useCallback(async (activeProjects: Project[]) => {
     try {
       const token = localStorage.getItem('auth_token');
@@ -1252,12 +1260,80 @@ export const ProjectList = () => {
 
       // Load watched projects from API
       await loadWatchedProjects(active);
+
+      // Load resource mappings
+      await loadResourceMappings();
     } catch (error) {
       notify('Error fetching projects', { type: 'error' });
     } finally {
       setLoading(false);
     }
   }, [dataProvider, notify, loadWatchedProjects]);
+
+  const loadResourceMappings = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project-resource-mappings`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const mappingsMap: any = {};
+          data.mappings.forEach((mapping: any) => {
+            mappingsMap[mapping.project_key] = {
+              slack_channel_ids: mapping.slack_channel_ids || [],
+              notion_page_ids: mapping.notion_page_ids || [],
+              github_repos: mapping.github_repos || []
+            };
+          });
+          setResourceMappings(mappingsMap);
+        }
+      }
+    } catch (error) {
+      // Silently fail - mappings are optional
+    }
+  };
+
+  const handleResourceMappingChange = async (
+    projectKey: string,
+    projectName: string,
+    resourceType: 'slack' | 'notion' | 'github',
+    newValues: string[]
+  ) => {
+    // Update local state immediately
+    const updated = {
+      ...resourceMappings,
+      [projectKey]: {
+        ...resourceMappings[projectKey],
+        slack_channel_ids: resourceType === 'slack' ? newValues : (resourceMappings[projectKey]?.slack_channel_ids || []),
+        notion_page_ids: resourceType === 'notion' ? newValues : (resourceMappings[projectKey]?.notion_page_ids || []),
+        github_repos: resourceType === 'github' ? newValues : (resourceMappings[projectKey]?.github_repos || [])
+      }
+    };
+    setResourceMappings(updated);
+
+    // Save to backend
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project-resource-mappings/${projectKey}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_name: projectName,
+          ...updated[projectKey]
+        })
+      });
+
+      if (response.ok) {
+        notify('Resource mapping updated', { type: 'success' });
+      } else {
+        throw new Error('Failed to update resource mapping');
+      }
+    } catch (error) {
+      notify('Error updating resource mapping', { type: 'error' });
+      // Reload mappings to restore previous state
+      loadResourceMappings();
+    }
+  };
 
   useEffect(() => {
     fetchProjects();
@@ -1516,6 +1592,9 @@ export const ProjectList = () => {
                           <TableCell>Key</TableCell>
                           <TableCell>Type</TableCell>
                           <TableCell>Project Type</TableCell>
+                          <TableCell>Slack Channels</TableCell>
+                          <TableCell>Notion Pages</TableCell>
+                          <TableCell>GitHub Repos</TableCell>
                           {workType === 'project-based' && <TableCell>{currentMonth} Forecast</TableCell>}
                           {workType === 'growth-support' && <TableCell>Retainer Hours</TableCell>}
                           <TableCell>{currentMonth} Hours</TableCell>
@@ -1560,6 +1639,30 @@ export const ProjectList = () => {
                                   <MenuItem value="n-a">N/A</MenuItem>
                                 </Select>
                               </FormControl>
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 180 }}>
+                              <ResourceMappingCell
+                                projectKey={project.key}
+                                resourceType="slack"
+                                values={resourceMappings[project.key]?.slack_channel_ids || []}
+                                onChange={(newValues) => handleResourceMappingChange(project.key, project.name, 'slack', newValues)}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 180 }}>
+                              <ResourceMappingCell
+                                projectKey={project.key}
+                                resourceType="notion"
+                                values={resourceMappings[project.key]?.notion_page_ids || []}
+                                onChange={(newValues) => handleResourceMappingChange(project.key, project.name, 'notion', newValues)}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 180 }}>
+                              <ResourceMappingCell
+                                projectKey={project.key}
+                                resourceType="github"
+                                values={resourceMappings[project.key]?.github_repos || []}
+                                onChange={(newValues) => handleResourceMappingChange(project.key, project.name, 'github', newValues)}
+                              />
                             </TableCell>
                             {(workType === 'project-based' || workType === 'growth-support') && (
                               <TableCell>
