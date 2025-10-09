@@ -1,7 +1,7 @@
 """Database connection management utilities."""
 import logging
 from contextlib import contextmanager
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import NullPool
 from config.settings import settings
@@ -120,6 +120,28 @@ def init_database():
         # Create all tables
         Base.metadata.create_all(engine)
         logger.info("Database tables created/verified")
+
+        # Create project_resource_mappings table if it doesn't exist
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS project_resource_mappings (
+                    id SERIAL PRIMARY KEY,
+                    project_key TEXT NOT NULL UNIQUE,
+                    project_name TEXT NOT NULL,
+                    slack_channel_ids TEXT,
+                    notion_page_ids TEXT,
+                    github_repos TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_project_resource_mappings_key
+                ON project_resource_mappings(project_key)
+            """))
+            conn.commit()
+            logger.info("project_resource_mappings table created/verified")
+
         return True
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
