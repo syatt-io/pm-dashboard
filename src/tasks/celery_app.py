@@ -21,7 +21,7 @@ celery_app = Celery(
     include=['src.tasks.vector_tasks']
 )
 
-# Configure Celery with unique key prefix
+# Configure Celery with unique key prefix and Redis connection handling
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
@@ -33,11 +33,30 @@ celery_app.conf.update(
     worker_max_tasks_per_child=50,  # Restart worker after 50 tasks to prevent memory leaks
     # Use unique key prefix to isolate from other apps sharing same Redis
     result_backend_transport_options={
-        'global_keyprefix': 'agent-pm:'
+        'global_keyprefix': 'agent-pm:',
+        'retry_on_timeout': True,
+        'socket_keepalive': True,
+        'socket_keepalive_options': {
+            1: 1,  # TCP_KEEPIDLE
+            2: 1,  # TCP_KEEPINTVL
+            3: 3   # TCP_KEEPCNT
+        },
+        'health_check_interval': 30
     },
     broker_transport_options={
-        'global_keyprefix': 'agent-pm:'
-    }
+        'global_keyprefix': 'agent-pm:',
+        'retry_on_timeout': True,
+        'socket_keepalive': True,
+        'socket_keepalive_options': {
+            1: 1,  # TCP_KEEPIDLE
+            2: 1,  # TCP_KEEPINTVL
+            3: 3   # TCP_KEEPCNT
+        },
+        'health_check_interval': 30
+    },
+    # Broker connection retry settings
+    broker_connection_retry_on_startup=True,
+    broker_connection_max_retries=10
 )
 
 # Configure periodic tasks
