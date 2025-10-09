@@ -411,10 +411,14 @@ def search_slack_channels():
     try:
         query = request.args.get('q', '').lower()
 
-        from config.settings import settings
+        import os
         from slack_sdk import WebClient
 
-        slack_client = WebClient(token=settings.slack.bot_token)
+        slack_token = os.getenv('SLACK_BOT_TOKEN')
+        if not slack_token:
+            return jsonify({'success': False, 'error': 'Slack not configured'}), 500
+
+        slack_client = WebClient(token=slack_token)
 
         # Get all channels (public and private that bot is member of)
         response = slack_client.conversations_list(
@@ -448,10 +452,14 @@ def search_notion_pages():
     try:
         query = request.args.get('q', '').lower()
 
+        import os
         from src.integrations.notion_api import NotionAPIClient
-        from config.settings import settings
 
-        notion_client = NotionAPIClient(api_key=settings.notion.api_key)
+        notion_api_key = os.getenv('NOTION_API_KEY')
+        if not notion_api_key:
+            return jsonify({'success': False, 'error': 'Notion not configured'}), 500
+
+        notion_client = NotionAPIClient(api_key=notion_api_key)
 
         # Get all pages from Notion
         all_pages = notion_client.get_all_pages(days_back=365)
