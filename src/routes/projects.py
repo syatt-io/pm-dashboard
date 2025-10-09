@@ -584,7 +584,7 @@ def search_jira_projects():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@projects_bp.route('/todo-counts', methods=['GET'])
+@projects_bp.route('/api/projects/todo-counts', methods=['GET'])
 def get_project_todo_counts():
     """Get todo counts for all projects."""
     try:
@@ -608,4 +608,35 @@ def get_project_todo_counts():
 
     except Exception as e:
         logger.error(f"Error getting project todo counts: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/api/projects/monthly-hours', methods=['GET'])
+def get_project_monthly_hours():
+    """Get current month's hours for all projects."""
+    try:
+        from src.utils.database import get_engine
+        from sqlalchemy import text
+        from datetime import datetime
+
+        # Get current month/year
+        now = datetime.now()
+        current_month = now.replace(day=1)
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            # Get current month's hours from project_monthly_forecast
+            result = conn.execute(text("""
+                SELECT project_key, actual_monthly_hours
+                FROM project_monthly_forecast
+                WHERE month_year = :month
+            """), {"month": current_month})
+
+            # Convert to dict: {project_key: hours}
+            monthly_hours = {row[0]: float(row[1] or 0) for row in result}
+
+        return jsonify({'success': True, 'monthly_hours': monthly_hours})
+
+    except Exception as e:
+        logger.error(f"Error getting project monthly hours: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

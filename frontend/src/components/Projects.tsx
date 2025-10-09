@@ -1222,6 +1222,9 @@ export const ProjectList = () => {
   // Todo counts state
   const [todoCounts, setTodoCounts] = useState<{[projectKey: string]: number}>({});
 
+  // Monthly hours state
+  const [monthlyHours, setMonthlyHours] = useState<{[projectKey: string]: number}>({});
+
   // Navigation
   const redirect = useRedirect();
 
@@ -1269,9 +1272,10 @@ export const ProjectList = () => {
       // Load watched projects from API
       await loadWatchedProjects(active);
 
-      // Load resource mappings and todo counts
+      // Load resource mappings, todo counts, and monthly hours
       await loadResourceMappings();
       await loadTodoCounts();
+      await loadMonthlyHours();
     } catch (error) {
       notify('Error fetching projects', { type: 'error' });
     } finally {
@@ -1313,6 +1317,20 @@ export const ProjectList = () => {
       }
     } catch (error) {
       // Silently fail - todo counts are optional
+    }
+  };
+
+  const loadMonthlyHours = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/monthly-hours`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setMonthlyHours(data.monthly_hours || {});
+        }
+      }
+    } catch (error) {
+      // Silently fail - monthly hours are optional
     }
   };
 
@@ -1554,10 +1572,22 @@ export const ProjectList = () => {
                   </TableHead>
                   <TableBody>
                     {watchedProjects.map((project) => {
-                      const currentHours = project.cumulative_hours || 0;
-                      const forecastedHours = project.total_hours || 0;
                       const projectType = project.project_work_type || 'project-based';
                       const todoCount = todoCounts[project.key] || 0;
+
+                      // Determine current and forecasted hours based on project type
+                      let currentHours = 0;
+                      let forecastedHours = 0;
+
+                      if (projectType === 'growth-support') {
+                        // Retainer projects: use monthly hours
+                        currentHours = monthlyHours[project.key] || 0;
+                        forecastedHours = project.retainer_hours || 0;
+                      } else if (projectType === 'project-based') {
+                        // Project-based: use cumulative hours
+                        currentHours = project.cumulative_hours || 0;
+                        forecastedHours = project.total_hours || 0;
+                      }
 
                       // Helper function to get color based on usage percentage
                       const getHoursColor = () => {
