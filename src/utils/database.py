@@ -131,6 +131,7 @@ def init_database():
                     slack_channel_ids TEXT,
                     notion_page_ids TEXT,
                     github_repos TEXT,
+                    jira_project_keys TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -138,6 +139,20 @@ def init_database():
             conn.execute(text("""
                 CREATE INDEX IF NOT EXISTS idx_project_resource_mappings_key
                 ON project_resource_mappings(project_key)
+            """))
+            # Add jira_project_keys column if it doesn't exist (migration for existing tables)
+            conn.execute(text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name = 'project_resource_mappings'
+                        AND column_name = 'jira_project_keys'
+                    ) THEN
+                        ALTER TABLE project_resource_mappings
+                        ADD COLUMN jira_project_keys TEXT;
+                    END IF;
+                END $$;
             """))
             conn.commit()
             logger.info("project_resource_mappings table created/verified")

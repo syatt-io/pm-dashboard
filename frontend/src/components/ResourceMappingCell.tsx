@@ -18,7 +18,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.host
 
 interface ResourceMappingCellProps {
   projectKey: string;
-  resourceType: 'slack' | 'notion' | 'github';
+  resourceType: 'slack' | 'notion' | 'github' | 'jira';
   values: string[];
   onChange: (newValues: string[]) => void;
 }
@@ -59,6 +59,8 @@ export const ResourceMappingCell: React.FC<ResourceMappingCellProps> = ({
       newValue = item.id;
     } else if (resourceType === 'notion') {
       newValue = item.id;
+    } else if (resourceType === 'jira') {
+      newValue = item.key;
     } else {
       newValue = item.name;
     }
@@ -79,7 +81,8 @@ export const ResourceMappingCell: React.FC<ResourceMappingCellProps> = ({
     const searchEndpoint = {
       slack: '/api/search/slack-channels',
       notion: '/api/search/notion-pages',
-      github: '/api/search/github-repos'
+      github: '/api/search/github-repos',
+      jira: '/api/search/jira-projects'
     }[resourceType];
 
     setLoading(true);
@@ -92,6 +95,8 @@ export const ResourceMappingCell: React.FC<ResourceMappingCellProps> = ({
             setSearchResults(data.channels || []);
           } else if (resourceType === 'notion') {
             setSearchResults(data.pages || []);
+          } else if (resourceType === 'jira') {
+            setSearchResults(data.projects || []);
           } else {
             setSearchResults(data.repos || []);
           }
@@ -118,6 +123,7 @@ export const ResourceMappingCell: React.FC<ResourceMappingCellProps> = ({
       case 'slack': return 'Slack Channels';
       case 'notion': return 'Notion Pages';
       case 'github': return 'GitHub Repos';
+      case 'jira': return 'Jira Projects';
     }
   };
 
@@ -190,6 +196,8 @@ export const ResourceMappingCell: React.FC<ResourceMappingCellProps> = ({
                   ? `#${item.name} ${item.is_private ? '🔒' : ''}`
                   : resourceType === 'notion'
                   ? item.title
+                  : resourceType === 'jira'
+                  ? `${item.key} - ${item.name}`
                   : item.name;
 
                 const secondaryText = resourceType === 'slack'

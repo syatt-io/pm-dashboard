@@ -323,20 +323,21 @@ def get_all_project_resource_mappings():
         engine = get_engine()
         with engine.connect() as conn:
             result = conn.execute(text("""
-                SELECT project_key, project_name, slack_channel_ids, notion_page_ids, github_repos
+                SELECT project_key, project_name, slack_channel_ids, notion_page_ids, github_repos, jira_project_keys
                 FROM project_resource_mappings
                 ORDER BY project_key
             """))
 
             mappings = []
             for row in result:
-                project_key, project_name, slack_channel_ids, notion_page_ids, github_repos = row
+                project_key, project_name, slack_channel_ids, notion_page_ids, github_repos, jira_project_keys = row
                 mappings.append({
                     'project_key': project_key,
                     'project_name': project_name,
                     'slack_channel_ids': json.loads(slack_channel_ids) if slack_channel_ids else [],
                     'notion_page_ids': json.loads(notion_page_ids) if notion_page_ids else [],
-                    'github_repos': json.loads(github_repos) if github_repos else []
+                    'github_repos': json.loads(github_repos) if github_repos else [],
+                    'jira_project_keys': json.loads(jira_project_keys) if jira_project_keys else []
                 })
 
         return jsonify({'success': True, 'mappings': mappings})
@@ -371,6 +372,7 @@ def update_project_resource_mapping(project_key):
                     SET slack_channel_ids = :slack_channels,
                         notion_page_ids = :notion_pages,
                         github_repos = :github_repos,
+                        jira_project_keys = :jira_projects,
                         updated_at = :updated_at
                     WHERE project_key = :key
                 """), {
@@ -378,20 +380,22 @@ def update_project_resource_mapping(project_key):
                     'slack_channels': json.dumps(data.get('slack_channel_ids', [])),
                     'notion_pages': json.dumps(data.get('notion_page_ids', [])),
                     'github_repos': json.dumps(data.get('github_repos', [])),
+                    'jira_projects': json.dumps(data.get('jira_project_keys', [])),
                     'updated_at': datetime.now()
                 })
             else:
                 # Insert new mapping
                 conn.execute(text("""
                     INSERT INTO project_resource_mappings
-                    (project_key, project_name, slack_channel_ids, notion_page_ids, github_repos, created_at, updated_at)
-                    VALUES (:key, :name, :slack_channels, :notion_pages, :github_repos, :created_at, :updated_at)
+                    (project_key, project_name, slack_channel_ids, notion_page_ids, github_repos, jira_project_keys, created_at, updated_at)
+                    VALUES (:key, :name, :slack_channels, :notion_pages, :github_repos, :jira_projects, :created_at, :updated_at)
                 """), {
                     'key': project_key,
                     'name': data.get('project_name', project_key),
                     'slack_channels': json.dumps(data.get('slack_channel_ids', [])),
                     'notion_pages': json.dumps(data.get('notion_page_ids', [])),
                     'github_repos': json.dumps(data.get('github_repos', [])),
+                    'jira_projects': json.dumps(data.get('jira_project_keys', [])),
                     'created_at': datetime.now(),
                     'updated_at': datetime.now()
                 })
@@ -532,4 +536,48 @@ def search_github_repos():
 
     except Exception as e:
         logger.error(f"Error searching GitHub repos: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/search/jira-projects', methods=['GET'])
+def search_jira_projects():
+    """Search for Jira projects by key or name."""
+    try:
+        query = request.args.get('q', '').lower()
+
+        from src.integrations.jira_client import JiraClient
+        from config.settings import settings
+
+        # Check if Jira is configured
+        if not all([settings.jira.url, settings.jira.username, settings.jira.api_token]):
+            return jsonify({'success': False, 'error': 'Jira not configured'}), 500
+
+        # Initialize Jira client
+        jira_client = JiraClient(
+            url=settings.jira.url,
+            username=settings.jira.username,
+            api_token=settings.jira.api_token
+        )
+
+        # Get all projects
+        all_projects = jira_client.get_all_projects()
+
+        # Filter by query (search in both key and name)
+        filtered_projects = []
+        for project in all_projects:
+            project_key = project.get('key', '').lower()
+            project_name = project.get('name', '').lower()
+            if query in project_key or query in project_name:
+                filtered_projects.append({
+                    'key': project.get('key'),
+                    'name': project.get('name')
+                })
+
+        # Sort by key
+        filtered_projects.sort(key=lambda x: x['key'])
+
+        return jsonify({'success': True, 'projects': filtered_projects})
+
+    except Exception as e:
+        logger.error(f"Error searching Jira projects: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
