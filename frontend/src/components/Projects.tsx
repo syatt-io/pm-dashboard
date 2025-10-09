@@ -6,7 +6,7 @@ import {
   useNotify,
   useDataProvider,
   Button,
-  useNavigate,
+  useRedirect,
 } from 'react-admin';
 import {
   Card,
@@ -1223,7 +1223,7 @@ export const ProjectList = () => {
   const [todoCounts, setTodoCounts] = useState<{[projectKey: string]: number}>({});
 
   // Navigation
-  const navigate = useNavigate();
+  const redirect = useRedirect();
 
   const loadWatchedProjects = useCallback(async (activeProjects: Project[]) => {
     try {
@@ -1269,8 +1269,9 @@ export const ProjectList = () => {
       // Load watched projects from API
       await loadWatchedProjects(active);
 
-      // Load resource mappings
+      // Load resource mappings and todo counts
       await loadResourceMappings();
+      await loadTodoCounts();
     } catch (error) {
       notify('Error fetching projects', { type: 'error' });
     } finally {
@@ -1298,6 +1299,20 @@ export const ProjectList = () => {
       }
     } catch (error) {
       // Silently fail - mappings are optional
+    }
+  };
+
+  const loadTodoCounts = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/todo-counts`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setTodoCounts(data.counts || {});
+        }
+      }
+    } catch (error) {
+      // Silently fail - todo counts are optional
     }
   };
 
@@ -1515,7 +1530,7 @@ export const ProjectList = () => {
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
-            {/* My Projects - Card View */}
+            {/* My Projects - Table View */}
             {watchedProjects.length === 0 ? (
               <Alert severity="info" sx={{ mb: 3 }}>
                 <Typography variant="h6" gutterBottom>
@@ -1523,25 +1538,95 @@ export const ProjectList = () => {
                 </Typography>
                 <Typography variant="body2">
                   Switch to the "Active Projects" tab and use the watch toggles to select projects you want to follow.
-                  They'll appear here as beautiful project cards with detailed information.
                 </Typography>
               </Alert>
             ) : (
-              <Box>
-                <Typography variant="h6" gutterBottom sx={{ color: 'primary.main', mb: 3 }}>
-                  🎯 Your Project Dashboard
-                </Typography>
-                <Grid container spacing={3}>
-                  {watchedProjects.map((project) => (
-                    <Grid item xs={12} sm={6} md={4} key={project.key}>
-                      <ProjectCard
-                        project={project}
-                        onCardClick={handleCardClick}
-                      />
-                    </Grid>
-                  ))}
-                </Grid>
-              </Box>
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Hours</TableCell>
+                      <TableCell>Meeting Day</TableCell>
+                      <TableCell># of TODOs</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {watchedProjects.map((project) => {
+                      const currentHours = project.cumulative_hours || 0;
+                      const forecastedHours = project.total_hours || 0;
+                      const projectType = project.project_work_type || 'project-based';
+                      const todoCount = todoCounts[project.key] || 0;
+
+                      // Helper function to get color based on usage percentage
+                      const getHoursColor = () => {
+                        if (projectType === 'n-a') return 'text.primary';
+                        if (!forecastedHours || forecastedHours === 0) return 'success.main';
+                        const percentage = (currentHours / forecastedHours) * 100;
+                        if (percentage > 100) return 'error.main';
+                        if (percentage > 80) return 'warning.main';
+                        return 'success.main';
+                      };
+
+                      const getTypeLabel = (type: string) => {
+                        switch (type) {
+                          case 'project-based': return 'Project-based';
+                          case 'growth-support': return 'Growth & Support';
+                          case 'n-a': return 'N/A';
+                          default: return 'Other';
+                        }
+                      };
+
+                      return (
+                        <TableRow
+                          key={project.key}
+                          sx={{
+                            cursor: 'pointer',
+                            '&:hover': {
+                              backgroundColor: 'rgba(85, 77, 255, 0.08)'
+                            }
+                          }}
+                          onClick={() => redirect('show', 'projects', project.key)}
+                        >
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {project.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {project.key}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>{getTypeLabel(projectType)}</TableCell>
+                          <TableCell>
+                            <Typography
+                              variant="body2"
+                              sx={{ color: getHoursColor(), fontWeight: 'medium' }}
+                            >
+                              {currentHours.toFixed(1)} / {forecastedHours.toFixed(1)}h
+                            </Typography>
+                            {forecastedHours > 0 && (
+                              <Typography variant="caption" color="text.secondary">
+                                ({((currentHours / forecastedHours) * 100).toFixed(0)}%)
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {project.weekly_meeting_day || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={todoCount}
+                              size="small"
+                              color={todoCount > 0 ? 'primary' : 'default'}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
           </TabPanel>
 
