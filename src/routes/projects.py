@@ -420,9 +420,9 @@ def search_slack_channels():
 
         slack_client = WebClient(token=slack_token)
 
-        # Get all channels (public and private that bot is member of)
+        # Get only public channels (bot doesn't have groups:read scope for private channels)
         response = slack_client.conversations_list(
-            types="public_channel,private_channel",
+            types="public_channel",
             limit=1000
         )
 
