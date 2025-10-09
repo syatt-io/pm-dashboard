@@ -461,25 +461,24 @@ def search_notion_pages():
 
         notion_client = NotionAPIClient(api_key=notion_api_key)
 
-        # Get all pages from Notion
-        all_pages = notion_client.get_all_pages(days_back=365)
+        # Use Notion search API with query parameter for faster results
+        search_result = notion_client.search(query=query, filter_type='page', page_size=50)
 
-        # Filter by query
+        # Extract pages with proper title extraction
         pages = []
-        for page in all_pages:
-            title = page.get('title', 'Untitled')
+        for page in search_result.get('results', []):
+            # Use the get_page_title method to properly extract title
+            title = notion_client.get_page_title(page)
+
             if query in title.lower():
                 pages.append({
                     'id': page.get('id'),
                     'title': title,
-                    'url': page.get('url')
+                    'url': page.get('url', '')
                 })
 
         # Sort by title
         pages.sort(key=lambda x: x['title'])
-
-        # Limit to 50 results
-        pages = pages[:50]
 
         return jsonify({'success': True, 'pages': pages})
 
@@ -490,34 +489,54 @@ def search_notion_pages():
 
 @projects_bp.route('/search/github-repos', methods=['GET'])
 def search_github_repos():
-    """Get list of GitHub repos (from ingested data)."""
+    """Search for GitHub repositories from GitHub API."""
     try:
-        from sqlalchemy import text
-        from src.utils.database import get_engine
+        query = request.args.get('q', '').lower()
 
-        # For now, return a simple list of repos from project_resource_mappings
-        # In the future, we could fetch from GitHub API or from Pinecone metadata
-        engine = get_engine()
-        with engine.connect() as conn:
-            result = conn.execute(text("""
-                SELECT DISTINCT github_repos
-                FROM project_resource_mappings
-                WHERE github_repos IS NOT NULL AND github_repos != '[]'
-            """))
+        import os
+        import asyncio
+        from src.integrations.github_client import GitHubClient
 
-            import json
-            repos_set = set()
-            for row in result:
-                github_repos = row[0]
-                if github_repos:
-                    repos = json.loads(github_repos)
-                    repos_set.update(repos)
+        # Get GitHub credentials from environment
+        github_app_id = os.getenv('GITHUB_APP_ID', '')
+        github_private_key = os.getenv('GITHUB_APP_PRIVATE_KEY', '')
+        github_installation_id = os.getenv('GITHUB_APP_INSTALLATION_ID', '')
+        github_api_token = os.getenv('GITHUB_API_TOKEN', '')
+        github_org = os.getenv('GITHUB_ORGANIZATION', '')
 
-            # Convert to list and sort
-            repos = [{'name': repo} for repo in sorted(repos_set)]
+        # Check if GitHub is configured
+        has_app_auth = all([github_app_id, github_private_key, github_installation_id])
+        has_token_auth = bool(github_api_token)
 
-        return jsonify({'success': True, 'repos': repos})
+        if not (has_app_auth or has_token_auth):
+            return jsonify({'success': False, 'error': 'GitHub not configured'}), 500
+
+        # Initialize GitHub client
+        github_client = GitHubClient(
+            api_token=github_api_token,
+            organization=github_org,
+            app_id=github_app_id,
+            private_key=github_private_key,
+            installation_id=github_installation_id
+        )
+
+        # Get all accessible repos from GitHub
+        async def get_repos():
+            return await github_client.list_accessible_repos()
+
+        all_repos = asyncio.run(get_repos())
+
+        # Filter by query
+        filtered_repos = []
+        for repo in all_repos:
+            if query in repo.lower():
+                filtered_repos.append({'name': repo})
+
+        # Sort by name
+        filtered_repos.sort(key=lambda x: x['name'])
+
+        return jsonify({'success': True, 'repos': filtered_repos})
 
     except Exception as e:
-        logger.error(f"Error getting GitHub repos: {e}")
+        logger.error(f"Error searching GitHub repos: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
