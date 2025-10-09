@@ -48,7 +48,7 @@ class AIConfig:
     """AI model configuration."""
     api_key: str
     provider: str = "openai"  # or "anthropic"
-    model: str = "gpt-4o-mini"  # Fast, cheap, good quality for summarization
+    model: str = "gpt-4"  # Default - override with OPENAI_MODEL env var
     temperature: float = 0.3
     max_tokens: int = 2000
 
