@@ -48,7 +48,7 @@ class AIConfig:
     """AI model configuration."""
     api_key: str
     provider: str = "openai"  # or "anthropic"
-    model: str = "gpt-4"
+    model: str = "gpt-4o-mini"  # Fast, cheap, good quality for summarization
     temperature: float = 0.3
     max_tokens: int = 2000
 
@@ -61,6 +61,12 @@ class PineconeConfig:
     index_name: str = "agent-pm-context"
     dimension: int = 1536  # text-embedding-3-small dimension
     metric: str = "cosine"
+
+
+@dataclass
+class NotionConfig:
+    """Notion API configuration."""
+    api_key: str
 
 
 @dataclass
@@ -113,6 +119,7 @@ class Settings:
         self.agent = self._load_agent_config()
         self.web = self._load_web_config()
         self.pinecone = self._load_pinecone_config()
+        self.notion = self._load_notion_config()
 
     @staticmethod
     def _load_fireflies_config() -> FirefliesConfig:
@@ -257,6 +264,11 @@ class Settings:
             dimension=int(os.getenv("PINECONE_DIMENSION", "1536")),
             metric=os.getenv("PINECONE_METRIC", "cosine")
         )
+
+    @staticmethod
+    def _load_notion_config() -> NotionConfig:
+        api_key = os.getenv("NOTION_API_KEY", "")
+        return NotionConfig(api_key=api_key)
 
 
 settings = Settings()
