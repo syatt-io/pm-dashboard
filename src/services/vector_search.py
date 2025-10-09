@@ -170,17 +170,17 @@ class VectorSearchService:
             "timestamp_epoch": {"$gte": int(cutoff_date.timestamp())}
         })
 
-        # Project filter - only applies to Jira content
+        # Project filter - applies across all data sources using resource mappings
         if project_key:
-            conditions.append({
-                "$or": [
-                    # Match Jira issues with this project_key
-                    {"project_key": project_key.upper()},
-                    # Allow non-Jira content (no project_key field) to pass through
-                    # This ensures Slack/Fireflies/Notion results are not excluded
-                    {"source": {"$in": ["slack", "fireflies", "notion", "github"]}}
-                ]
-            })
+            # Get project resource mappings from database
+            project_filters = self._get_project_resource_filters(project_key.upper())
+
+            if project_filters:
+                conditions.append(project_filters)
+            else:
+                # Fallback: if no mappings configured, only filter Jira
+                logger.warning(f"No resource mappings found for project {project_key}, only filtering Jira")
+                conditions.append({"project_key": project_key.upper()})
 
         # Source filter
         if sources:
@@ -246,6 +246,80 @@ class VectorSearchService:
         # For Phase 1, just use pure vector search
         # In Phase 2, we can add sparse vector support or BM25 for hybrid
         return self.search(query, top_k, days_back, sources, user_email)
+
+    def _get_project_resource_filters(self, project_key: str) -> Optional[Dict[str, Any]]:
+        """Build Pinecone filter for project using resource mappings from database.
+
+        Args:
+            project_key: Project key to get mappings for
+
+        Returns:
+            Pinecone filter dict with $or conditions for all mapped resources,
+            or None if no mappings found
+        """
+        try:
+            from src.utils.database import get_engine
+            from sqlalchemy import text
+            import json
+
+            engine = get_engine()
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT slack_channel_ids, notion_page_ids, github_repos FROM project_resource_mappings WHERE project_key = :key"),
+                    {"key": project_key}
+                )
+                row = result.fetchone()
+
+                if not row:
+                    return None
+
+                slack_channel_ids, notion_page_ids, github_repos = row
+
+                # Parse JSON arrays
+                slack_channels = json.loads(slack_channel_ids) if slack_channel_ids else []
+                notion_pages = json.loads(notion_page_ids) if notion_page_ids else []
+                github_repo_list = json.loads(github_repos) if github_repos else []
+
+                # Build $or filter combining all resource types
+                or_conditions = []
+
+                # Jira: Match by project_key
+                or_conditions.append({"project_key": project_key})
+
+                # Slack: Match by channel_id
+                if slack_channels:
+                    or_conditions.append({"channel_id": {"$in": slack_channels}})
+
+                # Notion: Match by page_id
+                if notion_pages:
+                    or_conditions.append({"page_id": {"$in": notion_pages}})
+
+                # GitHub: Match by repo name (stored in metadata during ingestion)
+                if github_repo_list:
+                    # Metadata field would be 'repo' or 'repository_name' depending on ingestion
+                    or_conditions.append({"repo": {"$in": github_repo_list}})
+
+                # Fireflies: Use project keywords from project_keywords table
+                # Get keywords for this project
+                keywords_result = conn.execute(
+                    text("SELECT keyword FROM project_keywords WHERE project_key = :key"),
+                    {"key": project_key}
+                )
+                keywords = [row[0].lower() for row in keywords_result]
+
+                # For Fireflies, we'll rely on the semantic search to find matching meetings
+                # by including project keywords in the search query (handled in ContextSearchService)
+                # No explicit metadata filter needed here
+
+                if not or_conditions:
+                    return None
+
+                logger.info(f"Project {project_key} filter: {len(or_conditions)} resource types")
+                return {"$or": or_conditions}
+
+        except Exception as e:
+            logger.error(f"Error building project resource filters: {e}")
+            return None
 
     def get_index_stats(self) -> Dict[str, Any]:
         """Get statistics about the Pinecone index.
