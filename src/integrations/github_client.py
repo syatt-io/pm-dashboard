@@ -365,31 +365,50 @@ class GitHubClient:
         return candidates[0] if candidates else None
 
     async def list_accessible_repos(self) -> List[str]:
-        """List all repositories accessible by the GitHub App.
+        """List all repositories accessible by the GitHub App with pagination.
 
         Returns:
             List of repository names (without org prefix)
         """
         headers = await self._get_auth_headers()
+        all_repos = []
+        page = 1
+        per_page = 100  # Max allowed by GitHub API
 
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get(
-                    f"{self.base_url}/installation/repositories",
-                    headers=headers,
-                    timeout=10.0
-                )
+                while True:
+                    response = await client.get(
+                        f"{self.base_url}/installation/repositories",
+                        headers=headers,
+                        params={"per_page": per_page, "page": page},
+                        timeout=10.0
+                    )
 
-                if response.status_code == 200:
-                    data = response.json()
-                    repos = [repo["name"] for repo in data.get("repositories", [])]
-                    logger.info(f"GitHub App has access to {len(repos)} repositories: {repos[:10]}")
-                    # Log all repos for debugging
-                    logger.info(f"All accessible repos: {sorted(repos)}")
-                    return repos
-                else:
-                    logger.warning(f"Failed to list accessible repos: {response.status_code}")
-                    return []
+                    if response.status_code == 200:
+                        data = response.json()
+                        repos = data.get("repositories", [])
+
+                        if not repos:
+                            # No more repos, we're done
+                            break
+
+                        repo_names = [repo["name"] for repo in repos]
+                        all_repos.extend(repo_names)
+
+                        # Check if there are more pages
+                        total_count = data.get("total_count", 0)
+                        if len(all_repos) >= total_count:
+                            break
+
+                        page += 1
+                    else:
+                        logger.warning(f"Failed to list accessible repos: {response.status_code}")
+                        break
+
+                logger.info(f"GitHub App has access to {len(all_repos)} repositories")
+                logger.info(f"All accessible repos: {sorted(all_repos)}")
+                return all_repos
 
             except Exception as e:
                 logger.error(f"Error listing accessible repos: {e}")
