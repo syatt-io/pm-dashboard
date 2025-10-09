@@ -2098,10 +2098,13 @@ class SlackTodoBot:
                 formatted_summary = self._replace_slack_user_ids(formatted_summary)
 
                 # Slack text blocks have a 3000 character limit
-                MAX_SUMMARY_LENGTH = 3000
+                # Use 2950 to account for markdown formatting and safety margin
+                MAX_SUMMARY_LENGTH = 2950
 
                 if len(formatted_summary) > MAX_SUMMARY_LENGTH:
-                    formatted_summary = formatted_summary[:MAX_SUMMARY_LENGTH].rsplit(' ', 1)[0] + "..."
+                    # Truncate at word boundary and add ellipsis
+                    truncated = formatted_summary[:MAX_SUMMARY_LENGTH].rsplit(' ', 1)[0]
+                    formatted_summary = truncated + "..."
                     logger.warning(f"Summary truncated from {len(results.summary)} to {len(formatted_summary)} chars")
 
                 blocks.append({
