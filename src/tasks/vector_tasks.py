@@ -735,3 +735,207 @@ def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Notion backfill failed: {e}")
         return {"success": False, "error": str(e)}
+
+
+@celery_app.task(name='src.tasks.vector_tasks.backfill_slack')
+def backfill_slack(days_back: int = 180) -> Dict[str, Any]:
+    """Manual task: Backfill all Slack messages from the last N days.
+
+    NOT scheduled - trigger manually via console or Celery CLI:
+    celery -A src.tasks.celery_app call src.tasks.vector_tasks.backfill_slack
+
+    Args:
+        days_back: Number of days to backfill (default 180 = 6 months)
+
+    Returns:
+        Dict with backfill stats
+    """
+    from src.services.vector_ingest import VectorIngestService
+    from config.settings import settings
+    from slack_sdk import WebClient
+
+    logger.info(f"🔄 Starting Slack backfill ({days_back} days)...")
+
+    try:
+        # Initialize services
+        ingest_service = VectorIngestService()
+        slack_client = WebClient(token=settings.notifications.slack_bot_token)
+
+        # Calculate oldest timestamp (N days ago)
+        oldest_date = datetime.now() - timedelta(days=days_back)
+        oldest_timestamp = str(int(oldest_date.timestamp()))
+
+        logger.info(f"📥 Fetching messages since {oldest_date.isoformat()}...")
+
+        # Get all public channels
+        channels_response = slack_client.conversations_list(
+            exclude_archived=True,
+            types="public_channel",
+            limit=200
+        )
+
+        if not channels_response.get('ok'):
+            logger.error(f"Failed to list Slack channels: {channels_response.get('error')}")
+            return {"success": False, "error": "Failed to list channels"}
+
+        channels = channels_response.get('channels', [])
+        total_ingested = 0
+        channels_processed = 0
+
+        # Ingest messages from each channel
+        for channel in channels:
+            channel_id = channel['id']
+            channel_name = channel['name']
+            is_private = channel.get('is_private', False)
+
+            try:
+                # Auto-join public channels
+                if not is_private and not channel.get('is_member', False):
+                    try:
+                        slack_client.conversations_join(channel=channel_id)
+                        logger.info(f"Joined public channel #{channel_name}")
+                    except Exception as e:
+                        logger.warning(f"Could not join #{channel_name}: {e}")
+
+                # Get message history with pagination
+                messages_all = []
+                cursor = None
+
+                while True:
+                    history = slack_client.conversations_history(
+                        channel=channel_id,
+                        oldest=oldest_timestamp,
+                        limit=100,
+                        cursor=cursor
+                    )
+
+                    if not history.get('ok'):
+                        logger.warning(f"Could not fetch history for #{channel_name}")
+                        break
+
+                    messages = history.get('messages', [])
+                    messages_all.extend(messages)
+
+                    # Check if there are more messages
+                    cursor = history.get('response_metadata', {}).get('next_cursor')
+                    if not cursor:
+                        break
+
+                if not messages_all:
+                    continue
+
+                # Ingest messages
+                count = ingest_service.ingest_slack_messages(
+                    messages=messages_all,
+                    channel_id=channel_id,
+                    channel_name=channel_name,
+                    is_private=is_private
+                )
+
+                total_ingested += count
+                channels_processed += 1
+                logger.info(f"✅ Ingested {count} messages from #{channel_name}")
+
+            except Exception as e:
+                logger.error(f"Error ingesting #{channel_name}: {e}")
+                continue
+
+        logger.info(f"✅ Slack backfill complete! Total ingested: {total_ingested} messages from {channels_processed} channels")
+
+        return {
+            "success": True,
+            "channels_processed": channels_processed,
+            "messages_ingested": total_ingested,
+            "days_back": days_back,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Slack backfill failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@celery_app.task(name='src.tasks.vector_tasks.backfill_jira')
+def backfill_jira(days_back: int = 180) -> Dict[str, Any]:
+    """Manual task: Backfill all Jira issues from the last N days.
+
+    NOT scheduled - trigger manually via console or Celery CLI:
+    celery -A src.tasks.celery_app call src.tasks.vector_tasks.backfill_jira
+
+    Args:
+        days_back: Number of days to backfill (default 180 = 6 months)
+
+    Returns:
+        Dict with backfill stats
+    """
+    from src.services.vector_ingest import VectorIngestService
+    from src.integrations.jira_api import JiraAPIClient
+    from config.settings import settings
+
+    logger.info(f"🔄 Starting Jira backfill ({days_back} days)...")
+
+    try:
+        # Check if Jira is configured
+        if not hasattr(settings, 'jira'):
+            logger.warning("Jira not configured - skipping backfill")
+            return {"success": False, "error": "No config"}
+
+        # Initialize services
+        ingest_service = VectorIngestService()
+        jira_client = JiraAPIClient(
+            jira_url=settings.jira.url,
+            username=settings.jira.username,
+            api_token=settings.jira.api_token
+        )
+
+        # Build JQL query for date range
+        jql = f"updated >= -{days_back}d ORDER BY updated DESC"
+
+        logger.info(f"📥 Fetching Jira issues with JQL: {jql}")
+
+        # Fetch all issues with pagination
+        issues_all = []
+        start_at = 0
+        max_results = 100
+
+        while True:
+            issues_batch = jira_client.search_issues(
+                jql=jql,
+                start_at=start_at,
+                max_results=max_results
+            )
+
+            if not issues_batch:
+                break
+
+            issues_all.extend(issues_batch)
+
+            if len(issues_batch) < max_results:
+                break
+
+            start_at += max_results
+            logger.info(f"   Fetched {len(issues_all)} issues so far...")
+
+        logger.info(f"✅ Found {len(issues_all)} issues")
+
+        if not issues_all:
+            logger.warning("⚠️  No issues found")
+            return {"success": True, "issues_found": 0, "issues_ingested": 0}
+
+        # Ingest into Pinecone
+        logger.info("📊 Ingesting into Pinecone...")
+        total_ingested = ingest_service.ingest_jira_issues(issues=issues_all)
+
+        logger.info(f"✅ Jira backfill complete! Total ingested: {total_ingested} issues")
+
+        return {
+            "success": True,
+            "issues_found": len(issues_all),
+            "issues_ingested": total_ingested,
+            "days_back": days_back,
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Jira backfill failed: {e}")
+        return {"success": False, "error": str(e)}

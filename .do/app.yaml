@@ -1,11 +1,15 @@
 name: agent-pm
 region: nyc
 
-# Database
+# Databases
 databases:
   - name: agentpm-db
     engine: PG
     version: "15"
+    production: false
+  - name: agentpm-redis
+    engine: REDIS
+    version: "7"
     production: false
 
 # Single service for both backend and frontend
@@ -39,6 +43,10 @@ services:
       # Database (auto-configured by DigitalOcean)
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
+
+      # Redis (auto-configured by DigitalOcean)
+      - key: REDIS_URL
+        value: ${agentpm-redis.DATABASE_URL}
 
       # JWT Secret (generate with: openssl rand -hex 32)
       - key: JWT_SECRET_KEY
@@ -92,6 +100,22 @@ services:
       - key: GITHUB_ORGANIZATION
         value: syatt-io
 
+      # Pinecone Vector Database
+      - key: PINECONE_API_KEY
+        type: SECRET
+      - key: PINECONE_ENVIRONMENT
+        value: us-east-1-aws
+      - key: PINECONE_INDEX_NAME
+        value: agent-pm-context
+      - key: PINECONE_DIMENSION
+        value: "1536"
+      - key: PINECONE_METRIC
+        value: cosine
+
+      # Notion
+      - key: NOTION_API_KEY
+        type: SECRET
+
     health_check:
       http_path: /api/health
       initial_delay_seconds: 70
@@ -99,3 +123,83 @@ services:
       timeout_seconds: 10
       success_threshold: 1
       failure_threshold: 3
+
+  # Celery Worker - Background task processor
+  - name: celery-worker
+    github:
+      repo: syatt-io/pm-dashboard
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+
+    build_command: pip install -r requirements.txt
+
+    run_command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=2
+
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    envs:
+      # Database
+      - key: DATABASE_URL
+        value: ${agentpm-db.DATABASE_URL}
+
+      # Redis
+      - key: REDIS_URL
+        value: ${agentpm-redis.DATABASE_URL}
+
+      # OpenAI
+      - key: OPENAI_API_KEY
+        type: SECRET
+
+      # Jira Configuration
+      - key: JIRA_URL
+        value: https://syatt.atlassian.net
+      - key: JIRA_USERNAME
+        value: mike.samimi@syatt.io
+      - key: JIRA_API_TOKEN
+        type: SECRET
+
+      # Slack
+      - key: SLACK_BOT_TOKEN
+        type: SECRET
+
+      # Fireflies
+      - key: FIREFLIES_API_KEY
+        type: SECRET
+
+      # Pinecone
+      - key: PINECONE_API_KEY
+        type: SECRET
+      - key: PINECONE_ENVIRONMENT
+        value: us-east-1-aws
+      - key: PINECONE_INDEX_NAME
+        value: agent-pm-context
+      - key: PINECONE_DIMENSION
+        value: "1536"
+      - key: PINECONE_METRIC
+        value: cosine
+
+      # Notion
+      - key: NOTION_API_KEY
+        type: SECRET
+
+  # Celery Beat - Task scheduler
+  - name: celery-beat
+    github:
+      repo: syatt-io/pm-dashboard
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+
+    build_command: pip install -r requirements.txt
+
+    run_command: celery -A src.tasks.celery_app beat --loglevel=info
+
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    envs:
+      # Redis
+      - key: REDIS_URL
+        value: ${agentpm-redis.DATABASE_URL}

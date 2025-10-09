@@ -7,6 +7,13 @@ from celery.schedules import crontab
 # Initialize Celery
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 
+# Use database 1 for agent-pm to isolate from other apps
+# Replace /0 with /1 at the end of the URL
+if redis_url.endswith('/0'):
+    redis_url = redis_url[:-2] + '/1'
+elif not redis_url.split('/')[-1].isdigit():
+    redis_url = redis_url.rstrip('/') + '/1'
+
 celery_app = Celery(
     'agent_pm',
     broker=redis_url,
@@ -14,7 +21,7 @@ celery_app = Celery(
     include=['src.tasks.vector_tasks']
 )
 
-# Configure Celery
+# Configure Celery with unique key prefix
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
@@ -24,6 +31,13 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=30 * 60,  # 30 minutes max per task
     worker_max_tasks_per_child=50,  # Restart worker after 50 tasks to prevent memory leaks
+    # Use unique key prefix to isolate from other apps sharing same Redis
+    result_backend_transport_options={
+        'global_keyprefix': 'agent-pm:'
+    },
+    broker_transport_options={
+        'global_keyprefix': 'agent-pm:'
+    }
 )
 
 # Configure periodic tasks
@@ -42,6 +56,11 @@ celery_app.conf.beat_schedule = {
     'ingest-fireflies-hourly': {
         'task': 'src.tasks.vector_tasks.ingest_fireflies_transcripts',
         'schedule': crontab(hour='*/1', minute=0)
+    },
+    # Ingest Notion pages every hour
+    'ingest-notion-hourly': {
+        'task': 'src.tasks.vector_tasks.ingest_notion_pages',
+        'schedule': crontab(hour='*/1', minute=15)  # Offset by 15min from Fireflies
     },
 }
 

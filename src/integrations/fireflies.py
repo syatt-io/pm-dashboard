@@ -36,24 +36,40 @@ class FirefliesClient:
         }
 
     def get_recent_meetings(self, days_back: int = 7, limit: int = 100) -> List[Dict[str, Any]]:
-        """Fetch meetings from the last N days."""
-        # Try a larger hardcoded limit in the query instead of using variables
-        # Fireflies seems to have issues with parameterized limits
-        query = """
-        query {
-            transcripts(limit: 50) {
-                id
-                title
-                date
-                duration
-            }
-        }
-        """
+        """Fetch meetings from the last N days with pagination support."""
+        all_transcripts = []
+        skip = 0
+        batch_size = 50  # Fireflies API max per request
 
-        variables = {}
+        while len(all_transcripts) < limit:
+            # Fetch batch with skip offset for pagination
+            query = f"""
+            query {{
+                transcripts(limit: {batch_size}, skip: {skip}) {{
+                    id
+                    title
+                    date
+                    duration
+                }}
+            }}
+            """
 
-        response = self._make_request(query, variables)
-        transcripts = response.get("data", {}).get("transcripts", [])
+            response = self._make_request(query, {})
+            transcripts = response.get("data", {}).get("transcripts", [])
+
+            # No more results
+            if not transcripts:
+                break
+
+            all_transcripts.extend(transcripts)
+            skip += batch_size
+
+            # Stop if we got fewer than batch_size (last page)
+            if len(transcripts) < batch_size:
+                break
+
+        # Trim to requested limit
+        transcripts = all_transcripts[:limit]
 
         # Filter by date in Python since the API date format is unclear
         if transcripts and days_back:

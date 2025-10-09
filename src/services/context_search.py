@@ -80,6 +80,29 @@ class ContextSearchService:
         thread = threading.Thread(target=sync_in_background, daemon=True)
         thread.start()
 
+    def _get_user_email_from_id(self, user_id: int) -> Optional[str]:
+        """Get user email from user ID for permission filtering.
+
+        Args:
+            user_id: App user ID
+
+        Returns:
+            User email if found, None otherwise
+        """
+        try:
+            from src.models.user import User
+            from src.utils.database import session_scope
+
+            with session_scope() as db_session:
+                user = db_session.query(User).filter_by(id=user_id).first()
+                if user and user.email:
+                    return user.email
+                return None
+
+        except Exception as e:
+            self.logger.warning(f"Could not get user email for user_id {user_id}: {e}")
+            return None
+
     def _get_project_keywords(self) -> Dict[str, List[str]]:
         """Get project keywords from database with caching.
 
@@ -550,65 +573,60 @@ class ContextSearchService:
         debug: bool = True,  # Enable debug logging by default for now
         detail_level: str = "normal"
     ) -> ContextSearchResults:
-        """Search for context across all sources.
+        """Search for context across all sources using vector database.
 
         Args:
             query: Search query/topic
             days_back: How many days back to search
-            sources: List of sources to search ('slack', 'fireflies', 'jira', 'notion')
-            user_id: User ID for accessing user-specific credentials
+            sources: List of sources to search ('slack', 'fireflies', 'jira', 'notion', 'github')
+            user_id: User ID for accessing user-specific credentials and Fireflies permissions
             debug: Enable debug logging for scoring
             detail_level: Summary detail level - 'brief', 'normal', or 'detailed'
 
         Returns:
-            ContextSearchResults with aggregated results
+            ContextSearchResults with aggregated results from vector search
         """
+        from src.services.vector_search import VectorSearchService
+
         if sources is None:
             sources = ['slack', 'fireflies', 'jira', 'github', 'notion']
 
-        # Detect project and expand query with keywords (two-tier: project + topic)
-        detected_project, project_keywords, topic_keywords = self._detect_project_and_expand_query(query)
+        self.logger.info(f"🔍 Vector search for: '{query}' (sources: {sources}, days: {days_back})")
 
-        self.logger.info(f"🔍 SEARCH DEBUG: query='{query}', project={detected_project}")
-        self.logger.info(f"  Project keywords: {project_keywords}")
-        self.logger.info(f"  Topic keywords: {topic_keywords}")
+        # Get user email for Fireflies permission filtering
+        user_email = None
+        if user_id:
+            user_email = self._get_user_email_from_id(user_id)
+            if user_email:
+                self.logger.info(f"  User email for permissions: {user_email}")
 
-        all_results = []
+        # Initialize vector search service
+        vector_search = VectorSearchService()
 
-        # Search each source with hybrid semantic + keyword matching
-        if 'slack' in sources:
-            slack_results = await self._search_slack(query, days_back, user_id, project_keywords, topic_keywords, debug)
-            all_results.extend(slack_results)
+        # Check if vector search is available
+        if not vector_search.is_available():
+            self.logger.warning("⚠️ Vector search not available - Pinecone not configured")
+            return ContextSearchResults(
+                query=query,
+                results=[],
+                summary="Vector search is not available. Please configure Pinecone.",
+                confidence="low"
+            )
 
-        if 'fireflies' in sources:
-            fireflies_results = await self._search_fireflies(query, days_back, user_id, project_keywords, topic_keywords, debug)
-            all_results.extend(fireflies_results)
+        # Perform semantic vector search
+        all_results = vector_search.search(
+            query=query,
+            days_back=days_back,
+            top_k=50,  # Retrieve top 50 most relevant documents
+            sources=sources,
+            user_email=user_email  # For Fireflies access filtering
+        )
 
-        if 'jira' in sources:
-            jira_results = await self._search_jira(query, days_back, detected_project, project_keywords, topic_keywords, debug)
-            all_results.extend(jira_results)
+        self.logger.info(f"✅ Vector search returned {len(all_results)} results")
 
-        if 'github' in sources:
-            github_results = await self._search_github(query, days_back, detected_project, project_keywords, topic_keywords, debug)
-            all_results.extend(github_results)
-
-        if 'notion' in sources:
-            notion_results = await self._search_notion(query, days_back, user_id, project_keywords, topic_keywords, debug)
-            all_results.extend(notion_results)
-
-        # Sort by relevance score first, then by date
-        all_results.sort(key=lambda x: (x.relevance_score, x.date), reverse=True)
-
-        # Build project context for AI summarization
-        project_context = None
-        if detected_project and project_keywords:
-            project_context = {
-                'project_key': detected_project,
-                'keywords': list(project_keywords)
-            }
-
-        # Generate AI summary and insights with project context and detail level
-        summarized = await self._generate_insights(query, all_results, project_context, detail_level)
+        # Results are already sorted by relevance score from vector_search
+        # Generate AI summary and insights with detail level
+        summarized = await self._generate_insights(query, all_results, None, detail_level)
 
         return ContextSearchResults(
             query=query,

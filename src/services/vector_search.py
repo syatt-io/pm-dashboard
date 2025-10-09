@@ -160,10 +160,10 @@ class VectorSearchService:
         """
         conditions = []
 
-        # Date filter
+        # Date filter - use numeric timestamp_epoch for Pinecone $gte operator
         cutoff_date = datetime.now() - timedelta(days=days_back)
         conditions.append({
-            "date": {"$gte": cutoff_date.strftime('%Y-%m-%d')}
+            "timestamp_epoch": {"$gte": int(cutoff_date.timestamp())}
         })
 
         # Source filter

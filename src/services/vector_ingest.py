@@ -206,6 +206,7 @@ class VectorIngestService:
                         'is_private': is_private,
                         'user_id': msg.get('user', 'unknown'),
                         'timestamp': msg_date.isoformat(),
+                        'timestamp_epoch': int(msg_date.timestamp()),  # Numeric for filtering
                         'date': msg_date.strftime('%Y-%m-%d'),
                         'permalink': msg.get('permalink', ''),
                         # No access_list needed - all users can see all Slack content
@@ -246,7 +247,12 @@ class VectorIngestService:
         for issue in issues:
             try:
                 issue_key = issue.get('key', '')
-                fields = issue.get('fields', {})
+                fields = issue.get('fields')
+
+                # Skip issues without fields (API error or deleted issue)
+                if not fields:
+                    logger.warning(f"Skipping Jira issue {issue_key} - missing fields")
+                    continue
 
                 # Generate unique ID
                 doc_id = f"jira-{issue_key}"
@@ -281,6 +287,7 @@ class VectorIngestService:
                         'assignee': fields.get('assignee', {}).get('displayName', 'Unassigned'),
                         'reporter': fields.get('reporter', {}).get('displayName', 'Unknown'),
                         'timestamp': issue_date.isoformat(),
+                        'timestamp_epoch': int(issue_date.timestamp()),  # Numeric for filtering
                         'date': issue_date.strftime('%Y-%m-%d'),
                         'url': f"{self.settings.jira.url}/browse/{issue_key}",
                         # No access control needed - all users can see all Jira content
@@ -365,6 +372,7 @@ class VectorIngestService:
                         'attendee_emails': attendee_emails,
                         'duration': transcript.get('duration', 0),
                         'timestamp': meeting_date.isoformat(),
+                        'timestamp_epoch': int(meeting_date.timestamp()),  # Numeric for filtering
                         'date': meeting_date.strftime('%Y-%m-%d'),
                         # Access control based on sharing settings
                         'access_type': 'public' if is_public else 'shared',
@@ -382,6 +390,84 @@ class VectorIngestService:
 
         if not documents:
             logger.warning("No valid Fireflies transcripts to ingest")
+            return 0
+
+        return self.upsert_documents(documents)
+
+    def ingest_notion_pages(
+        self,
+        pages: List[Dict[str, Any]],
+        full_content_map: Dict[str, str]
+    ) -> int:
+        """Ingest Notion pages into vector database.
+
+        Args:
+            pages: List of Notion page metadata dicts
+            full_content_map: Dict mapping page_id to full page content text
+
+        Returns:
+            Number of successfully ingested pages
+        """
+        documents = []
+
+        for page in pages:
+            try:
+                page_id = page.get('id', '')
+
+                # Get page title
+                properties = page.get('properties', {})
+                title = "Untitled"
+                for prop_name, prop_data in properties.items():
+                    if prop_data.get('type') == 'title':
+                        title_arr = prop_data.get('title', [])
+                        if title_arr:
+                            title = title_arr[0].get('plain_text', 'Untitled')
+                            break
+
+                # Get full content from map
+                content = full_content_map.get(page_id, '')
+
+                # Parse dates
+                created_time = page.get('created_time', '')
+                last_edited_time = page.get('last_edited_time', '')
+
+                page_date = datetime.now()
+                if last_edited_time:
+                    try:
+                        page_date = datetime.fromisoformat(last_edited_time.replace('Z', '+00:00'))
+                    except:
+                        pass
+
+                # Generate unique ID
+                doc_id = f"notion-{page_id}"
+
+                # Create document
+                doc = VectorDocument(
+                    id=doc_id,
+                    source='notion',
+                    title=title,
+                    content=content,
+                    metadata={
+                        'page_id': page_id,
+                        'url': page.get('url', ''),
+                        'created_time': created_time,
+                        'last_edited_time': last_edited_time,
+                        'timestamp': page_date.isoformat(),
+                        'timestamp_epoch': int(page_date.timestamp()),
+                        'date': page_date.strftime('%Y-%m-%d'),
+                        # All Notion pages accessible to all users (no per-user permissions)
+                        'access_type': 'all'
+                    }
+                )
+
+                documents.append(doc)
+
+            except Exception as e:
+                logger.error(f"Error processing Notion page {page.get('id')}: {e}")
+                continue
+
+        if not documents:
+            logger.warning("No valid Notion pages to ingest")
             return 0
 
         return self.upsert_documents(documents)
