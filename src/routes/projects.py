@@ -545,22 +545,23 @@ def search_jira_projects():
     try:
         query = request.args.get('q', '').lower()
 
-        from src.integrations.jira_client import JiraClient
         from config.settings import settings
+        import requests
+        from requests.auth import HTTPBasicAuth
 
         # Check if Jira is configured
         if not all([settings.jira.url, settings.jira.username, settings.jira.api_token]):
             return jsonify({'success': False, 'error': 'Jira not configured'}), 500
 
-        # Initialize Jira client
-        jira_client = JiraClient(
-            url=settings.jira.url,
-            username=settings.jira.username,
-            api_token=settings.jira.api_token
-        )
+        # Call Jira REST API to get all projects
+        url = f"{settings.jira.url}/rest/api/3/project"
+        auth = HTTPBasicAuth(settings.jira.username, settings.jira.api_token)
+        headers = {"Accept": "application/json"}
 
-        # Get all projects
-        all_projects = jira_client.get_all_projects()
+        response = requests.get(url, auth=auth, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        all_projects = response.json()
 
         # Filter by query (search in both key and name)
         filtered_projects = []
