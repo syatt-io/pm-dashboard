@@ -493,31 +493,24 @@ def search_github_repos():
     try:
         query = request.args.get('q', '').lower()
 
-        import os
         import asyncio
         from src.integrations.github_client import GitHubClient
-
-        # Get GitHub credentials from environment
-        github_app_id = os.getenv('GITHUB_APP_ID', '')
-        github_private_key = os.getenv('GITHUB_APP_PRIVATE_KEY', '')
-        github_installation_id = os.getenv('GITHUB_APP_INSTALLATION_ID', '')
-        github_api_token = os.getenv('GITHUB_API_TOKEN', '')
-        github_org = os.getenv('GITHUB_ORGANIZATION', '')
+        from config.settings import settings
 
         # Check if GitHub is configured
-        has_app_auth = all([github_app_id, github_private_key, github_installation_id])
-        has_token_auth = bool(github_api_token)
+        has_app_auth = all([settings.github.app_id, settings.github.private_key, settings.github.installation_id])
+        has_token_auth = bool(settings.github.api_token)
 
         if not (has_app_auth or has_token_auth):
             return jsonify({'success': False, 'error': 'GitHub not configured'}), 500
 
-        # Initialize GitHub client
+        # Initialize GitHub client (same pattern as context_search.py)
         github_client = GitHubClient(
-            api_token=github_api_token,
-            organization=github_org,
-            app_id=github_app_id,
-            private_key=github_private_key,
-            installation_id=github_installation_id
+            api_token=settings.github.api_token,
+            organization=settings.github.organization,
+            app_id=settings.github.app_id,
+            private_key=settings.github.private_key,
+            installation_id=settings.github.installation_id
         )
 
         # Get all accessible repos from GitHub
