@@ -582,3 +582,30 @@ def search_jira_projects():
     except Exception as e:
         logger.error(f"Error searching Jira projects: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/todo-counts', methods=['GET'])
+def get_project_todo_counts():
+    """Get todo counts for all projects."""
+    try:
+        from src.utils.database import get_engine
+        from sqlalchemy import text
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            # Get counts of todos grouped by project_key
+            result = conn.execute(text("""
+                SELECT project_key, COUNT(*) as count
+                FROM todo_items
+                WHERE project_key IS NOT NULL
+                GROUP BY project_key
+            """))
+
+            # Convert to dict: {project_key: count}
+            counts = {row[0]: row[1] for row in result}
+
+        return jsonify({'success': True, 'counts': counts})
+
+    except Exception as e:
+        logger.error(f"Error getting project todo counts: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

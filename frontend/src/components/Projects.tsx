@@ -6,6 +6,7 @@ import {
   useNotify,
   useDataProvider,
   Button,
+  useNavigate,
 } from 'react-admin';
 import {
   Card,
@@ -1217,6 +1218,12 @@ export const ProjectList = () => {
     github_repos: string[];
     jira_project_keys: string[];
   }}>({});
+
+  // Todo counts state
+  const [todoCounts, setTodoCounts] = useState<{[projectKey: string]: number}>({});
+
+  // Navigation
+  const navigate = useNavigate();
 
   const loadWatchedProjects = useCallback(async (activeProjects: Project[]) => {
     try {
