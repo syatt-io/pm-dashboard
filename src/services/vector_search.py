@@ -265,7 +265,7 @@ class VectorSearchService:
             engine = get_engine()
             with engine.connect() as conn:
                 result = conn.execute(
-                    text("SELECT slack_channel_ids, notion_page_ids, github_repos FROM project_resource_mappings WHERE project_key = :key"),
+                    text("SELECT slack_channel_ids, notion_page_ids, github_repos, jira_project_keys FROM project_resource_mappings WHERE project_key = :key"),
                     {"key": project_key}
                 )
                 row = result.fetchone()
@@ -273,18 +273,23 @@ class VectorSearchService:
                 if not row:
                     return None
 
-                slack_channel_ids, notion_page_ids, github_repos = row
+                slack_channel_ids, notion_page_ids, github_repos, jira_project_keys = row
 
                 # Parse JSON arrays
                 slack_channels = json.loads(slack_channel_ids) if slack_channel_ids else []
                 notion_pages = json.loads(notion_page_ids) if notion_page_ids else []
                 github_repo_list = json.loads(github_repos) if github_repos else []
+                jira_projects = json.loads(jira_project_keys) if jira_project_keys else []
 
                 # Build $or filter combining all resource types
                 or_conditions = []
 
-                # Jira: Match by project_key
-                or_conditions.append({"project_key": project_key})
+                # Jira: Match by project_key from mappings (if configured), otherwise use the project key itself
+                if jira_projects:
+                    or_conditions.append({"project_key": {"$in": jira_projects}})
+                else:
+                    # Fallback: use the project key itself for Jira filtering
+                    or_conditions.append({"project_key": project_key})
 
                 # Slack: Match by channel_id
                 if slack_channels:

@@ -1215,6 +1215,7 @@ export const ProjectList = () => {
     slack_channel_ids: string[];
     notion_page_ids: string[];
     github_repos: string[];
+    jira_project_keys: string[];
   }}>({});
 
   const loadWatchedProjects = useCallback(async (activeProjects: Project[]) => {
@@ -1281,7 +1282,8 @@ export const ProjectList = () => {
             mappingsMap[mapping.project_key] = {
               slack_channel_ids: mapping.slack_channel_ids || [],
               notion_page_ids: mapping.notion_page_ids || [],
-              github_repos: mapping.github_repos || []
+              github_repos: mapping.github_repos || [],
+              jira_project_keys: mapping.jira_project_keys || []
             };
           });
           setResourceMappings(mappingsMap);
@@ -1295,7 +1297,7 @@ export const ProjectList = () => {
   const handleResourceMappingChange = async (
     projectKey: string,
     projectName: string,
-    resourceType: 'slack' | 'notion' | 'github',
+    resourceType: 'slack' | 'notion' | 'github' | 'jira',
     newValues: string[]
   ) => {
     // Update local state immediately
@@ -1305,7 +1307,8 @@ export const ProjectList = () => {
         ...resourceMappings[projectKey],
         slack_channel_ids: resourceType === 'slack' ? newValues : (resourceMappings[projectKey]?.slack_channel_ids || []),
         notion_page_ids: resourceType === 'notion' ? newValues : (resourceMappings[projectKey]?.notion_page_ids || []),
-        github_repos: resourceType === 'github' ? newValues : (resourceMappings[projectKey]?.github_repos || [])
+        github_repos: resourceType === 'github' ? newValues : (resourceMappings[projectKey]?.github_repos || []),
+        jira_project_keys: resourceType === 'jira' ? newValues : (resourceMappings[projectKey]?.jira_project_keys || [])
       }
     };
     setResourceMappings(updated);
@@ -1595,6 +1598,7 @@ export const ProjectList = () => {
                           <TableCell>Slack Channels</TableCell>
                           <TableCell>Notion Pages</TableCell>
                           <TableCell>GitHub Repos</TableCell>
+                          <TableCell>Jira Projects</TableCell>
                           {workType === 'project-based' && <TableCell>{currentMonth} Forecast</TableCell>}
                           {workType === 'growth-support' && <TableCell>Retainer Hours</TableCell>}
                           <TableCell>{currentMonth} Hours</TableCell>
@@ -1662,6 +1666,14 @@ export const ProjectList = () => {
                                 resourceType="github"
                                 values={resourceMappings[project.key]?.github_repos || []}
                                 onChange={(newValues) => handleResourceMappingChange(project.key, project.name, 'github', newValues)}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ minWidth: 180 }}>
+                              <ResourceMappingCell
+                                projectKey={project.key}
+                                resourceType="jira"
+                                values={resourceMappings[project.key]?.jira_project_keys || []}
+                                onChange={(newValues) => handleResourceMappingChange(project.key, project.name, 'jira', newValues)}
                               />
                             </TableCell>
                             {(workType === 'project-based' || workType === 'growth-support') && (
