@@ -317,15 +317,15 @@ class SlackTodoBot:
                     respond(self._get_find_context_help_message())
                     return
 
-                # Parse command: /find-context <topic> [--days 180]
+                # Parse command: /find-context <topic> [--days 180] [--project PROJ]
                 args = text.split()
                 if len(args) < 1:
                     respond("❌ Please provide a search topic: `/find-context authentication flow`")
                     return
 
-                # Extract --days and --detail parameters if present
+                # Extract --days and --project parameters if present
                 days = 90  # Default to 90 days
-                detail_level = "normal"  # Default detail level
+                project = None  # Optional project filter
                 query_parts = []
                 i = 0
                 while i < len(args):
@@ -340,12 +340,8 @@ class SlackTodoBot:
                         except ValueError:
                             respond("❌ Invalid days value. Must be a number.")
                             return
-                    elif args[i] == '--detail' and i + 1 < len(args):
-                        detail = args[i + 1].lower()
-                        if detail not in ['brief', 'normal', 'detailed']:
-                            respond("❌ Invalid detail level. Use: brief, normal, or detailed")
-                            return
-                        detail_level = detail
+                    elif args[i] == '--project' and i + 1 < len(args):
+                        project = args[i + 1].upper()
                         i += 2
                         continue
                     query_parts.append(args[i])
@@ -357,8 +353,8 @@ class SlackTodoBot:
                     return
 
                 # Show searching message
-                detail_msg = "" if detail_level == "normal" else f" [{detail_level} summary]"
-                respond(f"🔍 Searching for *{query}* across Slack, Fireflies, and Jira (last {days} days{detail_msg})...\n_This may take a moment_")
+                project_msg = f" for project *{project}*" if project else ""
+                respond(f"🔍 Searching for *{query}*{project_msg} across Slack, Fireflies, and Jira (last {days} days)...\n_This may take a moment_")
 
                 # Perform the search asynchronously to avoid timeout
                 # Get channel_id for posting results
@@ -368,7 +364,7 @@ class SlackTodoBot:
                 import threading
                 def run_search():
                     try:
-                        result = self._find_context(user_id, query, days, detail_level)
+                        result = self._find_context(user_id, query, days, project=project)
                         # Post result using chat.postMessage instead of respond()
                         self.app.client.chat_postMessage(
                             channel=channel_id,
@@ -2050,7 +2046,7 @@ class SlackTodoBot:
 
         return {"blocks": blocks}
 
-    def _find_context(self, user_id: str, query: str, days: int, detail_level: str = "normal") -> Dict[str, Any]:
+    def _find_context(self, user_id: str, query: str, days: int, project: Optional[str] = None) -> Dict[str, Any]:
         """Execute context search and format results."""
         try:
             import asyncio
@@ -2062,12 +2058,13 @@ class SlackTodoBot:
             # Create search service
             search_service = ContextSearchService()
 
-            # Perform search
+            # Perform search (always use detailed level, add project filter if specified)
             results = asyncio.run(search_service.search(
                 query=query,
                 days_back=days,
                 user_id=app_user_id,
-                detail_level=detail_level
+                detail_level="detailed",
+                project=project
             ))
 
             # Debug logging
@@ -2096,24 +2093,22 @@ class SlackTodoBot:
 
             # Add AI summary (flexible format - AI decides structure)
             if results.summary:
-                # Format summary for better readability
+                # Format summary for better readability and convert Slack user IDs to names
                 formatted_summary = self._format_summary_for_slack(results.summary)
+                formatted_summary = self._replace_slack_user_ids(formatted_summary)
 
                 # Slack text blocks have a 3000 character limit
-                # Truncate summary to 2900 chars to leave room for citation note
-                MAX_SUMMARY_LENGTH = 2900
-                citation_note = "\n\n_Numbers in [brackets] are citations - toggle sources below to see quotes._"
+                MAX_SUMMARY_LENGTH = 3000
 
                 if len(formatted_summary) > MAX_SUMMARY_LENGTH:
                     formatted_summary = formatted_summary[:MAX_SUMMARY_LENGTH].rsplit(' ', 1)[0] + "..."
                     logger.warning(f"Summary truncated from {len(results.summary)} to {len(formatted_summary)} chars")
 
-                summary_text = f"{formatted_summary}{citation_note}"
                 blocks.append({
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": summary_text
+                        "text": formatted_summary
                     }
                 })
 
@@ -2278,3 +2273,35 @@ class SlackTodoBot:
 
         # Join with double newlines for Slack spacing
         return '\n\n'.join(paragraphs) if paragraphs else summary
+
+    def _replace_slack_user_ids(self, text: str) -> str:
+        """Replace Slack user IDs with user names.
+
+        Args:
+            text: Text containing potential <@U12345> user mentions
+
+        Returns:
+            Text with user IDs replaced by names
+        """
+        import re
+
+        # Find all Slack user mentions: <@U12345>
+        user_id_pattern = r'<@(U[A-Z0-9]+)>'
+        matches = re.findall(user_id_pattern, text)
+
+        if not matches:
+            return text
+
+        # Fetch user info for each ID and replace
+        for user_id in set(matches):  # Use set to avoid duplicate API calls
+            try:
+                response = self.client.users_info(user=user_id)
+                if response.get('ok') and response.get('user'):
+                    user = response['user']
+                    display_name = user.get('profile', {}).get('display_name') or user.get('real_name') or user.get('name') or user_id
+                    text = text.replace(f'<@{user_id}>', display_name)
+            except Exception as e:
+                logger.warning(f"Failed to fetch user info for {user_id}: {e}")
+                # Leave the user ID as-is if we can't fetch the name
+
+        return text
