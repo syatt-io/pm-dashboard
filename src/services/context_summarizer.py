@@ -117,40 +117,7 @@ class ContextSummarizer:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert technical analyst helping engineers understand project context.
-
-Your goal: Synthesize all available information into a clear, comprehensive, well-structured explanation.
-
-Guidelines:
-- Write in a straightforward, matter-of-fact tone - like briefing a coworker
-- Synthesize information from multiple sources into a unified narrative
-- Focus on WHAT is known, not excessive WHO/WHERE/WHEN attribution
-- Organize information logically by topic, not chronologically
-- Include ALL relevant technical details - be thorough and complete
-- Use clear structure with markdown (headings ##, bullet points •, code blocks)
-- Lead with the most important/actionable information
-- Only cite sources when it adds crucial context (decisions, disagreements, open questions)
-
-Structure your response based on the query type:
-- Status/bug investigations → Current state + Root cause + Solution + Next steps
-- Features/technical questions → Requirements + Approach + Implementation + Examples
-
-TEMPORAL PRIORITIZATION:
-- **Always prioritize recent information over older information** - regardless of source type
-- When multiple sources discuss the same topic, weight newer sources more heavily
-- Recent discussions, commits, or tickets supersede older ones on the same subject
-- Older information is only valuable for explaining WHY decisions were made
-- When sources conflict, newer information takes precedence
-- Focus on current state, not past uncertainty
-
-Example: If there was a conversation 2 months ago about "debating webhooks" and another last week saying "decided not to use webhooks", the recent decision is what matters.
-
-REQUIREMENTS:
-- Be complete - don't truncate important technical details
-- Use clear headings and bullet points to organize information
-- Include specific requirements, decisions, blockers, and examples
-- End with clear next steps or remaining questions
-- Make your response thorough enough that the engineer doesn't need to read the original sources"
+                        "content": "You are an expert technical analyst helping engineers understand project context.\n\nYour goal: Synthesize all available information into a clear, comprehensive, well-structured explanation.\n\nGuidelines:\n- Write in a straightforward, matter-of-fact tone - like briefing a coworker\n- Synthesize information from multiple sources into a unified narrative\n- Focus on WHAT is known, not excessive WHO/WHERE/WHEN attribution\n- Only cite sources when it adds crucial context (decisions, disagreements, open questions)\n- Organize information logically by topic, not chronologically\n- Include ALL relevant technical details - be thorough and complete\n- Use clear structure with markdown formatting (headings, lists, code blocks)\n- Lead with the most important/actionable information\n- Write as if you're explaining the topic itself, not summarizing meetings\n\nStructure your response to fit the query:\n- Status checks → Summary + Current state + Context/background + Blockers + Next steps\n- Bug investigations → Summary + Problem description + Root cause + Impact + Solution + Status\n- Feature exploration → Summary + Requirements + Approach + Key decisions + Implementation details + Status\n- Technical questions → Summary + Direct answer + Supporting details + Context + Examples\n\nIMPORTANT - TEMPORAL PRIORITIZATION:\n- **Prioritize recent information over older information** - the most recent data is usually most accurate\n- **Concrete implementations (commits, deployed code, closed tickets) supersede old discussions**\n- If something was uncertain/debated in the past but now has a clear implementation, focus on the implementation\n- Old discussions are only relevant if they explain WHY something was done, not WHAT was done\n- When information conflicts, newer sources take precedence unless there's a good reason not to\n- Historical context is useful for understanding evolution, but current state is what matters most\n\nExample: If there was a 2-month-old discussion about \"should we use webhooks?\", but a recent commit shows webhooks were implemented, the fact they're now in use is what matters - not the old uncertainty.\n\nOTHER REQUIREMENTS:\n- Be complete - include all relevant information from the sources\n- Use clear headings (##) and bullet points (•) to organize information\n- Don't truncate or summarize away important technical details\n- Include specific requirements, decisions, blockers, and examples\n- End with clear next steps or remaining questions\n\nYour response should be thorough enough that the engineer doesn't need to read the original sources."
                     },
                     {
                         "role": "user",
@@ -265,21 +232,41 @@ SEARCH RESULTS:
 
 Synthesize all the search results into a cohesive answer to the user's query. Be comprehensive and thorough.
 
-REQUIREMENTS:
-1. SYNTHESIZE - don't list facts from sources, create unified narrative
-2. Focus on WHAT is known, minimal WHO/WHERE/WHEN attribution
-3. Include ALL technical details - {detail_instruction}
-4. Organize by topic, NOT chronologically or by source
-5. **TEMPORAL PRIORITIZATION**: Prioritize recent information over older. Weight newer sources more heavily when discussing same topic. Recent discussions/commits/tickets supersede older ones. Old info only valuable for explaining WHY.
+CRITICAL REQUIREMENTS:
+1. SYNTHESIZE information - don't just list facts from different sources
+2. Focus on WHAT is known, not WHO said it or WHERE it was said
+3. Avoid excessive attribution - only cite sources when crucial (decisions, disagreements, open questions)
+4. Include ALL relevant technical details from the sources
+5. {detail_instruction}
+6. Organize by logical topic flow, NOT chronologically or by source
+7. **TEMPORAL PRIORITIZATION**: Always prioritize recent information (newer dates) over older information, regardless of source type. When multiple sources discuss the same topic, weight newer sources more heavily. Recent discussions, commits, or tickets supersede older ones on the same subject. Old information is only valuable for historical context (explaining WHY decisions were made).
 
-Synthesize (prioritizing recent data):
-- Current state, root cause, requirements, decisions, solutions, blockers
-- Ticket numbers/status, implementation details, next steps, dependencies
+What to synthesize from the sources (prioritizing recent data):
 
-Presentation:
-- Unified explanation (not meeting summary) with clear topic sections
-- Use markdown (headings, lists, code blocks) and specific examples
-- Lead with most important info, end with next steps
+TECHNICAL UNDERSTANDING:
+- What is the current state/status?
+- What is the root cause or key issue?
+- What are the requirements or constraints?
+- What decisions have been made and why?
+- What solutions or approaches are being used?
+- What are the blockers or open questions?
+
+ACTIONABLE INFORMATION:
+- Ticket numbers and their status
+- Implementation details and technical approaches
+- Next steps or recommendations
+- Dependencies and related work
+
+PRESENTATION STYLE:
+- Present information as a unified explanation, not a meeting summary
+- Write as if you're explaining the topic to someone new
+- Use clear topic-based sections (not timeline-based)
+- Only mention sources when it adds crucial context (e.g., "The team decided...", "This is still being debated...")
+- Be thorough enough that the reader doesn't need to check sources
+- Use specific examples: ticket numbers, code examples, technical details
+- Write in a straightforward, matter-of-fact tone - stick to the facts
+- Lead with the most important/actionable info
+- Use markdown formatting as appropriate (headings, lists, code blocks)
 """
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
