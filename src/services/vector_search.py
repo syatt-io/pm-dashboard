@@ -376,17 +376,31 @@ class VectorSearchService:
                     # Metadata field would be 'repo' or 'repository_name' depending on ingestion
                     or_conditions.append({"repo": {"$in": github_repo_list}})
 
-                # Fireflies: Use project keywords from project_keywords table
+                # Fireflies: Use project keywords for text-based filtering
                 # Get keywords for this project
                 keywords_result = conn.execute(
                     text("SELECT keyword FROM project_keywords WHERE project_key = :key"),
-                    {"key": project_key}
+                    {"key": canonical_key}
                 )
                 keywords = [row[0].lower() for row in keywords_result]
 
-                # For Fireflies, we'll rely on the semantic search to find matching meetings
-                # by including project keywords in the search query (handled in ContextSearchService)
-                # No explicit metadata filter needed here
+                # Build text search conditions for Fireflies using keywords
+                if keywords:
+                    # Create regex conditions for each keyword (case-insensitive)
+                    keyword_regex_conditions = [
+                        {"title": {"$regex": f"(?i){kw}"}} for kw in keywords
+                    ]
+
+                    # Add Fireflies filter: source must be "fireflies" AND title matches any keyword
+                    fireflies_filter = {
+                        "$and": [
+                            {"source": "fireflies"},
+                            {"$or": keyword_regex_conditions}
+                        ]
+                    }
+
+                    or_conditions.append(fireflies_filter)
+                    logger.info(f"📝 Added Fireflies text filter with {len(keywords)} keywords: {keywords}")
 
                 if not or_conditions:
                     return None
