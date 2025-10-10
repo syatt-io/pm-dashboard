@@ -1,7 +1,6 @@
 """API routes for triggering data backfills."""
 
 import logging
-import asyncio
 import os
 from flask import Blueprint, jsonify, request
 from src.services.auth import admin_required
@@ -40,34 +39,31 @@ def trigger_jira_backfill():
         days: Number of days back to fetch (default: 2555 / ~7 years)
 
     Returns:
-        JSON response with backfill status
+        JSON response with task ID for async processing
     """
     try:
         days_back = int(request.args.get('days', 2555))
 
-        logger.info(f"Triggering Jira backfill for {days_back} days")
+        logger.info(f"Queueing Jira backfill task for {days_back} days")
 
-        # Import here to avoid circular imports
-        from src.tasks.backfill_jira import backfill_jira_issues
+        # Import Celery task
+        from src.tasks.vector_tasks import backfill_jira
 
-        # Run the backfill asynchronously
-        result = asyncio.run(backfill_jira_issues(days_back=days_back))
+        # Queue the task asynchronously (non-blocking)
+        task = backfill_jira.delay(days_back=days_back)
 
-        if result.get("success"):
-            return jsonify({
-                "success": True,
-                "message": f"Jira backfill completed successfully",
-                "data": result
-            }), 200
-        else:
-            return jsonify({
-                "success": False,
-                "error": result.get("error", "Unknown error"),
-                "data": result
-            }), 500
+        logger.info(f"✅ Jira backfill task queued: {task.id}")
+
+        return jsonify({
+            "success": True,
+            "message": f"Jira backfill task queued successfully",
+            "task_id": task.id,
+            "days_back": days_back,
+            "status": "QUEUED"
+        }), 202  # 202 Accepted - processing started
 
     except Exception as e:
-        logger.error(f"Error triggering Jira backfill: {e}")
+        logger.error(f"Error queueing Jira backfill: {e}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -80,33 +76,35 @@ def trigger_notion_backfill():
     """
     Trigger Notion backfill to ingest historical pages into vector database.
 
+    Query params:
+        days: Number of days back to fetch (default: 365 / ~1 year)
+
     Returns:
-        JSON response with backfill status
+        JSON response with task ID for async processing
     """
     try:
-        logger.info("Triggering Notion backfill")
+        days_back = int(request.args.get('days', 365))
 
-        # Import here to avoid circular imports
-        from src.tasks.backfill_notion import backfill_notion_pages
+        logger.info(f"Queueing Notion backfill task for {days_back} days")
 
-        # Run the backfill asynchronously
-        result = asyncio.run(backfill_notion_pages())
+        # Import Celery task
+        from src.tasks.vector_tasks import backfill_notion
 
-        if result.get("success"):
-            return jsonify({
-                "success": True,
-                "message": "Notion backfill completed successfully",
-                "data": result
-            }), 200
-        else:
-            return jsonify({
-                "success": False,
-                "error": result.get("error", "Unknown error"),
-                "data": result
-            }), 500
+        # Queue the task asynchronously (non-blocking)
+        task = backfill_notion.delay(days_back=days_back)
+
+        logger.info(f"✅ Notion backfill task queued: {task.id}")
+
+        return jsonify({
+            "success": True,
+            "message": f"Notion backfill task queued successfully",
+            "task_id": task.id,
+            "days_back": days_back,
+            "status": "QUEUED"
+        }), 202  # 202 Accepted - processing started
 
     except Exception as e:
-        logger.error(f"Error triggering Notion backfill: {e}")
+        logger.error(f"Error queueuing Notion backfill: {e}")
         return jsonify({
             "success": False,
             "error": str(e)
