@@ -49,17 +49,17 @@ def trigger_jira_backfill():
         # Import Celery task
         from src.tasks.vector_tasks import backfill_jira
 
-        # Queue the task asynchronously (non-blocking)
-        task = backfill_jira.delay(days_back=days_back)
+        # Queue the task asynchronously without result tracking (avoids Redis backend connection issues)
+        backfill_jira.apply_async(args=[days_back], ignore_result=True)
 
-        logger.info(f"✅ Jira backfill task queued: {task.id}")
+        logger.info(f"✅ Jira backfill task queued for {days_back} days")
 
         return jsonify({
             "success": True,
             "message": f"Jira backfill task queued successfully",
-            "task_id": task.id,
             "days_back": days_back,
-            "status": "QUEUED"
+            "status": "QUEUED",
+            "note": "Task is running in background - check Celery worker logs for progress"
         }), 202  # 202 Accepted - processing started
 
     except Exception as e:
@@ -90,17 +90,17 @@ def trigger_notion_backfill():
         # Import Celery task
         from src.tasks.vector_tasks import backfill_notion
 
-        # Queue the task asynchronously (non-blocking)
-        task = backfill_notion.delay(days_back=days_back)
+        # Queue the task asynchronously without result tracking (avoids Redis backend connection issues)
+        backfill_notion.apply_async(args=[days_back], ignore_result=True)
 
-        logger.info(f"✅ Notion backfill task queued: {task.id}")
+        logger.info(f"✅ Notion backfill task queued for {days_back} days")
 
         return jsonify({
             "success": True,
             "message": f"Notion backfill task queued successfully",
-            "task_id": task.id,
             "days_back": days_back,
-            "status": "QUEUED"
+            "status": "QUEUED",
+            "note": "Task is running in background - check Celery worker logs for progress"
         }), 202  # 202 Accepted - processing started
 
     except Exception as e:
