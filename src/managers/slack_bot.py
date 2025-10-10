@@ -2077,12 +2077,12 @@ class SlackTodoBot:
             # Create search service
             search_service = ContextSearchService()
 
-            # Perform search (always use detailed level, add project filter if specified)
+            # Perform search (use slack detail level for optimal Slack formatting and length)
             results = asyncio.run(search_service.search(
                 query=query,
                 days_back=days,
                 user_id=app_user_id,
-                detail_level="detailed",
+                detail_level="slack",
                 project=project
             ))
 
