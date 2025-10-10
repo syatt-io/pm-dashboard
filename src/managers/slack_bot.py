@@ -2118,21 +2118,51 @@ class SlackTodoBot:
 
                 # Slack text blocks have a 3000 character limit
                 # Use 2950 to account for markdown formatting and safety margin
-                MAX_SUMMARY_LENGTH = 2950
+                MAX_BLOCK_LENGTH = 2950
 
-                if len(formatted_summary) > MAX_SUMMARY_LENGTH:
-                    # Truncate at word boundary and add ellipsis
-                    truncated = formatted_summary[:MAX_SUMMARY_LENGTH].rsplit(' ', 1)[0]
-                    formatted_summary = truncated + "..."
-                    logger.warning(f"Summary truncated from {len(results.summary)} to {len(formatted_summary)} chars")
+                # Split long summaries into multiple text blocks
+                if len(formatted_summary) > MAX_BLOCK_LENGTH:
+                    # Split at word boundaries to avoid cutting mid-word
+                    parts = []
+                    remaining = formatted_summary
 
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": formatted_summary
-                    }
-                })
+                    while len(remaining) > MAX_BLOCK_LENGTH:
+                        # Find last word boundary before limit
+                        split_pos = remaining[:MAX_BLOCK_LENGTH].rfind('\n\n')
+                        if split_pos == -1:
+                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind('\n')
+                        if split_pos == -1:
+                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind('. ')
+                        if split_pos == -1:
+                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind(' ')
+                        if split_pos == -1:
+                            split_pos = MAX_BLOCK_LENGTH
+
+                        parts.append(remaining[:split_pos].strip())
+                        remaining = remaining[split_pos:].strip()
+
+                    if remaining:
+                        parts.append(remaining)
+
+                    logger.info(f"📝 Split summary into {len(parts)} blocks (total: {len(formatted_summary)} chars)")
+
+                    # Add all parts as separate text blocks
+                    for part in parts:
+                        blocks.append({
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": part
+                            }
+                        })
+                else:
+                    blocks.append({
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": formatted_summary
+                        }
+                    })
 
             # Add divider before footer
             blocks.append({"type": "divider"})
