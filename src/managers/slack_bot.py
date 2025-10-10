@@ -382,11 +382,45 @@ class SlackTodoBot:
                 def run_search():
                     try:
                         result = self._find_context(user_id, query, days, project=project)
-                        # Post result using chat.postMessage instead of respond()
-                        self.app.client.chat_postMessage(
-                            channel=channel_id,
-                            **result
-                        )
+
+                        # Split blocks into header and body for threading
+                        blocks = result.get('blocks', [])
+                        if not blocks:
+                            # Fallback: post as-is if no blocks
+                            self.app.client.chat_postMessage(
+                                channel=channel_id,
+                                **result
+                            )
+                            return
+
+                        # Post header in main channel
+                        header_block = blocks[0] if blocks else None
+                        if header_block:
+                            header_response = self.app.client.chat_postMessage(
+                                channel=channel_id,
+                                blocks=[header_block],
+                                text=result.get('text', 'Context search results')
+                            )
+
+                            # Get thread timestamp
+                            thread_ts = header_response['ts']
+
+                            # Post remaining blocks in thread
+                            body_blocks = blocks[1:]
+                            if body_blocks:
+                                self.app.client.chat_postMessage(
+                                    channel=channel_id,
+                                    thread_ts=thread_ts,
+                                    blocks=body_blocks,
+                                    text=result.get('text', 'Context search summary')
+                                )
+                        else:
+                            # No header, post everything as-is
+                            self.app.client.chat_postMessage(
+                                channel=channel_id,
+                                **result
+                            )
+
                     except Exception as e:
                         logger.error(f"Error in background search: {e}")
                         self.app.client.chat_postMessage(
