@@ -10,6 +10,13 @@ import {
   Show,
   SimpleShowLayout,
   useRecordContext,
+  Edit,
+  SimpleForm,
+  TextInput,
+  SelectInput,
+  NumberInput,
+  EditButton,
+  TopToolbar,
 } from 'react-admin';
 import {
   Card,
@@ -41,6 +48,8 @@ import {
   List,
   ListItem,
   ListItemText,
+  Divider,
+  IconButton,
   ListItemIcon,
   Skeleton,
   Button as MuiButton,
@@ -1927,20 +1936,233 @@ export const ProjectList = () => {
   );
 };
 
-export const ProjectShow = () => (
-  <Show>
-    <SimpleShowLayout>
-      <TextField source="key" label="Project Key" />
-      <TextField source="name" label="Project Name" />
-      <TextField source="projectTypeKey" label="Type" />
-      <TextField source="description" label="Description" />
-      <TextField source="slack_channel" label="Slack Channel" />
-      <TextField source="weekly_meeting_day" label="Weekly Meeting Day" />
-      <TextField source="project_work_type" label="Work Type" />
-      <TextField source="forecasted_hours_month" label="Forecasted Hours/Month" />
-      <TextField source="total_hours" label="Total Hours" />
-      <TextField source="current_month_hours" label="Current Month Hours" />
-      <TextField source="cumulative_hours" label="Cumulative Hours" />
-    </SimpleShowLayout>
-  </Show>
+const ProjectShowActions = () => (
+  <TopToolbar>
+    <EditButton />
+  </TopToolbar>
+);
+
+export const ProjectShow = () => {
+  const record = useRecordContext();
+
+  if (!record) return null;
+
+  return (
+    <Show actions={<ProjectShowActions />}>
+      <Box sx={{ p: 3 }}>
+        <Grid container spacing={3}>
+          {/* Project Information */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                  Project Information
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Project Key
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {record.key}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Project Name
+                  </Typography>
+                  <Typography variant="body1">
+                    {record.name || 'N/A'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Description
+                  </Typography>
+                  <Typography variant="body1">
+                    {record.description || 'No description'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Work Type
+                  </Typography>
+                  <Typography variant="body1">
+                    {record.project_work_type || 'N/A'}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Weekly Meeting Day
+                  </Typography>
+                  <Typography variant="body1">
+                    {record.weekly_meeting_day || 'Not set'}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Hours & Forecasting */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                  Hours & Forecasting
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Forecasted Hours/Month
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    {record.forecasted_hours_month || 0} hours
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Total Hours
+                  </Typography>
+                  <Typography variant="body1">
+                    {record.total_hours || 0} hours
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Current Month Hours
+                  </Typography>
+                  <Typography variant="body1">
+                    {record.current_month_hours || 0} hours
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    Cumulative Hours
+                  </Typography>
+                  <Typography variant="body1">
+                    {record.cumulative_hours || 0} hours
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Resource Mappings */}
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                  Resource Mappings
+                </Typography>
+                <Divider sx={{ mb: 2 }} />
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Jira Projects
+                      </Typography>
+                      <Typography variant="body1">
+                        {record.jira_project_keys ? (typeof record.jira_project_keys === 'string' ? JSON.parse(record.jira_project_keys).join(', ') : record.jira_project_keys.join(', ')) : 'None'}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Slack Channels
+                      </Typography>
+                      <Typography variant="body1">
+                        {record.slack_channel_ids ? (typeof record.slack_channel_ids === 'string' ? JSON.parse(record.slack_channel_ids).join(', ') : record.slack_channel_ids.join(', ')) : 'None'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Notion Pages
+                      </Typography>
+                      <Typography variant="body1">
+                        {record.notion_page_ids ? (typeof record.notion_page_ids === 'string' ? JSON.parse(record.notion_page_ids).join(', ') : record.notion_page_ids.join(', ')) : 'None'}
+                      </Typography>
+                    </Box>
+
+                    <Box>
+                      <Typography variant="caption" color="text.secondary">
+                        GitHub Repos
+                      </Typography>
+                      <Typography variant="body1">
+                        {record.github_repos ? (typeof record.github_repos === 'string' ? JSON.parse(record.github_repos).join(', ') : record.github_repos.join(', ')) : 'None'}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    </Show>
+  );
+};
+
+export const ProjectEdit = () => (
+  <Edit>
+    <SimpleForm>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+        Edit Project
+      </Typography>
+
+      <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column', width: '100%' }}>
+        <TextInput source="key" label="Project Key" disabled fullWidth />
+        <TextInput source="name" label="Project Name" fullWidth />
+        <TextInput source="description" label="Description" multiline rows={3} fullWidth />
+
+        <SelectInput
+          source="project_work_type"
+          label="Work Type"
+          choices={[
+            { id: 'retainer', name: 'Retainer' },
+            { id: 'project', name: 'Project' },
+            { id: 'internal', name: 'Internal' },
+          ]}
+          fullWidth
+        />
+
+        <SelectInput
+          source="weekly_meeting_day"
+          label="Weekly Meeting Day"
+          choices={[
+            { id: 'Monday', name: 'Monday' },
+            { id: 'Tuesday', name: 'Tuesday' },
+            { id: 'Wednesday', name: 'Wednesday' },
+            { id: 'Thursday', name: 'Thursday' },
+            { id: 'Friday', name: 'Friday' },
+          ]}
+          fullWidth
+        />
+
+        <NumberInput source="forecasted_hours_month" label="Forecasted Hours/Month" fullWidth />
+        <NumberInput source="total_hours" label="Total Hours" fullWidth />
+
+        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
+          Resource Mappings (comma-separated)
+        </Typography>
+
+        <TextInput source="jira_project_keys" label="Jira Project Keys" fullWidth helperText="e.g., PROJ1, PROJ2" />
+        <TextInput source="slack_channel_ids" label="Slack Channel IDs" fullWidth helperText="e.g., C123456, C789012" />
+        <TextInput source="notion_page_ids" label="Notion Page IDs" fullWidth helperText="e.g., abc123, def456" />
+        <TextInput source="github_repos" label="GitHub Repos" fullWidth helperText="e.g., org/repo1, org/repo2" />
+      </Box>
+    </SimpleForm>
+  </Edit>
 );

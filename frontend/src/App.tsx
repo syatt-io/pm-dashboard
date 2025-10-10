@@ -22,7 +22,7 @@ import { TodoList, TodoShow, TodoEdit, TodoCreate } from './components/Todos';
 import { AnalysisList, AnalysisShow } from './components/Analysis';
 import { Dashboard } from './components/Dashboard';
 import { CustomLayout } from './components/Layout';
-import { ProjectList, ProjectShow } from './components/Projects';
+import { ProjectList, ProjectShow, ProjectEdit } from './components/Projects';
 import { LearningsList } from './components/LearningsList';
 import { LearningCreate } from './components/LearningCreate';
 import { LearningEdit } from './components/LearningEdit';
@@ -77,6 +77,7 @@ const AdminApp = () => {
           name="projects"
           list={ProjectList}
           show={ProjectShow}
+          edit={ProjectEdit}
           icon={BusinessIcon}
         />
         <Resource
