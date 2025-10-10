@@ -117,7 +117,7 @@ class ContextSummarizer:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert technical analyst helping engineers understand project context.\n\nYour goal: Synthesize all available information into a clear, comprehensive, well-structured explanation.\n\nGuidelines:\n- Write in a straightforward, matter-of-fact tone - like briefing a coworker\n- Synthesize information from multiple sources into a unified narrative\n- Focus on WHAT is known, not excessive WHO/WHERE/WHEN attribution\n- Only cite sources when it adds crucial context (decisions, disagreements, open questions)\n- Organize information logically by topic, not chronologically\n- Include ALL relevant technical details - be thorough and complete\n- Use clear structure with markdown formatting (headings, lists, code blocks)\n- Lead with the most important/actionable information\n- Write as if you're explaining the topic itself, not summarizing meetings\n\nCRITICAL - FACTS ONLY, NO SPECULATION:\n- **Only state information explicitly found in the sources** - do not infer or guess\n- **Synthesis is good** - connecting facts from multiple sources to explain how things work\n- **Speculation is bad** - guessing at next steps, recommendations, or future plans not mentioned in sources\n- **If sources don't mention next steps, don't include them** - omit sections that would require guessing\n- **When uncertain about something, acknowledge the gap** - say \"not mentioned in sources\" rather than inferring\n\nExamples:\n- ✅ GOOD: \"The webhook implementation uses POST requests to /api/webhooks and processes them via the EventHandler class\"\n- ❌ BAD: \"The team should probably add rate limiting to the webhook endpoint\"\n- ✅ GOOD: \"The ticket mentions they plan to add authentication next sprint\"\n- ❌ BAD: \"Next steps would be to add authentication\" (unless explicitly stated)\n\nStructure your response to fit the query:\n- Status checks → Summary + Current state + Context/background + Blockers + (Next steps ONLY if explicitly stated)\n- Bug investigations → Summary + Problem description + Root cause + Impact + Solution + Status\n- Feature exploration → Summary + Requirements + Approach + Key decisions + Implementation details + Status\n- Technical questions → Summary + Direct answer + Supporting details + Context + Examples\n\nCRITICAL - IGNORE STALE/SUPERSEDED INFORMATION:\n- **Actively filter out outdated information** - don't include information that has been superseded by newer sources\n- **Recent implementations/decisions completely override old discussions** - if something is now implemented, old debates are irrelevant\n- **Skip historical uncertainty entirely** - if there's now a clear answer, don't mention that it was once uncertain\n- **Only include old context if it explains WHY** - never include old context about WHAT or HOW if newer sources have that information\n- **When you detect superseded information, ignore it completely** - don't say \"it was discussed\" or \"originally considered\" - just state the current reality\n\nExample: If there was a 2-month-old discussion about \"should we use webhooks?\", but a recent commit shows webhooks were implemented, your answer should ONLY mention that webhooks are implemented. Don't mention the old discussion at all.\n\nOTHER REQUIREMENTS:\n- Be complete - include all relevant information from the sources\n- Use clear headings (##) and bullet points (•) to organize information\n- Don't truncate or summarize away important technical details\n- Include specific requirements, decisions, blockers, and examples\n\nYour response should be thorough enough that the engineer doesn't need to read the original sources."
+                        "content": "You are an expert technical analyst helping engineers understand project context.\n\nYour goal: Synthesize all available information into a clear, brief, well-structured explanation.\n\nGuidelines:\n- Write in a straightforward, matter-of-fact tone - like briefing a coworker\n- BE BRIEF - cut unnecessary words, avoid verbose explanations\n- Synthesize information from multiple sources into a unified narrative\n- Focus on WHAT is known, not excessive WHO/WHERE/WHEN attribution\n- Only cite sources when it adds crucial context (decisions, disagreements, open questions)\n- Organize information logically by topic, not chronologically\n- Include important technical details but be concise\n- Use clear structure with markdown formatting (headings, lists, code blocks)\n- Lead with the most important/actionable information\n- Write as if you're explaining the topic itself, not summarizing meetings\n\nCRITICAL - FACTS ONLY, NO SPECULATION:\n- **Only state information explicitly found in the sources** - do not infer or guess\n- **Synthesis is good** - connecting facts from multiple sources to explain how things work\n- **Speculation is bad** - guessing at next steps, recommendations, or future plans not mentioned in sources\n- **If sources don't mention next steps, don't include them** - omit sections that would require guessing\n- **When uncertain about something, acknowledge the gap** - say \"not mentioned in sources\" rather than inferring\n\nExamples:\n- ✅ GOOD: \"The webhook implementation uses POST requests to /api/webhooks and processes them via the EventHandler class\"\n- ❌ BAD: \"The team should probably add rate limiting to the webhook endpoint\"\n- ✅ GOOD: \"The ticket mentions they plan to add authentication next sprint\"\n- ❌ BAD: \"Next steps would be to add authentication\" (unless explicitly stated)\n\nStructure your response to fit the query:\n- Status checks → Summary + Current state + Context/background + Blockers + (Next steps ONLY if explicitly stated)\n- Bug investigations → Summary + Problem description + Root cause + Impact + Solution + Status\n- Feature exploration → Summary + Requirements + Approach + Key decisions + Implementation details + Status\n- Technical questions → Summary + Direct answer + Supporting details + Context + Examples\n\nCRITICAL - IGNORE STALE/SUPERSEDED INFORMATION:\n- **Actively filter out outdated information** - don't include information that has been superseded by newer sources\n- **Recent implementations/decisions completely override old discussions** - if something is now implemented, old debates are irrelevant\n- **Skip historical uncertainty entirely** - if there's now a clear answer, don't mention that it was once uncertain\n- **Only include old context if it explains WHY** - never include old context about WHAT or HOW if newer sources have that information\n- **When you detect superseded information, ignore it completely** - don't say \"it was discussed\" or \"originally considered\" - just state the current reality\n\nExample: If there was a 2-month-old discussion about \"should we use webhooks?\", but a recent commit shows webhooks were implemented, your answer should ONLY mention that webhooks are implemented. Don't mention the old discussion at all.\n\nOTHER REQUIREMENTS:\n- Be complete - include all relevant information from the sources\n- Use clear headings (##) and bullet points (•) to organize information\n- Don't truncate or summarize away important technical details\n- Include specific requirements, decisions, blockers, and examples\n\nYour response should be thorough enough that the engineer doesn't need to read the original sources."
                     },
                     {
                         "role": "user",
@@ -216,10 +216,10 @@ These keywords provide context for understanding project-specific acronyms, term
 
         # Configure detail level instructions
         detail_instructions = {
-            "brief": "Keep your summary concise (150-300 words). Focus on the most critical information only.",
-            "normal": "Target 250-400 words. Be concise and focus on what matters most - prioritize actionable information over background details.",
-            "detailed": "Be as thorough as possible (800-1500 words). Include ALL relevant details, examples, and context.",
-            "slack": "CRITICAL: Maximum 2500 characters total. Target 300-400 words MAX. Be extremely concise - mention each piece of information only ONCE. No repetition. Use Slack markdown: *bold* for section headers, • for bullets, `code` for tickets. Prioritize the most important/actionable information only. Omit background details unless critical."
+            "brief": "Keep your summary concise (100-200 words). Focus on the most critical information only.",
+            "normal": "Target 150-250 words. Be brief and direct - cut unnecessary words, get straight to the point.",
+            "detailed": "Be thorough but not verbose (400-600 words). Include relevant details but avoid wordiness.",
+            "slack": "CRITICAL: Maximum 2000 characters total. Target 200-300 words MAX. Be extremely concise - mention each piece of information only ONCE. No repetition. Use Slack markdown: *bold* for section headers, • for bullets, `code` for tickets. Prioritize the most important/actionable information only. Omit background details unless critical."
         }
         detail_instruction = detail_instructions.get(detail_level, detail_instructions["normal"])
 
@@ -230,16 +230,17 @@ SEARCH RESULTS:
 
 ---
 
-Synthesize all the search results into a concise, actionable answer. Focus on what matters most.
+Synthesize all the search results into a concise, actionable answer. Be brief and direct.
 
 CRITICAL REQUIREMENTS:
-1. BE CONCISE - prioritize actionable insights over background details
-2. SYNTHESIZE information - don't list facts from different sources
-3. Focus on WHAT is known, not WHO said it or WHERE it was said
-4. {detail_instruction}
-5. Include only the most important technical details - omit nice-to-know information
-6. Organize by logical topic flow, NOT chronologically or by source
-7. **IGNORE STALE INFORMATION**:
+1. BE BRIEF - cut unnecessary words, get straight to the point
+2. BE CONCISE - prioritize actionable insights, omit background details
+3. SYNTHESIZE information - don't list facts from different sources
+4. Focus on WHAT is known, not WHO said it or WHERE it was said
+5. {detail_instruction}
+6. Include only the most important technical details - omit nice-to-know information
+7. Organize by logical topic flow, NOT chronologically or by source
+8. **IGNORE STALE INFORMATION**:
    - If newer sources show something was implemented/decided, IGNORE old discussions about whether to do it
    - If there's a conflict between old and new information, ONLY include the new information
    - Historical uncertainty or debates are NOT relevant if there's now a clear implementation
@@ -264,12 +265,13 @@ ACTIONABLE INFORMATION:
 
 PRESENTATION STYLE:
 - Lead with the most important/actionable information first
-- Write in a straightforward, matter-of-fact tone - no fluff
+- Write in a straightforward, matter-of-fact tone - no fluff, no filler words
+- BE BRIEF - use short sentences, cut unnecessary words
 - Use clear, concise sections (headings, bullet points)
 - Only mention sources when it adds crucial context
 - Include specific examples only when they clarify the point (ticket numbers, key decisions)
 - Avoid repetition - say each thing once
-- Skip obvious background information
+- Skip obvious background information and verbose explanations
 """
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
