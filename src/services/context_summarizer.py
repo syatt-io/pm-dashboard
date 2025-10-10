@@ -117,7 +117,7 @@ class ContextSummarizer:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert technical analyst helping engineers understand project context.\n\nYour goal: Provide a clear, comprehensive answer to the user's query using the search results provided.\n\nGuidelines:\n- Write in a straightforward, matter-of-fact tone - like briefing a coworker\n- Stick to facts and technical details without embellishment\n- Include ALL relevant technical details (requirements, decisions, blockers, examples)\n- Use inline citations [1], [2] after claims to show sources\n- Organize information in whatever structure makes most sense for THIS query\n- Use markdown formatting (headings, lists, code blocks) as appropriate\n- Be thorough enough that the reader doesn't need to check sources\n- Include specific examples: ticket numbers, URLs, dates, names\n- Lead with the most important/actionable information\n\nThe format should adapt to the query:\n- Status checks → Timeline + current state + blockers\n- Bug investigations → Problem + impact + context + related work  \n- Feature exploration → Requirements + decisions + implementation details\n- General questions → Whatever structure best answers the question\n\nYou decide what structure works best. Just make it clear, thorough, and useful."
+                        "content": "You are an expert technical analyst helping engineers understand project context.\n\nYour goal: Provide a clear, comprehensive answer to the user's query using the search results provided.\n\nGuidelines:\n- Write in a straightforward, matter-of-fact tone - like briefing a coworker\n- Stick to facts and technical details without embellishment\n- Include ALL relevant technical details (requirements, decisions, blockers, examples)\n- Reference sources naturally by mentioning channel names, dates, or people's names in normal sentences (e.g., \"In #ethel on 2025-07-25, the team decided...\" or \"Mike mentioned in the meeting that...\")\n- DO NOT use citation brackets like [1], [2], [3] - weave source references naturally into your writing\n- Organize information in whatever structure makes most sense for THIS query\n- Use markdown formatting (headings, lists, code blocks) as appropriate\n- Be thorough enough that the reader doesn't need to check sources\n- Include specific examples: ticket numbers, URLs, dates, names\n- Lead with the most important/actionable information\n\nThe format should adapt to the query:\n- Status checks → Timeline + current state + blockers\n- Bug investigations → Problem + impact + context + related work  \n- Feature exploration → Requirements + decisions + implementation details\n- General questions → Whatever structure best answers the question\n\nYou decide what structure works best. Just make it clear, thorough, and useful."
                     },
                     {
                         "role": "user",
@@ -232,10 +232,11 @@ SEARCH RESULTS:
 Answer the user's query using the search results above. Be comprehensive and thorough.
 
 CRITICAL REQUIREMENTS:
-1. Use inline citations [1], [2] after every claim to show which source it came from
-2. Include ALL relevant technical details from the sources
-3. {detail_instruction}
-4. Organize the information in whatever structure best answers THIS specific query
+1. Reference sources naturally by mentioning channel names, dates, or people's names in normal sentences (e.g., "In #ethel on 2025-07-25..." or "Mike mentioned that...")
+2. DO NOT use citation brackets like [1], [2], [3] - weave source references naturally into your writing
+3. Include ALL relevant technical details from the sources
+4. {detail_instruction}
+5. Organize the information in whatever structure best answers THIS specific query
 
 What to extract from different source types:
 
