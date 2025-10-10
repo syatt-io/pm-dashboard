@@ -902,21 +902,20 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
 
             while True:
                 # search_issues returns {"issues": [...]}
-                result = await jira_client.search_issues(jql=jql, max_results=max_results)
+                result = await jira_client.search_issues(jql=jql, max_results=max_results, start_at=start_at)
                 issues_batch = result.get('issues', [])
 
                 if not issues_batch:
                     break
 
                 issues_all.extend(issues_batch)
+                logger.info(f"   Fetched {len(issues_all)} issues so far...")
 
                 if len(issues_batch) < max_results:
                     break
 
-                # Update JQL to skip already fetched issues
+                # Move to next page
                 start_at += max_results
-                jql = f"updated >= -{days_back}d ORDER BY updated DESC"
-                logger.info(f"   Fetched {len(issues_all)} issues so far...")
 
             logger.info(f"✅ Found {len(issues_all)} issues")
 
@@ -924,7 +923,8 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
                 logger.warning("⚠️  No issues found")
                 return {"success": True, "issues_found": 0, "issues_ingested": 0}
 
-            # Group issues by project and ingest
+            # Group issues by project and ingest in batches
+            logger.info("📊 Grouping issues by project...")
             projects = {}
             for issue in issues_all:
                 project_key = issue.get('key', '').split('-')[0] if issue.get('key') else 'UNKNOWN'
@@ -932,15 +932,19 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
                     projects[project_key] = []
                 projects[project_key].append(issue)
 
+            logger.info(f"✅ Grouped {len(issues_all)} issues into {len(projects)} projects")
+            logger.info(f"📊 Projects: {', '.join(f'{k} ({len(v)})' for k, v in projects.items())}")
+
             total_ingested = 0
-            for project_key, project_issues in projects.items():
+            for i, (project_key, project_issues) in enumerate(projects.items(), 1):
                 try:
+                    logger.info(f"[{i}/{len(projects)}] Ingesting {len(project_issues)} issues from {project_key}...")
                     count = ingest_service.ingest_jira_issues(
                         issues=project_issues,
                         project_key=project_key
                     )
                     total_ingested += count
-                    logger.info(f"✅ Ingested {count} issues from {project_key}")
+                    logger.info(f"✅ [{i}/{len(projects)}] Ingested {count} issues from {project_key} (Total: {total_ingested}/{len(issues_all)})")
                 except Exception as e:
                     logger.error(f"Error ingesting {project_key}: {e}")
                     continue

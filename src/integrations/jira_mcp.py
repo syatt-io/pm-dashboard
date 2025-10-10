@@ -133,13 +133,14 @@ class JiraMCPClient:
             logger.error(f"Error fetching ticket {ticket_key}: {e}")
             return {"success": False, "error": str(e)}
 
-    async def search_tickets(self, jql: str, max_results: int = 50, expand_comments: bool = False) -> List[Dict[str, Any]]:
+    async def search_tickets(self, jql: str, max_results: int = 50, expand_comments: bool = False, start_at: int = 0) -> List[Dict[str, Any]]:
         """Search tickets using JQL.
 
         Args:
             jql: JQL query string
             max_results: Maximum number of results to return
             expand_comments: If True, fetch and include comments for each issue
+            start_at: Starting index for pagination (0-based)
 
         Returns:
             List of issue dictionaries (with comments in fields if expand_comments=True)
@@ -154,7 +155,8 @@ class JiraMCPClient:
                 # This endpoint returns minimal data, so we need to fetch full issue details after
                 params = {
                     "jql": jql,
-                    "maxResults": max_results
+                    "maxResults": max_results,
+                    "startAt": start_at
                 }
 
                 # Step 1: Get issue IDs using new /search/jql endpoint
@@ -256,12 +258,12 @@ class JiraMCPClient:
             logger.error(f"Error searching tickets: {e}")
             return []
 
-    async def search_issues(self, jql: str, max_results: int = 50, expand_comments: bool = False) -> Dict[str, Any]:
+    async def search_issues(self, jql: str, max_results: int = 50, expand_comments: bool = False, start_at: int = 0) -> Dict[str, Any]:
         """Alias for search_tickets that returns result in dict format with 'issues' key.
 
         This maintains backward compatibility with existing code.
         """
-        issues = await self.search_tickets(jql, max_results, expand_comments)
+        issues = await self.search_tickets(jql, max_results, expand_comments, start_at)
         return {"issues": issues}
 
     async def add_comment(self, ticket_key: str, comment: str) -> Dict[str, Any]:

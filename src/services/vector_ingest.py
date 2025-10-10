@@ -272,7 +272,7 @@ class VectorIngestService:
                 updated = fields.get('updated', '')
                 issue_date = datetime.fromisoformat(updated.replace('Z', '+00:00')) if updated else datetime.now()
 
-                # Create document
+                # Create document with safe None checks
                 doc = VectorDocument(
                     id=doc_id,
                     source='jira',
@@ -281,11 +281,11 @@ class VectorIngestService:
                     metadata={
                         'issue_key': issue_key,
                         'project_key': project_key,
-                        'issue_type': fields.get('issuetype', {}).get('name', 'Unknown'),
-                        'status': fields.get('status', {}).get('name', 'Unknown'),
-                        'priority': fields.get('priority', {}).get('name', 'Medium'),
-                        'assignee': fields.get('assignee', {}).get('displayName', 'Unassigned'),
-                        'reporter': fields.get('reporter', {}).get('displayName', 'Unknown'),
+                        'issue_type': (fields.get('issuetype') or {}).get('name', 'Unknown'),
+                        'status': (fields.get('status') or {}).get('name', 'Unknown'),
+                        'priority': (fields.get('priority') or {}).get('name', 'Medium'),
+                        'assignee': (fields.get('assignee') or {}).get('displayName', 'Unassigned'),
+                        'reporter': (fields.get('reporter') or {}).get('displayName', 'Unknown'),
                         'timestamp': issue_date.isoformat(),
                         'timestamp_epoch': int(issue_date.timestamp()),  # Numeric for filtering
                         'date': issue_date.strftime('%Y-%m-%d'),

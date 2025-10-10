@@ -219,7 +219,7 @@ These keywords provide context for understanding project-specific acronyms, term
             "brief": "Keep your summary concise (150-300 words). Focus on the most critical information only.",
             "normal": "Aim for 400-800 words for complex topics (longer is better if information-dense).",
             "detailed": "Be as thorough as possible (800-1500 words). Include ALL relevant details, examples, and context.",
-            "slack": "Target 700-900 words (up to 4000 characters max for Slack limits). Be comprehensive but efficient - mention each piece of information only ONCE. Avoid repetition across sections. Use Slack markdown: *bold* for section headers, • for bullets, `code` for tickets/technical terms."
+            "slack": "CRITICAL: Maximum 3000 characters total (Slack enforces strict limits). Target 500-600 words. Be comprehensive but efficient - mention each piece of information only ONCE. Avoid repetition across sections. Use Slack markdown: *bold* for section headers, • for bullets, `code` for tickets/technical terms. Prioritize the most important/actionable information."
         }
         detail_instruction = detail_instructions.get(detail_level, detail_instructions["normal"])
 
