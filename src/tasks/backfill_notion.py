@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def backfill_notion_pages(days_back: int = 365):
+def backfill_notion_pages(days_back: int = 2555):
     """Backfill all Notion pages from the last N days."""
     logger.info(f"🔄 Starting Notion backfill ({days_back} days)...")
 
