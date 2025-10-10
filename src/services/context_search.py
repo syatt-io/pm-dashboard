@@ -663,7 +663,11 @@ class ContextSearchService:
         if user_id:
             user_email = self._get_user_email_from_id(user_id)
             if user_email:
-                self.logger.info(f"  User email for permissions: {user_email}")
+                self.logger.info(f"✅ User ID {user_id} → Email: {user_email} (for Fireflies permissions)")
+            else:
+                self.logger.warning(f"⚠️  User ID {user_id} found but NO email - Fireflies will only show PUBLIC meetings")
+        else:
+            self.logger.warning(f"⚠️  NO user_id provided - Fireflies will only show PUBLIC meetings")
 
         # Initialize vector search service
         vector_search = VectorSearchService()

@@ -371,7 +371,7 @@ class SlackTodoBot:
 
                 # Show searching message
                 project_msg = f" for project *{project}*" if project else ""
-                respond(f"🔍 Searching for *{query}*{project_msg} across Slack, Fireflies, and Jira (last {days} days)...\n_This may take a moment_")
+                respond(f"🔍 Searching for *{query}*{project_msg} across Slack, Fireflies, Jira, GitHub, and Notion (last {days} days)...\n_This may take a moment_")
 
                 # Perform the search asynchronously to avoid timeout
                 # Get channel_id for posting results

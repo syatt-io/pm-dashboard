@@ -100,6 +100,9 @@ class VectorSearchService:
         # Build metadata filter
         filter_conditions = self._build_filter(days_back, sources, user_email, project_key)
 
+        # Debug: Log the actual Pinecone filter being applied
+        logger.info(f"🔍 Pinecone filter conditions: {filter_conditions}")
+
         try:
             # Query Pinecone with hybrid search
             results = self.pinecone_index.query(
@@ -137,7 +140,16 @@ class VectorSearchService:
             # Sort by relevance score
             search_results.sort(key=lambda x: x.relevance_score, reverse=True)
 
+            # Debug: Log results by source for troubleshooting
+            source_counts = {}
+            for result in search_results:
+                source_counts[result.source] = source_counts.get(result.source, 0) + 1
+
             logger.info(f"✅ Vector search found {len(search_results)} results for: {query}")
+            if source_counts:
+                source_breakdown = ', '.join([f"{src}: {count}" for src, count in source_counts.items()])
+                logger.info(f"   📊 Results by source: {source_breakdown}")
+
             return search_results[:top_k]
 
         except Exception as e:
