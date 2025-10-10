@@ -49,6 +49,8 @@ class ContextSearchService:
         self._project_keywords_cache_time = None
         self._embedding_cache = {}  # Cache embeddings: hash(text) -> (embedding, timestamp)
         self._embedding_cache_ttl = 3600  # 1 hour cache TTL
+        self._slack_user_cache = {}  # Cache Slack user IDs: user_id -> display_name
+        self._slack_user_cache_time = None
 
         # Auto-sync Jira project keywords on first use (runs in background)
         self._sync_project_keywords_async()
@@ -102,6 +104,65 @@ class ContextSearchService:
         except Exception as e:
             self.logger.warning(f"Could not get user email for user_id {user_id}: {e}")
             return None
+
+    def _resolve_slack_user_id(self, user_id: str) -> str:
+        """Resolve Slack user ID to display name using Slack API.
+
+        Args:
+            user_id: Slack user ID (e.g., 'U012EQ1KQFK')
+
+        Returns:
+            Display name if found, otherwise returns the user ID
+        """
+        # Check cache first (cache for 1 hour)
+        if self._slack_user_cache_time and (datetime.now() - self._slack_user_cache_time).total_seconds() < 3600:
+            if user_id in self._slack_user_cache:
+                return self._slack_user_cache[user_id]
+
+        # Fetch from Slack API
+        try:
+            from config.settings import settings
+            from slack_sdk import WebClient
+
+            client = WebClient(token=settings.notifications.slack_bot_token)
+            response = client.users_info(user=user_id)
+
+            if response.get('ok'):
+                user_info = response.get('user', {})
+                display_name = user_info.get('profile', {}).get('display_name') or user_info.get('real_name') or user_id
+
+                # Cache the result
+                self._slack_user_cache[user_id] = display_name
+                self._slack_user_cache_time = datetime.now()
+
+                return display_name
+            else:
+                return user_id
+
+        except Exception as e:
+            self.logger.warning(f"Could not resolve Slack user ID {user_id}: {e}")
+            return user_id
+
+    def _replace_slack_user_ids_in_text(self, text: str) -> str:
+        """Replace Slack user ID mentions with display names.
+
+        Args:
+            text: Text containing Slack user IDs like <@U012EQ1KQFK>
+
+        Returns:
+            Text with user IDs replaced by display names
+        """
+        import re
+
+        # Find all Slack user ID mentions <@USERID>
+        pattern = r'<@([A-Z0-9]+)>'
+
+        def replace_mention(match):
+            user_id = match.group(1)
+            display_name = self._resolve_slack_user_id(user_id)
+            return f"@{display_name}"
+
+        return re.sub(pattern, replace_mention, text)
 
     def _get_project_keywords(self) -> Dict[str, List[str]]:
         """Get project keywords from database with caching.
@@ -628,6 +689,14 @@ class ContextSearchService:
         )
 
         self.logger.info(f"✅ Vector search returned {len(all_results)} results")
+
+        # Pre-process results: replace Slack user IDs with display names
+        for result in all_results:
+            if result.source == 'slack':
+                result.content = self._replace_slack_user_ids_in_text(result.content)
+                result.title = self._replace_slack_user_ids_in_text(result.title)
+                if result.author and result.author.startswith('U'):
+                    result.author = self._resolve_slack_user_id(result.author)
 
         # Results are already sorted by relevance score from vector_search
         # Generate AI summary and insights with detail level

@@ -173,13 +173,16 @@ class VectorSearchService:
         # Project filter - applies across all data sources using resource mappings
         if project_key:
             # Get project resource mappings from database
+            logger.info(f"🔍 Building project filter for: {project_key.upper()}")
             project_filters = self._get_project_resource_filters(project_key.upper())
 
             if project_filters:
+                logger.info(f"✅ Applied project filter with {len(project_filters.get('$or', []))} resource types")
+                logger.info(f"📋 Filter conditions: {project_filters}")
                 conditions.append(project_filters)
             else:
                 # Fallback: if no mappings configured, only filter Jira
-                logger.warning(f"No resource mappings found for project {project_key}, only filtering Jira")
+                logger.warning(f"⚠️  No resource mappings found for project {project_key}, only filtering Jira")
                 conditions.append({"project_key": project_key.upper()})
 
         # Source filter
