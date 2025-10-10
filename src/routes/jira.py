@@ -139,6 +139,113 @@ def get_jira_projects():
         return error_response(str(e), status_code=500)
 
 
+@jira_bp.route("/projects/<project_key>", methods=["GET"])
+def get_jira_project(project_key):
+    """Get a single Jira project by key with local database enhancements."""
+    try:
+        # Check if Jira credentials are configured
+        if not settings.jira.url or not settings.jira.username or not settings.jira.api_token:
+            logger.error("Jira credentials not configured")
+            return error_response("Jira credentials not configured", status_code=500)
+
+        logger.info(f"Fetching project {project_key} from Jira")
+
+        # Fetch project from Jira
+        async def fetch_project():
+            async with JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token
+            ) as jira_client:
+                projects = await jira_client.get_projects()
+                # Find the specific project by key
+                for project in projects:
+                    if project.get('key') == project_key:
+                        return project
+                return None
+
+        jira_project = asyncio.run(fetch_project())
+
+        if not jira_project:
+            return error_response(f"Project {project_key} not found", status_code=404)
+
+        logger.info(f"Found project {project_key} in Jira")
+
+        # Enhance with local database data
+        from sqlalchemy import text
+        engine = get_engine()
+
+        enhanced_project = jira_project.copy()
+        try:
+            with engine.connect() as conn:
+                # Get current month for joining with monthly forecast
+                from datetime import datetime
+                now = datetime.now()
+                current_month = datetime(now.year, now.month, 1).date()
+
+                # Get local project data joined with current month forecast
+                result = conn.execute(text("""
+                    SELECT
+                        p.is_active,
+                        p.project_work_type,
+                        p.total_hours,
+                        p.cumulative_hours,
+                        p.slack_channel,
+                        p.weekly_meeting_day,
+                        p.retainer_hours,
+                        p.description,
+                        pmf.forecasted_hours,
+                        pmf.actual_monthly_hours
+                    FROM projects p
+                    LEFT JOIN project_monthly_forecast pmf
+                        ON p.key = pmf.project_key
+                        AND pmf.month_year = :current_month
+                    WHERE p.key = :key
+                """), {"key": project_key, "current_month": current_month}).fetchone()
+
+                if result:
+                    enhanced_project["is_active"] = bool(result[0]) if result[0] is not None else True
+                    enhanced_project["project_work_type"] = result[1] if result[1] else 'project-based'
+                    enhanced_project["total_hours"] = float(result[2]) if result[2] else 0
+                    enhanced_project["cumulative_hours"] = float(result[3]) if result[3] else 0
+                    enhanced_project["slack_channel"] = result[4] if result[4] else None
+                    enhanced_project["weekly_meeting_day"] = result[5] if result[5] else None
+                    enhanced_project["retainer_hours"] = float(result[6]) if result[6] else 0
+                    enhanced_project["description"] = result[7] if result[7] else None
+                    enhanced_project["forecasted_hours_month"] = float(result[8]) if result[8] else 0
+                    enhanced_project["current_month_hours"] = float(result[9]) if result[9] else 0
+                else:
+                    # No database record - use defaults
+                    enhanced_project["is_active"] = True
+                    enhanced_project["project_work_type"] = 'project-based'
+                    enhanced_project["total_hours"] = 0
+                    enhanced_project["cumulative_hours"] = 0
+                    enhanced_project["slack_channel"] = None
+                    enhanced_project["weekly_meeting_day"] = None
+                    enhanced_project["retainer_hours"] = 0
+                    enhanced_project["description"] = None
+                    enhanced_project["forecasted_hours_month"] = 0
+                    enhanced_project["current_month_hours"] = 0
+        except Exception as e:
+            # If database operations fail, use defaults
+            logger.warning(f"Could not enhance project with database data: {e}")
+            enhanced_project["is_active"] = True
+            enhanced_project["project_work_type"] = 'project-based'
+            enhanced_project["total_hours"] = 0
+            enhanced_project["cumulative_hours"] = 0
+            enhanced_project["slack_channel"] = None
+            enhanced_project["weekly_meeting_day"] = None
+            enhanced_project["retainer_hours"] = 0
+            enhanced_project["description"] = None
+            enhanced_project["forecasted_hours_month"] = 0
+            enhanced_project["current_month_hours"] = 0
+
+        return success_response(data=enhanced_project)
+    except Exception as e:
+        logger.error(f"Error fetching Jira project {project_key}: {e}")
+        return error_response(str(e), status_code=500)
+
+
 @jira_bp.route("/issue-types", methods=["GET"])
 def get_jira_issue_types():
     """Get Jira issue types for a project."""
