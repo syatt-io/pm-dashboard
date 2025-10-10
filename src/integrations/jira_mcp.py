@@ -176,16 +176,20 @@ class JiraMCPClient:
                 if not issue_ids:
                     return []
 
-                # Step 2: Fetch full issue details for each ID using /issue endpoint in parallel
-                # The /search/jql endpoint doesn't support fields parameter
+                # Step 2: Fetch full issue details for each ID using /issue endpoint
+                # Add delays between requests to avoid rate limiting
                 import asyncio
 
-                async def fetch_issue(issue_id: str):
+                async def fetch_issue(issue_id: str, index: int, total: int):
                     try:
+                        # Add small delay between requests (0.05s = 20 requests/second max)
+                        if index > 0:
+                            await asyncio.sleep(0.05)
+
                         issue_response = await self.client.get(
                             f"{self.jira_url}/rest/api/3/issue/{issue_id}",
                             params={
-                                "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project,comment"
+                                "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project"
                             },
                             headers={
                                 "Authorization": f"Basic {auth_string}",
@@ -198,9 +202,20 @@ class JiraMCPClient:
                         logger.warning(f"Failed to fetch issue {issue_id}: {e}")
                         return None
 
-                # Fetch all issues in parallel
-                issue_results = await asyncio.gather(*[fetch_issue(issue_id) for issue_id in issue_ids])
-                issues = [issue for issue in issue_results if issue is not None]
+                # Fetch issues with rate limiting - process in smaller batches
+                issues = []
+                batch_size = 10  # Process 10 issues at a time
+                for i in range(0, len(issue_ids), batch_size):
+                    batch_ids = issue_ids[i:i+batch_size]
+                    batch_results = await asyncio.gather(*[
+                        fetch_issue(issue_id, idx, len(issue_ids))
+                        for idx, issue_id in enumerate(batch_ids)
+                    ])
+                    issues.extend([issue for issue in batch_results if issue is not None])
+
+                    # Add delay between batches
+                    if i + batch_size < len(issue_ids):
+                        await asyncio.sleep(0.5)
 
                 # Create result dict that matches the original structure
                 result = {"issues": issues}

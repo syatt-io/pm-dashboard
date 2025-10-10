@@ -1942,14 +1942,13 @@ const ProjectShowActions = () => (
   </TopToolbar>
 );
 
-export const ProjectShow = () => {
+const ProjectShowContent = () => {
   const record = useRecordContext();
 
   if (!record) return null;
 
   return (
-    <Show actions={<ProjectShowActions />}>
-      <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3 }}>
         <Grid container spacing={3}>
           {/* Project Information */}
           <Grid item xs={12} md={6}>
@@ -2110,10 +2109,15 @@ export const ProjectShow = () => {
             </Card>
           </Grid>
         </Grid>
-      </Box>
-    </Show>
+    </Box>
   );
 };
+
+export const ProjectShow = () => (
+  <Show actions={<ProjectShowActions />}>
+    <ProjectShowContent />
+  </Show>
+);
 
 export const ProjectEdit = () => (
   <Edit>

@@ -11,6 +11,7 @@ Usage:
 import logging
 import sys
 import asyncio
+import time
 from src.services.vector_ingest import VectorIngestService
 from src.integrations.jira_mcp import JiraMCPClient
 from config.settings import settings
@@ -21,6 +22,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Rate limiting configuration
+BATCH_SIZE = 50  # Fetch 50 issues at a time (reduced from 100)
+DELAY_BETWEEN_BATCHES = 2.0  # 2 seconds between batches
+DELAY_BETWEEN_PROJECTS = 5.0  # 5 seconds between projects
 
 
 async def backfill_jira_issues(days_back: int = 2555):
@@ -43,18 +49,24 @@ async def backfill_jira_issues(days_back: int = 2555):
     jql = f"updated >= -{days_back}d ORDER BY updated DESC"
     logger.info(f"📥 Fetching Jira issues with JQL: {jql}")
 
-    # Fetch all issues with pagination
+    # Fetch all issues with pagination and rate limiting
     try:
         issues_all = []
         start_at = 0
-        max_results = 100
+        batch_count = 0
 
         while True:
+            # Add delay between batches (except first batch)
+            if batch_count > 0:
+                logger.info(f"   ⏱️  Waiting {DELAY_BETWEEN_BATCHES}s before next batch...")
+                await asyncio.sleep(DELAY_BETWEEN_BATCHES)
+
             # search_issues returns {"issues": [...]}
             result = await jira_client.search_issues(
                 jql=jql,
-                max_results=max_results,
-                start_at=start_at
+                max_results=BATCH_SIZE,
+                start_at=start_at,
+                expand_comments=False  # Don't fetch comments to reduce data
             )
             issues_batch = result.get('issues', [])
 
@@ -62,15 +74,16 @@ async def backfill_jira_issues(days_back: int = 2555):
                 break
 
             issues_all.extend(issues_batch)
-            logger.info(f"   Fetched {len(issues_all)} issues so far...")
+            batch_count += 1
+            logger.info(f"   Fetched {len(issues_all)} issues so far (batch {batch_count})...")
 
-            if len(issues_batch) < max_results:
+            if len(issues_batch) < BATCH_SIZE:
                 break
 
             # Move to next page
-            start_at += max_results
+            start_at += BATCH_SIZE
 
-        logger.info(f"✅ Found {len(issues_all)} issues")
+        logger.info(f"✅ Found {len(issues_all)} issues in {batch_count} batches")
     except Exception as e:
         logger.error(f"❌ Failed to fetch issues: {e}")
         return 1
@@ -91,10 +104,15 @@ async def backfill_jira_issues(days_back: int = 2555):
     logger.info(f"✅ Grouped {len(issues_all)} issues into {len(projects)} projects")
     logger.info(f"📊 Projects: {', '.join(f'{k} ({len(v)})' for k, v in projects.items())}")
 
-    # Ingest into Pinecone
+    # Ingest into Pinecone with delays between projects
     total_ingested = 0
     for i, (project_key, project_issues) in enumerate(projects.items(), 1):
         try:
+            # Add delay between projects (except first one)
+            if i > 1:
+                logger.info(f"   ⏱️  Waiting {DELAY_BETWEEN_PROJECTS}s before next project...")
+                await asyncio.sleep(DELAY_BETWEEN_PROJECTS)
+
             logger.info(f"[{i}/{len(projects)}] Ingesting {len(project_issues)} issues from {project_key}...")
             count = ingest_service.ingest_jira_issues(
                 issues=project_issues,
