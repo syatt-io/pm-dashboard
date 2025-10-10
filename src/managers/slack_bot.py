@@ -317,7 +317,7 @@ class SlackTodoBot:
                     respond(self._get_find_context_help_message())
                     return
 
-                # Parse command: /find-context <topic> [--days 180] [--project PROJ]
+                # Parse command: /find-context <topic> [--days 180] [--project PROJ] or [--project=PROJ]
                 args = text.split()
                 if len(args) < 1:
                     respond("❌ Please provide a search topic: `/find-context authentication flow`")
@@ -329,6 +329,7 @@ class SlackTodoBot:
                 query_parts = []
                 i = 0
                 while i < len(args):
+                    # Handle --days N or --days=N
                     if args[i] == '--days' and i + 1 < len(args):
                         try:
                             days = int(args[i + 1])
@@ -340,9 +341,25 @@ class SlackTodoBot:
                         except ValueError:
                             respond("❌ Invalid days value. Must be a number.")
                             return
+                    elif args[i].startswith('--days='):
+                        try:
+                            days = int(args[i].split('=', 1)[1])
+                            if days < 1 or days > 365:
+                                respond("❌ Days must be between 1 and 365")
+                                return
+                            i += 1
+                            continue
+                        except (ValueError, IndexError):
+                            respond("❌ Invalid days value. Must be a number.")
+                            return
+                    # Handle --project PROJ or --project=PROJ
                     elif args[i] == '--project' and i + 1 < len(args):
                         project = args[i + 1].upper()
                         i += 2
+                        continue
+                    elif args[i].startswith('--project='):
+                        project = args[i].split('=', 1)[1].upper()
+                        i += 1
                         continue
                     query_parts.append(args[i])
                     i += 1
@@ -2022,7 +2039,8 @@ class SlackTodoBot:
                     "type": "mrkdwn",
                     "text": "*Find Historical Context Across All Sources*\n\n"
                            "`/find-context <topic>` - Search with default 90-day window\n"
-                           "`/find-context <topic> --days <N>` - Search with custom timeframe\n\n"
+                           "`/find-context <topic> --days N` - Search with custom timeframe\n"
+                           "`/find-context <topic> --project PROJ` - Filter by project\n\n"
                            "*Sources Searched:*\n"
                            "• 💬 Slack messages (channels bot is in)\n"
                            "• 🎙️ Fireflies meeting transcripts\n"
@@ -2031,8 +2049,9 @@ class SlackTodoBot:
                            "• 📝 Notion pages and docs\n\n"
                            "*Examples:*\n"
                            "• `/find-context authentication flow` - Find context about auth\n"
-                           "• `/find-context payment gateway --days 180` - Search last 6 months\n"
-                           "• `/find-context API refactor --days 30` - Recent discussions only"
+                           "• `/find-context payment gateway --days=180` - Search last 6 months\n"
+                           "• `/find-context fulfillment --project=BERNS` - Berns project only\n"
+                           "• `/find-context API refactor --days 30 --project ETHEL` - Recent, specific project"
                 }
             },
             {
