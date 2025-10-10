@@ -181,9 +181,10 @@ class VectorSearchService:
                 logger.info(f"📋 Filter conditions: {project_filters}")
                 conditions.append(project_filters)
             else:
-                # Fallback: if no mappings configured, only filter Jira
-                logger.warning(f"⚠️  No resource mappings found for project {project_key}, only filtering Jira")
-                conditions.append({"project_key": project_key.upper()})
+                # If project couldn't be resolved, return empty results
+                logger.warning(f"⚠️  Could not find project '{project_key}' - returning no results")
+                # Return a filter that matches nothing
+                conditions.append({"project_key": "__NONEXISTENT__"})
 
         # Source filter
         if sources:
@@ -250,11 +251,59 @@ class VectorSearchService:
         # In Phase 2, we can add sparse vector support or BM25 for hybrid
         return self.search(query, top_k, days_back, sources, user_email)
 
+    def _resolve_project_key(self, project_input: str) -> Optional[str]:
+        """Resolve project name or key to canonical project key.
+
+        Args:
+            project_input: User input (could be project key like "BRNS" or name like "Berns")
+
+        Returns:
+            Canonical project key if found, None otherwise
+        """
+        try:
+            from src.utils.database import get_engine
+            from sqlalchemy import text
+
+            engine = get_engine()
+            with engine.connect() as conn:
+                # Try exact match on key first
+                result = conn.execute(
+                    text("SELECT key FROM projects WHERE key = :key"),
+                    {"key": project_input.upper()}
+                )
+                row = result.fetchone()
+                if row:
+                    return row[0]
+
+                # Try case-insensitive match on name
+                result = conn.execute(
+                    text("SELECT key FROM projects WHERE LOWER(name) = LOWER(:name)"),
+                    {"name": project_input}
+                )
+                row = result.fetchone()
+                if row:
+                    return row[0]
+
+                # Try partial match on name (e.g., "berns" matches "Berns Garden Center")
+                result = conn.execute(
+                    text("SELECT key FROM projects WHERE LOWER(name) LIKE LOWER(:name)"),
+                    {"name": f"%{project_input}%"}
+                )
+                row = result.fetchone()
+                if row:
+                    return row[0]
+
+                return None
+
+        except Exception as e:
+            logger.error(f"Error resolving project key: {e}")
+            return None
+
     def _get_project_resource_filters(self, project_key: str) -> Optional[Dict[str, Any]]:
         """Build Pinecone filter for project using resource mappings from database.
 
         Args:
-            project_key: Project key to get mappings for
+            project_key: Project key or name to get mappings for
 
         Returns:
             Pinecone filter dict with $or conditions for all mapped resources,
@@ -265,11 +314,19 @@ class VectorSearchService:
             from sqlalchemy import text
             import json
 
+            # Resolve project name/key to canonical key
+            canonical_key = self._resolve_project_key(project_key)
+            if not canonical_key:
+                logger.warning(f"⚠️  Could not resolve project '{project_key}' to a valid project key")
+                return None
+
+            logger.info(f"📋 Resolved '{project_key}' to project key: {canonical_key}")
+
             engine = get_engine()
             with engine.connect() as conn:
                 result = conn.execute(
                     text("SELECT slack_channel_ids, notion_page_ids, github_repos, jira_project_keys FROM project_resource_mappings WHERE project_key = :key"),
-                    {"key": project_key}
+                    {"key": canonical_key}
                 )
                 row = result.fetchone()
 
@@ -287,12 +344,12 @@ class VectorSearchService:
                 # Build $or filter combining all resource types
                 or_conditions = []
 
-                # Jira: Match by project_key from mappings (if configured), otherwise use the project key itself
+                # Jira: Match by project_key from mappings (if configured), otherwise use the canonical key
                 if jira_projects:
                     or_conditions.append({"project_key": {"$in": jira_projects}})
                 else:
-                    # Fallback: use the project key itself for Jira filtering
-                    or_conditions.append({"project_key": project_key})
+                    # Fallback: use the canonical key for Jira filtering
+                    or_conditions.append({"project_key": canonical_key})
 
                 # Slack: Match by channel_id
                 if slack_channels:
