@@ -254,7 +254,7 @@ export const dataProvider: DataProvider = {
             // Handle projects response format (wrapped in success_response)
             if ((resource === 'projects' || resource === 'jira_projects') && json.data) {
                 return {
-                    data: { id: json.data.key || json.data.id || params.id, ...json.data },
+                    data: { ...json.data, id: json.data.key || json.data.id || params.id },
                 };
             }
             return {
