@@ -117,6 +117,10 @@ services:
       - key: NOTION_API_KEY
         type: SECRET
 
+      # Admin API Key (for backfill endpoints)
+      - key: ADMIN_API_KEY
+        type: SECRET
+
     health_check:
       http_path: /api/health
       initial_delay_seconds: 70
