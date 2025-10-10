@@ -2,16 +2,36 @@
 
 import logging
 import asyncio
+import os
 from flask import Blueprint, jsonify, request
 from src.services.auth import admin_required
+from functools import wraps
 
 logger = logging.getLogger(__name__)
 
 backfill_bp = Blueprint('backfill', __name__, url_prefix='/api/backfill')
 
 
+def admin_or_api_key_required(f):
+    """Decorator that allows either admin JWT auth or API key from environment."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check for API key in header
+        api_key = request.headers.get('X-Admin-Key')
+        admin_api_key = os.getenv('ADMIN_API_KEY')
+
+        if api_key and admin_api_key and api_key == admin_api_key:
+            # Valid API key - proceed without JWT auth
+            return f(*args, **kwargs)
+
+        # Fall back to JWT admin auth
+        return admin_required(f)(*args, **kwargs)
+
+    return decorated_function
+
+
 @backfill_bp.route('/jira', methods=['POST'])
-@admin_required
+@admin_or_api_key_required
 def trigger_jira_backfill():
     """
     Trigger Jira backfill to ingest historical issues into vector database.
@@ -55,7 +75,7 @@ def trigger_jira_backfill():
 
 
 @backfill_bp.route('/notion', methods=['POST'])
-@admin_required
+@admin_or_api_key_required
 def trigger_notion_backfill():
     """
     Trigger Notion backfill to ingest historical pages into vector database.
