@@ -145,6 +145,7 @@ from src.routes.tempo import tempo_bp
 from src.routes.user import user_bp
 from src.routes.dashboard import dashboard_bp
 from src.routes.feedback import feedback_bp
+from src.routes.backfill import backfill_bp
 
 app.register_blueprint(health_bp)
 app.register_blueprint(todos_bp)
@@ -158,6 +159,7 @@ app.register_blueprint(tempo_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(feedback_bp)
+app.register_blueprint(backfill_bp)
 
 # Initialize components
 fireflies = FirefliesClient(settings.fireflies.api_key)
