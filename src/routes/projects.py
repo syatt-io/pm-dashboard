@@ -584,7 +584,7 @@ def search_jira_projects():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@projects_bp.route('/api/projects/todo-counts', methods=['GET'])
+@projects_bp.route('/projects/todo-counts', methods=['GET'])
 def get_project_todo_counts():
     """Get todo counts for all projects."""
     try:
@@ -611,7 +611,7 @@ def get_project_todo_counts():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@projects_bp.route('/api/projects/monthly-hours', methods=['GET'])
+@projects_bp.route('/projects/monthly-hours', methods=['GET'])
 def get_project_monthly_hours():
     """Get current month's hours for all projects."""
     try:
