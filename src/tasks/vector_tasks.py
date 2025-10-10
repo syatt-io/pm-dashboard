@@ -914,6 +914,10 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
                 if len(issues_batch) < max_results:
                     break
 
+                # Rate limiting: Wait 1 second between API requests to avoid IP bans
+                await asyncio.sleep(1.0)
+                logger.debug("Waiting 1s before next Jira API request (rate limiting)...")
+
                 # Move to next page
                 start_at += max_results
 
