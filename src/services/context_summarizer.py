@@ -217,9 +217,9 @@ These keywords provide context for understanding project-specific acronyms, term
         # Configure detail level instructions
         detail_instructions = {
             "brief": "Keep your summary concise (150-300 words). Focus on the most critical information only.",
-            "normal": "Aim for 400-800 words for complex topics (longer is better if information-dense).",
+            "normal": "Target 250-400 words. Be concise and focus on what matters most - prioritize actionable information over background details.",
             "detailed": "Be as thorough as possible (800-1500 words). Include ALL relevant details, examples, and context.",
-            "slack": "CRITICAL: Maximum 3000 characters total (Slack enforces strict limits). Target 500-600 words. Be comprehensive but efficient - mention each piece of information only ONCE. Avoid repetition across sections. Use Slack markdown: *bold* for section headers, • for bullets, `code` for tickets/technical terms. Prioritize the most important/actionable information."
+            "slack": "CRITICAL: Maximum 2500 characters total. Target 300-400 words MAX. Be extremely concise - mention each piece of information only ONCE. No repetition. Use Slack markdown: *bold* for section headers, • for bullets, `code` for tickets. Prioritize the most important/actionable information only. Omit background details unless critical."
         }
         detail_instruction = detail_instructions.get(detail_level, detail_instructions["normal"])
 
@@ -230,16 +230,16 @@ SEARCH RESULTS:
 
 ---
 
-Synthesize all the search results into a cohesive answer to the user's query. Be comprehensive and thorough.
+Synthesize all the search results into a concise, actionable answer. Focus on what matters most.
 
 CRITICAL REQUIREMENTS:
-1. SYNTHESIZE information - don't just list facts from different sources
-2. Focus on WHAT is known, not WHO said it or WHERE it was said
-3. Avoid excessive attribution - only cite sources when crucial (decisions, disagreements, open questions)
-4. Include ALL relevant technical details from the sources
-5. {detail_instruction}
+1. BE CONCISE - prioritize actionable insights over background details
+2. SYNTHESIZE information - don't list facts from different sources
+3. Focus on WHAT is known, not WHO said it or WHERE it was said
+4. {detail_instruction}
+5. Include only the most important technical details - omit nice-to-know information
 6. Organize by logical topic flow, NOT chronologically or by source
-7. **TEMPORAL PRIORITIZATION**: Always prioritize recent information (newer dates) over older information, regardless of source type. When multiple sources discuss the same topic, weight newer sources more heavily. Recent discussions, commits, or tickets supersede older ones on the same subject. Old information is only valuable for historical context (explaining WHY decisions were made).
+7. **TEMPORAL PRIORITIZATION**: Always prioritize recent information (newer dates) over older information. Recent discussions, commits, or tickets supersede older ones on the same subject.
 
 What to synthesize from the sources (prioritizing recent data):
 
@@ -258,15 +258,13 @@ ACTIONABLE INFORMATION:
 - Dependencies and related work
 
 PRESENTATION STYLE:
-- Present information as a unified explanation, not a meeting summary
-- Write as if you're explaining the topic to someone new
-- Use clear topic-based sections (not timeline-based)
-- Only mention sources when it adds crucial context (e.g., "The team decided...", "This is still being debated...")
-- Be thorough enough that the reader doesn't need to check sources
-- Use specific examples: ticket numbers, code examples, technical details
-- Write in a straightforward, matter-of-fact tone - stick to the facts
-- Lead with the most important/actionable info
-- Use markdown formatting as appropriate (headings, lists, code blocks)
+- Lead with the most important/actionable information first
+- Write in a straightforward, matter-of-fact tone - no fluff
+- Use clear, concise sections (headings, bullet points)
+- Only mention sources when it adds crucial context
+- Include specific examples only when they clarify the point (ticket numbers, key decisions)
+- Avoid repetition - say each thing once
+- Skip obvious background information
 """
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
