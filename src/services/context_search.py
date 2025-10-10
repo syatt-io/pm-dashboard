@@ -1269,6 +1269,10 @@ class ContextSearchService:
 
             # Process PRs
             for pr in github_data.get("prs", []):
+                # Skip PRs with missing required fields
+                if not pr.get('title') or not pr.get('number'):
+                    continue
+
                 # Combine title and body for scoring
                 combined_text = f"{pr['title']} {pr.get('body', '')}"
 
@@ -1288,11 +1292,13 @@ class ContextSearchService:
                     pr_date = datetime.now()
 
                 # Create snippet from PR body
-                snippet = f"PR #{pr['number']}: {pr['title']}\n{pr.get('body', '')[:300]}..."
+                pr_title = pr.get('title', 'Untitled PR')
+                pr_repo = pr.get('repo', 'unknown')
+                snippet = f"PR #{pr['number']}: {pr_title}\n{pr.get('body', '')[:300]}..."
 
                 results.append(SearchResult(
                     source='github',
-                    title=f"PR #{pr['number']}: {pr['title']} [{pr['repo']}]",
+                    title=f"PR #{pr['number']}: {pr_title} [{pr_repo}]",
                     content=snippet,
                     date=pr_date,
                     url=pr.get('url'),
@@ -1302,8 +1308,10 @@ class ContextSearchService:
 
             # Process commits
             for commit in github_data.get("commits", []):
-                # Score commit message
+                # Skip commits with missing message
                 commit_message = commit.get("message", "")
+                if not commit_message:
+                    continue
 
                 proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
                     commit_message, query, project_keywords, topic_keywords, debug
@@ -1320,12 +1328,13 @@ class ContextSearchService:
                     commit_date = datetime.now()
 
                 # Create snippet from commit message
-                first_line = commit_message.split('\n')[0][:100]
+                first_line = commit_message.split('\n')[0][:100] if commit_message else "No message"
+                commit_repo = commit.get('repo', 'unknown')
                 snippet = f"Commit: {first_line}\n{commit_message[:300]}..."
 
                 results.append(SearchResult(
                     source='github',
-                    title=f"Commit: {first_line} [{commit['repo']}]",
+                    title=f"Commit: {first_line} [{commit_repo}]",
                     content=snippet,
                     date=commit_date,
                     url=commit.get('url'),
