@@ -114,12 +114,19 @@ auth_service = AuthService(db_session_factory)
 app.auth_service = auth_service
 
 # Start the scheduler for nightly jobs (Tempo sync, reminders, etc.)
-logger.info("Starting TODO scheduler...")
-start_scheduler()
+# NOTE: When running under Gunicorn, the scheduler is started by gunicorn_config.py
+# to ensure it only runs in ONE worker (prevents duplicate notifications)
+if __name__ == '__main__':
+    # Only start scheduler when running in development mode
+    logger.info("Starting TODO scheduler (dev mode)...")
+    start_scheduler()
 
-# Register cleanup on application shutdown
-import atexit
-atexit.register(stop_scheduler)
+    # Register cleanup on application shutdown
+    import atexit
+    atexit.register(stop_scheduler)
+else:
+    # In production (Gunicorn), scheduler is managed by gunicorn_config.py
+    logger.info("Scheduler will be started by Gunicorn config (production mode)")
 
 # Register auth blueprint
 auth_blueprint = create_auth_blueprint(db_session_factory)
