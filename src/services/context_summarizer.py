@@ -150,7 +150,7 @@ REQUIREMENTS:
 - Use clear headings and bullet points to organize information
 - Include specific requirements, decisions, blockers, and examples
 - End with clear next steps or remaining questions
-- Make your response thorough enough that the engineer doesn't need to read the original sources"should we use webhooks?\", but a recent commit shows webhooks were implemented, the fact they're now in use is what matters - not the old uncertainty.\n\nOTHER REQUIREMENTS:\n- Be complete - include all relevant information from the sources\n- Use clear headings (##) and bullet points (•) to organize information\n- Don't truncate or summarize away important technical details\n- Include specific requirements, decisions, blockers, and examples\n- End with clear next steps or remaining questions\n\nYour response should be thorough enough that the engineer doesn't need to read the original sources."
+- Make your response thorough enough that the engineer doesn't need to read the original sources"
                     },
                     {
                         "role": "user",
