@@ -7,6 +7,9 @@ import {
   useDataProvider,
   Button,
   useRedirect,
+  Show,
+  SimpleShowLayout,
+  useRecordContext,
 } from 'react-admin';
 import {
   Card,
@@ -1925,14 +1928,19 @@ export const ProjectList = () => {
 };
 
 export const ProjectShow = () => (
-  <Card>
-    <CardContent>
-      <Typography variant="h5" gutterBottom>
-        Project Details
-      </Typography>
-      <TextField source="name" label="Name" />
-      <TextField source="key" label="Key" />
+  <Show>
+    <SimpleShowLayout>
+      <TextField source="key" label="Project Key" />
+      <TextField source="name" label="Project Name" />
       <TextField source="projectTypeKey" label="Type" />
-    </CardContent>
-  </Card>
+      <TextField source="description" label="Description" />
+      <TextField source="slack_channel" label="Slack Channel" />
+      <TextField source="weekly_meeting_day" label="Weekly Meeting Day" />
+      <TextField source="project_work_type" label="Work Type" />
+      <TextField source="forecasted_hours_month" label="Forecasted Hours/Month" />
+      <TextField source="total_hours" label="Total Hours" />
+      <TextField source="current_month_hours" label="Current Month Hours" />
+      <TextField source="cumulative_hours" label="Cumulative Hours" />
+    </SimpleShowLayout>
+  </Show>
 );
