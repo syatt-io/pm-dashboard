@@ -862,114 +862,23 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
     NOT scheduled - trigger manually via console or Celery CLI:
     celery -A src.tasks.celery_app call src.tasks.vector_tasks.backfill_jira
 
+    This task calls the shared backfill_jira_issues() function in backfill_jira.py
+    to avoid code duplication.
+
     Args:
         days_back: Number of days to backfill (default 365 = 12 months)
 
     Returns:
         Dict with backfill stats
     """
-    from src.services.vector_ingest import VectorIngestService
-    from src.integrations.jira_mcp import JiraMCPClient
-    from config.settings import settings
+    from src.tasks.backfill_jira import backfill_jira_issues
     import asyncio
 
-    logger.info(f"🔄 Starting Jira backfill ({days_back} days)...")
+    logger.info(f"🔄 Starting Jira backfill via Celery ({days_back} days)...")
 
-    async def run_jira_backfill():
-        try:
-            # Check if Jira is configured
-            if not hasattr(settings, 'jira'):
-                logger.warning("Jira not configured - skipping backfill")
-                return {"success": False, "error": "No config"}
-
-            # Initialize services
-            ingest_service = VectorIngestService()
-            jira_client = JiraMCPClient(
-                jira_url=settings.jira.url,
-                username=settings.jira.username,
-                api_token=settings.jira.api_token
-            )
-
-            # Build JQL query for date range
-            jql = f"updated >= -{days_back}d ORDER BY updated DESC"
-
-            logger.info(f"📥 Fetching Jira issues with JQL: {jql}")
-
-            # Fetch all issues with pagination
-            issues_all = []
-            start_at = 0
-            max_results = 100
-
-            while True:
-                # search_issues returns {"issues": [...]}
-                result = await jira_client.search_issues(jql=jql, max_results=max_results, start_at=start_at)
-                issues_batch = result.get('issues', [])
-
-                if not issues_batch:
-                    break
-
-                issues_all.extend(issues_batch)
-                logger.info(f"   Fetched {len(issues_all)} issues so far...")
-
-                if len(issues_batch) < max_results:
-                    break
-
-                # Rate limiting: Wait 1 second between API requests to avoid IP bans
-                await asyncio.sleep(1.0)
-                logger.debug("Waiting 1s before next Jira API request (rate limiting)...")
-
-                # Move to next page
-                start_at += max_results
-
-            logger.info(f"✅ Found {len(issues_all)} issues")
-
-            if not issues_all:
-                logger.warning("⚠️  No issues found")
-                return {"success": True, "issues_found": 0, "issues_ingested": 0}
-
-            # Group issues by project and ingest in batches
-            logger.info("📊 Grouping issues by project...")
-            projects = {}
-            for issue in issues_all:
-                project_key = issue.get('key', '').split('-')[0] if issue.get('key') else 'UNKNOWN'
-                if project_key not in projects:
-                    projects[project_key] = []
-                projects[project_key].append(issue)
-
-            logger.info(f"✅ Grouped {len(issues_all)} issues into {len(projects)} projects")
-            logger.info(f"📊 Projects: {', '.join(f'{k} ({len(v)})' for k, v in projects.items())}")
-
-            total_ingested = 0
-            for i, (project_key, project_issues) in enumerate(projects.items(), 1):
-                try:
-                    logger.info(f"[{i}/{len(projects)}] Ingesting {len(project_issues)} issues from {project_key}...")
-                    count = ingest_service.ingest_jira_issues(
-                        issues=project_issues,
-                        project_key=project_key
-                    )
-                    total_ingested += count
-                    logger.info(f"✅ [{i}/{len(projects)}] Ingested {count} issues from {project_key} (Total: {total_ingested}/{len(issues_all)})")
-                except Exception as e:
-                    logger.error(f"Error ingesting {project_key}: {e}")
-                    continue
-
-            logger.info(f"✅ Jira backfill complete! Total ingested: {total_ingested} issues")
-
-            return {
-                "success": True,
-                "issues_found": len(issues_all),
-                "issues_ingested": total_ingested,
-                "days_back": days_back,
-                "timestamp": datetime.now().isoformat()
-            }
-
-        except Exception as e:
-            logger.error(f"Jira backfill failed: {e}")
-            return {"success": False, "error": str(e)}
-
-    # Run async function
     try:
-        return asyncio.run(run_jira_backfill())
+        # Call the shared backfill function
+        return asyncio.run(backfill_jira_issues(days_back=days_back))
     except Exception as e:
         logger.error(f"Jira backfill failed: {e}")
         return {"success": False, "error": str(e)}

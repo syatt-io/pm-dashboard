@@ -6,12 +6,17 @@ them into the Pinecone vector database. Run once to populate historical data.
 
 Usage:
     python src/tasks/backfill_jira.py
+
+This is the MAIN backfill implementation. The Celery task in vector_tasks.py
+calls this same function to avoid code duplication.
 """
 
 import logging
 import sys
 import asyncio
 import time
+from typing import Dict, Any
+from datetime import datetime
 from src.services.vector_ingest import VectorIngestService
 from src.integrations.jira_mcp import JiraMCPClient
 from config.settings import settings
@@ -29,7 +34,7 @@ DELAY_BETWEEN_BATCHES = 2.0  # 2 seconds between batches
 DELAY_BETWEEN_PROJECTS = 5.0  # 5 seconds between projects
 
 
-async def backfill_jira_issues(days_back: int = 2555):
+async def backfill_jira_issues(days_back: int = 2555) -> Dict[str, Any]:
     """Backfill all Jira issues from the last N days."""
     logger.info(f"🔄 Starting Jira backfill ({days_back} days)...")
 
@@ -43,7 +48,7 @@ async def backfill_jira_issues(days_back: int = 2555):
         )
     except Exception as e:
         logger.error(f"❌ Failed to initialize services: {e}")
-        return 1
+        return {"success": False, "error": f"Failed to initialize: {e}"}
 
     # Build JQL query for date range
     jql = f"updated >= -{days_back}d ORDER BY updated DESC"
@@ -86,11 +91,11 @@ async def backfill_jira_issues(days_back: int = 2555):
         logger.info(f"✅ Found {len(issues_all)} issues in {batch_count} batches")
     except Exception as e:
         logger.error(f"❌ Failed to fetch issues: {e}")
-        return 1
+        return {"success": False, "error": f"Failed to fetch: {e}"}
 
     if not issues_all:
         logger.warning("⚠️  No issues found - check Jira API credentials and permissions")
-        return 0
+        return {"success": True, "issues_found": 0, "issues_ingested": 0}
 
     # Group issues by project and ingest in batches
     logger.info("📊 Grouping issues by project...")
@@ -125,8 +130,18 @@ async def backfill_jira_issues(days_back: int = 2555):
             continue
 
     logger.info(f"✅ Jira backfill complete! Total ingested: {total_ingested} issues")
-    return 0
+    return {
+        "success": True,
+        "issues_found": len(issues_all),
+        "issues_ingested": total_ingested,
+        "days_back": days_back,
+        "timestamp": datetime.now().isoformat()
+    }
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(backfill_jira_issues()))
+    result = asyncio.run(backfill_jira_issues())
+    if result.get("success"):
+        sys.exit(0)
+    else:
+        sys.exit(1)
