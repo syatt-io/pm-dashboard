@@ -2100,12 +2100,19 @@ class SlackTodoBot:
                 }
 
             # Build response blocks
+            # Format header with query, project (if specified), and date range
+            header_parts = [f"🔍 Context Search: {query}"]
+            if project:
+                header_parts.append(f"(Project: {project})")
+            header_parts.append(f"[Last {days} days]")
+            header_text = " ".join(header_parts)
+
             blocks = [
                 {
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f"🔍 Context Search: {query}"
+                        "text": header_text
                     }
                 }
             ]
