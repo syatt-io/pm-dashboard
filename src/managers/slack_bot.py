@@ -550,18 +550,33 @@ class SlackTodoBot:
             try:
                 session_id = body['actions'][0]['value'].split(':')[1]
 
+                # Get channel and thread info from the action's message
+                channel_id = body['container']['channel_id']
+                message_ts = body['container']['message_ts']
+                # The message_ts from the button is the header message in the channel
+                # We need to post in the thread, so use message_ts as thread_ts
+                thread_ts = message_ts
+
                 # Retrieve session from Redis
                 session = self.session_manager.get(session_id)
                 if session is None:
                     logger.warning(f"Session {session_id} not found in Redis")
-                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
+                    self.app.client.chat_postMessage(
+                        channel=channel_id,
+                        thread_ts=thread_ts,
+                        text="❌ Search session expired (1 hour timeout). Please run `/find-context` again."
+                    )
                     return
 
                 results = session['results']
                 citations = getattr(results, 'citations', []) or []
 
                 if not citations:
-                    say("No sources/citations available for this search.")
+                    self.app.client.chat_postMessage(
+                        channel=channel_id,
+                        thread_ts=thread_ts,
+                        text="No sources/citations available for this search."
+                    )
                     return
 
                 # Build sources display
@@ -619,11 +634,27 @@ class SlackTodoBot:
                         }
                     })
 
-                say(blocks=blocks)
+                # Post in thread
+                self.app.client.chat_postMessage(
+                    channel=channel_id,
+                    thread_ts=thread_ts,
+                    blocks=blocks,
+                    text=f"Sources & Citations: {session['query']}"
+                )
 
             except Exception as e:
                 logger.error(f"Error showing sources: {e}")
-                say(f"❌ Error: {str(e)}")
+                # Try to get channel/thread info for error message
+                try:
+                    channel_id = body['container']['channel_id']
+                    thread_ts = body['container']['message_ts']
+                    self.app.client.chat_postMessage(
+                        channel=channel_id,
+                        thread_ts=thread_ts,
+                        text=f"❌ Error: {str(e)}"
+                    )
+                except:
+                    say(f"❌ Error: {str(e)}")
 
         @self.app.action("context_expand_search")
         def handle_expand_search(ack, body, say):

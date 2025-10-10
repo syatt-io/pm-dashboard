@@ -265,8 +265,44 @@ class VectorIngestService:
                 if isinstance(description, dict):
                     description = self._extract_text_from_adf(description)
 
-                # Combine summary + description
-                content = f"{summary}\n\n{description or ''}"
+                # Check for parent/epic information to enrich child tickets
+                parent_info = ""
+                parent = fields.get('parent')
+                if parent:
+                    # This is a sub-task with a parent issue
+                    parent_key = parent.get('key', '')
+                    parent_fields = parent.get('fields', {})
+                    parent_summary = parent_fields.get('summary', '')
+                    if parent_key and parent_summary:
+                        parent_info = f"\n\nParent Issue: {parent_key} - {parent_summary}"
+                        logger.debug(f"Adding parent info to {issue_key}: {parent_key}")
+
+                # Also check for epic link (can be in various fields depending on Jira config)
+                epic_info = ""
+                # Try the newer 'epic' field first
+                epic = fields.get('epic')
+                if epic and isinstance(epic, dict):
+                    epic_key = epic.get('key', '')
+                    epic_summary = epic.get('summary', '') or epic.get('name', '')
+                    if epic_key and epic_summary:
+                        epic_info = f"\n\nEpic: {epic_key} - {epic_summary}"
+                        logger.debug(f"Adding epic info to {issue_key}: {epic_key}")
+                else:
+                    # Fall back to checking common epic link custom field
+                    # Epic links are often in customfield_10008, but can vary
+                    for field_name, field_value in fields.items():
+                        if field_name.startswith('customfield_') and isinstance(field_value, dict):
+                            # Check if this looks like an epic reference
+                            if field_value.get('key') and ('epic' in field_name.lower() or field_value.get('type') == 'Epic'):
+                                epic_key = field_value.get('key', '')
+                                epic_summary = field_value.get('summary', '') or field_value.get('name', '')
+                                if epic_key and epic_summary:
+                                    epic_info = f"\n\nEpic: {epic_key} - {epic_summary}"
+                                    logger.debug(f"Adding epic info to {issue_key}: {epic_key} (from {field_name})")
+                                    break
+
+                # Combine summary + description + parent info + epic info
+                content = f"{summary}\n\n{description or ''}{parent_info}{epic_info}"
 
                 # Parse date
                 updated = fields.get('updated', '')

@@ -690,6 +690,40 @@ class ContextSearchService:
 
         self.logger.info(f"✅ Vector search returned {len(all_results)} results")
 
+        # Add direct GitHub API search (GitHub data is not indexed in Pinecone)
+        # This ensures we always get fresh GitHub results via API
+        if 'github' in sources:
+            self.logger.info("🔍 Adding direct GitHub API search...")
+            try:
+                # Detect project keywords for GitHub filtering
+                detected_project, project_keywords, topic_keywords = self._detect_project_and_expand_query(query)
+
+                # Use explicit project parameter if provided, otherwise use detected project
+                github_project = project or detected_project
+
+                # Call GitHub API directly
+                github_results = await self._search_github(
+                    query=query,
+                    days_back=days_back,
+                    project_key=github_project,
+                    project_keywords=project_keywords,
+                    topic_keywords=topic_keywords,
+                    debug=debug
+                )
+
+                if github_results:
+                    self.logger.info(f"✅ Direct GitHub API returned {len(github_results)} results")
+                    # Remove any GitHub results from vector search (avoid duplicates)
+                    all_results = [r for r in all_results if r.source != 'github']
+                    # Add fresh GitHub results from API
+                    all_results.extend(github_results)
+                    # Re-sort by relevance score
+                    all_results.sort(key=lambda r: r.relevance_score, reverse=True)
+                    self.logger.info(f"✅ Combined results: {len(all_results)} total (with GitHub API)")
+            except Exception as e:
+                self.logger.error(f"Error in direct GitHub search: {e}")
+                # Continue with vector search results only
+
         # Pre-process results: replace Slack user IDs with display names
         for result in all_results:
             if result.source == 'slack':
