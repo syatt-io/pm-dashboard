@@ -1950,10 +1950,25 @@ const ProjectShowContent = () => {
   const [editingKeywords, setEditingKeywords] = useState(false);
   const [keywordInput, setKeywordInput] = useState('');
 
-  // Load keywords when component mounts
+  // Resource mappings state
+  const [resourceMappings, setResourceMappings] = useState<{
+    slack_channel_ids: string[];
+    notion_page_ids: string[];
+    github_repos: string[];
+    jira_project_keys: string[];
+  }>({
+    slack_channel_ids: [],
+    notion_page_ids: [],
+    github_repos: [],
+    jira_project_keys: []
+  });
+  const [loadingMappings, setLoadingMappings] = useState(false);
+
+  // Load keywords and resource mappings when component mounts
   useEffect(() => {
     if (record?.key) {
       loadKeywords();
+      loadResourceMappings();
     }
   }, [record?.key]);
 
@@ -1971,6 +1986,72 @@ const ProjectShowContent = () => {
       // Silently fail
     } finally {
       setLoadingKeywords(false);
+    }
+  };
+
+  const loadResourceMappings = async () => {
+    if (!record?.key) return;
+
+    setLoadingMappings(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project-resource-mappings`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const mapping = data.mappings.find((m: any) => m.project_key === record.key);
+          if (mapping) {
+            setResourceMappings({
+              slack_channel_ids: mapping.slack_channel_ids || [],
+              notion_page_ids: mapping.notion_page_ids || [],
+              github_repos: mapping.github_repos || [],
+              jira_project_keys: mapping.jira_project_keys || []
+            });
+          }
+        }
+      }
+    } catch (error) {
+      // Silently fail
+    } finally {
+      setLoadingMappings(false);
+    }
+  };
+
+  const handleResourceMappingChange = async (
+    resourceType: 'slack' | 'notion' | 'github' | 'jira',
+    newValues: string[]
+  ) => {
+    // Update local state immediately
+    const updated = {
+      ...resourceMappings,
+      slack_channel_ids: resourceType === 'slack' ? newValues : resourceMappings.slack_channel_ids,
+      notion_page_ids: resourceType === 'notion' ? newValues : resourceMappings.notion_page_ids,
+      github_repos: resourceType === 'github' ? newValues : resourceMappings.github_repos,
+      jira_project_keys: resourceType === 'jira' ? newValues : resourceMappings.jira_project_keys
+    };
+    setResourceMappings(updated);
+
+    // Save to backend
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/project-resource-mappings/${record.key}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_name: record.name,
+          ...updated
+        })
+      });
+
+      if (response.ok) {
+        notify('Resource mapping updated', { type: 'success' });
+      } else {
+        throw new Error('Failed to update resource mapping');
+      }
+    } catch (error) {
+      notify('Error updating resource mapping', { type: 'error' });
+      // Reload mappings to restore previous state
+      loadResourceMappings();
     }
   };
 
@@ -2125,51 +2206,72 @@ const ProjectShowContent = () => {
             <Card>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Resource Mappings
+                  🔗 Resource Mappings
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                  Click + to add resources, click × on chips to remove them
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
 
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Jira Projects
-                      </Typography>
-                      <Typography variant="body1">
-                        {record.jira_project_keys ? (typeof record.jira_project_keys === 'string' ? JSON.parse(record.jira_project_keys).join(', ') : record.jira_project_keys.join(', ')) : 'None'}
-                      </Typography>
-                    </Box>
+                {loadingMappings ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                    <CircularProgress />
+                  </Box>
+                ) : (
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          Jira Projects
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="jira"
+                          values={resourceMappings.jira_project_keys}
+                          onChange={(newValues) => handleResourceMappingChange('jira', newValues)}
+                        />
+                      </Box>
 
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Slack Channels
-                      </Typography>
-                      <Typography variant="body1">
-                        {record.slack_channel_ids ? (typeof record.slack_channel_ids === 'string' ? JSON.parse(record.slack_channel_ids).join(', ') : record.slack_channel_ids.join(', ')) : 'None'}
-                      </Typography>
-                    </Box>
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          Slack Channels
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="slack"
+                          values={resourceMappings.slack_channel_ids}
+                          onChange={(newValues) => handleResourceMappingChange('slack', newValues)}
+                        />
+                      </Box>
+                    </Grid>
+
+                    <Grid item xs={12} md={6}>
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          Notion Pages
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="notion"
+                          values={resourceMappings.notion_page_ids}
+                          onChange={(newValues) => handleResourceMappingChange('notion', newValues)}
+                        />
+                      </Box>
+
+                      <Box sx={{ mb: 3 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                          GitHub Repos
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="github"
+                          values={resourceMappings.github_repos}
+                          onChange={(newValues) => handleResourceMappingChange('github', newValues)}
+                        />
+                      </Box>
+                    </Grid>
                   </Grid>
-
-                  <Grid item xs={12} md={6}>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Notion Pages
-                      </Typography>
-                      <Typography variant="body1">
-                        {record.notion_page_ids ? (typeof record.notion_page_ids === 'string' ? JSON.parse(record.notion_page_ids).join(', ') : record.notion_page_ids.join(', ')) : 'None'}
-                      </Typography>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        GitHub Repos
-                      </Typography>
-                      <Typography variant="body1">
-                        {record.github_repos ? (typeof record.github_repos === 'string' ? JSON.parse(record.github_repos).join(', ') : record.github_repos.join(', ')) : 'None'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
+                )}
               </CardContent>
             </Card>
           </Grid>
