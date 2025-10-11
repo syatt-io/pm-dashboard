@@ -244,6 +244,103 @@ def trigger_tempo_backfill():
         }), 500
 
 
+@backfill_bp.route('/fireflies', methods=['POST'])
+@admin_or_api_key_required
+def trigger_fireflies_backfill():
+    """
+    Trigger Fireflies backfill to re-ingest all meetings with updated permissions and project tags.
+
+    Query params:
+        days: Number of days back to fetch (default: 365 / ~1 year)
+        limit: Max meetings to process (default: 1000)
+
+    Returns:
+        JSON response with task started status
+    """
+    try:
+        days_back = int(request.args.get('days', 365))
+        limit = int(request.args.get('limit', 1000))
+
+        logger.info(f"Starting Fireflies backfill in background thread for {days_back} days (limit: {limit})")
+
+        def run_fireflies_backfill():
+            """Background thread function to run Fireflies re-ingestion."""
+            try:
+                from src.integrations.fireflies import FirefliesClient
+                from src.services.vector_ingest import VectorIngestService
+                from config.settings import settings
+
+                logger.info("🔄 Starting Fireflies re-ingestion...")
+
+                # Initialize services
+                ingest_service = VectorIngestService()
+                fireflies_client = FirefliesClient(api_key=settings.fireflies.api_key)
+
+                # Fetch all meetings
+                logger.info(f"📥 Fetching meetings from last {days_back} days...")
+                meetings = fireflies_client.get_recent_meetings(days_back=days_back, limit=limit)
+
+                if not meetings:
+                    logger.warning("⚠️  No meetings found")
+                    return
+
+                logger.info(f"✅ Found {len(meetings)} meetings")
+
+                # Fetch full transcripts with permissions
+                logger.info("📝 Fetching full transcripts with permissions...")
+                transcripts = []
+                for i, meeting in enumerate(meetings, 1):
+                    try:
+                        if i % 10 == 0:
+                            logger.info(f"   Progress: {i}/{len(meetings)} transcripts fetched...")
+
+                        transcript = fireflies_client.get_meeting_transcript(meeting['id'])
+                        if transcript:
+                            transcripts.append(transcript)
+
+                    except Exception as e:
+                        logger.error(f"Error fetching transcript {meeting['id']}: {e}")
+                        continue
+
+                if not transcripts:
+                    logger.warning("⚠️  No transcripts to ingest")
+                    return
+
+                logger.info(f"✅ Fetched {len(transcripts)} transcripts")
+
+                # Re-ingest with permissions and project tags
+                logger.info("📊 Re-ingesting into Pinecone with permissions and project tags...")
+                total_ingested = ingest_service.ingest_fireflies_transcripts(transcripts=transcripts)
+
+                logger.info(f"✅ Successfully re-ingested {total_ingested} transcripts!")
+
+            except Exception as e:
+                logger.error(f"Fireflies backfill failed: {e}", exc_info=True)
+                raise
+
+        # Run in background thread (fire-and-forget)
+        thread = threading.Thread(target=run_fireflies_backfill, daemon=True)
+        thread.start()
+
+        logger.info(f"✅ Fireflies backfill started in background")
+
+        return jsonify({
+            "success": True,
+            "message": f"Fireflies backfill started successfully in background",
+            "days_back": days_back,
+            "limit": limit,
+            "status": "RUNNING",
+            "note": "Task is running in background thread - check app logs for progress"
+        }), 202  # 202 Accepted - processing started
+
+    except Exception as e:
+        logger.error(f"Error starting Fireflies backfill: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @backfill_bp.route('/jira/check-projects', methods=['GET'])
 @admin_or_api_key_required
 def check_jira_projects():
