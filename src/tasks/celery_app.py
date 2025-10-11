@@ -65,10 +65,12 @@ celery_app.conf.update(
     broker_connection_max_retries=10,
     # SSL/TLS settings for Upstash Redis (required for secure connections)
     broker_use_ssl={
-        'ssl_cert_reqs': ssl.CERT_NONE  # Don't verify SSL certificates for managed Redis
+        'ssl_cert_reqs': ssl.CERT_NONE,  # Don't verify SSL certificates
+        'ssl_check_hostname': False,  # Don't check hostname
     },
     redis_backend_use_ssl={
-        'ssl_cert_reqs': ssl.CERT_NONE  # Don't verify SSL certificates for managed Redis
+        'ssl_cert_reqs': ssl.CERT_NONE,  # Don't verify SSL certificates
+        'ssl_check_hostname': False,  # Don't check hostname
     }
 )
 
