@@ -48,19 +48,8 @@ def reingest_fireflies():
 
                 transcript = fireflies_client.get_meeting_transcript(meeting['id'])
                 if transcript:
-                    transcript_dict = {
-                        'id': transcript.id,
-                        'title': transcript.title,
-                        'date': transcript.date.timestamp() * 1000,
-                        'duration': transcript.duration,
-                        'attendees': [{'name': name} for name in transcript.attendees],
-                        'transcript': transcript.transcript,
-                        'sharing_settings': {
-                            'shared_with': [],
-                            'is_public': False
-                        }
-                    }
-                    transcripts.append(transcript_dict)
+                    # get_meeting_transcript now returns dict with proper sharing settings
+                    transcripts.append(transcript)
 
             except Exception as e:
                 logger.error(f"Error fetching transcript {meeting['id']}: {e}")

@@ -274,22 +274,8 @@ def ingest_fireflies_transcripts() -> Dict[str, Any]:
             try:
                 transcript = fireflies_client.get_meeting_transcript(meeting['id'])
                 if transcript:
-                    # Convert to dict format for ingestion
-                    transcript_dict = {
-                        'id': transcript.id,
-                        'title': transcript.title,
-                        'date': transcript.date.timestamp() * 1000,  # Convert to milliseconds
-                        'duration': transcript.duration,
-                        'attendees': [{'name': name} for name in transcript.attendees],
-                        'transcript': transcript.transcript,
-                        # Note: sharing_settings would need to be fetched separately
-                        # For now, we'll use attendees as the access list
-                        'sharing_settings': {
-                            'shared_with': [],  # TODO: Fetch from Fireflies API if available
-                            'is_public': False
-                        }
-                    }
-                    transcripts.append(transcript_dict)
+                    # get_meeting_transcript now returns dict with proper sharing settings
+                    transcripts.append(transcript)
 
             except Exception as e:
                 logger.error(f"Error fetching transcript for meeting {meeting['id']}: {e}")
@@ -493,19 +479,8 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
                 try:
                     transcript = fireflies_client.get_meeting_transcript(meeting['id'])
                     if transcript:
-                        transcript_dict = {
-                            'id': transcript.id,
-                            'title': transcript.title,
-                            'date': transcript.date.timestamp() * 1000,
-                            'duration': transcript.duration,
-                            'attendees': [{'name': name} for name in transcript.attendees],
-                            'transcript': transcript.transcript,
-                            'sharing_settings': {
-                                'shared_with': [],
-                                'is_public': False
-                            }
-                        }
-                        transcripts.append(transcript_dict)
+                        # get_meeting_transcript now returns dict with proper sharing settings
+                        transcripts.append(transcript)
                 except Exception as e:
                     logger.error(f"Error fetching transcript {meeting['id']}: {e}")
 

@@ -93,8 +93,11 @@ class FirefliesClient:
 
         return transcripts
 
-    def get_meeting_transcript(self, meeting_id: str) -> Optional[MeetingTranscript]:
-        """Fetch detailed transcript for a specific meeting."""
+    def get_meeting_transcript(self, meeting_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch detailed transcript for a specific meeting with sharing settings.
+
+        Returns raw dict with all fields including sharing/permission data.
+        """
         query = """
         query GetTranscript($id: String!) {
             transcript(id: $id) {
@@ -102,6 +105,12 @@ class FirefliesClient:
                 title
                 date
                 duration
+                user {
+                    email
+                    name
+                }
+                participants
+                organizer_email
                 sentences {
                     text
                     speaker_name
@@ -135,17 +144,35 @@ class FirefliesClient:
             except:
                 meeting_date = datetime.now()
 
-        return MeetingTranscript(
-            id=data["id"],
-            title=data.get("title", "Untitled Meeting"),
-            date=meeting_date,
-            duration=data.get("duration", 0),
-            attendees=[],  # Not in simplified query
-            transcript=full_transcript,
-            summary=None,  # Not in simplified query
-            action_items=None,  # Not in simplified query
-            topics=None  # Not in simplified query
-        )
+        # Get participants (attendees) as list of emails
+        participants = data.get("participants", [])
+        organizer_email = data.get("organizer_email", "")
+        user_email = data.get("user", {}).get("email", "") if data.get("user") else ""
+
+        # Build attendee list with emails
+        attendees = []
+        if participants:
+            attendees = [{"email": p, "name": p} for p in participants]
+
+        # Ensure organizer is in attendees
+        if organizer_email and organizer_email not in participants:
+            attendees.append({"email": organizer_email, "name": organizer_email})
+
+        # Return raw dict with all data for ingestion
+        return {
+            "id": data["id"],
+            "title": data.get("title", "Untitled Meeting"),
+            "date": meeting_date.timestamp() * 1000,  # Convert to milliseconds
+            "duration": data.get("duration", 0),
+            "attendees": attendees,
+            "transcript": full_transcript,
+            "sharing_settings": {
+                # By default, all attendees have access
+                # Fireflies doesn't have explicit sharing API, so we use attendees as access list
+                "shared_with": participants if participants else [],
+                "is_public": False  # Meetings are private by default
+            }
+        }
 
     def get_unprocessed_meetings(self, last_processed_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get meetings that haven't been processed yet."""
