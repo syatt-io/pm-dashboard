@@ -11,6 +11,7 @@ import {
   ListItemText,
   CircularProgress,
   Typography,
+  Alert,
 } from '@mui/material';
 import { Add as AddIcon, Close as CloseIcon } from '@mui/icons-material';
 
@@ -161,6 +162,14 @@ export const ResourceMappingCell: React.FC<ResourceMappingCellProps> = ({
             Add {getLabel()}
           </Typography>
 
+          {resourceType === 'notion' && (
+            <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
+              <Typography variant="caption">
+                💡 Parent pages (📁) automatically include all child pages
+              </Typography>
+            </Alert>
+          )}
+
           <TextField
             fullWidth
             size="small"
@@ -195,13 +204,19 @@ export const ResourceMappingCell: React.FC<ResourceMappingCellProps> = ({
                 const displayText = resourceType === 'slack'
                   ? `#${item.name} ${item.is_private ? '🔒' : ''}`
                   : resourceType === 'notion'
-                  ? item.title
+                  ? `${item.is_parent ? '📁 ' : '📄 '}${item.title}${item.is_parent ? ' (Parent Page)' : ''}`
                   : resourceType === 'jira'
                   ? `${item.key} - ${item.name}`
                   : item.name;
 
                 const secondaryText = resourceType === 'slack'
                   ? `${item.num_members} members`
+                  : resourceType === 'notion' && item.parent_type
+                  ? item.parent_type === 'workspace'
+                    ? 'Root page (no parent)'
+                    : item.parent_type === 'database_id'
+                    ? 'Child of database'
+                    : 'Child of page'
                   : undefined;
 
                 return (

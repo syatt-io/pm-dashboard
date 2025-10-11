@@ -1730,7 +1730,7 @@ export const ProjectList = () => {
                           <TableCell>Type</TableCell>
                           <TableCell>Project Type</TableCell>
                           <TableCell>Slack Channels</TableCell>
-                          <TableCell>Notion Pages</TableCell>
+                          <TableCell>Notion Parent Pages/Databases</TableCell>
                           <TableCell>GitHub Repos</TableCell>
                           <TableCell>Jira Projects</TableCell>
                           {workType === 'project-based' && <TableCell>{currentMonth} Forecast</TableCell>}
@@ -2248,7 +2248,10 @@ const ProjectShowContent = () => {
                     <Grid item xs={12} md={6}>
                       <Box sx={{ mb: 3 }}>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                          Notion Pages
+                          Notion Parent Pages/Databases
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}>
+                          💡 Map parent pages or databases to automatically include all child pages
                         </Typography>
                         <ResourceMappingCell
                           projectKey={record.key}

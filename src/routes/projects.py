@@ -452,7 +452,7 @@ def search_slack_channels():
 
 @projects_bp.route('/search/notion-pages', methods=['GET'])
 def search_notion_pages():
-    """Search for Notion pages by title."""
+    """Search for Notion pages by title with parent/child hierarchy info."""
     try:
         query = request.args.get('q', '').lower()
 
@@ -468,21 +468,47 @@ def search_notion_pages():
         # Use Notion search API with query parameter for faster results
         search_result = notion_client.search(query=query, filter_type='page', page_size=50)
 
-        # Extract pages with proper title extraction
+        # Extract pages with proper title extraction and parent info
         pages = []
+        page_ids_in_results = set()
+
         for page in search_result.get('results', []):
             # Use the get_page_title method to properly extract title
             title = notion_client.get_page_title(page)
 
             if query in title.lower():
+                page_id = page.get('id')
+                parent = page.get('parent', {})
+                parent_type = parent.get('type', 'workspace')
+
+                # Extract parent ID based on type
+                parent_id = None
+                if parent_type == 'page_id':
+                    parent_id = parent.get('page_id')
+                elif parent_type == 'database_id':
+                    parent_id = parent.get('database_id')
+
+                page_ids_in_results.add(page_id)
+
                 pages.append({
-                    'id': page.get('id'),
+                    'id': page_id,
                     'title': title,
-                    'url': page.get('url', '')
+                    'url': page.get('url', ''),
+                    'parent': parent,
+                    'parent_type': parent_type,
+                    'parent_id': parent_id,
+                    'is_parent': False  # Will be updated below
                 })
 
-        # Sort by title
-        pages.sort(key=lambda x: x['title'])
+        # Determine which pages are parents (have children in the result set)
+        for page in pages:
+            page_id = page['id']
+            # Check if any other page has this page as parent
+            has_children = any(p.get('parent_id') == page_id for p in pages if p['id'] != page_id)
+            page['is_parent'] = has_children
+
+        # Sort: parents first, then by title
+        pages.sort(key=lambda x: (not x['is_parent'], x['title']))
 
         return jsonify({'success': True, 'pages': pages})
 
