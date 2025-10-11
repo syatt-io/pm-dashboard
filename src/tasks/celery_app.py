@@ -1,6 +1,7 @@
 """Celery application configuration for background task processing."""
 
 import os
+import ssl
 from celery import Celery
 from celery.schedules import crontab
 
@@ -64,10 +65,10 @@ celery_app.conf.update(
     broker_connection_max_retries=10,
     # SSL/TLS settings for Upstash Redis (required for secure connections)
     broker_use_ssl={
-        'ssl_cert_reqs': None  # Don't verify SSL certificates for managed Redis
+        'ssl_cert_reqs': ssl.CERT_NONE  # Don't verify SSL certificates for managed Redis
     },
     redis_backend_use_ssl={
-        'ssl_cert_reqs': None  # Don't verify SSL certificates for managed Redis
+        'ssl_cert_reqs': ssl.CERT_NONE  # Don't verify SSL certificates for managed Redis
     }
 )
 
