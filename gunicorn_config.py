@@ -2,7 +2,7 @@
 Gunicorn configuration for agent-pm Flask application.
 
 This config ensures scheduled jobs only run in ONE worker to prevent duplicates.
-Uses Redis-based locking to guarantee single scheduler instance.
+Uses PostgreSQL advisory locks to guarantee single scheduler instance.
 """
 
 import logging
@@ -26,43 +26,61 @@ def post_worker_init(worker):
     """
     Called after a worker has been initialized.
     Only ONE worker will successfully acquire the lock and start the scheduler.
+    Uses PostgreSQL advisory locks for coordination.
     """
     try:
-        import redis
+        import psycopg2
+        from urllib.parse import urlparse
 
-        # Connect to Redis
-        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
-        r = redis.from_url(redis_url, decode_responses=True)
+        # Get database connection
+        database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
 
-        # Try to acquire lock with SET NX (set if not exists)
-        # Lock expires after 24 hours as a safety mechanism
-        lock_key = 'agent-pm:scheduler:lock'
-        acquired = r.set(lock_key, worker.pid, nx=True, ex=86400)
+        # Parse database URL
+        parsed = urlparse(database_url)
+
+        # Connect to PostgreSQL
+        conn = psycopg2.connect(
+            host=parsed.hostname,
+            port=parsed.port or 5432,
+            user=parsed.username,
+            password=parsed.password,
+            database=parsed.path.lstrip('/')
+        )
+        conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+        cursor = conn.cursor()
+
+        # Try to acquire advisory lock (non-blocking)
+        # Lock ID: 987654321 (arbitrary number unique to scheduler)
+        cursor.execute("SELECT pg_try_advisory_lock(987654321)")
+        acquired = cursor.fetchone()[0]
 
         if acquired:
-            logger.info(f"✓ Worker {worker.pid} acquired scheduler lock - starting scheduler")
+            logger.info(f"✓ Worker {worker.pid} acquired PostgreSQL advisory lock - starting scheduler")
+
+            # Store connection in worker to keep lock alive
+            worker.scheduler_db_conn = conn
+            worker.scheduler_db_cursor = cursor
 
             from src.services.scheduler import start_scheduler
             start_scheduler()
 
             logger.info(f"✓ Scheduler started successfully in worker {worker.pid}")
         else:
-            current_owner = r.get(lock_key)
-            logger.info(f"Worker {worker.pid} - scheduler already running in worker {current_owner}")
+            logger.info(f"Worker {worker.pid} - scheduler already running in another worker")
+            cursor.close()
+            conn.close()
 
-    except ImportError:
-        # Redis not available - fall back to starting in first worker only
-        logger.warning("Redis not available - using fallback scheduler start")
-        if worker.age == 0:  # First worker
+    except Exception as e:
+        logger.error(f"Error in post_worker_init for worker {worker.pid}: {e}")
+        logger.warning("Falling back to first-worker scheduler start")
+        # Fallback: start in first worker only
+        if worker.age == 0:
             try:
                 from src.services.scheduler import start_scheduler
                 logger.info(f"Starting scheduler in worker {worker.pid} (fallback mode)")
                 start_scheduler()
-            except Exception as e:
-                logger.error(f"Failed to start scheduler: {e}")
-
-    except Exception as e:
-        logger.error(f"Error in post_worker_init for worker {worker.pid}: {e}")
+            except Exception as e2:
+                logger.error(f"Failed to start scheduler: {e2}")
 
 
 def worker_exit(server, worker):
@@ -78,22 +96,21 @@ def worker_exit(server, worker):
             logger.info(f"Stopping scheduler in worker {worker.pid}")
             stop_scheduler()
 
-            # Release the Redis lock so another worker can take over if needed
+            # Release the PostgreSQL advisory lock if we hold it
             try:
-                import redis
-                redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
-                r = redis.from_url(redis_url, decode_responses=True)
+                if hasattr(worker, 'scheduler_db_cursor') and hasattr(worker, 'scheduler_db_conn'):
+                    cursor = worker.scheduler_db_cursor
+                    conn = worker.scheduler_db_conn
 
-                lock_key = 'agent-pm:scheduler:lock'
-                current_owner = r.get(lock_key)
+                    # Release advisory lock
+                    cursor.execute("SELECT pg_advisory_unlock(987654321)")
+                    logger.info(f"Released PostgreSQL advisory lock from worker {worker.pid}")
 
-                # Only release if we own the lock
-                if current_owner and str(current_owner) == str(worker.pid):
-                    r.delete(lock_key)
-                    logger.info(f"Released scheduler lock from worker {worker.pid}")
+                    cursor.close()
+                    conn.close()
 
             except Exception as e:
-                logger.error(f"Error releasing scheduler lock: {e}")
+                logger.error(f"Error releasing PostgreSQL advisory lock: {e}")
 
     except Exception as e:
         logger.error(f"Error stopping scheduler in worker {worker.pid}: {e}")

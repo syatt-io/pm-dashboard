@@ -4,24 +4,28 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
-# Initialize Celery
-redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+# Use PostgreSQL as broker instead of Redis
+# This avoids Redis connection issues with Upstash and uses existing PostgreSQL infrastructure
+database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
 
-# Use database 1 for agent-pm to isolate from other apps
-# Replace /0 with /1 at the end of the URL
-if redis_url.endswith('/0'):
-    redis_url = redis_url[:-2] + '/1'
-elif not redis_url.split('/')[-1].isdigit():
-    redis_url = redis_url.rstrip('/') + '/1'
+# Celery requires 'db+' prefix for SQLAlchemy broker
+# Convert postgresql:// to db+postgresql://
+if database_url.startswith('postgresql://'):
+    broker_url = 'db+' + database_url
+elif database_url.startswith('postgres://'):
+    # Some providers use postgres:// instead of postgresql://
+    broker_url = 'db+postgresql://' + database_url.split('://', 1)[1]
+else:
+    broker_url = database_url
 
 celery_app = Celery(
     'agent_pm',
-    broker=redis_url,
-    backend=redis_url,
+    broker=broker_url,
+    backend=broker_url,
     include=['src.tasks.vector_tasks']
 )
 
-# Configure Celery with unique key prefix and Redis connection handling
+# Configure Celery for PostgreSQL broker
 celery_app.conf.update(
     task_serializer='json',
     accept_content=['json'],
@@ -31,32 +35,15 @@ celery_app.conf.update(
     task_track_started=True,
     task_time_limit=30 * 60,  # 30 minutes max per task
     worker_max_tasks_per_child=50,  # Restart worker after 50 tasks to prevent memory leaks
-    # Use unique key prefix to isolate from other apps sharing same Redis
-    result_backend_transport_options={
-        'global_keyprefix': 'agent-pm:',
-        'retry_on_timeout': True,
-        'socket_keepalive': True,
-        'socket_keepalive_options': {
-            1: 1,  # TCP_KEEPIDLE
-            2: 1,  # TCP_KEEPINTVL
-            3: 3   # TCP_KEEPCNT
-        },
-        'health_check_interval': 30
-    },
-    broker_transport_options={
-        'global_keyprefix': 'agent-pm:',
-        'retry_on_timeout': True,
-        'socket_keepalive': True,
-        'socket_keepalive_options': {
-            1: 1,  # TCP_KEEPIDLE
-            2: 1,  # TCP_KEEPINTVL
-            3: 3   # TCP_KEEPCNT
-        },
-        'health_check_interval': 30
-    },
     # Broker connection retry settings
     broker_connection_retry_on_startup=True,
-    broker_connection_max_retries=10
+    broker_connection_max_retries=10,
+    # PostgreSQL-specific settings
+    broker_transport_options={
+        'visibility_timeout': 3600,  # 1 hour timeout for long-running tasks
+    },
+    # Use database table prefix to isolate from other apps
+    result_backend_table_prefix='celery_'
 )
 
 # Configure periodic tasks
