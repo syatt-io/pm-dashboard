@@ -151,17 +151,17 @@ class JiraMCPClient:
                 import base64
                 auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
 
-                # Use /rest/api/3/search endpoint which returns full issue data directly
-                # This is more reliable than the two-step /search/jql approach
+                # Build params for /search/jql endpoint
+                # This endpoint returns minimal data, so we need to fetch full issue details after
                 params = {
                     "jql": jql,
                     "maxResults": max_results,
-                    "startAt": start_at,
-                    "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project,key"
+                    "startAt": start_at
                 }
 
+                # Step 1: Get issue IDs using /search/jql endpoint
                 response = await self.client.get(
-                    f"{self.jira_url}/rest/api/3/search",
+                    f"{self.jira_url}/rest/api/3/search/jql",
                     params=params,
                     headers={
                         "Authorization": f"Basic {auth_string}",
@@ -171,10 +171,58 @@ class JiraMCPClient:
                 response.raise_for_status()
 
                 search_result = response.json()
-                issues = search_result.get('issues', [])
+                issue_ids = [issue.get('id') for issue in search_result.get('issues', [])]
 
-                if not issues:
+                if not issue_ids:
                     return []
+
+                # Step 2: Fetch full issue details for each ID using /issue endpoint
+                # IMPORTANT: Increased rate limit delays and better error handling
+                import asyncio
+
+                failed_issues = []  # Track failed fetches
+
+                async def fetch_issue(issue_id: str, index: int, total: int):
+                    try:
+                        # Add delay between requests (0.1s = 10 requests/second to be safer)
+                        if index > 0:
+                            await asyncio.sleep(0.1)
+
+                        issue_response = await self.client.get(
+                            f"{self.jira_url}/rest/api/3/issue/{issue_id}",
+                            params={
+                                "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project,key"
+                            },
+                            headers={
+                                "Authorization": f"Basic {auth_string}",
+                                "Accept": "application/json"
+                            }
+                        )
+                        issue_response.raise_for_status()
+                        return issue_response.json()
+                    except Exception as e:
+                        logger.error(f"Failed to fetch issue {issue_id}: {e}")
+                        failed_issues.append(issue_id)
+                        return None
+
+                # Fetch issues with rate limiting - process in smaller batches
+                issues = []
+                batch_size = 5  # Reduced to 5 issues at a time to avoid rate limiting
+                for i in range(0, len(issue_ids), batch_size):
+                    batch_ids = issue_ids[i:i+batch_size]
+                    batch_results = await asyncio.gather(*[
+                        fetch_issue(issue_id, idx, len(issue_ids))
+                        for idx, issue_id in enumerate(batch_ids)
+                    ])
+                    issues.extend([issue for issue in batch_results if issue is not None])
+
+                    # Add longer delay between batches
+                    if i + batch_size < len(issue_ids):
+                        await asyncio.sleep(1.0)
+
+                # Log if any issues failed
+                if failed_issues:
+                    logger.warning(f"Failed to fetch {len(failed_issues)}/{len(issue_ids)} issues. IDs: {failed_issues[:10]}")
 
                 # Create result dict that matches the original structure
                 result = {"issues": issues}
