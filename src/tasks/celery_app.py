@@ -14,6 +14,11 @@ if redis_url.endswith('/0'):
 elif not redis_url.split('/')[-1].isdigit():
     redis_url = redis_url.rstrip('/') + '/1'
 
+# Convert redis:// to rediss:// for SSL/TLS connections (required by Celery)
+# Upstash Redis requires TLS, so use rediss:// scheme
+if 'upstash.io' in redis_url and redis_url.startswith('redis://'):
+    redis_url = redis_url.replace('redis://', 'rediss://', 1)
+
 celery_app = Celery(
     'agent_pm',
     broker=redis_url,
