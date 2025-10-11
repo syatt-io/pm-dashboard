@@ -640,3 +640,60 @@ def get_project_monthly_hours():
     except Exception as e:
         logger.error(f"Error getting project monthly hours: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/projects/<project_key>/keywords', methods=['GET'])
+def get_project_keywords(project_key):
+    """Get keywords for a specific project."""
+    try:
+        from src.utils.database import get_engine
+        from sqlalchemy import text
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT keyword FROM project_keywords WHERE project_key = :key ORDER BY keyword"),
+                {"key": project_key.upper()}
+            )
+            keywords = [row[0] for row in result]
+
+        return jsonify({'success': True, 'keywords': keywords})
+
+    except Exception as e:
+        logger.error(f"Error getting project keywords: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/projects/<project_key>/keywords', methods=['PUT'])
+def update_project_keywords(project_key):
+    """Update keywords for a specific project."""
+    try:
+        data = request.json
+        keywords = data.get('keywords', [])
+
+        from src.utils.database import get_engine
+        from sqlalchemy import text
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            # Delete existing keywords
+            conn.execute(
+                text("DELETE FROM project_keywords WHERE project_key = :key"),
+                {"key": project_key.upper()}
+            )
+
+            # Insert new keywords
+            for keyword in keywords:
+                if keyword.strip():  # Only insert non-empty keywords
+                    conn.execute(
+                        text("INSERT INTO project_keywords (project_key, keyword) VALUES (:key, :keyword)"),
+                        {"key": project_key.upper(), "keyword": keyword.strip().lower()}
+                    )
+
+            conn.commit()
+
+        return jsonify({'success': True, 'message': 'Keywords updated successfully'})
+
+    except Exception as e:
+        logger.error(f"Error updating project keywords: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

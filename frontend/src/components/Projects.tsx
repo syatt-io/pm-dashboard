@@ -1944,6 +1944,71 @@ const ProjectShowActions = () => (
 
 const ProjectShowContent = () => {
   const record = useRecordContext();
+  const notify = useNotify();
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [loadingKeywords, setLoadingKeywords] = useState(false);
+  const [editingKeywords, setEditingKeywords] = useState(false);
+  const [keywordInput, setKeywordInput] = useState('');
+
+  // Load keywords when component mounts
+  useEffect(() => {
+    if (record?.key) {
+      loadKeywords();
+    }
+  }, [record?.key]);
+
+  const loadKeywords = async () => {
+    if (!record?.key) return;
+
+    setLoadingKeywords(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${record.key}/keywords`);
+      if (response.ok) {
+        const data = await response.json();
+        setKeywords(data.keywords || []);
+      }
+    } catch (error) {
+      // Silently fail
+    } finally {
+      setLoadingKeywords(false);
+    }
+  };
+
+  const handleAddKeyword = () => {
+    const trimmed = keywordInput.trim().toLowerCase();
+    if (trimmed && !keywords.includes(trimmed)) {
+      setKeywords([...keywords, trimmed]);
+      setKeywordInput('');
+    }
+  };
+
+  const handleRemoveKeyword = (keyword: string) => {
+    setKeywords(keywords.filter(k => k !== keyword));
+  };
+
+  const handleSaveKeywords = async () => {
+    setLoadingKeywords(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects/${record.key}/keywords`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ keywords })
+      });
+
+      if (response.ok) {
+        notify('Keywords updated successfully', { type: 'success' });
+        setEditingKeywords(false);
+      } else {
+        throw new Error('Failed to update keywords');
+      }
+    } catch (error) {
+      notify('Error updating keywords', { type: 'error' });
+    } finally {
+      setLoadingKeywords(false);
+    }
+  };
 
   if (!record) return null;
 
@@ -2105,6 +2170,120 @@ const ProjectShowContent = () => {
                     </Box>
                   </Grid>
                 </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Project Keywords */}
+          <Grid item xs={12}>
+            <Card sx={{ borderLeft: '4px solid', borderLeftColor: 'warning.main' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      🏷️ Project Keywords
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Keywords used for Fireflies meeting filtering in /find-context command
+                    </Typography>
+                  </Box>
+                  {!editingKeywords && (
+                    <MuiButton
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setEditingKeywords(true)}
+                      disabled={loadingKeywords}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Edit Keywords
+                    </MuiButton>
+                  )}
+                </Box>
+                <Divider sx={{ mb: 2 }} />
+
+                {loadingKeywords ? (
+                  <CircularProgress size={24} />
+                ) : editingKeywords ? (
+                  <Box>
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      Keywords help filter Fireflies meetings for this project. Add words that commonly appear in meeting titles.
+                    </Alert>
+
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                      {keywords.map((keyword, index) => (
+                        <Chip
+                          key={index}
+                          label={keyword}
+                          onDelete={() => handleRemoveKeyword(keyword)}
+                          color="primary"
+                          variant="outlined"
+                        />
+                      ))}
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                      <MuiTextField
+                        size="small"
+                        placeholder="Add keyword..."
+                        value={keywordInput}
+                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddKeyword();
+                          }
+                        }}
+                        fullWidth
+                      />
+                      <MuiButton
+                        variant="contained"
+                        size="small"
+                        onClick={handleAddKeyword}
+                        disabled={!keywordInput.trim()}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Add
+                      </MuiButton>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                      <MuiButton
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          loadKeywords();
+                          setEditingKeywords(false);
+                        }}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Cancel
+                      </MuiButton>
+                      <MuiButton
+                        variant="contained"
+                        size="small"
+                        color="primary"
+                        onClick={handleSaveKeywords}
+                        disabled={loadingKeywords}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Save Keywords
+                      </MuiButton>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box>
+                    {keywords.length === 0 ? (
+                      <Alert severity="warning">
+                        <strong>No keywords configured!</strong> Without keywords, Fireflies meetings won't be included in project searches. Click "Edit Keywords" to add keywords.
+                      </Alert>
+                    ) : (
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        {keywords.map((keyword, index) => (
+                          <Chip key={index} label={keyword} color="primary" />
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Grid>
