@@ -151,17 +151,17 @@ class JiraMCPClient:
                 import base64
                 auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
 
-                # Build params for new /search/jql endpoint (old /search was deprecated)
-                # This endpoint returns minimal data, so we need to fetch full issue details after
+                # Use /rest/api/3/search endpoint which returns full issue data directly
+                # This is more reliable than the two-step /search/jql approach
                 params = {
                     "jql": jql,
                     "maxResults": max_results,
-                    "startAt": start_at
+                    "startAt": start_at,
+                    "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project,key"
                 }
 
-                # Step 1: Get issue IDs using new /search/jql endpoint
                 response = await self.client.get(
-                    f"{self.jira_url}/rest/api/3/search/jql",
+                    f"{self.jira_url}/rest/api/3/search",
                     params=params,
                     headers={
                         "Authorization": f"Basic {auth_string}",
@@ -171,51 +171,10 @@ class JiraMCPClient:
                 response.raise_for_status()
 
                 search_result = response.json()
-                issue_ids = [issue.get('id') for issue in search_result.get('issues', [])]
+                issues = search_result.get('issues', [])
 
-                if not issue_ids:
+                if not issues:
                     return []
-
-                # Step 2: Fetch full issue details for each ID using /issue endpoint
-                # Add delays between requests to avoid rate limiting
-                import asyncio
-
-                async def fetch_issue(issue_id: str, index: int, total: int):
-                    try:
-                        # Add small delay between requests (0.05s = 20 requests/second max)
-                        if index > 0:
-                            await asyncio.sleep(0.05)
-
-                        issue_response = await self.client.get(
-                            f"{self.jira_url}/rest/api/3/issue/{issue_id}",
-                            params={
-                                "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project"
-                            },
-                            headers={
-                                "Authorization": f"Basic {auth_string}",
-                                "Accept": "application/json"
-                            }
-                        )
-                        issue_response.raise_for_status()
-                        return issue_response.json()
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch issue {issue_id}: {e}")
-                        return None
-
-                # Fetch issues with rate limiting - process in smaller batches
-                issues = []
-                batch_size = 10  # Process 10 issues at a time
-                for i in range(0, len(issue_ids), batch_size):
-                    batch_ids = issue_ids[i:i+batch_size]
-                    batch_results = await asyncio.gather(*[
-                        fetch_issue(issue_id, idx, len(issue_ids))
-                        for idx, issue_id in enumerate(batch_ids)
-                    ])
-                    issues.extend([issue for issue in batch_results if issue is not None])
-
-                    # Add delay between batches
-                    if i + batch_size < len(issue_ids):
-                        await asyncio.sleep(0.5)
 
                 # Create result dict that matches the original structure
                 result = {"issues": issues}
