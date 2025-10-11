@@ -130,6 +130,79 @@ def trigger_notion_backfill():
         }), 500
 
 
+@backfill_bp.route('/jira/test-query', methods=['GET'])
+@admin_or_api_key_required
+def test_jira_query():
+    """
+    Test the exact JQL query used by backfill to diagnose result limits.
+
+    Query params:
+        days: Number of days back (default: 2555)
+        limit: Max results to fetch (default: 100)
+
+    Returns:
+        First N issues from the query
+    """
+    try:
+        days_back = int(request.args.get('days', 2555))
+        limit = int(request.args.get('limit', 100))
+
+        logger.info(f"Testing backfill JQL query for {days_back} days, limit {limit}")
+
+        from src.integrations.jira_mcp import JiraMCPClient
+        from config.settings import settings
+
+        async def test_query_async():
+            jira_client = JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token
+            )
+
+            # Use the EXACT same JQL as the backfill
+            jql = f"updated >= -{days_back}d ORDER BY updated DESC"
+            logger.info(f"Testing JQL: {jql}")
+
+            result = await jira_client.search_issues(
+                jql=jql,
+                max_results=limit
+            )
+
+            issues = result.get('issues', [])
+
+            # Extract project keys
+            projects_found = {}
+            for issue in issues:
+                project_key = issue.get('key', '').split('-')[0] if issue.get('key') else 'UNKNOWN'
+                if project_key not in projects_found:
+                    projects_found[project_key] = []
+                projects_found[project_key].append(issue.get('key'))
+
+            await jira_client.client.aclose()
+
+            return {
+                "jql": jql,
+                "total_issues_fetched": len(issues),
+                "limit_requested": limit,
+                "projects_found": projects_found,
+                "sample_keys": [issue.get('key') for issue in issues[:20]]
+            }
+
+        result = asyncio.run(test_query_async())
+
+        return jsonify({
+            "success": True,
+            **result
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in test_jira_query: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @backfill_bp.route('/jira/check-projects', methods=['GET'])
 @admin_or_api_key_required
 def check_jira_projects():
