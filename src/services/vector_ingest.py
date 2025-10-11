@@ -395,6 +395,9 @@ class VectorIngestService:
                 # Build access list: attendees + people it's shared with
                 access_list = list(set(attendee_emails + shared_with_emails))
 
+                # Match meeting title against project keywords to create tags
+                project_tags = self._match_project_keywords(title)
+
                 # Create document
                 doc = VectorDocument(
                     id=doc_id,
@@ -414,7 +417,9 @@ class VectorIngestService:
                         'access_type': 'public' if is_public else 'shared',
                         'access_list': access_list,  # Attendees + shared users
                         'shared_with': shared_with_emails,  # Explicitly shared
-                        'is_public': is_public
+                        'is_public': is_public,
+                        # Project tags for filtering (based on keyword matching)
+                        'project_tags': project_tags if project_tags else []
                     }
                 )
 
@@ -507,6 +512,53 @@ class VectorIngestService:
             return 0
 
         return self.upsert_documents(documents)
+
+    def _match_project_keywords(self, title: str) -> List[str]:
+        """Match meeting title against project keywords and return matching project keys.
+
+        Args:
+            title: Meeting title to check
+
+        Returns:
+            List of project keys whose keywords match the title
+        """
+        try:
+            from src.utils.database import get_engine
+            from sqlalchemy import text
+
+            # Normalize title for case-insensitive matching
+            title_lower = title.lower()
+
+            engine = get_engine()
+            matched_projects = []
+
+            with engine.connect() as conn:
+                # Get all project keywords
+                result = conn.execute(
+                    text("SELECT DISTINCT project_key, keyword FROM project_keywords")
+                )
+
+                # Group keywords by project
+                project_keywords = {}
+                for row in result:
+                    project_key, keyword = row
+                    if project_key not in project_keywords:
+                        project_keywords[project_key] = []
+                    project_keywords[project_key].append(keyword.lower())
+
+                # Check each project's keywords against title
+                for project_key, keywords in project_keywords.items():
+                    for keyword in keywords:
+                        if keyword in title_lower:
+                            matched_projects.append(project_key)
+                            logger.debug(f"Matched '{title}' to project {project_key} via keyword '{keyword}'")
+                            break  # Only add project once even if multiple keywords match
+
+            return matched_projects
+
+        except Exception as e:
+            logger.error(f"Error matching project keywords: {e}")
+            return []
 
     def _extract_text_from_adf(self, adf_content: Dict[str, Any]) -> str:
         """Extract plain text from Atlassian Document Format (ADF) JSON."""

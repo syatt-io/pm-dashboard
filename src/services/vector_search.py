@@ -376,31 +376,17 @@ class VectorSearchService:
                     # Metadata field would be 'repo' or 'repository_name' depending on ingestion
                     or_conditions.append({"repo": {"$in": github_repo_list}})
 
-                # Fireflies: Use project keywords for text-based filtering
-                # Get keywords for this project
-                keywords_result = conn.execute(
-                    text("SELECT keyword FROM project_keywords WHERE project_key = :key"),
-                    {"key": canonical_key}
-                )
-                keywords = [row[0].lower() for row in keywords_result]
-
-                # Build text search conditions for Fireflies using keywords
-                if keywords:
-                    # Create regex conditions for each keyword (case-insensitive)
-                    keyword_regex_conditions = [
-                        {"title": {"$regex": f"(?i){kw}"}} for kw in keywords
+                # Fireflies: Use project_tags field for filtering
+                # Meetings are tagged with project keys during ingestion based on keyword matching
+                fireflies_filter = {
+                    "$and": [
+                        {"source": "fireflies"},
+                        {"project_tags": {"$in": [canonical_key]}}
                     ]
+                }
 
-                    # Add Fireflies filter: source must be "fireflies" AND title matches any keyword
-                    fireflies_filter = {
-                        "$and": [
-                            {"source": "fireflies"},
-                            {"$or": keyword_regex_conditions}
-                        ]
-                    }
-
-                    or_conditions.append(fireflies_filter)
-                    logger.info(f"📝 Added Fireflies text filter with {len(keywords)} keywords: {keywords}")
+                or_conditions.append(fireflies_filter)
+                logger.info(f"📝 Added Fireflies filter for project tag: {canonical_key}")
 
                 if not or_conditions:
                     return None
