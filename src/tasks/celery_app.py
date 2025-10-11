@@ -1,7 +1,6 @@
 """Celery application configuration for background task processing."""
 
 import os
-import ssl
 from celery import Celery
 from celery.schedules import crontab
 
@@ -14,11 +13,6 @@ if redis_url.endswith('/0'):
     redis_url = redis_url[:-2] + '/1'
 elif not redis_url.split('/')[-1].isdigit():
     redis_url = redis_url.rstrip('/') + '/1'
-
-# Convert redis:// to rediss:// for SSL/TLS connections (required by Celery)
-# Upstash Redis requires TLS, so use rediss:// scheme
-if 'upstash.io' in redis_url and redis_url.startswith('redis://'):
-    redis_url = redis_url.replace('redis://', 'rediss://', 1)
 
 celery_app = Celery(
     'agent_pm',
@@ -62,16 +56,7 @@ celery_app.conf.update(
     },
     # Broker connection retry settings
     broker_connection_retry_on_startup=True,
-    broker_connection_max_retries=10,
-    # SSL/TLS settings for Upstash Redis (required for secure connections)
-    broker_use_ssl={
-        'ssl_cert_reqs': ssl.CERT_NONE,  # Don't verify SSL certificates
-        'ssl_check_hostname': False,  # Don't check hostname
-    },
-    redis_backend_use_ssl={
-        'ssl_cert_reqs': ssl.CERT_NONE,  # Don't verify SSL certificates
-        'ssl_check_hostname': False,  # Don't check hostname
-    }
+    broker_connection_max_retries=10
 )
 
 # Configure periodic tasks
