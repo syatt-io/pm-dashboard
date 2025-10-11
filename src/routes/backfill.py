@@ -128,3 +128,86 @@ def trigger_notion_backfill():
             "success": False,
             "error": str(e)
         }), 500
+
+
+@backfill_bp.route('/jira/check-projects', methods=['GET'])
+@admin_or_api_key_required
+def check_jira_projects():
+    """
+    Diagnostic endpoint to check if specific Jira projects have issues.
+
+    Query params:
+        projects: Comma-separated list of project keys (e.g., "CAR,ECSC,MAMS")
+        days: Number of days back to check (default: 2555)
+
+    Returns:
+        JSON with issue counts per project
+    """
+    try:
+        projects_param = request.args.get('projects', 'CAR,ECSC,MAMS')
+        days_back = int(request.args.get('days', 2555))
+
+        project_keys = [p.strip() for p in projects_param.split(',')]
+
+        logger.info(f"Checking projects: {project_keys} for issues in last {days_back} days")
+
+        # Import Jira client
+        from src.integrations.jira_mcp import JiraMCPClient
+        from config.settings import settings
+
+        async def check_projects_async():
+            jira_client = JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token
+            )
+
+            results = {}
+            for project_key in project_keys:
+                try:
+                    jql = f"project = {project_key} AND updated >= -{days_back}d"
+                    logger.info(f"Checking {project_key} with JQL: {jql}")
+
+                    result = await jira_client.search_issues(
+                        jql=jql,
+                        max_results=1  # Just need count
+                    )
+
+                    # Jira returns total count even with max_results=1
+                    issue_count = len(result.get('issues', []))
+
+                    # Try to get total from API response if available
+                    # For more accurate count, we'd need to check response metadata
+                    results[project_key] = {
+                        "issues_found": issue_count,
+                        "sample_issues": [issue.get('key') for issue in result.get('issues', [])]
+                    }
+
+                    logger.info(f"✅ {project_key}: found {issue_count} issues")
+
+                except Exception as e:
+                    logger.error(f"❌ Error checking {project_key}: {e}")
+                    results[project_key] = {
+                        "error": str(e),
+                        "issues_found": 0
+                    }
+
+            await jira_client.client.aclose()
+            return results
+
+        # Run async function
+        results = asyncio.run(check_projects_async())
+
+        return jsonify({
+            "success": True,
+            "days_back": days_back,
+            "projects_checked": project_keys,
+            "results": results
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error in check_jira_projects: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
