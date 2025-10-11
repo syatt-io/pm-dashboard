@@ -50,6 +50,9 @@ class TempoAPIClient:
         # Cache for issue ID to key mappings
         self.issue_cache: Dict[str, Optional[str]] = {}
 
+        # Cache for account ID to display name mappings
+        self.account_cache: Dict[str, Optional[str]] = {}
+
     def get_issue_key_from_jira(self, issue_id: str) -> Optional[str]:
         """
         Resolve Jira issue ID to issue key via Jira API.
@@ -77,6 +80,36 @@ class TempoAPIClient:
         except Exception as e:
             logger.debug(f"Error getting issue key for ID {issue_id}: {e}")
             self.issue_cache[issue_id] = None
+            return None
+
+    def get_user_name(self, account_id: str) -> Optional[str]:
+        """
+        Resolve Jira account ID to user display name via Jira API.
+
+        Args:
+            account_id: Jira account ID (e.g., "abc123")
+
+        Returns:
+            User display name (e.g., "Mike Samimi") or None if not found
+        """
+        if account_id in self.account_cache:
+            return self.account_cache[account_id]
+
+        try:
+            url = f"{self.jira_url}/rest/api/3/user"
+            params = {"accountId": account_id}
+            response = requests.get(url, headers=self.jira_headers, params=params, timeout=10)
+            response.raise_for_status()
+
+            user_data = response.json()
+            display_name = user_data.get("displayName")
+
+            self.account_cache[account_id] = display_name
+            return display_name
+
+        except Exception as e:
+            logger.debug(f"Error getting user name for account ID {account_id}: {e}")
+            self.account_cache[account_id] = None
             return None
 
     def get_worklogs(

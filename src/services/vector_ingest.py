@@ -2,6 +2,7 @@
 
 import logging
 import hashlib
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -512,6 +513,123 @@ class VectorIngestService:
             return 0
 
         return self.upsert_documents(documents)
+
+    def ingest_tempo_worklogs(
+        self,
+        worklogs: List[Dict[str, Any]],
+        tempo_client: Any  # TempoAPIClient instance
+    ) -> int:
+        """Ingest Tempo worklogs into vector database.
+
+        Each worklog is stored as a separate document that references its Jira issue.
+        This enables time-specific queries and maintains temporal event history.
+
+        Args:
+            worklogs: List of Tempo worklog dicts from API
+            tempo_client: TempoAPIClient instance for issue/user resolution
+
+        Returns:
+            Number of successfully ingested worklogs
+        """
+        documents = []
+        issue_pattern = re.compile(r'([A-Z]+-\d+)')
+
+        for worklog in worklogs:
+            try:
+                # Get worklog metadata
+                worklog_id = worklog.get('tempoWorklogId', '')
+                description = worklog.get('description', '')
+                time_spent_seconds = worklog.get('timeSpentSeconds', 0)
+                hours_logged = time_spent_seconds / 3600
+
+                # Parse worklog date
+                start_date = worklog.get('startDate', '')  # Format: YYYY-MM-DD
+                start_time = worklog.get('startTime', '')  # Format: HH:MM:SS
+
+                # Combine date and time for timestamp
+                if start_date and start_time:
+                    timestamp_str = f"{start_date}T{start_time}"
+                    worklog_date = datetime.fromisoformat(timestamp_str)
+                elif start_date:
+                    worklog_date = datetime.fromisoformat(start_date)
+                else:
+                    worklog_date = datetime.now()
+
+                # Resolve issue key using dual-path resolution
+                issue_key = None
+                issue_summary = ""
+
+                # Fast path: Extract from description
+                issue_match = issue_pattern.search(description)
+                if issue_match:
+                    issue_key = issue_match.group(1)
+                else:
+                    # Complete path: Jira API lookup
+                    issue_id = worklog.get('issue', {}).get('id')
+                    if issue_id:
+                        issue_key = tempo_client.get_issue_key_from_jira(str(issue_id))
+
+                # Skip worklogs without issue association
+                if not issue_key:
+                    logger.debug(f"Skipping worklog {worklog_id} - no issue key found")
+                    continue
+
+                # Extract project key from issue key
+                project_key = issue_key.split('-')[0]
+
+                # Get user information
+                author = worklog.get('author', {})
+                author_account_id = author.get('accountId', '')
+                author_name = tempo_client.get_user_name(author_account_id) if author_account_id else 'Unknown'
+
+                # Try to get email from author object (if available)
+                author_email = author.get('emailAddress', '') or author.get('email', '')
+
+                # Generate unique ID
+                doc_id = f"tempo-{worklog_id}"
+
+                # Build content for embedding
+                # Combine issue key, author, date, and description for rich semantic search
+                content = f"[{issue_key}] Time Entry - {author_name} logged {hours_logged:.1f} hours on {start_date}"
+                if description:
+                    content += f": {description}"
+
+                # Create document
+                doc = VectorDocument(
+                    id=doc_id,
+                    source='tempo',
+                    title=f"{issue_key}: {hours_logged:.1f}h by {author_name}",
+                    content=content,
+                    metadata={
+                        'worklog_id': worklog_id,
+                        'issue_key': issue_key,
+                        'project_key': project_key,
+                        'author_account_id': author_account_id,
+                        'author_name': author_name,
+                        'author_email': author_email if author_email else None,
+                        'hours_logged': hours_logged,
+                        'worklog_date': start_date,
+                        'timestamp': worklog_date.isoformat(),
+                        'timestamp_epoch': int(worklog_date.timestamp()),
+                        'date': worklog_date.strftime('%Y-%m-%d'),
+                        'description': description,
+                        # All Tempo data accessible to all users (same as Jira)
+                        'access_type': 'all'
+                    }
+                )
+
+                documents.append(doc)
+
+            except Exception as e:
+                logger.error(f"Error processing Tempo worklog {worklog.get('tempoWorklogId')}: {e}")
+                continue
+
+        if not documents:
+            logger.warning("No valid Tempo worklogs to ingest")
+            return 0
+
+        logger.info(f"📝 Ingesting {len(documents)} Tempo worklogs into Pinecone...")
+        return self.upsert_documents(documents, batch_size=50)
 
     def _match_project_keywords(self, title: str) -> List[str]:
         """Match meeting title against project keywords and return matching project keys.

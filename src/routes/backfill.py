@@ -203,6 +203,47 @@ def test_jira_query():
         }), 500
 
 
+@backfill_bp.route('/tempo', methods=['POST'])
+@admin_or_api_key_required
+def trigger_tempo_backfill():
+    """
+    Trigger Tempo backfill to ingest historical worklogs into vector database.
+
+    Query params:
+        days: Number of days back to fetch (default: 365 / ~1 year)
+
+    Returns:
+        JSON response with task started status
+    """
+    try:
+        days_back = int(request.args.get('days', 365))
+
+        logger.info(f"Starting Tempo backfill in background thread for {days_back} days")
+
+        # Import backfill function
+        from src.tasks.backfill_tempo import backfill_tempo_worklogs
+
+        # Run in background thread (fire-and-forget)
+        run_async_in_thread(backfill_tempo_worklogs, days_back)
+
+        logger.info(f"✅ Tempo backfill started in background for {days_back} days")
+
+        return jsonify({
+            "success": True,
+            "message": f"Tempo backfill started successfully in background",
+            "days_back": days_back,
+            "status": "RUNNING",
+            "note": "Task is running in background thread - check app logs for progress"
+        }), 202  # 202 Accepted - processing started
+
+    except Exception as e:
+        logger.error(f"Error starting Tempo backfill: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @backfill_bp.route('/jira/check-projects', methods=['GET'])
 @admin_or_api_key_required
 def check_jira_projects():
