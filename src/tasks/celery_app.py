@@ -56,14 +56,7 @@ celery_app.conf.update(
     },
     # Broker connection retry settings
     broker_connection_retry_on_startup=True,
-    broker_connection_max_retries=10,
-    # SSL/TLS settings for Upstash Redis (required for rediss:// URLs)
-    broker_use_ssl={
-        'ssl_cert_reqs': None  # Don't verify SSL certificates
-    },
-    redis_backend_use_ssl={
-        'ssl_cert_reqs': None  # Don't verify SSL certificates
-    }
+    broker_connection_max_retries=10
 )
 
 # Configure periodic tasks
