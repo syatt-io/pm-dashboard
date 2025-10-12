@@ -480,6 +480,18 @@ class VectorIngestService:
                     except:
                         pass
 
+                # Extract parent information for hierarchical filtering
+                parent = page.get('parent', {})
+                parent_type = parent.get('type', 'workspace')
+
+                # Extract parent ID based on type
+                parent_id = None
+                if parent_type == 'page_id':
+                    parent_id = parent.get('page_id')
+                elif parent_type == 'database_id':
+                    parent_id = parent.get('database_id')
+                # If workspace, parent_id remains None
+
                 # Generate unique ID
                 doc_id = f"notion-{page_id}"
 
@@ -497,6 +509,9 @@ class VectorIngestService:
                         'timestamp': page_date.isoformat(),
                         'timestamp_epoch': int(page_date.timestamp()),
                         'date': page_date.strftime('%Y-%m-%d'),
+                        # Parent hierarchy for filtering
+                        'parent_id': parent_id,
+                        'parent_type': parent_type,
                         # All Notion pages accessible to all users (no per-user permissions)
                         'access_type': 'all'
                     }

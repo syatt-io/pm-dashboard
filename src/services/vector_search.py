@@ -367,9 +367,17 @@ class VectorSearchService:
                 if slack_channels:
                     or_conditions.append({"channel_id": {"$in": slack_channels}})
 
-                # Notion: Match by page_id
+                # Notion: Match by parent_id (includes all child pages automatically)
+                # If a parent page/database is mapped, this will match:
+                # 1. The parent page itself (page_id matches)
+                # 2. All child pages (parent_id matches)
                 if notion_pages:
-                    or_conditions.append({"page_id": {"$in": notion_pages}})
+                    or_conditions.append({
+                        "$or": [
+                            {"page_id": {"$in": notion_pages}},  # Match parent pages directly
+                            {"parent_id": {"$in": notion_pages}}  # Match all child pages
+                        ]
+                    })
 
                 # GitHub: Match by repo name (stored in metadata during ingestion)
                 if github_repo_list:
