@@ -15,13 +15,13 @@ for env_var in ['REDIS_URL', 'BROKER_URL', 'CELERY_BROKER_URL', 'CELERY_RESULT_B
 # This avoids Redis connection issues with Upstash and uses existing PostgreSQL infrastructure
 database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
 
-# Celery requires 'db+' prefix for SQLAlchemy broker
-# Convert postgresql:// to db+postgresql://
+# Celery/Kombu requires 'sqla+' prefix for SQLAlchemy broker transport
+# Convert postgresql:// to sqla+postgresql://
 if database_url.startswith('postgresql://'):
-    broker_url = 'db+' + database_url
+    broker_url = 'sqla+' + database_url
 elif database_url.startswith('postgres://'):
     # Some providers use postgres:// instead of postgresql://
-    broker_url = 'db+postgresql://' + database_url.split('://', 1)[1]
+    broker_url = 'sqla+postgresql://' + database_url.split('://', 1)[1]
 else:
     broker_url = database_url
 
