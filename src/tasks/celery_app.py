@@ -4,10 +4,12 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 
-# IMPORTANT: Unset REDIS_URL to prevent Celery from auto-detecting it
-# We want to explicitly use PostgreSQL as the broker
-if 'REDIS_URL' in os.environ:
-    del os.environ['REDIS_URL']
+# IMPORTANT: Unset ALL Redis/broker environment variables that Celery might auto-detect
+# We want to explicitly use PostgreSQL as the broker via DATABASE_URL only
+for env_var in ['REDIS_URL', 'BROKER_URL', 'CELERY_BROKER_URL', 'CELERY_RESULT_BACKEND']:
+    if env_var in os.environ:
+        del os.environ[env_var]
+        print(f"Removed {env_var} from environment to force PostgreSQL broker")
 
 # Use PostgreSQL as broker instead of Redis
 # This avoids Redis connection issues with Upstash and uses existing PostgreSQL infrastructure
@@ -23,10 +25,14 @@ elif database_url.startswith('postgres://'):
 else:
     broker_url = database_url
 
+# Debug: Print the broker URL (without credentials)
+broker_display = broker_url.split('@')[0] + '@***' if '@' in broker_url else broker_url
+print(f"Celery broker configured: {broker_display}")
+
+# Create Celery app WITHOUT broker/backend parameters to avoid import-time evaluation
+# The broker will be set in conf.update() below
 celery_app = Celery(
     'agent_pm',
-    broker=broker_url,
-    backend=broker_url,
     include=['src.tasks.vector_tasks']
 )
 
