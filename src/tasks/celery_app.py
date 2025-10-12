@@ -19,9 +19,9 @@ else:
     print("⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
 
 # GCP Pub/Sub broker configuration
-# Format: gcpubsub://PROJECT_ID
+# Format: gcpubsub://projects/PROJECT_ID
 gcp_project_id = os.getenv('GCP_PROJECT_ID', 'syatt-io')
-broker_url = f'gcpubsub://{gcp_project_id}'
+broker_url = f'gcpubsub://projects/{gcp_project_id}'
 
 # Use PostgreSQL for result backend (storing task results)
 database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
