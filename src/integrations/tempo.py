@@ -11,6 +11,7 @@ import os
 import re
 import base64
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
@@ -53,9 +54,24 @@ class TempoAPIClient:
         # Cache for account ID to display name mappings
         self.account_cache: Dict[str, Optional[str]] = {}
 
+        # Rate limiting: Track last request time to avoid hitting Jira API limits
+        self.last_jira_request_time = 0.0
+        self.min_request_interval = 0.1  # 100ms between Jira API calls (max 10 req/sec)
+
+    def _rate_limit(self):
+        """Enforce rate limiting for Jira API calls."""
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_jira_request_time
+
+        if time_since_last_request < self.min_request_interval:
+            sleep_time = self.min_request_interval - time_since_last_request
+            time.sleep(sleep_time)
+
+        self.last_jira_request_time = time.time()
+
     def get_issue_key_from_jira(self, issue_id: str) -> Optional[str]:
         """
-        Resolve Jira issue ID to issue key via Jira API.
+        Resolve Jira issue ID to issue key via Jira API with rate limiting.
 
         Args:
             issue_id: Jira issue ID (numeric)
@@ -67,6 +83,9 @@ class TempoAPIClient:
             return self.issue_cache[issue_id]
 
         try:
+            # Rate limit to avoid hitting Jira API limits
+            self._rate_limit()
+
             url = f"{self.jira_url}/rest/api/3/issue/{issue_id}"
             response = requests.get(url, headers=self.jira_headers, timeout=10)
             response.raise_for_status()
@@ -84,7 +103,7 @@ class TempoAPIClient:
 
     def get_user_name(self, account_id: str) -> Optional[str]:
         """
-        Resolve Jira account ID to user display name via Jira API.
+        Resolve Jira account ID to user display name via Jira API with rate limiting.
 
         Args:
             account_id: Jira account ID (e.g., "abc123")
@@ -96,6 +115,9 @@ class TempoAPIClient:
             return self.account_cache[account_id]
 
         try:
+            # Rate limit to avoid hitting Jira API limits
+            self._rate_limit()
+
             url = f"{self.jira_url}/rest/api/3/user"
             params = {"accountId": account_id}
             response = requests.get(url, headers=self.jira_headers, params=params, timeout=10)
