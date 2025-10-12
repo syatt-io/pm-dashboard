@@ -20,6 +20,7 @@ pinecone>=5.0.0
 celery>=5.3.0
 kombu>=5.3.0
 google-cloud-pubsub>=2.18.0
+google-cloud-monitoring>=2.15.0
 
 # Authentication
 google-auth==2.41.1
