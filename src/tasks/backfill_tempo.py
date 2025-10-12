@@ -98,38 +98,64 @@ def backfill_tempo_worklogs(days_back: int = 365) -> Dict[str, Any]:
         active_project_keys = set([key for key, _ in active_projects])
         filtered_worklogs = []
         projects_with_worklogs = {}
+        fast_path_count = 0
+        slow_path_count = 0
+        skipped_count = 0
 
         # Compile regex pattern once for performance
         issue_pattern = re.compile(r'([A-Z]+-\d+)')
 
-        for worklog in all_worklogs:
-            # Extract project key from issue key in description or issue object
-            issue_id = worklog.get('issue', {}).get('id')
-            description = worklog.get('description', '')
+        logger.info(f"🔍 Starting to filter {len(all_worklogs)} worklogs by active projects...")
 
-            # Fast path: extract from description
-            issue_match = issue_pattern.search(description)
+        for idx, worklog in enumerate(all_worklogs):
+            # Progress logging every 1000 worklogs
+            if (idx + 1) % 1000 == 0:
+                logger.info(f"   Progress: {idx + 1}/{len(all_worklogs)} worklogs processed... "
+                          f"(filtered: {len(filtered_worklogs)}, fast: {fast_path_count}, slow: {slow_path_count}, skipped: {skipped_count})")
 
-            if issue_match:
-                issue_key = issue_match.group(1)
-                project_key = issue_key.split('-')[0]
-            else:
-                # Complete path: resolve via Jira (will be cached)
-                if issue_id:
-                    issue_key = tempo_client.get_issue_key_from_jira(str(issue_id))
-                    if issue_key:
-                        project_key = issue_key.split('-')[0]
-                    else:
-                        continue
+            try:
+                # Extract project key from issue key in description or issue object
+                issue_id = worklog.get('issue', {}).get('id')
+                description = worklog.get('description', '')
+
+                # Fast path: extract from description
+                issue_match = issue_pattern.search(description)
+
+                if issue_match:
+                    issue_key = issue_match.group(1)
+                    project_key = issue_key.split('-')[0]
+                    fast_path_count += 1
                 else:
-                    continue
+                    # Complete path: resolve via Jira (will be cached)
+                    if issue_id:
+                        try:
+                            issue_key = tempo_client.get_issue_key_from_jira(str(issue_id))
+                            if issue_key:
+                                project_key = issue_key.split('-')[0]
+                                slow_path_count += 1
+                            else:
+                                skipped_count += 1
+                                continue
+                        except Exception as jira_err:
+                            logger.warning(f"Failed to resolve issue ID {issue_id}: {jira_err}")
+                            skipped_count += 1
+                            continue
+                    else:
+                        skipped_count += 1
+                        continue
 
-            # Only include worklogs for active projects
-            if project_key in active_project_keys:
-                filtered_worklogs.append(worklog)
-                projects_with_worklogs[project_key] = projects_with_worklogs.get(project_key, 0) + 1
+                # Only include worklogs for active projects
+                if project_key in active_project_keys:
+                    filtered_worklogs.append(worklog)
+                    projects_with_worklogs[project_key] = projects_with_worklogs.get(project_key, 0) + 1
+
+            except Exception as worklog_err:
+                logger.warning(f"Error processing worklog {idx}: {worklog_err}")
+                skipped_count += 1
+                continue
 
         logger.info(f"✅ Filtered to {len(filtered_worklogs)} worklogs from {len(projects_with_worklogs)} active projects")
+        logger.info(f"📊 Resolution stats: Fast path: {fast_path_count}, Slow path (Jira API): {slow_path_count}, Skipped: {skipped_count}")
         logger.info(f"📊 Projects with worklogs: {', '.join(f'{k} ({v})' for k, v in sorted(projects_with_worklogs.items()))}")
 
         if not filtered_worklogs:
@@ -137,7 +163,7 @@ def backfill_tempo_worklogs(days_back: int = 365) -> Dict[str, Any]:
             return {"success": True, "worklogs_found": 0, "worklogs_ingested": 0}
 
     except Exception as e:
-        logger.error(f"❌ Failed to filter worklogs: {e}")
+        logger.error(f"❌ Failed to filter worklogs: {e}", exc_info=True)
         return {"success": False, "error": f"Failed to filter worklogs: {e}"}
 
     # Ingest into Pinecone

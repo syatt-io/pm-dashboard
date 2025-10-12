@@ -113,7 +113,11 @@ class VectorIngestService:
             return 0
 
         # Generate embeddings for documents that don't have them
-        for doc in documents:
+        logger.info(f"🔄 Generating embeddings for {len(documents)} documents...")
+        for idx, doc in enumerate(documents):
+            if (idx + 1) % 100 == 0:
+                logger.info(f"   Embedding progress: {idx + 1}/{len(documents)}")
+
             if not doc.embedding:
                 doc.embedding = self.get_embedding(doc.content)
                 if not doc.embedding:
@@ -125,6 +129,8 @@ class VectorIngestService:
         if not valid_docs:
             logger.warning("No valid documents to upsert (all failed embedding generation)")
             return 0
+
+        logger.info(f"✅ Generated {len(valid_docs)} embeddings successfully")
 
         # Upsert in batches
         upserted = 0
@@ -548,8 +554,15 @@ class VectorIngestService:
         """
         documents = []
         issue_pattern = re.compile(r'([A-Z]+-\d+)')
+        skipped_count = 0
 
-        for worklog in worklogs:
+        logger.info(f"🔄 Processing {len(worklogs)} worklogs to build documents...")
+
+        for idx, worklog in enumerate(worklogs):
+            # Progress logging every 500 worklogs
+            if (idx + 1) % 500 == 0:
+                logger.info(f"   Document building progress: {idx + 1}/{len(worklogs)} ({len(documents)} valid, {skipped_count} skipped)")
+
             try:
                 # Get worklog metadata
                 worklog_id = worklog.get('tempoWorklogId', '')
@@ -587,6 +600,7 @@ class VectorIngestService:
                 # Skip worklogs without issue association
                 if not issue_key:
                     logger.debug(f"Skipping worklog {worklog_id} - no issue key found")
+                    skipped_count += 1
                     continue
 
                 # Extract project key from issue key
@@ -637,12 +651,14 @@ class VectorIngestService:
 
             except Exception as e:
                 logger.error(f"Error processing Tempo worklog {worklog.get('tempoWorklogId')}: {e}")
+                skipped_count += 1
                 continue
 
         if not documents:
-            logger.warning("No valid Tempo worklogs to ingest")
+            logger.warning(f"⚠️  No valid Tempo worklogs to ingest ({skipped_count} skipped)")
             return 0
 
+        logger.info(f"✅ Built {len(documents)} valid documents ({skipped_count} skipped)")
         logger.info(f"📝 Ingesting {len(documents)} Tempo worklogs into Pinecone...")
         return self.upsert_documents(documents, batch_size=50)
 
