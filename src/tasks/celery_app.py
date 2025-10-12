@@ -1,33 +1,40 @@
 """Celery application configuration for background task processing."""
 
 import os
+import json
 from celery import Celery
 from celery.schedules import crontab
 
-# IMPORTANT: Unset ALL Redis/broker environment variables that Celery might auto-detect
-# We want to explicitly use PostgreSQL as the broker via DATABASE_URL only
-for env_var in ['REDIS_URL', 'BROKER_URL', 'CELERY_BROKER_URL', 'CELERY_RESULT_BACKEND']:
-    if env_var in os.environ:
-        del os.environ[env_var]
-        print(f"Removed {env_var} from environment to force PostgreSQL broker")
-
-# Use PostgreSQL as broker instead of Redis
-# This avoids Redis connection issues with Upstash and uses existing PostgreSQL infrastructure
-database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
-
-# Celery/Kombu requires 'sqla+' prefix for SQLAlchemy broker transport
-# Convert postgresql:// to sqla+postgresql://
-if database_url.startswith('postgresql://'):
-    broker_url = 'sqla+' + database_url
-elif database_url.startswith('postgres://'):
-    # Some providers use postgres:// instead of postgresql://
-    broker_url = 'sqla+postgresql://' + database_url.split('://', 1)[1]
+# Set up GCP credentials from environment variable
+# The credentials JSON is stored as GOOGLE_APPLICATION_CREDENTIALS_JSON
+gcp_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+if gcp_creds_json:
+    # Write credentials to a temporary file that google-cloud-pubsub can use
+    creds_path = '/tmp/gcp-credentials.json'
+    with open(creds_path, 'w') as f:
+        f.write(gcp_creds_json)
+    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = creds_path
+    print("✓ GCP credentials configured from environment")
 else:
-    broker_url = database_url
+    print("⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
 
-# Debug: Print the broker URL (without credentials)
-broker_display = broker_url.split('@')[0] + '@***' if '@' in broker_url else broker_url
-print(f"Celery broker configured: {broker_display}")
+# GCP Pub/Sub broker configuration
+# Format: gcpubsub://PROJECT_ID
+gcp_project_id = os.getenv('GCP_PROJECT_ID', 'syatt-io')
+broker_url = f'gcpubsub://{gcp_project_id}'
+
+# Use PostgreSQL for result backend (storing task results)
+database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
+if database_url.startswith('postgresql://'):
+    result_backend_url = 'db+' + database_url
+elif database_url.startswith('postgres://'):
+    result_backend_url = 'db+postgresql://' + database_url.split('://', 1)[1]
+else:
+    result_backend_url = 'db+' + database_url
+
+print(f"Celery broker: GCP Pub/Sub (project: {gcp_project_id})")
+backend_display = result_backend_url.split('@')[0] + '@***' if '@' in result_backend_url else result_backend_url
+print(f"Celery result backend: {backend_display}")
 
 # Create Celery app WITHOUT broker/backend parameters to avoid import-time evaluation
 # The broker will be set in conf.update() below
@@ -36,11 +43,12 @@ celery_app = Celery(
     include=['src.tasks.vector_tasks']
 )
 
-# Configure Celery for PostgreSQL broker
+# Configure Celery with GCP Pub/Sub broker and PostgreSQL result backend
 celery_app.conf.update(
-    # EXPLICITLY set broker and backend to override any environment variables
+    # Broker: GCP Pub/Sub for message queuing
+    # Result Backend: PostgreSQL for storing task results
     broker_url=broker_url,
-    result_backend=broker_url,
+    result_backend=result_backend_url,
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
@@ -52,10 +60,6 @@ celery_app.conf.update(
     # Broker connection retry settings
     broker_connection_retry_on_startup=True,
     broker_connection_max_retries=10,
-    # PostgreSQL-specific settings
-    broker_transport_options={
-        'visibility_timeout': 3600,  # 1 hour timeout for long-running tasks
-    },
     # Use database table prefix to isolate from other apps
     result_backend_table_prefix='celery_'
 )

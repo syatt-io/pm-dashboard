@@ -7,10 +7,6 @@ databases:
     engine: PG
     version: "15"
     production: false
-  - name: agentpm-redis
-    engine: REDIS
-    version: "7"
-    production: false
 
 # Single service for both backend and frontend
 services:
@@ -44,10 +40,6 @@ services:
       # Database (auto-configured by DigitalOcean)
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
-
-      # Redis (auto-configured by DigitalOcean)
-      - key: REDIS_URL
-        value: ${agentpm-redis.DATABASE_URL}
 
       # JWT Secret (generate with: openssl rand -hex 32)
       - key: JWT_SECRET_KEY
@@ -145,9 +137,15 @@ services:
     instance_size_slug: basic-xxs
 
     envs:
-      # Database (PostgreSQL is now used as Celery broker instead of Redis)
+      # Database (PostgreSQL for result backend)
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
+
+      # GCP Pub/Sub (Celery broker)
+      - key: GCP_PROJECT_ID
+        value: syatt-io
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        type: SECRET
 
       # OpenAI
       - key: OPENAI_API_KEY
@@ -201,6 +199,12 @@ services:
     instance_size_slug: basic-xxs
 
     envs:
-      # Database (PostgreSQL is now used as Celery broker instead of Redis)
+      # Database (PostgreSQL for result backend)
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
+
+      # GCP Pub/Sub (Celery broker)
+      - key: GCP_PROJECT_ID
+        value: syatt-io
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
+        type: SECRET
