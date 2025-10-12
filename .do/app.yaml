@@ -41,6 +41,10 @@ services:
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
 
+      # Encryption key for sensitive data
+      - key: ENCRYPTION_KEY
+        type: SECRET
+
       # JWT Secret (generate with: openssl rand -hex 32)
       - key: JWT_SECRET_KEY
         type: SECRET
