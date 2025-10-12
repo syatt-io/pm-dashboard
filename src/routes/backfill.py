@@ -220,11 +220,22 @@ def trigger_tempo_backfill():
 
         logger.info(f"Starting Tempo backfill in background thread for {days_back} days")
 
-        # Import backfill function
-        from src.tasks.backfill_tempo import backfill_tempo_worklogs
+        def run_tempo_backfill():
+            """Background thread function to run Tempo backfill."""
+            try:
+                from src.tasks.backfill_tempo import backfill_tempo_worklogs
+
+                logger.info("🔄 Starting Tempo backfill...")
+                result = backfill_tempo_worklogs(days_back)
+                logger.info(f"✅ Tempo backfill completed: {result}")
+
+            except Exception as e:
+                logger.error(f"Tempo backfill failed: {e}", exc_info=True)
+                raise
 
         # Run in background thread (fire-and-forget)
-        run_async_in_thread(backfill_tempo_worklogs, days_back)
+        thread = threading.Thread(target=run_tempo_backfill, daemon=True)
+        thread.start()
 
         logger.info(f"✅ Tempo backfill started in background for {days_back} days")
 
