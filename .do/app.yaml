@@ -149,10 +149,6 @@ services:
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
 
-      # Redis - REMOVED: Using PostgreSQL as broker to avoid Upstash connection issues
-      # - key: REDIS_URL
-      #   value: ${agentpm-redis.DATABASE_URL}
-
       # OpenAI
       - key: OPENAI_API_KEY
         type: SECRET
@@ -208,7 +204,3 @@ services:
       # Database (PostgreSQL is now used as Celery broker instead of Redis)
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
-
-      # Redis - REMOVED: Using PostgreSQL as broker to avoid Upstash connection issues
-      # - key: REDIS_URL
-      #   value: ${agentpm-redis.DATABASE_URL}
