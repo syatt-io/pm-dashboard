@@ -32,6 +32,9 @@ celery_app = Celery(
 
 # Configure Celery for PostgreSQL broker
 celery_app.conf.update(
+    # EXPLICITLY set broker and backend to override any environment variables
+    broker_url=broker_url,
+    result_backend=broker_url,
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
