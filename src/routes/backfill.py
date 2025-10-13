@@ -209,35 +209,66 @@ def trigger_tempo_backfill():
     """
     Trigger Tempo backfill to ingest historical worklogs into vector database.
 
-    Uses Celery for robust long-running execution (won't timeout like daemon threads).
+    Uses Celery for robust long-running execution with checkpointing and date range support.
 
     Query params:
-        days: Number of days back to fetch (default: 365 / ~1 year)
+        days: Number of days back to fetch (default: 365 / ~1 year) - ignored if from_date/to_date provided
+        from_date: Start date in YYYY-MM-DD format (optional)
+        to_date: End date in YYYY-MM-DD format (optional)
+        batch_id: Optional batch identifier for tracking (e.g., "2024-01")
 
     Returns:
         JSON response with Celery task ID for tracking
     """
     try:
-        days_back = int(request.args.get('days', 365))
+        days_back = request.args.get('days')
+        from_date = request.args.get('from_date')
+        to_date = request.args.get('to_date')
+        batch_id = request.args.get('batch_id')
 
-        logger.info(f"Triggering Tempo backfill Celery task for {days_back} days")
+        # Convert days_back to int if provided
+        if days_back:
+            days_back = int(days_back)
+
+        if from_date and to_date:
+            logger.info(f"Triggering Tempo backfill for date range: {from_date} to {to_date}")
+            log_msg = f"date range {from_date} to {to_date}"
+        else:
+            if not days_back:
+                days_back = 365
+            logger.info(f"Triggering Tempo backfill Celery task for {days_back} days")
+            log_msg = f"{days_back} days"
 
         # Import and trigger Celery task
         from src.tasks.vector_tasks import backfill_tempo
 
-        # Trigger async Celery task
-        task = backfill_tempo.delay(days_back)
+        # Trigger async Celery task with new parameters
+        task = backfill_tempo.delay(
+            days_back=days_back,
+            from_date=from_date,
+            to_date=to_date,
+            batch_id=batch_id
+        )
 
         logger.info(f"✅ Tempo backfill Celery task started: {task.id}")
 
-        return jsonify({
+        response = {
             "success": True,
-            "message": f"Tempo backfill started successfully via Celery",
-            "days_back": days_back,
+            "message": f"Tempo backfill started successfully via Celery ({log_msg})",
             "task_id": task.id,
             "status": "RUNNING",
             "note": "Task is running via Celery worker - check celery-worker logs for progress"
-        }), 202  # 202 Accepted - processing started
+        }
+
+        if from_date and to_date:
+            response["from_date"] = from_date
+            response["to_date"] = to_date
+        if days_back:
+            response["days_back"] = days_back
+        if batch_id:
+            response["batch_id"] = batch_id
+
+        return jsonify(response), 202  # 202 Accepted - processing started
 
     except Exception as e:
         logger.error(f"Error starting Tempo backfill: {e}")

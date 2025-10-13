@@ -6,6 +6,7 @@ from .base import Base
 # Import all model classes for easy access
 from .user import User, UserRole, UserWatchedProject
 from .learning import Learning
+from .backfill_progress import BackfillProgress
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -82,6 +83,7 @@ __all__ = [
     'TodoItem',
     'ProcessedMeeting',
     'FeedbackItem',
+    'BackfillProgress',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',

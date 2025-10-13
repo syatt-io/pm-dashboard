@@ -153,12 +153,13 @@ class VectorIngestService:
                     })
 
                 # Upsert to Pinecone
-                self.pinecone_index.upsert(vectors=vectors)
+                response = self.pinecone_index.upsert(vectors=vectors)
+                logger.info(f"🔍 Pinecone upsert response: {response}")
                 upserted += len(vectors)
                 logger.info(f"✅ Upserted batch of {len(vectors)} vectors ({upserted}/{len(valid_docs)} total)")
 
             except Exception as e:
-                logger.error(f"Error upserting batch: {e}")
+                logger.error(f"❌ Error upserting batch: {e}", exc_info=True)
                 continue
 
         logger.info(f"✅ Successfully upserted {upserted}/{len(documents)} documents to Pinecone")
@@ -624,27 +625,33 @@ class VectorIngestService:
                     content += f": {description}"
 
                 # Create document
+                # Build metadata dict, excluding None values (Pinecone doesn't accept None)
+                metadata = {
+                    'worklog_id': worklog_id,
+                    'issue_key': issue_key,
+                    'project_key': project_key,
+                    'author_account_id': author_account_id,
+                    'author_name': author_name,
+                    'hours_logged': hours_logged,
+                    'worklog_date': start_date,
+                    'timestamp': worklog_date.isoformat(),
+                    'timestamp_epoch': int(worklog_date.timestamp()),
+                    'date': worklog_date.strftime('%Y-%m-%d'),
+                    'description': description,
+                    # All Tempo data accessible to all users (same as Jira)
+                    'access_type': 'all'
+                }
+
+                # Only add author_email if it exists (Pinecone doesn't accept None)
+                if author_email:
+                    metadata['author_email'] = author_email
+
                 doc = VectorDocument(
                     id=doc_id,
                     source='tempo',
                     title=f"{issue_key}: {hours_logged:.1f}h by {author_name}",
                     content=content,
-                    metadata={
-                        'worklog_id': worklog_id,
-                        'issue_key': issue_key,
-                        'project_key': project_key,
-                        'author_account_id': author_account_id,
-                        'author_name': author_name,
-                        'author_email': author_email if author_email else None,
-                        'hours_logged': hours_logged,
-                        'worklog_date': start_date,
-                        'timestamp': worklog_date.isoformat(),
-                        'timestamp_epoch': int(worklog_date.timestamp()),
-                        'date': worklog_date.strftime('%Y-%m-%d'),
-                        'description': description,
-                        # All Tempo data accessible to all users (same as Jira)
-                        'access_type': 'all'
-                    }
+                    metadata=metadata
                 )
 
                 documents.append(doc)

@@ -860,26 +860,46 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
 
 
 @celery_app.task(name='src.tasks.vector_tasks.backfill_tempo', bind=True, time_limit=3600)
-def backfill_tempo(self, days_back: int = 365) -> Dict[str, Any]:
-    """Manual task: Backfill all Tempo worklogs from the last N days.
+def backfill_tempo(
+    self,
+    days_back: int = None,
+    from_date: str = None,
+    to_date: str = None,
+    batch_id: str = None
+) -> Dict[str, Any]:
+    """Manual task: Backfill Tempo worklogs with date range support.
 
     NOT scheduled - trigger manually via API or Celery CLI.
-    Uses Celery for robust long-running execution (won't be killed like daemon threads).
+    Uses Celery for robust long-running execution with checkpointing.
 
     Args:
-        days_back: Number of days to backfill (default 365 = 12 months)
+        days_back: Number of days to backfill (default 365) - ignored if from_date/to_date provided
+        from_date: Start date in YYYY-MM-DD format (overrides days_back)
+        to_date: End date in YYYY-MM-DD format (overrides days_back)
+        batch_id: Optional batch identifier for tracking (e.g., "2024-01")
 
     Returns:
         Dict with backfill stats
     """
     from src.tasks.backfill_tempo import backfill_tempo_worklogs
 
-    logger.info(f"🔄 Starting Tempo backfill via Celery ({days_back} days)...")
+    if from_date and to_date:
+        logger.info(f"🔄 Starting Tempo backfill via Celery for date range: {from_date} to {to_date}")
+    else:
+        if days_back is None:
+            days_back = 365
+        logger.info(f"🔄 Starting Tempo backfill via Celery ({days_back} days)...")
+
     logger.info(f"📋 Task ID: {self.request.id}")
 
     try:
-        # Call the shared backfill function (synchronous)
-        result = backfill_tempo_worklogs(days_back=days_back)
+        # Call the shared backfill function with new parameters
+        result = backfill_tempo_worklogs(
+            days_back=days_back,
+            from_date=from_date,
+            to_date=to_date,
+            batch_id=batch_id
+        )
         logger.info(f"✅ Tempo backfill task complete: {result}")
         return result
     except Exception as e:
