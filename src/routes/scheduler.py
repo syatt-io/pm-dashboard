@@ -148,3 +148,114 @@ def trigger_tempo_sync():
     except Exception as e:
         logger.error(f"Error triggering Tempo sync: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# Celery Task Trigger Routes (New Scheduler)
+# ============================================================================
+
+@scheduler_bp.route("/scheduler/celery/daily-digest", methods=["POST"])
+def trigger_celery_daily_digest():
+    """Trigger daily digest via Celery task."""
+    try:
+        from src.tasks.celery_app import celery_app
+        task = celery_app.send_task('src.tasks.notification_tasks.send_daily_digest')
+        return jsonify({
+            "success": True,
+            "message": "Daily digest task queued",
+            "task_id": task.id
+        })
+    except Exception as e:
+        logger.error(f"Error queuing daily digest: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@scheduler_bp.route("/scheduler/celery/overdue-reminders", methods=["POST"])
+def trigger_celery_overdue_reminders():
+    """Trigger overdue reminders via Celery task."""
+    try:
+        from src.tasks.celery_app import celery_app
+        task = celery_app.send_task('src.tasks.notification_tasks.send_overdue_reminders')
+        return jsonify({
+            "success": True,
+            "message": "Overdue reminders task queued",
+            "task_id": task.id
+        })
+    except Exception as e:
+        logger.error(f"Error queuing overdue reminders: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@scheduler_bp.route("/scheduler/celery/due-today", methods=["POST"])
+def trigger_celery_due_today():
+    """Trigger due today reminders via Celery task."""
+    try:
+        from src.tasks.celery_app import celery_app
+        task = celery_app.send_task('src.tasks.notification_tasks.send_due_today_reminders')
+        return jsonify({
+            "success": True,
+            "message": "Due today reminders task queued",
+            "task_id": task.id
+        })
+    except Exception as e:
+        logger.error(f"Error queuing due today reminders: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@scheduler_bp.route("/scheduler/celery/weekly-summary", methods=["POST"])
+def trigger_celery_weekly_summary():
+    """Trigger weekly summary via Celery task."""
+    try:
+        from src.tasks.celery_app import celery_app
+        task = celery_app.send_task('src.tasks.notification_tasks.send_weekly_summary')
+        return jsonify({
+            "success": True,
+            "message": "Weekly summary task queued",
+            "task_id": task.id
+        })
+    except Exception as e:
+        logger.error(f"Error queuing weekly summary: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@scheduler_bp.route("/scheduler/celery/tempo-sync", methods=["POST"])
+def trigger_celery_tempo_sync():
+    """Trigger Tempo sync via Celery task."""
+    try:
+        from src.tasks.celery_app import celery_app
+        task = celery_app.send_task('src.tasks.notification_tasks.sync_tempo_hours')
+        return jsonify({
+            "success": True,
+            "message": "Tempo sync task queued",
+            "task_id": task.id
+        })
+    except Exception as e:
+        logger.error(f"Error queuing Tempo sync: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@scheduler_bp.route("/scheduler/celery/test-all", methods=["POST"])
+def trigger_all_celery_tasks():
+    """Trigger all notification tasks via Celery for testing."""
+    try:
+        from src.tasks.celery_app import celery_app
+
+        tasks = [
+            ('daily_digest', 'src.tasks.notification_tasks.send_daily_digest'),
+            ('overdue_reminders', 'src.tasks.notification_tasks.send_overdue_reminders'),
+            ('due_today_reminders', 'src.tasks.notification_tasks.send_due_today_reminders'),
+        ]
+
+        results = {}
+        for name, task_path in tasks:
+            task = celery_app.send_task(task_path)
+            results[name] = task.id
+
+        return jsonify({
+            "success": True,
+            "message": "All notification tasks queued",
+            "task_ids": results
+        })
+    except Exception as e:
+        logger.error(f"Error queuing tasks: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
