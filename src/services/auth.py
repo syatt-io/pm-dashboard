@@ -24,26 +24,17 @@ class AuthService:
         self.allowed_domain = os.getenv('ALLOWED_EMAIL_DOMAIN', '@syatt.io')
         self.admin_email = os.getenv('ADMIN_EMAIL', 'mike.samimi@syatt.io')
 
-        # JWT Configuration - FAIL FAST if not configured in production
+        # JWT Configuration - FAIL FAST if not configured
+        # ✅ FIXED: Always require JWT_SECRET_KEY - no fallback
         self.jwt_secret = os.getenv('JWT_SECRET_KEY')
-        is_production = os.getenv('FLASK_ENV') == 'production'
 
         if not self.jwt_secret:
-            if is_production:
-                error_msg = (
-                    "CRITICAL: JWT_SECRET_KEY is not set in production environment. "
-                    "This is a security risk. Application startup aborted."
-                )
-                logger.error(error_msg)
-                raise ValueError(error_msg)
-            else:
-                # Development fallback with clear warning
-                logger.warning("=" * 80)
-                logger.warning("WARNING: Using default JWT_SECRET_KEY in development mode")
-                logger.warning("This is INSECURE and should NEVER be used in production")
-                logger.warning("Set JWT_SECRET_KEY environment variable")
-                logger.warning("=" * 80)
-                self.jwt_secret = 'dev-only-secret-key-do-not-use-in-production'
+            error_msg = (
+                "CRITICAL: JWT_SECRET_KEY is not set. Application startup aborted. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         self.jwt_expiry_hours = int(os.getenv('JWT_EXPIRY_HOURS', '24'))
 

@@ -61,7 +61,10 @@ celery_app.conf.update(
     broker_connection_retry_on_startup=True,
     broker_connection_max_retries=10,
     # Use database table prefix to isolate from other apps
-    result_backend_table_prefix='celery_'
+    result_backend_table_prefix='celery_',
+    # ✅ FIXED: Clean up task results after 1 hour to prevent database bloat
+    result_expires=3600,  # 1 hour in seconds
+    result_backend_max_connections=10,  # Limit connections to result backend
 )
 
 # Configure periodic tasks

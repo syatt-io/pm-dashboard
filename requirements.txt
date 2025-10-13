@@ -71,5 +71,6 @@ gunicorn>=21.2.0
 uvicorn==0.37.0
 flask>=3.0.0
 flask-cors>=4.0.0
+flask-limiter>=3.5.0  # ✅ Rate limiting for API endpoints
 psycopg2-binary>=2.9.0
 gevent>=23.7.0

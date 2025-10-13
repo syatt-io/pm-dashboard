@@ -16,6 +16,8 @@ os.environ['JIRA_URL'] = 'https://test.atlassian.net'
 os.environ['JIRA_USERNAME'] = 'test@example.com'
 os.environ['JIRA_API_TOKEN'] = 'test-token'
 os.environ['ENCRYPTION_KEY'] = 'test-encryption-key-32-bytes-long!'
+# ✅ FIXED: Add JWT_SECRET_KEY for tests (required after removing fallback)
+os.environ['JWT_SECRET_KEY'] = 'test-jwt-secret-key-32-bytes-long-for-testing-only!'
 
 from src.web_interface import app as flask_app
 from src.models import Base, User, UserRole, Learning, TodoItem

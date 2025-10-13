@@ -10,12 +10,22 @@ from google_auth_oauthlib.flow import Flow
 
 logger = logging.getLogger(__name__)
 
-def create_auth_blueprint(db_session_factory):
-    """Create authentication blueprint with database session factory."""
+def create_auth_blueprint(db_session_factory, limiter=None):
+    """Create authentication blueprint with database session factory and rate limiter."""
     auth_bp = Blueprint('auth', __name__)
     auth_service = AuthService(db_session_factory)
 
+    # Helper to conditionally apply rate limiting
+    def rate_limit(limit_string):
+        def decorator(f):
+            if limiter:
+                return limiter.limit(limit_string)(f)
+            return f
+        return decorator
+
+    # ✅ FIXED: Apply rate limiting to authentication endpoints
     @auth_bp.route('/api/auth/google', methods=['POST'])
+    @rate_limit("10 per minute")  # Max 10 login attempts per minute
     def google_login():
         """Handle Google OAuth login."""
         try:

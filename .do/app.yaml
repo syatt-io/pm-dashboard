@@ -6,7 +6,7 @@ databases:
   - name: agentpm-db
     engine: PG
     version: "15"
-    production: false
+    production: true  # ✅ FIXED: Enable automated backups and production features
 
 # Single service for both backend and frontend
 services:

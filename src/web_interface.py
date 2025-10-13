@@ -2,6 +2,8 @@
 
 from flask import Flask, render_template, request, jsonify, session, redirect, send_from_directory
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import asyncio
 import uuid
 import logging
@@ -73,18 +75,44 @@ if not app.secret_key:
         app.secret_key = 'dev-secret-key-change-in-production'
 
 # Configure CORS for development and production
-# Get frontend port from environment, default to 4001
-frontend_port = int(os.getenv('FRONTEND_PORT', 4001))
-cors_origins = [f"http://localhost:{frontend_port}", "http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]
+# ✅ FIXED: Strict CORS configuration - production only allows single domain
 if os.getenv('FLASK_ENV') == 'production':
-    # Add production domain when deployed
-    production_domain = os.getenv('PRODUCTION_DOMAIN')
-    if production_domain:
-        cors_origins.append(f"https://{production_domain}")
+    # Production: only allow the production domain
+    base_url = os.getenv('WEB_BASE_URL', 'https://agent-pm-tsbbb.ondigitalocean.app')
+    cors_origins = [base_url]
+    logger.info(f"Production CORS: {cors_origins}")
+else:
+    # Development: allow localhost on multiple ports for testing
+    frontend_port = int(os.getenv('FRONTEND_PORT', 4001))
+    cors_origins = [
+        f"http://localhost:{frontend_port}",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002"
+    ]
+    logger.info(f"Development CORS: {cors_origins}")
 
 CORS(app, origins=cors_origins, supports_credentials=True,
      allow_headers=['Content-Type', 'Authorization'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+
+# ✅ FIXED: Initialize rate limiter for API protection
+# Use Redis if available (production), otherwise in-memory (development)
+redis_url = os.getenv('REDIS_URL')
+if redis_url:
+    storage_uri = redis_url
+    logger.info(f"Rate limiter using Redis: {redis_url.split('@')[0]}@***")
+else:
+    storage_uri = "memory://"
+    logger.warning("Rate limiter using in-memory storage (development only)")
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["1000 per day", "200 per hour"],  # Global limits
+    storage_uri=storage_uri,
+    strategy="fixed-window",
+)
 
 # Set up database and auth
 # Initialize database once at startup
@@ -128,8 +156,8 @@ else:
     # In production (Gunicorn), scheduler is managed by gunicorn_config.py
     logger.info("Scheduler will be started by Gunicorn config (production mode)")
 
-# Register auth blueprint
-auth_blueprint = create_auth_blueprint(db_session_factory)
+# Register auth blueprint with rate limiter
+auth_blueprint = create_auth_blueprint(db_session_factory, limiter)
 app.register_blueprint(auth_blueprint)
 
 # Register extracted route blueprints
@@ -160,6 +188,12 @@ app.register_blueprint(user_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(backfill_bp)
+
+# ✅ FIXED: Apply rate limiting to critical backfill endpoints (expensive operations)
+limiter.limit("3 per hour")(app.view_functions['backfill.trigger_jira_backfill'])
+limiter.limit("3 per hour")(app.view_functions['backfill.trigger_notion_backfill'])
+limiter.limit("5 per hour")(app.view_functions['backfill.trigger_tempo_backfill'])
+limiter.limit("5 per hour")(app.view_functions['backfill.trigger_fireflies_backfill'])
 
 # Initialize components
 fireflies = FirefliesClient(settings.fireflies.api_key)

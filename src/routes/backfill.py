@@ -6,11 +6,43 @@ import threading
 import asyncio
 from flask import Blueprint, jsonify, request
 from src.services.auth import admin_required
+from src.models.validators import (
+    BackfillJiraRequest,
+    BackfillNotionRequest,
+    BackfillTempoRequest,
+    BackfillFirefliesRequest,
+    JiraQueryTestRequest
+)
+from pydantic import ValidationError
 from functools import wraps
 
 logger = logging.getLogger(__name__)
 
 backfill_bp = Blueprint('backfill', __name__, url_prefix='/api/backfill')
+# Rate limiting applied in web_interface.py after blueprint registration
+
+
+def validate_request(model_class):
+    """Decorator to validate request query parameters using Pydantic model."""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            try:
+                # Parse query parameters and validate
+                params = request.args.to_dict()
+                validated_data = model_class(**params)
+                # Add validated data to request context
+                request.validated_params = validated_data
+                return f(*args, **kwargs)
+            except ValidationError as e:
+                logger.warning(f"Validation error for {f.__name__}: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": "Invalid parameters",
+                    "details": e.errors()
+                }), 400
+        return wrapped
+    return decorator
 
 
 def run_async_in_thread(async_func, *args):
@@ -50,18 +82,20 @@ def admin_or_api_key_required(f):
 
 @backfill_bp.route('/jira', methods=['POST'])
 @admin_or_api_key_required
+@validate_request(BackfillJiraRequest)  # ✅ FIXED: Input validation
 def trigger_jira_backfill():
     """
     Trigger Jira backfill to ingest historical issues into vector database.
 
     Query params:
-        days: Number of days back to fetch (default: 2555 / ~7 years)
+        days: Number of days back to fetch (default: 2555, max: 3650)
 
     Returns:
         JSON response with task started status
     """
     try:
-        days_back = int(request.args.get('days', 2555))
+        # ✅ FIXED: Use validated parameters
+        days_back = request.validated_params.days
 
         logger.info(f"Starting Jira backfill in background thread for {days_back} days")
 
@@ -91,18 +125,20 @@ def trigger_jira_backfill():
 
 @backfill_bp.route('/notion', methods=['POST'])
 @admin_or_api_key_required
+@validate_request(BackfillNotionRequest)  # ✅ FIXED: Input validation
 def trigger_notion_backfill():
     """
     Trigger Notion backfill to ingest historical pages into vector database.
 
     Query params:
-        days: Number of days back to fetch (default: 365 / ~1 year)
+        days: Number of days back to fetch (default: 365, max: 3650)
 
     Returns:
         JSON response with task started status
     """
     try:
-        days_back = int(request.args.get('days', 365))
+        # ✅ FIXED: Use validated parameters
+        days_back = request.validated_params.days
 
         logger.info(f"Starting Notion backfill in background thread for {days_back} days")
 
@@ -132,20 +168,23 @@ def trigger_notion_backfill():
 
 @backfill_bp.route('/jira/test-query', methods=['GET'])
 @admin_or_api_key_required
+@validate_request(JiraQueryTestRequest)  # ✅ FIXED: Input validation
 def test_jira_query():
     """
     Test the exact JQL query used by backfill to diagnose result limits.
 
     Query params:
-        days: Number of days back (default: 2555)
-        limit: Max results to fetch (default: 100)
+        days: Number of days back (default: 2555, max: 3650)
+        limit: Max results to fetch (default: 100, max: 1000)
 
     Returns:
         First N issues from the query
     """
     try:
-        days_back = int(request.args.get('days', 2555))
-        limit = int(request.args.get('limit', 100))
+        # ✅ FIXED: Use validated parameters
+        params = request.validated_params
+        days_back = params.days
+        limit = params.limit
 
         logger.info(f"Testing backfill JQL query for {days_back} days, limit {limit}")
 
@@ -205,6 +244,7 @@ def test_jira_query():
 
 @backfill_bp.route('/tempo', methods=['POST'])
 @admin_or_api_key_required
+@validate_request(BackfillTempoRequest)  # ✅ FIXED: Input validation
 def trigger_tempo_backfill():
     """
     Trigger Tempo backfill to ingest historical worklogs into vector database.
@@ -212,7 +252,7 @@ def trigger_tempo_backfill():
     Uses Celery for robust long-running execution with checkpointing and date range support.
 
     Query params:
-        days: Number of days back to fetch (default: 365 / ~1 year) - ignored if from_date/to_date provided
+        days: Number of days back to fetch (default: 365, max: 3650) - ignored if from_date/to_date provided
         from_date: Start date in YYYY-MM-DD format (optional)
         to_date: End date in YYYY-MM-DD format (optional)
         batch_id: Optional batch identifier for tracking (e.g., "2024-01")
@@ -221,14 +261,12 @@ def trigger_tempo_backfill():
         JSON response with Celery task ID for tracking
     """
     try:
-        days_back = request.args.get('days')
-        from_date = request.args.get('from_date')
-        to_date = request.args.get('to_date')
-        batch_id = request.args.get('batch_id')
-
-        # Convert days_back to int if provided
-        if days_back:
-            days_back = int(days_back)
+        # ✅ FIXED: Use validated parameters
+        params = request.validated_params
+        days_back = params.days
+        from_date = params.from_date
+        to_date = params.to_date
+        batch_id = params.batch_id
 
         if from_date and to_date:
             logger.info(f"Triggering Tempo backfill for date range: {from_date} to {to_date}")
@@ -280,20 +318,23 @@ def trigger_tempo_backfill():
 
 @backfill_bp.route('/fireflies', methods=['POST'])
 @admin_or_api_key_required
+@validate_request(BackfillFirefliesRequest)  # ✅ FIXED: Input validation
 def trigger_fireflies_backfill():
     """
     Trigger Fireflies backfill to re-ingest all meetings with updated permissions and project tags.
 
     Query params:
-        days: Number of days back to fetch (default: 365 / ~1 year)
-        limit: Max meetings to process (default: 1000)
+        days: Number of days back to fetch (default: 365, max: 3650)
+        limit: Max meetings to process (default: 1000, max: 5000)
 
     Returns:
         JSON response with task started status
     """
     try:
-        days_back = int(request.args.get('days', 365))
-        limit = int(request.args.get('limit', 1000))
+        # ✅ FIXED: Use validated parameters
+        params = request.validated_params
+        days_back = params.days
+        limit = params.limit
 
         logger.info(f"Starting Fireflies backfill in background thread for {days_back} days (limit: {limit})")
 
