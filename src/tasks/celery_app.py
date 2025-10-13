@@ -40,7 +40,7 @@ print(f"Celery result backend: {backend_display}")
 # The broker will be set in conf.update() below
 celery_app = Celery(
     'agent_pm',
-    include=['src.tasks.vector_tasks']
+    include=['src.tasks.vector_tasks', 'src.tasks.notification_tasks']
 )
 
 # Configure Celery with GCP Pub/Sub broker and PostgreSQL result backend
@@ -66,6 +66,7 @@ celery_app.conf.update(
 
 # Configure periodic tasks
 celery_app.conf.beat_schedule = {
+    # ========== Vector Database Ingestion Tasks ==========
     # Ingest Slack messages every 15 minutes
     'ingest-slack-15min': {
         'task': 'src.tasks.vector_tasks.ingest_slack_messages',
@@ -85,6 +86,70 @@ celery_app.conf.beat_schedule = {
     'ingest-notion-hourly': {
         'task': 'src.tasks.vector_tasks.ingest_notion_pages',
         'schedule': crontab(hour='*/1', minute=15)  # Offset by 15min from Fireflies
+    },
+
+    # ========== Notification & Digest Tasks ==========
+    # Daily digest at 9 AM EST (14:00 UTC during DST, 13:00 UTC standard time)
+    # Using 13:00 UTC to work for both DST and standard time
+    'daily-todo-digest': {
+        'task': 'src.tasks.notification_tasks.send_daily_digest',
+        'schedule': crontab(hour=13, minute=0)
+    },
+    # Due today reminders at 9:30 AM EST (14:30 UTC during DST)
+    'due-today-reminders': {
+        'task': 'src.tasks.notification_tasks.send_due_today_reminders',
+        'schedule': crontab(hour=13, minute=30)
+    },
+    # Overdue reminders at 10 AM EST (15:00 UTC during DST)
+    'overdue-reminders-morning': {
+        'task': 'src.tasks.notification_tasks.send_overdue_reminders',
+        'schedule': crontab(hour=14, minute=0)
+    },
+    # Overdue reminders at 2 PM EST (19:00 UTC during DST)
+    'overdue-reminders-afternoon': {
+        'task': 'src.tasks.notification_tasks.send_overdue_reminders',
+        'schedule': crontab(hour=18, minute=0)
+    },
+    # Check urgent items every 2 hours during work hours (9 AM, 11 AM, 1 PM, 3 PM, 5 PM EST)
+    'urgent-items-9am': {
+        'task': 'src.tasks.notification_tasks.check_urgent_items',
+        'schedule': crontab(hour=13, minute=0)
+    },
+    'urgent-items-11am': {
+        'task': 'src.tasks.notification_tasks.check_urgent_items',
+        'schedule': crontab(hour=15, minute=0)
+    },
+    'urgent-items-1pm': {
+        'task': 'src.tasks.notification_tasks.check_urgent_items',
+        'schedule': crontab(hour=17, minute=0)
+    },
+    'urgent-items-3pm': {
+        'task': 'src.tasks.notification_tasks.check_urgent_items',
+        'schedule': crontab(hour=19, minute=0)
+    },
+    'urgent-items-5pm': {
+        'task': 'src.tasks.notification_tasks.check_urgent_items',
+        'schedule': crontab(hour=21, minute=0)
+    },
+
+    # ========== Weekly Tasks ==========
+    # Weekly summary on Mondays at 9 AM EST (14:00 UTC during DST)
+    'weekly-summary': {
+        'task': 'src.tasks.notification_tasks.send_weekly_summary',
+        'schedule': crontab(day_of_week=1, hour=13, minute=0)
+    },
+    # Weekly hours reports on Mondays at 10 AM EST (15:00 UTC during DST)
+    'weekly-hours-reports': {
+        'task': 'src.tasks.notification_tasks.send_weekly_hours_reports',
+        'schedule': crontab(day_of_week=1, hour=14, minute=0)
+    },
+
+    # ========== Daily Sync Tasks ==========
+    # Tempo hours sync at 4 AM EST (9:00 UTC during DST, 8:00 UTC standard time)
+    # Using 8:00 UTC to work for both DST and standard time
+    'tempo-sync-daily': {
+        'task': 'src.tasks.notification_tasks.sync_tempo_hours',
+        'schedule': crontab(hour=8, minute=0)
     },
 }
 
