@@ -857,3 +857,31 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Jira backfill failed: {e}")
         return {"success": False, "error": str(e)}
+
+
+@celery_app.task(name='src.tasks.vector_tasks.backfill_tempo', bind=True, time_limit=3600)
+def backfill_tempo(self, days_back: int = 365) -> Dict[str, Any]:
+    """Manual task: Backfill all Tempo worklogs from the last N days.
+
+    NOT scheduled - trigger manually via API or Celery CLI.
+    Uses Celery for robust long-running execution (won't be killed like daemon threads).
+
+    Args:
+        days_back: Number of days to backfill (default 365 = 12 months)
+
+    Returns:
+        Dict with backfill stats
+    """
+    from src.tasks.backfill_tempo import backfill_tempo_worklogs
+
+    logger.info(f"🔄 Starting Tempo backfill via Celery ({days_back} days)...")
+    logger.info(f"📋 Task ID: {self.request.id}")
+
+    try:
+        # Call the shared backfill function (synchronous)
+        result = backfill_tempo_worklogs(days_back=days_back)
+        logger.info(f"✅ Tempo backfill task complete: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Tempo backfill failed: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}

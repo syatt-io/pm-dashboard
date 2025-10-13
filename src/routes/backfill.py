@@ -209,42 +209,34 @@ def trigger_tempo_backfill():
     """
     Trigger Tempo backfill to ingest historical worklogs into vector database.
 
+    Uses Celery for robust long-running execution (won't timeout like daemon threads).
+
     Query params:
         days: Number of days back to fetch (default: 365 / ~1 year)
 
     Returns:
-        JSON response with task started status
+        JSON response with Celery task ID for tracking
     """
     try:
         days_back = int(request.args.get('days', 365))
 
-        logger.info(f"Starting Tempo backfill in background thread for {days_back} days")
+        logger.info(f"Triggering Tempo backfill Celery task for {days_back} days")
 
-        def run_tempo_backfill():
-            """Background thread function to run Tempo backfill."""
-            try:
-                from src.tasks.backfill_tempo import backfill_tempo_worklogs
+        # Import and trigger Celery task
+        from src.tasks.vector_tasks import backfill_tempo
 
-                logger.info("🔄 Starting Tempo backfill...")
-                result = backfill_tempo_worklogs(days_back)
-                logger.info(f"✅ Tempo backfill completed: {result}")
+        # Trigger async Celery task
+        task = backfill_tempo.delay(days_back)
 
-            except Exception as e:
-                logger.error(f"Tempo backfill failed: {e}", exc_info=True)
-                raise
-
-        # Run in background thread (fire-and-forget)
-        thread = threading.Thread(target=run_tempo_backfill, daemon=True)
-        thread.start()
-
-        logger.info(f"✅ Tempo backfill started in background for {days_back} days")
+        logger.info(f"✅ Tempo backfill Celery task started: {task.id}")
 
         return jsonify({
             "success": True,
-            "message": f"Tempo backfill started successfully in background",
+            "message": f"Tempo backfill started successfully via Celery",
             "days_back": days_back,
+            "task_id": task.id,
             "status": "RUNNING",
-            "note": "Task is running in background thread - check app logs for progress"
+            "note": "Task is running via Celery worker - check celery-worker logs for progress"
         }), 202  # 202 Accepted - processing started
 
     except Exception as e:
