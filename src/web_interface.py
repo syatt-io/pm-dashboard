@@ -98,21 +98,28 @@ CORS(app, origins=cors_origins, supports_credentials=True,
 
 # ✅ FIXED: Initialize rate limiter for API protection
 # Use Redis if available (production), otherwise in-memory (development)
-redis_url = os.getenv('REDIS_URL')
-if redis_url:
-    storage_uri = redis_url
-    logger.info(f"Rate limiter using Redis: {redis_url.split('@')[0]}@***")
-else:
-    storage_uri = "memory://"
-    logger.warning("Rate limiter using in-memory storage (development only)")
+try:
+    redis_url = os.getenv('REDIS_URL')
+    if redis_url:
+        storage_uri = redis_url
+        logger.info(f"Rate limiter using Redis: {redis_url.split('@')[0]}@***")
+    else:
+        storage_uri = "memory://"
+        logger.warning("Rate limiter using in-memory storage (development only)")
 
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["1000 per day", "200 per hour"],  # Global limits
-    storage_uri=storage_uri,
-    strategy="fixed-window",
-)
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["1000 per day", "200 per hour"],  # Global limits
+        storage_uri=storage_uri,
+        strategy="fixed-window",
+    )
+    logger.info("✅ Rate limiter initialized successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to initialize rate limiter: {e}")
+    # Create a no-op limiter that allows all requests (degraded mode)
+    limiter = None
+    logger.warning("⚠️  Running in degraded mode without rate limiting")
 
 # Set up database and auth
 # Initialize database once at startup
@@ -190,10 +197,14 @@ app.register_blueprint(feedback_bp)
 app.register_blueprint(backfill_bp)
 
 # ✅ FIXED: Apply rate limiting to critical backfill endpoints (expensive operations)
-limiter.limit("3 per hour")(app.view_functions['backfill.trigger_jira_backfill'])
-limiter.limit("3 per hour")(app.view_functions['backfill.trigger_notion_backfill'])
-limiter.limit("5 per hour")(app.view_functions['backfill.trigger_tempo_backfill'])
-limiter.limit("5 per hour")(app.view_functions['backfill.trigger_fireflies_backfill'])
+if limiter:
+    limiter.limit("3 per hour")(app.view_functions['backfill.trigger_jira_backfill'])
+    limiter.limit("3 per hour")(app.view_functions['backfill.trigger_notion_backfill'])
+    limiter.limit("5 per hour")(app.view_functions['backfill.trigger_tempo_backfill'])
+    limiter.limit("5 per hour")(app.view_functions['backfill.trigger_fireflies_backfill'])
+    logger.info("✅ Rate limits applied to backfill endpoints")
+else:
+    logger.warning("⚠️  Skipping rate limit application (limiter not available)")
 
 # Initialize components
 fireflies = FirefliesClient(settings.fireflies.api_key)
