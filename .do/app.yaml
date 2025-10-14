@@ -147,6 +147,14 @@ services:
     instance_size_slug: basic-xxs
 
     envs:
+      # Flask Configuration (needed for notification checks)
+      - key: FLASK_ENV
+        value: production
+
+      # Slack Channel (for notifications)
+      - key: SLACK_CHANNEL
+        value: "#mikes-minion"
+
       # Database (PostgreSQL for result backend)
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
@@ -171,6 +179,8 @@ services:
 
       # Slack
       - key: SLACK_BOT_TOKEN
+        type: SECRET
+      - key: SLACK_SIGNING_SECRET
         type: SECRET
 
       # Fireflies
