@@ -100,8 +100,7 @@ celery_app.conf.beat_schedule = {
     },
 
     # ========== Notification & Digest Tasks ==========
-    # Daily digest at 9 AM EST (14:00 UTC during DST, 13:00 UTC standard time)
-    # Using 13:00 UTC to work for both DST and standard time
+    # Daily digest at 9 AM EST (13:00 UTC)
     'daily-todo-digest': {
         'task': 'src.tasks.notification_tasks.send_daily_digest',
         'schedule': crontab(hour=13, minute=0)
