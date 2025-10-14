@@ -70,25 +70,28 @@ celery_app.conf.update(
 # Configure periodic tasks
 celery_app.conf.beat_schedule = {
     # ========== Vector Database Ingestion Tasks ==========
-    # Ingest Slack messages every 15 minutes
-    'ingest-slack-15min': {
-        'task': 'src.tasks.vector_tasks.ingest_slack_messages',
-        'schedule': crontab(minute='*/15')
-    },
-    # Ingest Jira issues every 30 minutes
-    'ingest-jira-30min': {
-        'task': 'src.tasks.vector_tasks.ingest_jira_issues',
-        'schedule': crontab(minute='*/30')
-    },
-    # Ingest Fireflies transcripts every hour
-    'ingest-fireflies-hourly': {
-        'task': 'src.tasks.vector_tasks.ingest_fireflies_transcripts',
-        'schedule': crontab(hour='*/1', minute=0)
-    },
-    # Ingest Notion pages daily at 2 AM EST (6:00 UTC)
+    # All ingestion tasks run daily between 2-5 AM EST (6-9 UTC) to minimize resource usage
+    # Staggered by 15 minutes to avoid overwhelming services
+
+    # Ingest Notion pages daily at 2:00 AM EST (6:00 UTC)
     'ingest-notion-daily': {
         'task': 'src.tasks.vector_tasks.ingest_notion_pages',
         'schedule': crontab(hour=6, minute=0)
+    },
+    # Ingest Slack messages daily at 2:15 AM EST (6:15 UTC)
+    'ingest-slack-daily': {
+        'task': 'src.tasks.vector_tasks.ingest_slack_messages',
+        'schedule': crontab(hour=6, minute=15)
+    },
+    # Ingest Jira issues daily at 2:30 AM EST (6:30 UTC)
+    'ingest-jira-daily': {
+        'task': 'src.tasks.vector_tasks.ingest_jira_issues',
+        'schedule': crontab(hour=6, minute=30)
+    },
+    # Ingest Fireflies transcripts daily at 2:45 AM EST (6:45 UTC)
+    'ingest-fireflies-daily': {
+        'task': 'src.tasks.vector_tasks.ingest_fireflies_transcripts',
+        'schedule': crontab(hour=6, minute=45)
     },
     # Ingest Tempo worklogs daily at 4:30 AM EST (8:30 UTC) - after tempo-sync-daily
     'ingest-tempo-daily': {
