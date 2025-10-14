@@ -383,6 +383,78 @@ def ingest_notion_pages() -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
+@celery_app.task(name='src.tasks.vector_tasks.ingest_tempo_worklogs')
+def ingest_tempo_worklogs() -> Dict[str, Any]:
+    """Periodic task: Ingest Tempo worklogs updated since last sync.
+
+    Runs daily via Celery Beat. Ingests worklogs from the last 2 days
+    to catch any recent entries or updates.
+
+    Returns:
+        Dict with ingestion stats
+    """
+    from src.services.vector_ingest import VectorIngestService
+    from src.integrations.tempo_api import TempoAPIClient
+    from config.settings import settings
+
+    logger.info("🔄 Starting Tempo worklogs ingestion task...")
+
+    try:
+        # Initialize services
+        ingest_service = VectorIngestService()
+        tempo_client = TempoAPIClient(api_token=settings.jira.tempo_api_token)
+
+        # Get last sync time (default to 2 days ago to catch any updates)
+        last_sync = ingest_service.get_last_sync_timestamp('tempo')
+        if not last_sync:
+            last_sync = datetime.now() - timedelta(days=2)
+
+        # Calculate days back (minimum 2 days to catch updates)
+        days_back = max(2, (datetime.now() - last_sync).days + 1)
+
+        logger.info(f"Fetching Tempo worklogs from last {days_back} days...")
+
+        # Calculate date range
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=days_back)
+
+        # Fetch worklogs
+        worklogs = tempo_client.get_worklogs(
+            start_date=start_date.strftime("%Y-%m-%d"),
+            end_date=end_date.strftime("%Y-%m-%d")
+        )
+
+        if not worklogs:
+            logger.info("No Tempo worklogs found")
+            return {
+                "success": True,
+                "total_ingested": 0,
+                "timestamp": datetime.now().isoformat()
+            }
+
+        logger.info(f"Found {len(worklogs)} worklogs to ingest")
+
+        # Ingest worklogs
+        total_ingested = ingest_service.ingest_tempo_worklogs(worklogs=worklogs)
+
+        # Update last sync timestamp
+        ingest_service.update_last_sync_timestamp('tempo', datetime.now())
+
+        result = {
+            "success": True,
+            "total_ingested": total_ingested,
+            "days_back": days_back,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        logger.info(f"✅ Tempo worklogs ingestion complete: {total_ingested} worklogs")
+        return result
+
+    except Exception as e:
+        logger.error(f"Tempo worklogs ingestion task failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @celery_app.task(name='src.tasks.vector_tasks.backfill_all_sources')
 def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
     """One-time backfill task: Ingest historical data from all sources.

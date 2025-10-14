@@ -85,10 +85,15 @@ celery_app.conf.beat_schedule = {
         'task': 'src.tasks.vector_tasks.ingest_fireflies_transcripts',
         'schedule': crontab(hour='*/1', minute=0)
     },
-    # Ingest Notion pages every hour
-    'ingest-notion-hourly': {
+    # Ingest Notion pages daily at 2 AM EST (6:00 UTC)
+    'ingest-notion-daily': {
         'task': 'src.tasks.vector_tasks.ingest_notion_pages',
-        'schedule': crontab(hour='*/1', minute=15)  # Offset by 15min from Fireflies
+        'schedule': crontab(hour=6, minute=0)
+    },
+    # Ingest Tempo worklogs daily at 4:30 AM EST (8:30 UTC) - after tempo-sync-daily
+    'ingest-tempo-daily': {
+        'task': 'src.tasks.vector_tasks.ingest_tempo_worklogs',
+        'schedule': crontab(hour=8, minute=30)
     },
 
     # ========== Notification & Digest Tasks ==========
