@@ -394,7 +394,7 @@ def ingest_tempo_worklogs() -> Dict[str, Any]:
         Dict with ingestion stats
     """
     from src.services.vector_ingest import VectorIngestService
-    from src.integrations.tempo_api import TempoAPIClient
+    from src.integrations.tempo import TempoAPIClient
     from config.settings import settings
 
     logger.info("🔄 Starting Tempo worklogs ingestion task...")
