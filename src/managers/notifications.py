@@ -86,7 +86,33 @@ class NotificationManager:
         """Send notification to Slack."""
         try:
             # Determine channel based on priority
-            channel = self.config.slack_urgent_channel if content.priority == "urgent" else self.config.slack_channel
+            channel_name = self.config.slack_urgent_channel if content.priority == "urgent" else self.config.slack_channel
+
+            # Convert channel name to ID if it starts with # (channel name)
+            # Slack API requires channel IDs, not names
+            if channel_name.startswith('#'):
+                # Try to resolve channel name to ID using conversations.list
+                try:
+                    response = self.slack_client.conversations_list(
+                        types="public_channel,private_channel",
+                        exclude_archived=True
+                    )
+                    clean_name = channel_name.lstrip('#')
+                    for ch in response.get('channels', []):
+                        if ch['name'] == clean_name:
+                            channel = ch['id']
+                            logger.info(f"Resolved Slack channel '{channel_name}' to ID '{channel}'")
+                            break
+                    else:
+                        # Channel not found, use name as-is (will likely fail but with clear error)
+                        channel = channel_name
+                        logger.warning(f"Could not resolve channel '{channel_name}' to ID, using as-is")
+                except Exception as e:
+                    logger.warning(f"Error resolving channel name '{channel_name}': {e}, using as-is")
+                    channel = channel_name
+            else:
+                # Already a channel ID or no # prefix
+                channel = channel_name
 
             # Build message blocks
             blocks = [
