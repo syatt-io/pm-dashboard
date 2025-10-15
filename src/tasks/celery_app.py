@@ -65,6 +65,15 @@ celery_app.conf.update(
     # ✅ FIXED: Clean up task results after 1 hour to prevent database bloat
     result_expires=3600,  # 1 hour in seconds
     result_backend_max_connections=10,  # Limit connections to result backend
+    # ✅ GCP Pub/Sub message retention and acknowledgment settings
+    # Increase acknowledgment deadline to prevent message loss during worker restarts
+    broker_transport_options={
+        'ack_deadline': 600,  # 10 minutes for worker to acknowledge (default is 60s)
+        'retry_policy': {
+            'minimum_backoff': 10,  # Minimum backoff of 10 seconds
+            'maximum_backoff': 600,  # Maximum backoff of 10 minutes
+        },
+    },
 )
 
 # Configure periodic tasks
