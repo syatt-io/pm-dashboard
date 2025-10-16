@@ -416,6 +416,43 @@ def trigger_fireflies_backfill():
         }), 500
 
 
+@backfill_bp.route('/notifications/tempo-sync', methods=['POST'])
+@admin_or_api_key_required
+def trigger_tempo_sync_notification():
+    """
+    Manually trigger the Tempo hours sync notification task.
+
+    This is useful for testing the notification system without waiting for the scheduled run.
+
+    Returns:
+        JSON response with Celery task ID for tracking
+    """
+    try:
+        logger.info("Manually triggering Tempo sync notification task")
+
+        # Import and trigger Celery task
+        from src.tasks.celery_app import celery_app
+
+        task = celery_app.send_task('src.tasks.notification_tasks.sync_tempo_hours')
+
+        logger.info(f"✅ Tempo sync notification task started: {task.id}")
+
+        return jsonify({
+            "success": True,
+            "message": "Tempo sync notification task triggered successfully",
+            "task_id": task.id,
+            "status": "QUEUED",
+            "note": "Check celery-worker logs for execution details including new verbose logging"
+        }), 202  # 202 Accepted - processing started
+
+    except Exception as e:
+        logger.error(f"Error triggering Tempo sync notification: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @backfill_bp.route('/jira/check-projects', methods=['GET'])
 @admin_or_api_key_required
 def check_jira_projects():
