@@ -29,8 +29,8 @@ class NotificationConfig:
     """Notification settings for multiple channels."""
     slack_bot_token: Optional[str] = None
     slack_signing_secret: Optional[str] = None
-    slack_channel: str = "#pm-updates"
-    slack_urgent_channel: str = "#urgent-tasks"
+    slack_channel: str = "#mikes-minion"
+    slack_urgent_channel: str = "#mikes-minion"
 
     smtp_host: Optional[str] = None
     smtp_port: int = 587
@@ -194,8 +194,8 @@ class Settings:
         return NotificationConfig(
             slack_bot_token=os.getenv("SLACK_BOT_TOKEN"),
             slack_signing_secret=os.getenv("SLACK_SIGNING_SECRET"),
-            slack_channel=os.getenv("SLACK_CHANNEL", "#pm-updates"),
-            slack_urgent_channel=os.getenv("SLACK_URGENT_CHANNEL", "#urgent-tasks"),
+            slack_channel=os.getenv("SLACK_CHANNEL", "#mikes-minion"),
+            slack_urgent_channel=os.getenv("SLACK_URGENT_CHANNEL", "#mikes-minion"),
             smtp_host=os.getenv("SMTP_HOST"),
             smtp_port=int(os.getenv("SMTP_PORT", "587")),
             smtp_user=os.getenv("SMTP_USER"),
