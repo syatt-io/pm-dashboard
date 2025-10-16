@@ -84,88 +84,94 @@ class NotificationManager:
 
     async def _send_slack(self, content: NotificationContent) -> Dict[str, Any]:
         """Send notification to Slack."""
-        try:
-            # Determine channel based on priority
-            channel_name = self.config.slack_urgent_channel if content.priority == "urgent" else self.config.slack_channel
+        def _send_slack_sync():
+            """Synchronous Slack sending (runs in executor)."""
+            try:
+                # Determine channel based on priority
+                channel_name = self.config.slack_urgent_channel if content.priority == "urgent" else self.config.slack_channel
 
-            # Convert channel name to ID if it starts with # (channel name)
-            # Slack API requires channel IDs, not names
-            if channel_name.startswith('#'):
-                # Try to resolve channel name to ID using conversations.list
-                try:
-                    response = self.slack_client.conversations_list(
-                        types="public_channel,private_channel",
-                        exclude_archived=True
-                    )
-                    clean_name = channel_name.lstrip('#')
-                    for ch in response.get('channels', []):
-                        if ch['name'] == clean_name:
-                            channel = ch['id']
-                            logger.info(f"Resolved Slack channel '{channel_name}' to ID '{channel}'")
-                            break
-                    else:
-                        # Channel not found, use name as-is (will likely fail but with clear error)
+                # Convert channel name to ID if it starts with # (channel name)
+                # Slack API requires channel IDs, not names
+                if channel_name.startswith('#'):
+                    # Try to resolve channel name to ID using conversations.list
+                    try:
+                        response = self.slack_client.conversations_list(
+                            types="public_channel,private_channel",
+                            exclude_archived=True
+                        )
+                        clean_name = channel_name.lstrip('#')
+                        for ch in response.get('channels', []):
+                            if ch['name'] == clean_name:
+                                channel = ch['id']
+                                logger.info(f"Resolved Slack channel '{channel_name}' to ID '{channel}'")
+                                break
+                        else:
+                            # Channel not found, use name as-is (will likely fail but with clear error)
+                            channel = channel_name
+                            logger.warning(f"Could not resolve channel '{channel_name}' to ID, using as-is")
+                    except Exception as e:
+                        logger.warning(f"Error resolving channel name '{channel_name}': {e}, using as-is")
                         channel = channel_name
-                        logger.warning(f"Could not resolve channel '{channel_name}' to ID, using as-is")
-                except Exception as e:
-                    logger.warning(f"Error resolving channel name '{channel_name}': {e}, using as-is")
+                else:
+                    # Already a channel ID or no # prefix
                     channel = channel_name
-            else:
-                # Already a channel ID or no # prefix
-                channel = channel_name
 
-            # Build message blocks
-            blocks = [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": content.title
+                # Build message blocks
+                blocks = [
+                    {
+                        "type": "header",
+                        "text": {
+                            "type": "plain_text",
+                            "text": content.title
+                        }
+                    },
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": content.body
+                        }
                     }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": content.body
-                    }
-                }
-            ]
+                ]
 
-            # Add items if present
-            if content.items:
-                items_text = "\n".join([f"• {item.get('title', item)}" for item in content.items[:10]])
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": items_text
-                    }
-                })
+                # Add items if present
+                if content.items:
+                    items_text = "\n".join([f"• {item.get('title', item)}" for item in content.items[:10]])
+                    blocks.append({
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": items_text
+                        }
+                    })
 
-            # Add footer if present
-            if content.footer:
-                blocks.append({
-                    "type": "context",
-                    "elements": [{
-                        "type": "plain_text",
-                        "text": content.footer
-                    }]
-                })
+                # Add footer if present
+                if content.footer:
+                    blocks.append({
+                        "type": "context",
+                        "elements": [{
+                            "type": "plain_text",
+                            "text": content.footer
+                        }]
+                    })
 
-            response = self.slack_client.chat_postMessage(
-                channel=channel,
-                blocks=blocks,
-                text=content.title  # Fallback text
-            )
-            return {"success": True, "channel": "slack", "message_id": response["ts"]}
+                response = self.slack_client.chat_postMessage(
+                    channel=channel,
+                    blocks=blocks,
+                    text=content.title  # Fallback text
+                )
+                return {"success": True, "channel": "slack", "message_id": response["ts"]}
 
-        except SlackApiError as e:
-            logger.error(f"Slack API error: {e}")
-            return {"success": False, "channel": "slack", "error": str(e)}
-        except Exception as e:
-            logger.error(f"Error sending Slack notification: {e}")
-            return {"success": False, "channel": "slack", "error": str(e)}
+            except SlackApiError as e:
+                logger.error(f"Slack API error: {e}")
+                return {"success": False, "channel": "slack", "error": str(e)}
+            except Exception as e:
+                logger.error(f"Error sending Slack notification: {e}")
+                return {"success": False, "channel": "slack", "error": str(e)}
+
+        # Run synchronous Slack API calls in executor to avoid blocking
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _send_slack_sync)
 
     async def _send_email(self, content: NotificationContent) -> Dict[str, Any]:
         """Send notification via email."""
