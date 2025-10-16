@@ -44,6 +44,10 @@ class ContextSummarizer:
         self.client = AsyncOpenAI(api_key=settings.ai.api_key)
         self.model = settings.ai.model  # Use configured model from OPENAI_MODEL env variable
 
+        # Load prompts from configuration
+        from src.utils.prompt_manager import get_prompt_manager
+        self.prompt_manager = get_prompt_manager()
+
     async def summarize(
         self,
         query: str,
@@ -111,13 +115,20 @@ class ContextSummarizer:
             logger.info(f"📊 Processing {len(results)} results into summary")
 
         try:
+            # Get system message from configuration
+            system_message = self.prompt_manager.get_prompt(
+                'context_search',
+                'system_message',
+                default="You are an expert technical analyst helping engineers understand project context."
+            )
+
             # Build API parameters - some models don't support temperature/max_completion_tokens
             api_params = {
                 "model": self.model,
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert technical analyst helping engineers understand project context.\n\nYour goal: Synthesize all available information into a clear, brief, well-structured explanation.\n\nGuidelines:\n- Write in a straightforward, matter-of-fact tone - like briefing a coworker\n- BE BRIEF - cut unnecessary words, avoid verbose explanations\n- Synthesize information from multiple sources into a unified narrative\n- Focus on WHAT is known, not excessive WHO/WHERE/WHEN attribution\n- Only cite sources when it adds crucial context (decisions, disagreements, open questions)\n- Organize information logically by topic, not chronologically\n- Include important technical details but be concise\n- Use clear structure with markdown formatting (headings, lists, code blocks)\n- Lead with the most important/actionable information\n- Write as if you're explaining the topic itself, not summarizing meetings\n\nCRITICAL - FACTS ONLY, NO SPECULATION:\n- **Only state information explicitly found in the sources** - do not infer or guess\n- **Synthesis is good** - connecting facts from multiple sources to explain how things work\n- **Speculation is bad** - guessing at next steps, recommendations, or future plans not mentioned in sources\n- **If sources don't mention next steps, don't include them** - omit sections that would require guessing\n- **When uncertain about something, acknowledge the gap** - say \"not mentioned in sources\" rather than inferring\n\nExamples:\n- ✅ GOOD: \"The webhook implementation uses POST requests to /api/webhooks and processes them via the EventHandler class\"\n- ❌ BAD: \"The team should probably add rate limiting to the webhook endpoint\"\n- ✅ GOOD: \"The ticket mentions they plan to add authentication next sprint\"\n- ❌ BAD: \"Next steps would be to add authentication\" (unless explicitly stated)\n\nStructure your response to fit the query:\n- Status checks → Summary + Current state + Context/background + Blockers + (Next steps ONLY if explicitly stated)\n- Bug investigations → Summary + Problem description + Root cause + Impact + Solution + Status\n- Feature exploration → Summary + Requirements + Approach + Key decisions + Implementation details + Status\n- Technical questions → Summary + Direct answer + Supporting details + Context + Examples\n\nCRITICAL - IGNORE STALE/SUPERSEDED INFORMATION:\n- **Actively filter out outdated information** - don't include information that has been superseded by newer sources\n- **Recent implementations/decisions completely override old discussions** - if something is now implemented, old debates are irrelevant\n- **Skip historical uncertainty entirely** - if there's now a clear answer, don't mention that it was once uncertain\n- **Only include old context if it explains WHY** - never include old context about WHAT or HOW if newer sources have that information\n- **When you detect superseded information, ignore it completely** - don't say \"it was discussed\" or \"originally considered\" - just state the current reality\n\nExample: If there was a 2-month-old discussion about \"should we use webhooks?\", but a recent commit shows webhooks were implemented, your answer should ONLY mention that webhooks are implemented. Don't mention the old discussion at all.\n\nOTHER REQUIREMENTS:\n- Be complete - include all relevant information from the sources\n- Use clear headings (##) and bullet points (•) to organize information\n- Don't truncate or summarize away important technical details\n- Include specific requirements, decisions, blockers, and examples\n\nYour response should be thorough enough that the engineer doesn't need to read the original sources."
+                        "content": system_message
                     },
                     {
                         "role": "user",
@@ -208,71 +219,38 @@ class ContextSummarizer:
             project_key = project_context['project_key']
             keywords = project_context['keywords']
             keywords_str = ", ".join(sorted(keywords)[:15])  # Limit to 15 most relevant
-            domain_context = f"""
-DOMAIN CONTEXT:
-This query relates to the "{project_key}" project. Related terms and concepts for this project include: {keywords_str}.
-These keywords provide context for understanding project-specific acronyms, terminology, and abbreviations that may appear in the results.
-"""
 
-        # Configure detail level instructions
-        detail_instructions = {
-            "brief": "Keep your summary concise (100-200 words). Focus on the most critical information only.",
-            "normal": "Target 150-250 words. Be brief and direct - cut unnecessary words, get straight to the point.",
-            "detailed": "Be thorough but not verbose (400-600 words). Include relevant details but avoid wordiness.",
-            "slack": "CRITICAL: Maximum 2000 characters total. Target 200-300 words MAX. Be extremely concise - mention each piece of information only ONCE. No repetition. Use Slack markdown: *bold* for section headers, • for bullets, `code` for tickets. Prioritize the most important/actionable information only. Omit background details unless critical."
-        }
-        detail_instruction = detail_instructions.get(detail_level, detail_instructions["normal"])
+            # Get domain context template from config
+            domain_context_template = self.prompt_manager.get_prompt(
+                'context_search',
+                'domain_context_template',
+                default="\nDOMAIN CONTEXT:\nThis query relates to the \"{project_key}\" project. Related terms: {keywords_str}.\n"
+            )
+            domain_context = domain_context_template.format(
+                project_key=project_key,
+                keywords_str=keywords_str
+            )
 
-        return f"""Query: "{query}"
-{domain_context}
-SEARCH RESULTS:
-{context_text}
+        # Get detail level instructions from config
+        detail_levels = self.prompt_manager.get_prompt('context_search', 'detail_levels', default={})
+        detail_instruction = detail_levels.get(
+            detail_level,
+            "Target 150-250 words. Be brief and direct - cut unnecessary words, get straight to the point."
+        )
 
----
+        # Get user prompt template from config
+        user_prompt_template = self.prompt_manager.get_prompt(
+            'context_search',
+            'user_prompt_template',
+            default='Query: "{query}"\n{domain_context}\nSEARCH RESULTS:\n{context_text}\n\nSynthesize the results into a concise answer.'
+        )
 
-Synthesize all the search results into a concise, actionable answer. Be brief and direct.
-
-CRITICAL REQUIREMENTS:
-1. BE BRIEF - cut unnecessary words, get straight to the point
-2. BE CONCISE - prioritize actionable insights, omit background details
-3. SYNTHESIZE information - don't list facts from different sources
-4. Focus on WHAT is known, not WHO said it or WHERE it was said
-5. {detail_instruction}
-6. Include only the most important technical details - omit nice-to-know information
-7. Organize by logical topic flow, NOT chronologically or by source
-8. **IGNORE STALE INFORMATION**:
-   - If newer sources show something was implemented/decided, IGNORE old discussions about whether to do it
-   - If there's a conflict between old and new information, ONLY include the new information
-   - Historical uncertainty or debates are NOT relevant if there's now a clear implementation
-   - Only mention old information if it explains WHY a current decision was made
-   - When you see superseded information, skip it entirely - don't even mention it existed
-
-What to synthesize from the sources (prioritizing recent data):
-
-TECHNICAL UNDERSTANDING:
-- What is the current state/status?
-- What is the root cause or key issue?
-- What are the requirements or constraints?
-- What decisions have been made and why?
-- What solutions or approaches are being used?
-- What are the blockers or open questions?
-
-ACTIONABLE INFORMATION:
-- Ticket numbers and their status
-- Implementation details and technical approaches
-- Next steps or recommendations (ONLY if explicitly stated in sources - don't infer or guess)
-- Dependencies and related work
-
-PRESENTATION STYLE:
-- Lead with the most important/actionable information first
-- Write in a straightforward, matter-of-fact tone - no fluff, no filler words
-- BE BRIEF - use short sentences, cut unnecessary words
-- Use clear, concise sections (headings, bullet points)
-- Only mention sources when it adds crucial context
-- Include specific examples only when they clarify the point (ticket numbers, key decisions)
-- Avoid repetition - say each thing once
-- Skip obvious background information and verbose explanations
-"""
+        return user_prompt_template.format(
+            query=query,
+            domain_context=domain_context,
+            context_text=context_text,
+            detail_instruction=detail_instruction
+        )
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
         """Parse the flexible AI response.

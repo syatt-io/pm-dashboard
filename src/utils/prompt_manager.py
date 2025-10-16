@@ -63,6 +63,10 @@ class PromptManager:
         """Get all digest generation related prompts."""
         return self.prompts.get('digest_generation', {})
 
+    def get_context_search_prompts(self) -> Dict[str, str]:
+        """Get all context search related prompts."""
+        return self.prompts.get('context_search', {})
+
     def get_prompt(self, category: str, prompt_key: str, default: str = "") -> str:
         """
         Get a specific prompt by category and key.
@@ -127,6 +131,17 @@ class PromptManager:
             'digest_generation': {
                 'system_message': """You are a project management assistant.""",
                 'insights_prompt_template': """Generate project insights from the provided data."""
+            },
+            'context_search': {
+                'system_message': """You are an expert technical analyst helping engineers understand project context.""",
+                'user_prompt_template': """Query: "{query}"\n{domain_context}\nSEARCH RESULTS:\n{context_text}\n\nSynthesize the results into a concise answer.""",
+                'domain_context_template': """\nDOMAIN CONTEXT:\nThis query relates to the "{project_key}" project. Related terms: {keywords_str}.\n""",
+                'detail_levels': {
+                    'brief': 'Keep your summary concise (100-200 words). Focus on the most critical information only.',
+                    'normal': 'Target 150-250 words. Be brief and direct - cut unnecessary words, get straight to the point.',
+                    'detailed': 'Be thorough but not verbose (400-600 words). Include relevant details but avoid wordiness.',
+                    'slack': 'CRITICAL: Maximum 2000 characters total. Target 200-300 words MAX. Be extremely concise.'
+                }
             },
             'prompt_settings': {
                 'summary_max_length': 500,
