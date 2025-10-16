@@ -416,7 +416,7 @@ def trigger_fireflies_backfill():
         }), 500
 
 
-@backfill_bp.route('/trigger-tempo-sync', methods=['POST'])
+@backfill_bp.route('/trigger-tempo-sync', methods=['GET'])
 @admin_or_api_key_required
 def trigger_tempo_sync_notification():
     """
