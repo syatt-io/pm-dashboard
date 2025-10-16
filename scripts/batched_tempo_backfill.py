@@ -18,9 +18,16 @@ import sys
 from datetime import datetime, timedelta
 from typing import List, Tuple
 
+# Force unbuffered output
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 # Configuration
 API_URL = "https://agent-pm-tsbbb.ondigitalocean.app"
 ADMIN_API_KEY = "bc2233d757d98984b806514c36535e5b4cb7908d3283ddbddbbbe052217e31fa"
+
+# Wait time between chunks (in seconds) - default 3 minutes
+WAIT_BETWEEN_CHUNKS = 180
 
 
 def generate_monthly_chunks(days_back: int = 365) -> List[Tuple[str, str, str]]:
