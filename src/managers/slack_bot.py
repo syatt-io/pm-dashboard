@@ -1238,9 +1238,14 @@ class SlackTodoBot:
             channel = channel or settings.notifications.slack_channel
 
             if summary.total == 0:
-                await self.client.chat_postMessage(
-                    channel=channel,
-                    text="🎉 No active TODOs today! Great job team!"
+                # Run synchronous Slack API call in executor
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(
+                    None,
+                    lambda: self.client.chat_postMessage(
+                        channel=channel,
+                        text="🎉 No active TODOs today! Great job team!"
+                    )
                 )
                 return
 
@@ -1302,10 +1307,15 @@ class SlackTodoBot:
                 }]
             })
 
-            await self.client.chat_postMessage(
-                channel=channel,
-                blocks=blocks,
-                text="Daily TODO Digest"
+            # Run synchronous Slack API call in executor
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(
+                None,
+                lambda: self.client.chat_postMessage(
+                    channel=channel,
+                    blocks=blocks,
+                    text="Daily TODO Digest"
+                )
             )
 
         except Exception as e:
