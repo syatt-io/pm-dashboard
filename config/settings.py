@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,6 +41,17 @@ class NotificationConfig:
 
     morning_digest_time: str = "08:00"
     evening_digest_time: str = "17:00"
+
+
+@dataclass
+class SlackChatConfig:
+    """Slack conversational chat feature configuration."""
+    enabled: bool = False
+    whitelisted_users: List[str] = None  # List of Slack user IDs
+
+    def __post_init__(self):
+        if self.whitelisted_users is None:
+            self.whitelisted_users = []
 
 
 @dataclass
@@ -115,6 +126,7 @@ class Settings:
         self.jira = self._load_jira_config()
         self.github = self._load_github_config()
         self.notifications = self._load_notification_config()
+        self.slack_chat = self._load_slack_chat_config()
         self.ai = self._load_ai_config()
         self.agent = self._load_agent_config()
         self.web = self._load_web_config()
@@ -203,6 +215,20 @@ class Settings:
             teams_webhook_url=os.getenv("TEAMS_WEBHOOK_URL"),
             morning_digest_time=os.getenv("MORNING_DIGEST_TIME", "08:00"),
             evening_digest_time=os.getenv("EVENING_DIGEST_TIME", "17:00")
+        )
+
+    @staticmethod
+    def _load_slack_chat_config() -> SlackChatConfig:
+        """Load Slack chat feature configuration."""
+        enabled = os.getenv("SLACK_CHAT_ENABLED", "false").lower() == "true"
+
+        # Parse whitelisted users (comma-separated Slack user IDs)
+        whitelist_str = os.getenv("SLACK_CHAT_WHITELISTED_USERS", "")
+        whitelisted_users = [uid.strip() for uid in whitelist_str.split(",") if uid.strip()]
+
+        return SlackChatConfig(
+            enabled=enabled,
+            whitelisted_users=whitelisted_users
         )
 
     @staticmethod

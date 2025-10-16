@@ -732,6 +732,100 @@ class SlackTodoBot:
             channel = event['channel']
             logger.info(f"Channel deleted: {channel} ")
 
+        # Slack chat feature handlers (DMs and @mentions)
+        if settings.slack_chat.enabled:
+            logger.info(f"🤖 Slack chat feature enabled! Whitelist: {settings.slack_chat.whitelisted_users}")
+
+            @self.app.event("app_mention")
+            def handle_app_mention(event, say):
+                """Handle @bot mentions for conversational chat."""
+                user_id = event.get('user')
+                text = event.get('text', '')
+                channel_id = event.get('channel')
+                thread_ts = event.get('thread_ts', event.get('ts'))  # Reply in thread if already in one
+
+                # Check whitelist
+                if settings.slack_chat.whitelisted_users and user_id not in settings.slack_chat.whitelisted_users:
+                    logger.info(f"User {user_id} not in whitelist, ignoring chat request")
+                    return
+
+                # Remove bot mention from text
+                bot_user_id = self.app.client.auth_test()['user_id']
+                question = re.sub(f'<@{bot_user_id}>', '', text).strip()
+
+                if not question:
+                    say(
+                        channel=channel_id,
+                        thread_ts=thread_ts,
+                        text="👋 Hi! Ask me anything and I'll search across Slack, meetings, Jira, GitHub, and Notion to help you."
+                    )
+                    return
+
+                # Handle the question via chat service
+                try:
+                    from src.services.slack_chat_service import SlackChatService
+                    chat_service = SlackChatService()
+
+                    # Run async handler
+                    asyncio.run(chat_service.handle_question(
+                        user_id=user_id,
+                        question=question,
+                        channel_id=channel_id,
+                        thread_ts=thread_ts
+                    ))
+                except Exception as e:
+                    logger.error(f"Error handling app_mention: {e}")
+                    say(
+                        channel=channel_id,
+                        thread_ts=thread_ts,
+                        text=f"❌ Sorry, I encountered an error: {str(e)}"
+                    )
+
+            @self.app.event("message")
+            def handle_dm_message(event):
+                """Handle direct messages for conversational chat."""
+                # Only process DMs (not channel messages)
+                channel_type = event.get('channel_type')
+                if channel_type != 'im':
+                    return  # Ignore channel messages
+
+                # Skip bot messages
+                if event.get('subtype') == 'bot_message':
+                    return
+
+                user_id = event.get('user')
+                text = event.get('text', '')
+                channel_id = event.get('channel')
+
+                # Check whitelist
+                if settings.slack_chat.whitelisted_users and user_id not in settings.slack_chat.whitelisted_users:
+                    logger.info(f"User {user_id} not in whitelist, ignoring DM")
+                    return
+
+                if not text or not text.strip():
+                    return
+
+                # Handle the question via chat service
+                try:
+                    from src.services.slack_chat_service import SlackChatService
+                    chat_service = SlackChatService()
+
+                    # Run async handler
+                    asyncio.run(chat_service.handle_question(
+                        user_id=user_id,
+                        question=text.strip(),
+                        channel_id=channel_id,
+                        thread_ts=None  # DMs don't have threads
+                    ))
+                except Exception as e:
+                    logger.error(f"Error handling DM: {e}")
+                    self.client.chat_postMessage(
+                        channel=channel_id,
+                        text=f"❌ Sorry, I encountered an error: {str(e)}"
+                    )
+        else:
+            logger.info("🤖 Slack chat feature is disabled (SLACK_CHAT_ENABLED=false)")
+
     def _get_help_message(self) -> Dict[str, Any]:
         """Get help message with all available commands."""
         blocks = [
