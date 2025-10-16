@@ -501,13 +501,22 @@ class TodoScheduler:
 
                 # Only send notification if in production
                 import os
-                if os.getenv('FLASK_ENV') == 'production':
+                flask_env = os.getenv('FLASK_ENV')
+                logger.info(f"FLASK_ENV={flask_env}, checking if should send notification...")
+                if flask_env == 'production':
+                    logger.info("Sending Tempo sync notification to Slack...")
                     content = NotificationContent(
                         title="Tempo Hours Sync",
                         body=summary_body,
                         priority="normal"
                     )
-                    asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                    try:
+                        asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                        logger.info("✅ Tempo sync notification sent successfully")
+                    except Exception as notif_error:
+                        logger.error(f"❌ Failed to send Tempo sync notification: {notif_error}", exc_info=True)
+                else:
+                    logger.info(f"Skipping notification (not in production, FLASK_ENV={flask_env})")
             else:
                 error_msg = stats.get("error", "Unknown error")
                 logger.error(f"Tempo sync failed: {error_msg}")
