@@ -510,18 +510,45 @@ class SlackChatService:
                 )
                 return
 
-            # Stream AI response with conversation context
-            await self._stream_response(
-                channel_id=channel_id,
-                message_ts=search_ts,
-                query=question,
-                results=results,
-                warning_text=warning_text,
-                user_id=user_id,
-                thread_ts=thread_ts,
-                conversation_history=conversation_history,
-                query_context=query_context
-            )
+            # Use the AI-generated summary from ContextSearchService (already uses conversational prompts)
+            if results.summary:
+                # Format summary with citations
+                formatted_response = self._format_response(results.summary, results)
+
+                self.slack_client.chat_update(
+                    channel=channel_id,
+                    ts=search_ts,
+                    text=formatted_response + warning_text
+                )
+
+                # Cache the response (only for non-follow-up questions)
+                if query_context and not query_context.is_follow_up:
+                    self._cache_response(question, user_id, formatted_response)
+
+                # Save conversation turn
+                result_titles = [r.title for r in results.results[:5]]  # Top 5 result titles
+                self.conversation_manager.add_conversation_turn(
+                    channel_id=channel_id,
+                    thread_ts=thread_ts,
+                    question=question,
+                    answer=results.summary,  # Store raw summary
+                    search_results=result_titles
+                )
+
+                logger.info(f"💬 Conversation turn saved for thread {thread_ts or 'DM'}")
+            else:
+                # Fallback: Stream AI response if no summary (shouldn't happen but safety net)
+                await self._stream_response(
+                    channel_id=channel_id,
+                    message_ts=search_ts,
+                    query=question,
+                    results=results,
+                    warning_text=warning_text,
+                    user_id=user_id,
+                    thread_ts=thread_ts,
+                    conversation_history=conversation_history,
+                    query_context=query_context
+                )
 
         except Exception as e:
             logger.error(f"Error handling question: {e}")
