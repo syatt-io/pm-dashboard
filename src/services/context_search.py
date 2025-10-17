@@ -1253,19 +1253,31 @@ class ContextSearchService:
                     project_key_lower = project_key.lower()
                     matches = []
 
+                    # First priority: exact project key match
                     for repo in accessible_repos:
                         repo_lower = repo.lower()
-                        # Check if project key or any keyword matches
-                        if project_key_lower in repo_lower:
-                            matches.append((repo, len(project_key_lower)))  # Prioritize longer matches
-                        else:
+                        if repo_lower == project_key_lower or repo_lower.startswith(f"{project_key_lower}-"):
+                            matches.append((repo, 1000))  # Highest priority
+                            break
+
+                    # Second priority: project key contained in repo name
+                    if not matches:
+                        for repo in accessible_repos:
+                            repo_lower = repo.lower()
+                            if project_key_lower in repo_lower:
+                                matches.append((repo, 100 + len(project_key_lower)))
+
+                    # Third priority: keywords, but ONLY if they're at least 5 chars (avoid "project" matching everything)
+                    if not matches:
+                        for repo in accessible_repos:
+                            repo_lower = repo.lower()
                             for kw in project_keywords:
-                                if kw and len(kw) >= 3 and kw in repo_lower:  # At least 3 chars to avoid false positives
+                                if kw and len(kw) >= 5 and kw in repo_lower:  # Increased from 3 to 5 chars
                                     matches.append((repo, len(kw)))
                                     break
 
                     if matches:
-                        # Pick the match with the longest matching keyword (more specific)
+                        # Pick the match with highest priority/longest keyword
                         repo_name = max(matches, key=lambda x: x[1])[0]
                         self.logger.info(f"✅ Matched GitHub repo: {repo_name} (fuzzy match from project keywords)")
                     else:
