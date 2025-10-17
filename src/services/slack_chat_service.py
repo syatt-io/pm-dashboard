@@ -59,16 +59,44 @@ class ConversationContextManager:
         if storage_backend == "redis":
             try:
                 import redis
-                redis_url = settings.agent.database_url.replace('postgresql://', 'redis://') if hasattr(settings.agent, 'database_url') else 'redis://localhost:6379/0'
-                # Try to use REDIS_URL from env if available
                 import os
+
+                # Use REDIS_URL environment variable (GCP Redis in production)
                 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-                self._redis_client = redis.from_url(redis_url, decode_responses=True)
+
+                # Connect with retry and health check settings
+                self._redis_client = redis.from_url(
+                    redis_url,
+                    decode_responses=True,
+                    socket_connect_timeout=5,
+                    socket_timeout=5,
+                    retry_on_timeout=True,
+                    health_check_interval=30
+                )
                 self._redis_client.ping()
-                logger.info(f"✅ Using Redis for conversation context: {redis_url}")
+
+                # Mask password in log message
+                masked_url = self._mask_redis_url(redis_url)
+                logger.info(f"✅ Using Redis for conversation context: {masked_url}")
             except Exception as e:
                 logger.warning(f"Redis not available, falling back to in-memory storage: {e}")
                 self.storage_backend = "memory"
+
+    def _mask_redis_url(self, url: str) -> str:
+        """Mask password in Redis URL for logging.
+
+        Args:
+            url: Redis URL (e.g., redis://user:password@host:port)
+
+        Returns:
+            Masked URL with password replaced by ***
+        """
+        if '@' in url and '://' in url:
+            protocol, rest = url.split('://', 1)
+            if '@' in rest:
+                auth, host = rest.rsplit('@', 1)
+                return f"{protocol}://***@{host}"
+        return url
 
     def _get_thread_key(self, channel_id: str, thread_ts: Optional[str]) -> str:
         """Generate unique key for thread."""
