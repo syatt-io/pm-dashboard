@@ -19,6 +19,7 @@ pinecone>=5.0.0
 # Background Task Processing
 celery>=5.3.0
 kombu>=5.3.0
+redis>=5.0.0  # Required for conversation history persistence across Slack chat requests
 google-cloud-pubsub>=2.18.0
 google-cloud-monitoring>=2.15.0
 
