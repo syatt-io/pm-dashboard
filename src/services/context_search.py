@@ -1117,8 +1117,20 @@ class ContextSearchService:
                 updated_str = fields.get('updated', '')
                 updated_date = datetime.fromisoformat(updated_str.replace('Z', '+00:00')) if updated_str else datetime.now()
 
-                # Create snippet from summary + description + comments
+                # Extract key metadata
                 summary = fields.get('summary', '')
+                status = fields.get('status', {}).get('name', 'Unknown')
+                assignee_data = fields.get('assignee', {})
+                assignee = assignee_data.get('displayName', 'Unassigned') if assignee_data else 'Unassigned'
+                priority_data = fields.get('priority', {})
+                priority = priority_data.get('name', 'None') if priority_data else 'None'
+                issue_type = fields.get('issuetype', {}).get('name', 'Task')
+
+                # Extract labels
+                labels = fields.get('labels', [])
+                labels_str = ', '.join(labels[:5]) if labels else ''  # Limit to 5 labels
+
+                # Description
                 description_raw = fields.get('description', '')
                 # Handle ADF format for description
                 if isinstance(description_raw, dict):
@@ -1139,7 +1151,8 @@ class ContextSearchService:
                         comment_bodies.append(body)
                     comment_text = " ".join(comment_bodies)
 
-                combined_text = f"{summary} {description} {comment_text}"
+                # Include metadata in combined text for semantic matching
+                combined_text = f"{summary} {description} {comment_text} Status: {status} Assignee: {assignee}"
 
                 # Score with hybrid semantic matching
                 proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(combined_text, query, project_keywords, topic_keywords, debug)
@@ -1148,7 +1161,14 @@ class ContextSearchService:
                 if not passes:
                     continue
 
-                snippet = f"{summary}\n{description[:200]}..." if description else summary
+                # Build rich snippet with metadata
+                metadata_line = f"[{status}] [{issue_type}] Assignee: {assignee}"
+                if priority != 'None':
+                    metadata_line += f" | Priority: {priority}"
+                if labels_str:
+                    metadata_line += f" | Labels: {labels_str}"
+
+                snippet = f"{metadata_line}\n{summary}\n{description[:200]}..." if description else f"{metadata_line}\n{summary}"
 
                 results.append(SearchResult(
                     source='jira',
@@ -1273,8 +1293,26 @@ class ContextSearchService:
                 if not pr.get('title') or not pr.get('number'):
                     continue
 
+                # Extract Jira ticket ID from PR title or branch
+                pr_title = pr.get('title', 'Untitled PR')
+                pr_branch = pr.get('head', {}).get('ref', '') if isinstance(pr.get('head'), dict) else ''
+
+                # Match patterns like ECAT-13, SUBS-608, etc.
+                jira_ticket_pattern = r'\b([A-Z]{2,6}-\d+)\b'
+                jira_ticket = None
+
+                # Try title first
+                title_match = re.search(jira_ticket_pattern, pr_title)
+                if title_match:
+                    jira_ticket = title_match.group(1)
+                # Try branch name if not in title
+                elif pr_branch:
+                    branch_match = re.search(jira_ticket_pattern, pr_branch)
+                    if branch_match:
+                        jira_ticket = branch_match.group(1)
+
                 # Combine title and body for scoring
-                combined_text = f"{pr['title']} {pr.get('body', '')}"
+                combined_text = f"{pr_title} {pr.get('body', '')}"
 
                 # Score with semantic matching
                 proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
@@ -1291,10 +1329,18 @@ class ContextSearchService:
                 except:
                     pr_date = datetime.now()
 
-                # Create snippet from PR body
-                pr_title = pr.get('title', 'Untitled PR')
+                # Get PR state (open/closed/merged)
+                pr_state = pr.get('state', 'unknown')
+                pr_merged = pr.get('merged', False)
+                state_str = 'Merged' if pr_merged else pr_state.capitalize()
+
+                # Create snippet with metadata
                 pr_repo = pr.get('repo', 'unknown')
-                snippet = f"PR #{pr['number']}: {pr_title}\n{pr.get('body', '')[:300]}..."
+                metadata_line = f"[{state_str}] PR #{pr['number']}"
+                if jira_ticket:
+                    metadata_line += f" | Linked: {jira_ticket}"
+
+                snippet = f"{metadata_line}\n{pr_title}\n{pr.get('body', '')[:300]}..."
 
                 results.append(SearchResult(
                     source='github',
@@ -1313,6 +1359,13 @@ class ContextSearchService:
                 if not commit_message:
                     continue
 
+                # Extract Jira ticket ID from commit message
+                jira_ticket_pattern = r'\b([A-Z]{2,6}-\d+)\b'
+                jira_ticket = None
+                ticket_match = re.search(jira_ticket_pattern, commit_message)
+                if ticket_match:
+                    jira_ticket = ticket_match.group(1)
+
                 proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
                     commit_message, query, project_keywords, topic_keywords, debug
                 )
@@ -1327,10 +1380,16 @@ class ContextSearchService:
                 except:
                     commit_date = datetime.now()
 
-                # Create snippet from commit message
+                # Create snippet from commit message with metadata
                 first_line = commit_message.split('\n')[0][:100] if commit_message else "No message"
                 commit_repo = commit.get('repo', 'unknown')
-                snippet = f"Commit: {first_line}\n{commit_message[:300]}..."
+                commit_sha = commit.get('sha', '')[:7] if commit.get('sha') else 'unknown'  # Short SHA
+
+                metadata_line = f"[Commit {commit_sha}]"
+                if jira_ticket:
+                    metadata_line += f" | Linked: {jira_ticket}"
+
+                snippet = f"{metadata_line}\n{first_line}\n{commit_message[:300]}..."
 
                 results.append(SearchResult(
                     source='github',
