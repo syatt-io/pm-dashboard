@@ -633,38 +633,46 @@ Keep it concise (under 250 words) and focus on answering the question directly."
             update_interval = 2  # Update every 2 seconds
             last_update = time.time()
 
-            # Use configured model (gpt-5)
+            # Determine if streaming is supported (o1 and gpt-5 models don't support streaming for unverified orgs)
+            supports_streaming = not (settings.ai.model.startswith('o1') or settings.ai.model.startswith('gpt-5'))
+
+            # Use configured model
             api_params = {
                 "model": settings.ai.model,
                 "messages": [
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": user_prompt}
-                ],
-                "stream": True
+                ]
             }
 
-            # Only add temperature for models that support it
-            if not settings.ai.model.startswith('o1') and not settings.ai.model.startswith('gpt-5'):
+            # Only add stream parameter and temperature for models that support it
+            if supports_streaming:
+                api_params["stream"] = True
                 api_params["temperature"] = 0.3
 
-            stream = await self.openai_client.chat.completions.create(**api_params)
+            response = await self.openai_client.chat.completions.create(**api_params)
 
-            async for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    full_response += chunk.choices[0].delta.content
+            if supports_streaming:
+                # Streaming: iterate over chunks
+                async for chunk in response:
+                    if chunk.choices[0].delta.content:
+                        full_response += chunk.choices[0].delta.content
 
-                    # Update message every 2 seconds
-                    now = time.time()
-                    if (now - last_update) >= update_interval:
-                        # Format with citations
-                        formatted_response = self._format_response(full_response, results)
+                        # Update message every 2 seconds
+                        now = time.time()
+                        if (now - last_update) >= update_interval:
+                            # Format with citations
+                            formatted_response = self._format_response(full_response, results)
 
-                        self.slack_client.chat_update(
-                            channel=channel_id,
-                            ts=message_ts,
-                            text=formatted_response + "\n\n_Generating..._" + warning_text
-                        )
-                        last_update = now
+                            self.slack_client.chat_update(
+                                channel=channel_id,
+                                ts=message_ts,
+                                text=formatted_response + "\n\n_Generating..._" + warning_text
+                            )
+                            last_update = now
+            else:
+                # Non-streaming: get complete response at once
+                full_response = response.choices[0].message.content
 
             # Final update with complete response
             formatted_response = self._format_response(full_response, results)
