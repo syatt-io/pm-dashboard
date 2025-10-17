@@ -445,6 +445,12 @@ class SlackChatService:
                 max_turns=5
             )
 
+            # Debug logging for conversation history
+            logger.info(f"💬 Conversation history lookup: channel={channel_id}, thread_ts={thread_ts}, found {len(conversation_history)} turns")
+            if conversation_history:
+                for i, turn in enumerate(conversation_history):
+                    logger.info(f"  Turn {i+1}: Q='{turn.question[:50]}...', A='{turn.answer[:50]}...'")
+
             # Understand the query (extract project, time range, keywords, etc.)
             query_context = self.query_understanding.understand_query(
                 query=question,

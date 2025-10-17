@@ -742,7 +742,15 @@ class SlackTodoBot:
                 user_id = event.get('user')
                 text = event.get('text', '')
                 channel_id = event.get('channel')
-                thread_ts = event.get('thread_ts', event.get('ts'))  # Reply in thread if already in one
+
+                # CRITICAL: For threaded messages, Slack sends thread_ts pointing to the parent message
+                # For new messages (not in a thread), thread_ts will be None
+                # We should ALWAYS use thread_ts if available, otherwise create a new thread
+                thread_ts = event.get('thread_ts')  # This is the parent message timestamp if in thread
+
+                # If no thread_ts, this is a new message - use current ts to create new thread
+                if not thread_ts:
+                    thread_ts = event.get('ts')
 
                 # Debug logging for thread handling - log full event for diagnosis
                 logger.info(f"📌 app_mention event - thread_ts: {event.get('thread_ts')}, ts: {event.get('ts')}, using: {thread_ts}")
