@@ -744,8 +744,9 @@ class SlackTodoBot:
                 channel_id = event.get('channel')
                 thread_ts = event.get('thread_ts', event.get('ts'))  # Reply in thread if already in one
 
-                # Debug logging for thread handling
+                # Debug logging for thread handling - log full event for diagnosis
                 logger.info(f"📌 app_mention event - thread_ts: {event.get('thread_ts')}, ts: {event.get('ts')}, using: {thread_ts}")
+                logger.info(f"📌 Full event keys: {list(event.keys())}")
 
                 # Check whitelist
                 if settings.slack_chat.whitelisted_users and user_id not in settings.slack_chat.whitelisted_users:
