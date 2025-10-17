@@ -180,8 +180,11 @@ class QueryUnderstandingService:
     PROJECT_PATTERNS = [
         r'\b([A-Z]{2,6})-\d+\b',  # Jira ticket format (e.g., PROJ-123)
         r'\b([A-Z]{2,6})\s+project\b',  # "PROJ project"
-        r'\bproject\s+([A-Z]{2,6})\b',  # "project PROJ"
+        r'\bproject\s+([A-Z]{2,6})(?:\s|$)',  # "project PROJ" (must be followed by space or end)
     ]
+
+    # Common English words to exclude from project extraction
+    EXCLUDED_WORDS = {'FOR', 'THE', 'AND', 'ARE', 'WAS', 'NOT', 'BUT', 'CAN', 'WILL', 'FROM', 'WITH'}
 
     # Time range patterns
     TIME_PATTERNS = {
@@ -244,6 +247,11 @@ class QueryUnderstandingService:
             match = re.search(pattern, query, re.IGNORECASE)
             if match:
                 project_ref = match.group(1).upper()
+
+                # Skip common English words
+                if project_ref in self.EXCLUDED_WORDS:
+                    continue
+
                 # Check if it's a full Jira ticket
                 full_match = re.search(r'\b([A-Z]{2,6}-\d+)\b', query)
                 if full_match:
