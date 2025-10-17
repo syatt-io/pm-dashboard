@@ -497,7 +497,7 @@ class SlackChatService:
                 query=question,
                 days_back=days_back,
                 user_id=app_user_id,
-                detail_level="brief",  # Concise for chat
+                detail_level="slack",  # Use slack detail level for conversational narrative style
                 project=query_context.project_key  # Use extracted project
             )
 
