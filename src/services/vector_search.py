@@ -112,7 +112,7 @@ class VectorSearchService:
                 include_metadata=True
             )
 
-            # Convert to SearchResult objects
+            # Convert to SearchResult objects and apply title boost
             search_results = []
             for match in results.get('matches', []):
                 metadata = match.get('metadata', {})
@@ -124,20 +124,33 @@ class VectorSearchService:
                 except:
                     result_date = datetime.now()
 
+                # Get base relevance score
+                base_score = float(match.get('score', 0.0))
+
+                # Apply title boost for Fireflies meetings with project keywords
+                title = metadata.get('title', 'Untitled')
+                boosted_score = self._apply_title_boost(
+                    base_score=base_score,
+                    title=title,
+                    source=metadata.get('source', 'unknown'),
+                    query=query,
+                    project_key=project_key
+                )
+
                 # Create SearchResult
                 search_result = SearchResult(
                     source=metadata.get('source', 'unknown'),
-                    title=metadata.get('title', 'Untitled'),
+                    title=title,
                     content=metadata.get('content_preview', ''),
                     date=result_date,
                     url=metadata.get('url') or metadata.get('permalink'),
                     author=metadata.get('assignee') or metadata.get('user_id', 'Unknown'),
-                    relevance_score=float(match.get('score', 0.0))
+                    relevance_score=boosted_score
                 )
 
                 search_results.append(search_result)
 
-            # Sort by relevance score
+            # Sort by boosted relevance score
             search_results.sort(key=lambda x: x.relevance_score, reverse=True)
 
             # Debug: Log results by source for troubleshooting
@@ -405,6 +418,87 @@ class VectorSearchService:
         except Exception as e:
             logger.error(f"Error building project resource filters: {e}")
             return None
+
+    def _apply_title_boost(
+        self,
+        base_score: float,
+        title: str,
+        source: str,
+        query: str,
+        project_key: Optional[str] = None
+    ) -> float:
+        """Apply title boost to meetings with project keywords in title.
+
+        Args:
+            base_score: Base similarity score from Pinecone
+            title: Meeting title
+            source: Data source (fireflies, slack, jira, etc.)
+            query: User's search query
+            project_key: Project key to check for in title
+
+        Returns:
+            Boosted score if project keyword found in title, otherwise base score
+        """
+        # Only boost Fireflies meetings
+        if source != 'fireflies':
+            return base_score
+
+        # Get project keywords to check for in title
+        keywords_to_check = []
+
+        # If project_key is provided, use it
+        if project_key:
+            # Resolve to canonical key
+            canonical_key = self._resolve_project_key(project_key)
+            if canonical_key:
+                keywords_to_check.append(canonical_key.lower())
+
+                # Also get the project name
+                try:
+                    from src.utils.database import get_engine
+                    from sqlalchemy import text
+
+                    engine = get_engine()
+                    with engine.connect() as conn:
+                        result = conn.execute(
+                            text("SELECT name FROM projects WHERE key = :key"),
+                            {"key": canonical_key}
+                        )
+                        row = result.fetchone()
+                        if row:
+                            project_name = row[0]
+                            keywords_to_check.append(project_name.lower())
+                            # Also check for common variations (e.g., "Beauchamp" from "Beauchamp Garden Center")
+                            name_parts = project_name.lower().split()
+                            keywords_to_check.extend(name_parts)
+                except Exception as e:
+                    logger.debug(f"Could not fetch project name for {canonical_key}: {e}")
+
+        # Also extract potential project names from the query
+        # Common patterns: "Beauchamp", "Berns", etc.
+        query_words = query.lower().split()
+        for word in query_words:
+            # Filter out common stop words
+            if len(word) > 3 and word not in ['what', 'when', 'where', 'which', 'been', 'focused', 'working', 'last', 'weeks', 'days']:
+                keywords_to_check.append(word)
+
+        # Check if any keywords appear in title
+        title_lower = title.lower()
+        boost_applied = False
+
+        for keyword in keywords_to_check:
+            if keyword in title_lower:
+                boost_applied = True
+                logger.debug(f"📈 Title boost applied: '{title}' contains '{keyword}'")
+                break
+
+        # Apply 30% boost if project keyword found in title
+        if boost_applied:
+            boosted_score = base_score * 1.3
+            logger.debug(f"   Base score: {base_score:.3f} → Boosted: {boosted_score:.3f}")
+            return boosted_score
+
+        return base_score
 
     def get_index_stats(self) -> Dict[str, Any]:
         """Get statistics about the Pinecone index.
