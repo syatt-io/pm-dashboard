@@ -736,9 +736,18 @@ class ContextSearchService:
                 if result.author and result.author.startswith('U'):
                     result.author = self._resolve_slack_user_id(result.author)
 
+        # Extract entity links for cross-referencing
+        entity_links = self._extract_and_link_entities(all_results)
+
+        # Log entity links for debugging
+        jira_count = len([k for k, v in entity_links['jira_tickets'].items() if len(v) > 1])
+        pr_count = len([k for k, v in entity_links['github_prs'].items() if len(v) > 1])
+        if jira_count > 0 or pr_count > 0:
+            self.logger.info(f"🔗 Found {jira_count} cross-referenced Jira tickets, {pr_count} cross-referenced PRs")
+
         # Results are already sorted by relevance score from vector_search
-        # Generate AI summary and insights with detail level
-        summarized = await self._generate_insights(query, all_results, None, detail_level)
+        # Generate AI summary and insights with detail level and entity links
+        summarized = await self._generate_insights(query, all_results, None, detail_level, entity_links)
 
         return ContextSearchResults(
             query=query,
@@ -1568,6 +1577,58 @@ class ContextSearchService:
 
         return snippet
 
+    def _extract_and_link_entities(self, results: List[SearchResult]) -> Dict[str, Any]:
+        """Extract Jira tickets, GitHub PRs, and people from results and create entity graph.
+
+        Args:
+            results: List of search results
+
+        Returns:
+            Dict with entity mappings:
+            {
+                'jira_tickets': {ticket_key: [result_indices]},
+                'github_prs': {pr_number: [result_indices]},
+                'people': {person_name: [result_indices]}
+            }
+        """
+        import re
+
+        entity_links = {
+            'jira_tickets': {},  # ticket_key -> [result indices]
+            'github_prs': {},    # pr_number -> [result_indices]
+            'people': {}         # person_name -> [result indices]
+        }
+
+        # Regex patterns
+        jira_pattern = r'\b([A-Z]{2,6}-\d+)\b'
+        pr_pattern = r'(?:PR\s*#?|#)(\d+)'
+
+        for idx, result in enumerate(results):
+            combined_text = f"{result.title} {result.content}"
+
+            # Extract Jira tickets
+            jira_tickets = re.findall(jira_pattern, combined_text)
+            for ticket in set(jira_tickets):
+                if ticket not in entity_links['jira_tickets']:
+                    entity_links['jira_tickets'][ticket] = []
+                entity_links['jira_tickets'][ticket].append(idx)
+
+            # Extract GitHub PRs
+            prs = re.findall(pr_pattern, combined_text, re.IGNORECASE)
+            for pr in set(prs):
+                pr_key = f"#{pr}"
+                if pr_key not in entity_links['github_prs']:
+                    entity_links['github_prs'][pr_key] = []
+                entity_links['github_prs'][pr_key].append(idx)
+
+            # Extract author as person entity (skip generic names)
+            if result.author and result.author not in ['Unknown', 'Unassigned', 'None']:
+                if result.author not in entity_links['people']:
+                    entity_links['people'][result.author] = []
+                entity_links['people'][result.author].append(idx)
+
+        return entity_links
+
     def _extract_text_from_adf(self, adf_content: Dict[str, Any]) -> str:
         """Extract plain text from Atlassian Document Format (ADF) JSON.
 
@@ -1603,7 +1664,8 @@ class ContextSearchService:
         query: str,
         results: List[SearchResult],
         project_context: Optional[Dict[str, Any]] = None,
-        detail_level: str = "normal"
+        detail_level: str = "normal",
+        entity_links: Optional[Dict[str, Any]] = None
     ):
         """Generate AI-powered insights from search results using ContextSummarizer.
 
@@ -1616,10 +1678,10 @@ class ContextSearchService:
             if not results:
                 return None
 
-            # Use the new AI summarizer with project context and detail level
+            # Use the new AI summarizer with project context, detail level, and entity links
             # Limit to 12 results to avoid context length issues (12 × ~800 chars = ~9600 chars < 8K token limit)
             summarizer = ContextSummarizer()
-            summarized = await summarizer.summarize(query, results[:12], debug=True, project_context=project_context, detail_level=detail_level)
+            summarized = await summarizer.summarize(query, results[:12], debug=True, project_context=project_context, detail_level=detail_level, entity_links=entity_links)
 
             # Convert timeline format to match expected format
             summarized.timeline = [

@@ -54,7 +54,8 @@ class ContextSummarizer:
         results: List[Any],
         debug: bool = False,
         project_context: Optional[Dict[str, Any]] = None,
-        detail_level: str = "normal"
+        detail_level: str = "normal",
+        entity_links: Optional[Dict[str, Any]] = None
     ) -> SummarizedContext:
         """Generate AI summary with inline citations.
 
@@ -107,8 +108,8 @@ class ContextSummarizer:
                 f"Content: {result.content}\n"
             )
 
-        # Build prompt for LLM with optional project context and detail level
-        prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level)
+        # Build prompt for LLM with optional project context, detail level, and entity links
+        prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level, entity_links, results)
 
         if debug:
             logger.info(f"📝 Summarization prompt: {len(prompt)} chars")
@@ -199,7 +200,7 @@ class ContextSummarizer:
                 confidence="low"
             )
 
-    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None, detail_level: str = "normal") -> str:
+    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None, detail_level: str = "normal", entity_links: Optional[Dict[str, Any]] = None, results: List[Any] = None) -> str:
         """Build the LLM prompt for summarization.
 
         Args:
@@ -207,6 +208,8 @@ class ContextSummarizer:
             context_blocks: Formatted context with citation numbers
             project_context: Optional dict with project_key and keywords for domain context
             detail_level: Detail level - 'brief', 'normal', or 'detailed'
+            entity_links: Optional dict with entity cross-references
+            results: Optional list of search results for entity linking
 
         Returns:
             Complete prompt for LLM
@@ -231,6 +234,11 @@ class ContextSummarizer:
                 keywords_str=keywords_str
             )
 
+        # Build entity context section if provided
+        entity_context = ""
+        if entity_links and results:
+            entity_context = self._format_entity_links(entity_links, results)
+
         # Get detail level instructions from config
         detail_levels = self.prompt_manager.get_prompt('context_search', 'detail_levels', default={})
         detail_instruction = detail_levels.get(
@@ -248,9 +256,54 @@ class ContextSummarizer:
         return user_prompt_template.format(
             query=query,
             domain_context=domain_context,
+            entity_context=entity_context,
             context_text=context_text,
             detail_instruction=detail_instruction
         )
+
+    def _format_entity_links(self, entity_links: Dict[str, Any], results: List[Any]) -> str:
+        """Format entity links for AI context.
+
+        Args:
+            entity_links: Dict with 'jira_tickets', 'github_prs', 'people' keys
+            results: List of search results for source attribution
+
+        Returns:
+            Formatted entity context string
+        """
+        lines = []
+
+        # Show Jira tickets mentioned in multiple sources
+        if entity_links.get('jira_tickets'):
+            jira_lines = []
+            for ticket, indices in sorted(entity_links['jira_tickets'].items()):
+                if len(indices) > 1:  # Only show cross-referenced entities
+                    # Filter out invalid indices
+                    valid_indices = [i for i in indices[:5] if i < len(results)]
+                    if valid_indices:
+                        sources = [f"[{i+1}] ({results[i].source})" for i in valid_indices]
+                        jira_lines.append(f"  - {ticket}: Mentioned in {', '.join(sources)}")
+
+            if jira_lines:
+                lines.append("\n\nCROSS-REFERENCED JIRA TICKETS:")
+                lines.extend(jira_lines)
+
+        # Show GitHub PRs mentioned in multiple sources
+        if entity_links.get('github_prs'):
+            pr_lines = []
+            for pr, indices in sorted(entity_links['github_prs'].items()):
+                if len(indices) > 1:
+                    # Filter out invalid indices
+                    valid_indices = [i for i in indices[:5] if i < len(results)]
+                    if valid_indices:
+                        sources = [f"[{i+1}] ({results[i].source})" for i in valid_indices]
+                        pr_lines.append(f"  - PR {pr}: Mentioned in {', '.join(sources)}")
+
+            if pr_lines:
+                lines.append("\n\nCROSS-REFERENCED GITHUB PRS:")
+                lines.extend(pr_lines)
+
+        return "\n".join(lines) if lines else ""
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
         """Parse the flexible AI response.

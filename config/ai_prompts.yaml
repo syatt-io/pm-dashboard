@@ -210,7 +210,7 @@ context_search:
 
   user_prompt_template: |
     Query: "{query}"
-    {domain_context}
+    {domain_context}{entity_context}
     SEARCH RESULTS:
     {context_text}
 
@@ -231,6 +231,22 @@ context_search:
 
     3. **Work details naturally into prose**: Instead of listing "SUBS-123, SUBS-124, SUBS-125", write "Three tasks are ready (SUBS-123, SUBS-124, SUBS-125)" or "Several implementation tickets are queued up".
 
+    CRITICAL - PROGRESS AWARENESS:
+    Extract and weave in these progress signals when present in the search results:
+    - **Jira Status**: In Progress, Done, Blocked, To Do, In Review, etc.
+    - **GitHub Activity**: PR opened/merged/in review, commit activity, review status
+    - **Timeline Signals**: "started 2 weeks ago", "completed yesterday", "3 days in progress"
+    - **Blockers**: "blocked on", "waiting for", "dependency on", "needs review"
+    - **Ownership**: "assigned to", "working on", "Mike is handling"
+    - **Recent Changes**: What changed recently vs what's been static
+
+    Examples of good progress synthesis:
+    - ✅ "SUBS-617 has been in progress for 3 days, currently blocked on index population"
+    - ✅ "PR #234 was merged yesterday after Mike's review, completing the initial setup"
+    - ✅ "Three tasks are ready to start (SUBS-618, SUBS-619, SUBS-620) once the blocker is resolved"
+    - ❌ "SUBS-617 exists" (too vague, missing status)
+    - ❌ "There is work happening" (no specifics)
+
     CRITICAL - NARRATIVE STYLE:
     - Write flowing paragraphs, not bulleted lists (unless 4+ similar items)
     - Avoid formal section headers (Summary, Current State, Blockers, etc.)
@@ -240,11 +256,13 @@ context_search:
     - Use conversational language, like explaining to a teammate
 
     WHAT TO INCLUDE:
-    - Current state/status of the work
+    - Current state/status of the work (with specific status from Jira/GitHub if available)
     - Technical approach or decisions made
-    - Relevant ticket numbers worked into sentences
-    - Any blockers or constraints that matter
+    - Relevant ticket numbers worked into sentences with their status
+    - Any blockers or constraints that matter (be specific about what's blocking)
     - Next steps (ONLY if explicitly mentioned - don't guess)
+    - Who owns what (if mentioned in results)
+    - How long work has been in progress (if timeline info available)
 
     WHAT TO SKIP:
     - Stale information superseded by newer updates
@@ -253,7 +271,7 @@ context_search:
     - Repetitive lists when prose works better
     - Attribution (who said it, which meeting) unless it clarifies a decision
 
-    Remember: You're explaining the situation clearly and concisely, not writing a formal report or listing every detail you found.
+    Remember: You're explaining the situation clearly and concisely with actionable progress insights, not writing a formal report or listing every detail you found.
 
   # Domain context template (for project-specific searches)
   domain_context_template: |
