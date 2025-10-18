@@ -101,10 +101,23 @@ CORS(app, origins=cors_origins, supports_credentials=True,
 try:
     redis_url = os.getenv('REDIS_URL')
     if redis_url:
+        # Configure Redis connection with proper timeouts and connection pooling
+        # This matches the pattern used in slack_chat_service.py for GCP Memorystore
+        storage_options = {
+            'socket_connect_timeout': 5,
+            'socket_timeout': 5,
+            'retry_on_timeout': True,
+            'health_check_interval': 30,
+            'connection_pool_kwargs': {
+                'max_connections': 50,
+                'socket_keepalive': True,
+            }
+        }
         storage_uri = redis_url
         logger.info(f"Rate limiter using Redis: {redis_url.split('@')[0]}@***")
     else:
         storage_uri = "memory://"
+        storage_options = {}
         logger.warning("Rate limiter using in-memory storage (development only)")
 
     limiter = Limiter(
@@ -112,7 +125,10 @@ try:
         key_func=get_remote_address,
         default_limits=["1000 per day", "200 per hour"],  # Global limits
         storage_uri=storage_uri,
+        storage_options=storage_options,
         strategy="fixed-window",
+        # Gracefully handle Redis failures without blocking requests
+        swallow_errors=True
     )
     logger.info("✅ Rate limiter initialized successfully")
 except Exception as e:
