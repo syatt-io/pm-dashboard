@@ -212,7 +212,7 @@ class QueryUnderstandingService:
     ]
 
     # Common English words to exclude from project extraction
-    EXCLUDED_WORDS = {'FOR', 'THE', 'AND', 'ARE', 'WAS', 'NOT', 'BUT', 'CAN', 'WILL', 'FROM', 'WITH'}
+    EXCLUDED_WORDS = {'FOR', 'THE', 'AND', 'ARE', 'WAS', 'NOT', 'BUT', 'CAN', 'WILL', 'FROM', 'WITH', 'ABOUT'}
 
     # Time range patterns
     TIME_PATTERNS = {
