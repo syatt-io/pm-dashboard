@@ -36,6 +36,7 @@ class QueryContext:
     time_description: Optional[str] = None
     keywords: List[str] = None
     is_follow_up: bool = False
+    detail_level: Optional[str] = None  # Optional override for detail level (brief, normal, detailed, slack)
 
     def __post_init__(self):
         if self.keywords is None:
@@ -255,17 +256,34 @@ class QueryUnderstandingService:
         """
         context = QueryContext(original_query=query)
 
-        # Extract project/ticket reference
-        context.project_key, context.jira_ticket = self._extract_project_info(query)
+        # Extract optional parameters (--detail, --project) and clean query
+        cleaned_query, extracted_params = self._extract_parameters(query)
+
+        # Store extracted parameters in context
+        if 'detail_level' in extracted_params:
+            context.detail_level = extracted_params['detail_level']
+        if 'project' in extracted_params:
+            # Override with explicit --project parameter if provided
+            context.project_key = extracted_params['project']
+
+        # Use cleaned query (without parameters) for further extraction
+        query_for_extraction = cleaned_query
+
+        # Extract project/ticket reference (only if not already set by --project)
+        if not context.project_key:
+            context.project_key, context.jira_ticket = self._extract_project_info(query_for_extraction)
+        else:
+            # Still extract ticket if present
+            _, context.jira_ticket = self._extract_project_info(query_for_extraction)
 
         # Extract time range
-        context.time_range_days, context.time_description = self._extract_time_range(query)
+        context.time_range_days, context.time_description = self._extract_time_range(query_for_extraction)
 
         # Check if follow-up question
-        context.is_follow_up = self._is_follow_up(query, conversation_history)
+        context.is_follow_up = self._is_follow_up(query_for_extraction, conversation_history)
 
         # Extract keywords
-        context.keywords = self._extract_keywords(query)
+        context.keywords = self._extract_keywords(query_for_extraction)
 
         return context
 
@@ -318,6 +336,59 @@ class QueryUnderstandingService:
             return True
 
         return False
+
+    def _extract_parameters(self, query: str) -> Tuple[str, Dict[str, str]]:
+        """Extract optional parameters from query (--detail, --project).
+
+        Args:
+            query: User's query potentially with parameters
+
+        Returns:
+            Tuple of (cleaned_query, extracted_params_dict)
+
+        Examples:
+            "what's the status --detail=normal" -> ("what's the status", {"detail_level": "normal"})
+            "searchspring --project=SUBS" -> ("searchspring", {"project": "SUBS"})
+            "what's happening --detail=brief --project=BC" -> ("what's happening", {"detail_level": "brief", "project": "BC"})
+        """
+        params = {}
+        cleaned_query = query
+
+        # Valid detail levels
+        valid_detail_levels = {'brief', 'normal', 'detailed', 'slack'}
+
+        # Extract --detail=VALUE or --detail VALUE
+        detail_patterns = [
+            r'--detail[=\s]+([a-z]+)',
+            r'--detail-level[=\s]+([a-z]+)'
+        ]
+        for pattern in detail_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                detail_value = match.group(1).lower()
+                if detail_value in valid_detail_levels:
+                    params['detail_level'] = detail_value
+                    # Remove parameter from query
+                    cleaned_query = re.sub(pattern, '', cleaned_query, flags=re.IGNORECASE).strip()
+                    break
+
+        # Extract --project=VALUE or --project VALUE
+        project_patterns = [
+            r'--project[=\s]+([A-Z]{2,6})',
+            r'--proj[=\s]+([A-Z]{2,6})'
+        ]
+        for pattern in project_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                params['project'] = match.group(1).upper()
+                # Remove parameter from query
+                cleaned_query = re.sub(pattern, '', cleaned_query, flags=re.IGNORECASE).strip()
+                break
+
+        # Clean up any double spaces
+        cleaned_query = re.sub(r'\s+', ' ', cleaned_query).strip()
+
+        return cleaned_query, params
 
     def _extract_keywords(self, query: str) -> List[str]:
         """Extract important keywords from query."""
@@ -487,6 +558,7 @@ class SlackChatService:
 
             logger.info(f"🧠 Query context: project={query_context.project_key}, "
                        f"time={query_context.time_description}, "
+                       f"detail_level={query_context.detail_level or 'slack (default)'}, "
                        f"follow_up={query_context.is_follow_up}, "
                        f"keywords={query_context.keywords[:3]}")
 
@@ -526,13 +598,16 @@ class SlackChatService:
             # Determine time range for search (use extracted time or default 90 days)
             days_back = query_context.time_range_days or 90
 
+            # Determine detail level (use extracted or default to "slack")
+            detail_level = query_context.detail_level or "slack"
+
             # Perform context search with extracted context
             results = await self.context_search.search(
                 query=question,
                 days_back=days_back,
                 user_id=app_user_id,
-                detail_level="slack",  # Use slack detail level for conversational narrative style
-                project=query_context.project_key  # Use extracted project
+                detail_level=detail_level,  # Use extracted detail level or default to slack
+                project=query_context.project_key  # Use extracted or auto-detected project
             )
 
             if not results.results:
