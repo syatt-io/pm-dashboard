@@ -745,7 +745,17 @@ class ContextSearchService:
         if jira_count > 0 or pr_count > 0:
             self.logger.info(f"🔗 Found {jira_count} cross-referenced Jira tickets, {pr_count} cross-referenced PRs")
 
-        # Results are already sorted by relevance score from vector_search
+        # LLM Re-ranking: Use AI to re-order results by actual relevance
+        # Takes top 50 from vector search, returns top 20 most relevant
+        if len(all_results) > 12:  # Only re-rank if we have enough results
+            reranked_results = await self._rerank_with_llm(
+                query=query,
+                results=all_results[:50],  # Top 50 from vector search
+                entity_links=entity_links
+            )
+            self.logger.info(f"🔄 Re-ranked {len(all_results[:50])} results → Using top {len(reranked_results)}")
+            all_results = reranked_results + all_results[50:]  # Reranked top + remaining results
+
         # Generate AI summary and insights with detail level and entity links
         summarized = await self._generate_insights(query, all_results, None, detail_level, entity_links)
 
@@ -1628,6 +1638,143 @@ class ContextSearchService:
                 entity_links['people'][result.author].append(idx)
 
         return entity_links
+
+    async def _rerank_with_llm(
+        self,
+        query: str,
+        results: List[SearchResult],
+        entity_links: Dict[str, Any]
+    ) -> List[SearchResult]:
+        """Re-rank search results using LLM for better relevance ordering.
+
+        Args:
+            query: Original search query
+            results: List of search results to re-rank (top 50 from vector search)
+            entity_links: Entity cross-references for boosting
+
+        Returns:
+            Re-ranked list of top 20 most relevant results
+        """
+        try:
+            from openai import AsyncOpenAI
+            from config.settings import settings
+            import json
+
+            if not results or len(results) <= 1:
+                return results
+
+            client = AsyncOpenAI(api_key=settings.ai.api_key)
+
+            # Build compact context for each result
+            result_summaries = []
+            for i, result in enumerate(results):
+                # Check if result is cross-referenced
+                is_cross_referenced = False
+                for ticket_indices in entity_links.get('jira_tickets', {}).values():
+                    if i in ticket_indices and len(ticket_indices) > 1:
+                        is_cross_referenced = True
+                        break
+                if not is_cross_referenced:
+                    for pr_indices in entity_links.get('github_prs', {}).values():
+                        if i in pr_indices and len(pr_indices) > 1:
+                            is_cross_referenced = True
+                            break
+
+                # Calculate recency (days ago)
+                days_ago = (datetime.now() - result.date).days
+
+                result_summaries.append({
+                    'index': i,
+                    'source': result.source,
+                    'title': result.title[:150],  # Truncate long titles
+                    'snippet': result.content[:300],  # Brief snippet
+                    'date': result.date.strftime('%Y-%m-%d'),
+                    'days_ago': days_ago,
+                    'author': result.author or 'Unknown',
+                    'vector_score': round(result.relevance_score, 3),
+                    'cross_referenced': is_cross_referenced
+                })
+
+            # Create re-ranking prompt
+            rerank_prompt = f"""You are a relevance ranking expert. Re-rank these search results for the query: "{query}"
+
+RANKING CRITERIA (in order of importance):
+1. **Direct relevance**: How well does the content answer the query?
+2. **Recency**: Prefer recent information (days_ago closer to 0)
+3. **Cross-references**: Results mentioned in multiple sources are more important
+4. **Progress signals**: Prioritize results with status updates, blockers, or recent activity
+5. **Source authority**: Jira/GitHub > Meetings > Slack (for technical queries)
+
+SEARCH RESULTS:
+{json.dumps(result_summaries, indent=2)}
+
+Return ONLY a JSON array of the top 20 result indices in descending order of relevance.
+Format: [index1, index2, index3, ...]
+
+Example: [5, 12, 3, 8, 15, ...]
+
+IMPORTANT:
+- Return indices only, no explanation
+- Must be valid JSON array
+- Include exactly 20 indices (or fewer if < 20 results)"""
+
+            # Use configured model (gpt-5 for reasoning)
+            api_params = {
+                "model": settings.ai.model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a search relevance expert. Analyze results and return only a JSON array of indices."
+                    },
+                    {
+                        "role": "user",
+                        "content": rerank_prompt
+                    }
+                ],
+                "response_format": {"type": "json_object"} if not settings.ai.model.startswith('o1') else None
+            }
+
+            # Only add temperature for non-reasoning models
+            if not settings.ai.model.startswith('o1') and not settings.ai.model.startswith('gpt-5'):
+                api_params["temperature"] = 0.3
+
+            response = await client.chat.completions.create(**api_params)
+            llm_response = response.choices[0].message.content.strip()
+
+            # Parse JSON response
+            try:
+                # Handle both array format [1,2,3] and object format {"indices": [1,2,3]}
+                parsed = json.loads(llm_response)
+                if isinstance(parsed, dict):
+                    # Extract indices from object
+                    ranked_indices = parsed.get('indices', parsed.get('rankings', []))
+                else:
+                    ranked_indices = parsed
+
+                # Validate indices
+                ranked_indices = [idx for idx in ranked_indices if isinstance(idx, int) and 0 <= idx < len(results)]
+
+                if not ranked_indices:
+                    self.logger.warning("LLM re-ranking returned no valid indices, using original order")
+                    return results[:20]
+
+                # Re-order results
+                reranked = [results[idx] for idx in ranked_indices[:20]]
+
+                self.logger.info(f"✅ LLM re-ranked {len(results)} → {len(reranked)} results")
+                self.logger.info(f"   Top 3 indices: {ranked_indices[:3]}")
+
+                return reranked
+
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Failed to parse LLM re-ranking response: {e}")
+                self.logger.error(f"Response was: {llm_response[:500]}")
+                return results[:20]
+
+        except Exception as e:
+            self.logger.error(f"Error in LLM re-ranking: {e}")
+            # Fallback to original order
+            return results[:20]
 
     def _extract_text_from_adf(self, adf_content: Dict[str, Any]) -> str:
         """Extract plain text from Atlassian Document Format (ADF) JSON.
