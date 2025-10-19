@@ -561,7 +561,7 @@ class SlackChatService:
 
             logger.info(f"🧠 Query context: project={query_context.project_key}, "
                        f"time={query_context.time_description}, "
-                       f"detail_level={query_context.detail_level or 'slack (default)'}, "
+                       f"detail_level={query_context.detail_level or 'normal (default)'}, "
                        f"follow_up={query_context.is_follow_up}, "
                        f"keywords={query_context.keywords[:3]}")
 
@@ -601,8 +601,8 @@ class SlackChatService:
             # Determine time range for search (use extracted time or default 90 days)
             days_back = query_context.time_range_days or 90
 
-            # Determine detail level (use extracted or default to "slack")
-            detail_level = query_context.detail_level or "slack"
+            # Determine detail level (use extracted or default to "normal")
+            detail_level = query_context.detail_level or "normal"
 
             # Convert conversation history to format expected by summarizer
             conversation_history_for_ai = []
@@ -616,7 +616,7 @@ class SlackChatService:
                 query=question,
                 days_back=days_back,
                 user_id=app_user_id,
-                detail_level=detail_level,  # Use extracted detail level or default to slack
+                detail_level=detail_level,  # Use extracted detail level or default to normal
                 project=query_context.project_key,  # Use extracted or auto-detected project
                 conversation_history=conversation_history_for_ai if conversation_history else None
             )
