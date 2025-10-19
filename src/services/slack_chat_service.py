@@ -482,6 +482,9 @@ class SlackChatService:
         # Query understanding service
         self.query_understanding = QueryUnderstandingService()
 
+        # Search context storage for feedback: message_ts -> search_metadata
+        self._search_context: Dict[str, Dict[str, Any]] = {}
+
         logger.info("SlackChatService initialized with conversation context")
 
     def _get_cache_key(self, query: str, user_id: str) -> str:
@@ -629,6 +632,23 @@ class SlackChatService:
                     ts=search_ts,
                     text=formatted_response + warning_text
                 )
+
+                # Add feedback reactions (👍/👎) to message
+                self._add_feedback_reactions(channel_id, search_ts)
+
+                # Store search context for feedback handling
+                self._search_context[search_ts] = {
+                    'query': question,
+                    'user_id': user_id,
+                    'app_user_id': app_user_id,
+                    'slack_user_id': user_id,
+                    'result_count': len(results.results),
+                    'result_sources': list(set([r.source for r in results.results])),
+                    'top_result_source': results.results[0].source if results.results else None,
+                    'detail_level': detail_level,
+                    'project_key': query_context.project_key,
+                    'timestamp': time.time()
+                }
 
                 # Cache the response (only for non-follow-up questions)
                 if query_context and not query_context.is_follow_up:
@@ -880,6 +900,86 @@ Keep it concise (under 250 words) and focus on answering the question directly."
                     formatted += source_line
 
         return formatted
+
+    def _add_feedback_reactions(self, channel_id: str, message_ts: str):
+        """Add thumbs up/down reactions to a message for feedback.
+
+        Args:
+            channel_id: Slack channel ID
+            message_ts: Message timestamp
+        """
+        try:
+            # Add 👍 reaction
+            self.slack_client.reactions_add(
+                channel=channel_id,
+                timestamp=message_ts,
+                name="+1"
+            )
+
+            # Add 👎 reaction
+            self.slack_client.reactions_add(
+                channel=channel_id,
+                timestamp=message_ts,
+                name="-1"
+            )
+
+            logger.debug(f"Added feedback reactions to message {message_ts}")
+
+        except Exception as e:
+            logger.error(f"Error adding reactions: {e}")
+
+    async def handle_reaction_event(
+        self,
+        user_id: str,
+        reaction: str,
+        channel_id: str,
+        message_ts: str
+    ):
+        """Handle user reaction to a search response.
+
+        Args:
+            user_id: Slack user ID who reacted
+            reaction: Reaction name (e.g., '+1', '-1')
+            channel_id: Slack channel ID
+            message_ts: Message timestamp
+        """
+        try:
+            # Only handle thumbs up/down reactions
+            if reaction not in ['+1', '-1']:
+                return
+
+            # Get search context for this message
+            search_context = self._search_context.get(message_ts)
+            if not search_context:
+                logger.warning(f"No search context found for message {message_ts}")
+                return
+
+            # Convert reaction to rating (2 = thumbs up, 1 = thumbs down)
+            rating = 2 if reaction == '+1' else 1
+
+            # Record feedback
+            from src.services.feedback_service import FeedbackService
+
+            feedback_service = FeedbackService()
+            feedback_id = await feedback_service.record_feedback(
+                query=search_context['query'],
+                rating=rating,
+                user_id=search_context.get('app_user_id'),
+                slack_user_id=user_id,
+                result_count=search_context.get('result_count'),
+                result_sources=search_context.get('result_sources'),
+                top_result_source=search_context.get('top_result_source'),
+                detail_level=search_context.get('detail_level'),
+                project_key=search_context.get('project_key')
+            )
+
+            rating_emoji = "👍" if rating == 2 else "👎"
+            logger.info(f"Recorded feedback {rating_emoji} from user {user_id} (feedback_id={feedback_id})")
+
+            # TODO: Add structured follow-up for negative feedback (next task)
+
+        except Exception as e:
+            logger.error(f"Error handling reaction event: {e}")
 
     def _map_slack_user_to_app_user(self, slack_user_id: str) -> Optional[int]:
         """Map Slack user to app user for permission filtering.

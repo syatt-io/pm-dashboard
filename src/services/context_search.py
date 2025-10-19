@@ -52,6 +52,10 @@ class ContextSearchService:
         self._slack_user_cache = {}  # Cache Slack user IDs: user_id -> display_name
         self._slack_user_cache_time = None
 
+        # Initialize query expander for synonym/term expansion
+        from src.services.query_expander import QueryExpander
+        self.query_expander = QueryExpander()
+
         # Auto-sync Jira project keywords on first use (runs in background)
         self._sync_project_keywords_async()
 
@@ -658,6 +662,24 @@ class ContextSearchService:
         project_msg = f" [project: {project}]" if project else ""
         self.logger.info(f"🔍 Vector search for: '{query}'{project_msg} (sources: {sources}, days: {days_back})")
 
+        # Expand query with synonyms and related terms
+        expanded_terms, expansion_map = self.query_expander.expand_query(
+            query=query,
+            project_key=project,
+            max_expansions=5
+        )
+
+        # Build expanded query string for vector search
+        expanded_query = ' '.join(expanded_terms)
+
+        # Log expansions if any were added
+        if expansion_map:
+            self.logger.info(f"📝 Query expansion: '{query}' → {len(expanded_terms)} terms (added {len(expanded_terms) - len(query.split())} expansions)")
+            self.logger.debug(f"   Expansion map: {expansion_map}")
+        else:
+            # No expansions found, use original query
+            expanded_query = query
+
         # Get user email for Fireflies permission filtering
         user_email = None
         if user_id:
@@ -682,9 +704,9 @@ class ContextSearchService:
                 confidence="low"
             )
 
-        # Perform semantic vector search with project filter
+        # Perform semantic vector search with project filter and expanded query
         all_results = vector_search.search(
-            query=query,
+            query=expanded_query,  # Use expanded query with synonyms
             days_back=days_back,
             top_k=50,  # Retrieve top 50 most relevant documents
             sources=sources,
