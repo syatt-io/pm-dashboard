@@ -46,17 +46,28 @@ class ProgressAnalyzer:
             'stuck', 'issue with', 'problem with', 'pending'
         }
 
-        # Jira status categories
+        # Jira status categories - split between in-review and deployed
         self.status_categories = {
             'todo': {'to do', 'open', 'backlog', 'new'},
-            'in_progress': {'in progress', 'in development', 'in review', 'code review'},
-            'done': {
-                'done', 'closed', 'resolved', 'completed', 'merged',
-                # Testing/Review statuses - these indicate work is complete and ready for validation
-                'uat', 'qa', 'ready for uat', 'ready for qa', 'in uat', 'in qa',
-                'ready for testing', 'testing', 'ready for review',
-                # Deployment/Release statuses
-                'ready for deployment', 'ready to deploy', 'deployed', 'released'
+            'in_progress': {'in progress', 'in development'},
+            'in_review': {
+                # Code review statuses
+                'in review', 'code review', 'internal review', 'peer review',
+                # Testing/QA statuses - work is done but awaiting validation
+                'qa', 'in qa', 'ready for qa',
+                'uat', 'in uat', 'ready for uat',
+                'testing', 'ready for testing',
+                'ready for review'
+            },
+            'ready_to_deploy': {
+                # Approved and ready for release
+                'ready for deployment', 'ready to deploy', 'ready for release',
+                'approved', 'ready for prod', 'ready for production'
+            },
+            'deployed': {
+                # Fully complete and in production
+                'deployed', 'released', 'in production', 'live',
+                'done', 'closed', 'resolved', 'completed', 'merged'
             },
             'blocked': {'blocked', 'on hold', 'waiting'}
         }
@@ -282,11 +293,13 @@ class ProgressAnalyzer:
                         jira_tickets[ticket]['last_updated'] = signal.date
                     jira_tickets[ticket]['source_count'] += 1
 
-        # Categorize tickets by status
+        # Categorize tickets by status (with new granular categories)
         status_breakdown = {
             'todo': [],
             'in_progress': [],
-            'done': [],
+            'in_review': [],
+            'ready_to_deploy': [],
+            'deployed': [],
             'blocked': []
         }
 
@@ -465,8 +478,14 @@ class ProgressAnalyzer:
         # Check Jira tickets
         for ticket_info in jira_status['tickets'].values():
             if ticket_info['last_updated'] < cutoff:
-                # Only flag non-Done tickets as stale
-                if ticket_info['status'].lower() not in self.status_categories['done']:
+                # Only flag non-deployed/non-ready-to-deploy tickets as stale
+                # Tickets in review, UAT, or ready-to-deploy are expected to stay in that state
+                status_lower = ticket_info['status'].lower()
+                is_final_state = (
+                    status_lower in self.status_categories.get('deployed', set()) or
+                    status_lower in self.status_categories.get('ready_to_deploy', set())
+                )
+                if not is_final_state:
                     stale.append({
                         'type': 'jira',
                         'entity': ticket_info['ticket'],
@@ -559,17 +578,21 @@ class ProgressAnalyzer:
         """
         parts = []
 
-        # Jira summary
+        # Jira summary with granular status breakdown
         jira_total = jira_status['total_count']
         if jira_total > 0:
             breakdown = jira_status['breakdown']
             parts.append(
-                f"{jira_total} Jira tickets tracked: "
-                f"{len(breakdown['done'])} done, "
+                f"{jira_total} Jira tickets: "
+                f"{len(breakdown['deployed'])} deployed, "
+                f"{len(breakdown['ready_to_deploy'])} ready to deploy, "
+                f"{len(breakdown['in_review'])} in review/testing, "
                 f"{len(breakdown['in_progress'])} in progress, "
-                f"{len(breakdown['todo'])} to do, "
-                f"{len(breakdown['blocked'])} blocked"
+                f"{len(breakdown['todo'])} to do"
             )
+            # Add blocked count if any
+            if len(breakdown['blocked']) > 0:
+                parts.append(f"{len(breakdown['blocked'])} blocked")
 
         # GitHub summary
         pr_total = github_activity['total_pr_count']
