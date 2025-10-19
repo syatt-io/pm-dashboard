@@ -50,7 +50,14 @@ class ProgressAnalyzer:
         self.status_categories = {
             'todo': {'to do', 'open', 'backlog', 'new'},
             'in_progress': {'in progress', 'in development', 'in review', 'code review'},
-            'done': {'done', 'closed', 'resolved', 'completed', 'merged'},
+            'done': {
+                'done', 'closed', 'resolved', 'completed', 'merged',
+                # Testing/Review statuses - these indicate work is complete and ready for validation
+                'uat', 'qa', 'ready for uat', 'ready for qa', 'in uat', 'in qa',
+                'ready for testing', 'testing', 'ready for review',
+                # Deployment/Release statuses
+                'ready for deployment', 'ready to deploy', 'deployed', 'released'
+            },
             'blocked': {'blocked', 'on hold', 'waiting'}
         }
 
