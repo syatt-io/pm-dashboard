@@ -743,18 +743,30 @@ class SlackTodoBot:
                 text = event.get('text', '')
                 channel_id = event.get('channel')
 
-                # CRITICAL: For threaded messages, Slack sends thread_ts pointing to the parent message
-                # For new messages (not in a thread), thread_ts will be None
-                # We should ALWAYS use thread_ts if available, otherwise create a new thread
-                thread_ts = event.get('thread_ts')  # This is the parent message timestamp if in thread
+                # CRITICAL FIX: For thread consistency, we need to use the SAME thread_ts for all messages in a thread
+                #
+                # Case 1: User @mentions bot in existing thread -> Slack provides thread_ts (parent message)
+                # Case 2: User @mentions bot in channel (new thread) -> No thread_ts, we use current ts
+                #
+                # When bot replies, it creates a thread. Future replies in that thread will use the
+                # ORIGINAL user message ts as thread_ts (not the bot's reply ts).
 
-                # If no thread_ts, this is a new message - use current ts to create new thread
-                if not thread_ts:
-                    thread_ts = event.get('ts')
+                original_thread_ts = event.get('thread_ts')  # Will be set if replying in existing thread
+                current_ts = event.get('ts')  # Current message timestamp
 
-                # Debug logging for thread handling - log full event for diagnosis
-                logger.info(f"📌 app_mention event - thread_ts: {event.get('thread_ts')}, ts: {event.get('ts')}, using: {thread_ts}")
-                logger.info(f"📌 Full event keys: {list(event.keys())}")
+                # For conversation history: always use the earliest message in the thread
+                # If thread_ts exists, use it (we're in an existing thread)
+                # If not, use current ts (we're starting a new thread)
+                thread_ts_for_history = original_thread_ts if original_thread_ts else current_ts
+
+                # For bot reply: use thread_ts if in thread, otherwise use current ts to create thread
+                thread_ts_for_reply = original_thread_ts if original_thread_ts else current_ts
+
+                # Debug logging for thread handling
+                logger.info(f"📌 app_mention - user={user_id}, channel={channel_id}")
+                logger.info(f"📌   original_thread_ts={original_thread_ts}, current_ts={current_ts}")
+                logger.info(f"📌   using for history: {thread_ts_for_history}, using for reply: {thread_ts_for_reply}")
+                logger.info(f"📌   is_thread_reply: {original_thread_ts is not None}")
 
                 # Check whitelist
                 if settings.slack_chat.whitelisted_users and user_id not in settings.slack_chat.whitelisted_users:
@@ -768,7 +780,7 @@ class SlackTodoBot:
                 if not question:
                     say(
                         channel=channel_id,
-                        thread_ts=thread_ts,
+                        thread_ts=thread_ts_for_reply,
                         text="👋 Hi! Ask me anything and I'll search across Slack, meetings, Jira, GitHub, and Notion to help you."
                     )
                     return
@@ -778,18 +790,19 @@ class SlackTodoBot:
                     from src.services.slack_chat_service import SlackChatService
                     chat_service = SlackChatService()
 
-                    # Run async handler
+                    # CRITICAL: Use the same thread_ts for conversation history
+                    # This ensures follow-up messages in the same thread have access to previous context
                     asyncio.run(chat_service.handle_question(
                         user_id=user_id,
                         question=question,
                         channel_id=channel_id,
-                        thread_ts=thread_ts
+                        thread_ts=thread_ts_for_history  # Use consistent thread_ts for history lookup
                     ))
                 except Exception as e:
                     logger.error(f"Error handling app_mention: {e}")
                     say(
                         channel=channel_id,
-                        thread_ts=thread_ts,
+                        thread_ts=thread_ts_for_reply,
                         text=f"❌ Sorry, I encountered an error: {str(e)}"
                     )
 
