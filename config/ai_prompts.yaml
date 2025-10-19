@@ -210,7 +210,7 @@ context_search:
 
   user_prompt_template: |
     Query: "{query}"
-    {domain_context}{entity_context}
+    {domain_context}{entity_context}{progress_context}
     SEARCH RESULTS:
     {context_text}
 

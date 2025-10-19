@@ -55,7 +55,8 @@ class ContextSummarizer:
         debug: bool = False,
         project_context: Optional[Dict[str, Any]] = None,
         detail_level: str = "normal",
-        entity_links: Optional[Dict[str, Any]] = None
+        entity_links: Optional[Dict[str, Any]] = None,
+        progress_analysis: Optional[Any] = None
     ) -> SummarizedContext:
         """Generate AI summary with inline citations.
 
@@ -65,6 +66,8 @@ class ContextSummarizer:
             debug: Enable debug logging
             project_context: Optional dict with 'project_key' and 'keywords' for domain context
             detail_level: Detail level - 'brief', 'normal', or 'detailed' (default: 'normal')
+            entity_links: Optional dict with entity cross-references
+            progress_analysis: Optional ProgressAnalysis object with progress signals
 
         Returns:
             SummarizedContext with summary, citations, key people, and timeline
@@ -108,8 +111,8 @@ class ContextSummarizer:
                 f"Content: {result.content}\n"
             )
 
-        # Build prompt for LLM with optional project context, detail level, and entity links
-        prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level, entity_links, results)
+        # Build prompt for LLM with optional project context, detail level, entity links, and progress analysis
+        prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level, entity_links, results, progress_analysis)
 
         if debug:
             logger.info(f"📝 Summarization prompt: {len(prompt)} chars")
@@ -200,7 +203,7 @@ class ContextSummarizer:
                 confidence="low"
             )
 
-    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None, detail_level: str = "normal", entity_links: Optional[Dict[str, Any]] = None, results: List[Any] = None) -> str:
+    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None, detail_level: str = "normal", entity_links: Optional[Dict[str, Any]] = None, results: List[Any] = None, progress_analysis: Optional[Any] = None) -> str:
         """Build the LLM prompt for summarization.
 
         Args:
@@ -210,6 +213,7 @@ class ContextSummarizer:
             detail_level: Detail level - 'brief', 'normal', or 'detailed'
             entity_links: Optional dict with entity cross-references
             results: Optional list of search results for entity linking
+            progress_analysis: Optional ProgressAnalysis object with progress signals
 
         Returns:
             Complete prompt for LLM
@@ -239,6 +243,11 @@ class ContextSummarizer:
         if entity_links and results:
             entity_context = self._format_entity_links(entity_links, results)
 
+        # Build progress context section if provided
+        progress_context = ""
+        if progress_analysis:
+            progress_context = self._format_progress_analysis(progress_analysis)
+
         # Get detail level instructions from config
         detail_levels = self.prompt_manager.get_prompt('context_search', 'detail_levels', default={})
         detail_instruction = detail_levels.get(
@@ -257,6 +266,7 @@ class ContextSummarizer:
             query=query,
             domain_context=domain_context,
             entity_context=entity_context,
+            progress_context=progress_context,
             context_text=context_text,
             detail_instruction=detail_instruction
         )
@@ -302,6 +312,84 @@ class ContextSummarizer:
             if pr_lines:
                 lines.append("\n\nCROSS-REFERENCED GITHUB PRS:")
                 lines.extend(pr_lines)
+
+        return "\n".join(lines) if lines else ""
+
+    def _format_progress_analysis(self, progress_analysis: Any) -> str:
+        """Format progress analysis for AI context.
+
+        Args:
+            progress_analysis: ProgressAnalysis object with progress signals
+
+        Returns:
+            Formatted progress context string
+        """
+        lines = []
+
+        # Summary line
+        if progress_analysis.progress_summary:
+            lines.append(f"\n\nPROGRESS OVERVIEW:\n{progress_analysis.progress_summary}")
+
+        # Jira status breakdown
+        if progress_analysis.jira_status and progress_analysis.jira_status.get('total_count', 0) > 0:
+            breakdown = progress_analysis.jira_status['breakdown']
+            lines.append("\n\nJIRA TICKET STATUS:")
+
+            # In Progress tickets
+            if breakdown.get('in_progress'):
+                lines.append("  In Progress:")
+                for ticket in breakdown['in_progress'][:5]:  # Limit to 5
+                    days_ago = (datetime.now() - ticket['last_updated']).days
+                    lines.append(f"    - {ticket['ticket']}: {ticket['status']} (updated {days_ago}d ago)")
+
+            # Blocked tickets (IMPORTANT)
+            if breakdown.get('blocked'):
+                lines.append("  Blocked:")
+                for ticket in breakdown['blocked']:
+                    days_ago = (datetime.now() - ticket['last_updated']).days
+                    lines.append(f"    - {ticket['ticket']}: {ticket['status']} (updated {days_ago}d ago)")
+
+            # Recently completed
+            if breakdown.get('done'):
+                recent_done = [t for t in breakdown['done'] if (datetime.now() - t['last_updated']).days <= 7]
+                if recent_done:
+                    lines.append("  Recently Completed (last 7 days):")
+                    for ticket in recent_done[:3]:
+                        days_ago = (datetime.now() - ticket['last_updated']).days
+                        lines.append(f"    - {ticket['ticket']} (completed {days_ago}d ago)")
+
+        # GitHub activity
+        if progress_analysis.github_activity and progress_analysis.github_activity.get('total_pr_count', 0) > 0:
+            lines.append("\n\nGITHUB ACTIVITY:")
+
+            # Recent PRs
+            recent_prs = progress_analysis.github_activity.get('recent_prs', [])
+            if recent_prs:
+                lines.append("  Recent PRs:")
+                for pr in recent_prs[:5]:
+                    days_ago = (datetime.now() - pr['date']).days
+                    lines.append(f"    - PR {pr['pr']}: {pr['status']} ({days_ago}d ago)")
+
+            # Recent commits
+            recent_commits = progress_analysis.github_activity.get('recent_commits', [])
+            if recent_commits:
+                lines.append(f"  Recent Commits: {len(recent_commits)} commits in last 7 days")
+
+        # Blockers (CRITICAL INFORMATION)
+        if progress_analysis.blockers:
+            lines.append("\n\nBLOCKERS:")
+            for blocker in progress_analysis.blockers[:5]:
+                lines.append(f"  - {blocker['entity']}: {blocker['description'][:150]} ({blocker['days_ago']}d ago)")
+
+        # Stale items (items with no updates in 14+ days)
+        if progress_analysis.stale_items:
+            lines.append("\n\nSTALE ITEMS (14+ days no update):")
+            for item in progress_analysis.stale_items[:5]:
+                lines.append(f"  - {item['entity']}: {item['status']} (last updated {item['days_ago']}d ago)")
+
+        # Recent activity summary
+        if progress_analysis.recent_activity:
+            lines.append(f"\n\nRECENT ACTIVITY: {len(progress_analysis.recent_activity)} updates in last 7 days")
 
         return "\n".join(lines) if lines else ""
 

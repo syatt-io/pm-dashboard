@@ -756,8 +756,14 @@ class ContextSearchService:
             self.logger.info(f"🔄 Re-ranked {len(all_results[:50])} results → Using top {len(reranked_results)}")
             all_results = reranked_results + all_results[50:]  # Reranked top + remaining results
 
-        # Generate AI summary and insights with detail level and entity links
-        summarized = await self._generate_insights(query, all_results, None, detail_level, entity_links)
+        # Progress Analysis: Extract progress signals from results
+        # Analyze Jira status, GitHub activity, blockers, stale work, timeline
+        progress_analysis = await self._analyze_progress(all_results, entity_links)
+        if progress_analysis:
+            self.logger.info(f"📊 Progress analysis: {progress_analysis.progress_summary}")
+
+        # Generate AI summary and insights with detail level, entity links, and progress analysis
+        summarized = await self._generate_insights(query, all_results, None, detail_level, entity_links, progress_analysis)
 
         return ContextSearchResults(
             query=query,
@@ -1806,15 +1812,53 @@ IMPORTANT:
         text = ' '.join(filter(None, text_parts))
         return text.strip()
 
+    async def _analyze_progress(
+        self,
+        results: List[SearchResult],
+        entity_links: Dict[str, Any]
+    ):
+        """Analyze progress signals from search results.
+
+        Args:
+            results: List of SearchResult objects
+            entity_links: Entity cross-references
+
+        Returns:
+            ProgressAnalysis object or None if error
+        """
+        try:
+            from src.services.progress_analyzer import ProgressAnalyzer
+
+            if not results:
+                return None
+
+            analyzer = ProgressAnalyzer()
+            analysis = await analyzer.analyze_progress(results, entity_links)
+
+            return analysis
+
+        except Exception as e:
+            self.logger.error(f"Error analyzing progress: {e}")
+            return None
+
     async def _generate_insights(
         self,
         query: str,
         results: List[SearchResult],
         project_context: Optional[Dict[str, Any]] = None,
         detail_level: str = "normal",
-        entity_links: Optional[Dict[str, Any]] = None
+        entity_links: Optional[Dict[str, Any]] = None,
+        progress_analysis: Optional[Any] = None
     ):
         """Generate AI-powered insights from search results using ContextSummarizer.
+
+        Args:
+            query: Search query
+            results: Search results
+            project_context: Optional project context dict
+            detail_level: Summary detail level
+            entity_links: Entity cross-references
+            progress_analysis: Optional ProgressAnalysis object with progress signals
 
         Returns:
             SummarizedContext object with all fields, or None if no results
@@ -1825,10 +1869,18 @@ IMPORTANT:
             if not results:
                 return None
 
-            # Use the new AI summarizer with project context, detail level, and entity links
+            # Use the new AI summarizer with project context, detail level, entity links, and progress analysis
             # Limit to 12 results to avoid context length issues (12 × ~800 chars = ~9600 chars < 8K token limit)
             summarizer = ContextSummarizer()
-            summarized = await summarizer.summarize(query, results[:12], debug=True, project_context=project_context, detail_level=detail_level, entity_links=entity_links)
+            summarized = await summarizer.summarize(
+                query,
+                results[:12],
+                debug=True,
+                project_context=project_context,
+                detail_level=detail_level,
+                entity_links=entity_links,
+                progress_analysis=progress_analysis
+            )
 
             # Convert timeline format to match expected format
             summarized.timeline = [
