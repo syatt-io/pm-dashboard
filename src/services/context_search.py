@@ -637,7 +637,8 @@ class ContextSearchService:
         user_id: Optional[int] = None,
         debug: bool = True,  # Enable debug logging by default for now
         detail_level: str = "normal",
-        project: Optional[str] = None
+        project: Optional[str] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> ContextSearchResults:
         """Search for context across all sources using vector database.
 
@@ -649,6 +650,7 @@ class ContextSearchService:
             debug: Enable debug logging for scoring
             detail_level: Summary detail level - 'brief', 'normal', or 'detailed'
             project: Filter by project key (e.g., 'SUBS', 'BC')
+            conversation_history: Optional list of prior conversation turns for threaded context
 
         Returns:
             ContextSearchResults with aggregated results from vector search
@@ -784,8 +786,8 @@ class ContextSearchService:
         if progress_analysis:
             self.logger.info(f"📊 Progress analysis: {progress_analysis.progress_summary}")
 
-        # Generate AI summary and insights with detail level, entity links, and progress analysis
-        summarized = await self._generate_insights(query, all_results, None, detail_level, entity_links, progress_analysis)
+        # Generate AI summary and insights with detail level, entity links, progress analysis, and conversation history
+        summarized = await self._generate_insights(query, all_results, None, detail_level, entity_links, progress_analysis, conversation_history)
 
         return ContextSearchResults(
             query=query,
@@ -1870,7 +1872,8 @@ IMPORTANT:
         project_context: Optional[Dict[str, Any]] = None,
         detail_level: str = "normal",
         entity_links: Optional[Dict[str, Any]] = None,
-        progress_analysis: Optional[Any] = None
+        progress_analysis: Optional[Any] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ):
         """Generate AI-powered insights from search results using ContextSummarizer.
 
@@ -1881,6 +1884,7 @@ IMPORTANT:
             detail_level: Summary detail level
             entity_links: Entity cross-references
             progress_analysis: Optional ProgressAnalysis object with progress signals
+            conversation_history: Optional list of prior conversation turns for threaded context
 
         Returns:
             SummarizedContext object with all fields, or None if no results
@@ -1891,7 +1895,7 @@ IMPORTANT:
             if not results:
                 return None
 
-            # Use the new AI summarizer with project context, detail level, entity links, and progress analysis
+            # Use the new AI summarizer with project context, detail level, entity links, progress analysis, and conversation history
             # Limit to 12 results to avoid context length issues (12 × ~800 chars = ~9600 chars < 8K token limit)
             summarizer = ContextSummarizer()
             summarized = await summarizer.summarize(
@@ -1901,7 +1905,8 @@ IMPORTANT:
                 project_context=project_context,
                 detail_level=detail_level,
                 entity_links=entity_links,
-                progress_analysis=progress_analysis
+                progress_analysis=progress_analysis,
+                conversation_history=conversation_history
             )
 
             # Convert timeline format to match expected format

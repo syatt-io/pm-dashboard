@@ -604,13 +604,21 @@ class SlackChatService:
             # Determine detail level (use extracted or default to "slack")
             detail_level = query_context.detail_level or "slack"
 
-            # Perform context search with extracted context
+            # Convert conversation history to format expected by summarizer
+            conversation_history_for_ai = []
+            if conversation_history:
+                for turn in conversation_history:
+                    conversation_history_for_ai.append({"role": "user", "content": turn.question})
+                    conversation_history_for_ai.append({"role": "assistant", "content": turn.answer})
+
+            # Perform context search with extracted context and conversation history
             results = await self.context_search.search(
                 query=question,
                 days_back=days_back,
                 user_id=app_user_id,
                 detail_level=detail_level,  # Use extracted detail level or default to slack
-                project=query_context.project_key  # Use extracted or auto-detected project
+                project=query_context.project_key,  # Use extracted or auto-detected project
+                conversation_history=conversation_history_for_ai if conversation_history else None
             )
 
             if not results.results:

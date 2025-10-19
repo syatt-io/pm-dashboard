@@ -56,7 +56,8 @@ class ContextSummarizer:
         project_context: Optional[Dict[str, Any]] = None,
         detail_level: str = "normal",
         entity_links: Optional[Dict[str, Any]] = None,
-        progress_analysis: Optional[Any] = None
+        progress_analysis: Optional[Any] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> SummarizedContext:
         """Generate AI summary with inline citations.
 
@@ -68,6 +69,7 @@ class ContextSummarizer:
             detail_level: Detail level - 'brief', 'normal', or 'detailed' (default: 'normal')
             entity_links: Optional dict with entity cross-references
             progress_analysis: Optional ProgressAnalysis object with progress signals
+            conversation_history: Optional list of prior conversation turns [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
 
         Returns:
             SummarizedContext with summary, citations, key people, and timeline
@@ -111,8 +113,8 @@ class ContextSummarizer:
                 f"Content: {result.content}\n"
             )
 
-        # Build prompt for LLM with optional project context, detail level, entity links, and progress analysis
-        prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level, entity_links, results, progress_analysis)
+        # Build prompt for LLM with optional project context, detail level, entity links, progress analysis, and conversation history
+        prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level, entity_links, results, progress_analysis, conversation_history)
 
         if debug:
             logger.info(f"📝 Summarization prompt: {len(prompt)} chars")
@@ -203,7 +205,7 @@ class ContextSummarizer:
                 confidence="low"
             )
 
-    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None, detail_level: str = "normal", entity_links: Optional[Dict[str, Any]] = None, results: List[Any] = None, progress_analysis: Optional[Any] = None) -> str:
+    def _build_summarization_prompt(self, query: str, context_blocks: List[str], project_context: Optional[Dict[str, Any]] = None, detail_level: str = "normal", entity_links: Optional[Dict[str, Any]] = None, results: List[Any] = None, progress_analysis: Optional[Any] = None, conversation_history: Optional[List[Dict[str, str]]] = None) -> str:
         """Build the LLM prompt for summarization.
 
         Args:
@@ -214,6 +216,7 @@ class ContextSummarizer:
             entity_links: Optional dict with entity cross-references
             results: Optional list of search results for entity linking
             progress_analysis: Optional ProgressAnalysis object with progress signals
+            conversation_history: Optional list of prior conversation turns
 
         Returns:
             Complete prompt for LLM
@@ -248,6 +251,11 @@ class ContextSummarizer:
         if progress_analysis:
             progress_context = self._format_progress_analysis(progress_analysis)
 
+        # Build conversation history section if provided
+        conversation_context = ""
+        if conversation_history and len(conversation_history) > 0:
+            conversation_context = self._format_conversation_history(conversation_history)
+
         # Get detail level instructions from config
         detail_levels = self.prompt_manager.get_prompt('context_search', 'detail_levels', default={})
         detail_instruction = detail_levels.get(
@@ -267,6 +275,7 @@ class ContextSummarizer:
             domain_context=domain_context,
             entity_context=entity_context,
             progress_context=progress_context,
+            conversation_context=conversation_context,
             context_text=context_text,
             detail_instruction=detail_instruction
         )
@@ -392,6 +401,35 @@ class ContextSummarizer:
             lines.append(f"\n\nRECENT ACTIVITY: {len(progress_analysis.recent_activity)} updates in last 7 days")
 
         return "\n".join(lines) if lines else ""
+
+    def _format_conversation_history(self, conversation_history: List[Dict[str, str]]) -> str:
+        """Format conversation history for AI context.
+
+        Args:
+            conversation_history: List of conversation turns with 'role' and 'content'
+
+        Returns:
+            Formatted conversation history string
+        """
+        if not conversation_history:
+            return ""
+
+        lines = ["\n\nPREVIOUS CONVERSATION:"]
+
+        for turn in conversation_history:
+            role = turn.get('role', 'unknown')
+            content = turn.get('content', '')
+
+            if role == 'user':
+                lines.append(f"User: {content}")
+            elif role == 'assistant':
+                # Truncate long assistant responses to save tokens
+                truncated_content = content[:500] + "..." if len(content) > 500 else content
+                lines.append(f"Assistant: {truncated_content}")
+
+        lines.append("\nThe current query is a follow-up to this conversation. Use the conversation context to better understand the user's intent.")
+
+        return "\n".join(lines)
 
     def _parse_ai_response(self, response: str) -> Dict[str, Any]:
         """Parse the flexible AI response.
