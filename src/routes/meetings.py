@@ -238,12 +238,12 @@ def analyze_meeting(meeting_id):
             existing_meeting = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
 
             if existing_meeting:
-                # Update existing record
+                # Update existing record - use json.dumps() for consistency with CREATE path
                 existing_meeting.analyzed_at = analyzed_at
                 existing_meeting.summary = analysis.summary
-                existing_meeting.key_decisions = analysis.key_decisions
-                existing_meeting.blockers = analysis.blockers
-                existing_meeting.action_items = action_items_data
+                existing_meeting.key_decisions = json.dumps(analysis.key_decisions) if analysis.key_decisions else None
+                existing_meeting.blockers = json.dumps(analysis.blockers) if analysis.blockers else None
+                existing_meeting.action_items = json.dumps(action_items_data) if action_items_data else None
                 existing_meeting.title = transcript['title']
                 existing_meeting.date = meeting_date
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
@@ -675,12 +675,12 @@ def analyze_meeting_api(user, meeting_id):
             existing_meeting = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
 
             if existing_meeting:
-                # Update existing record
+                # Update existing record - use json.dumps() for consistency with CREATE path
                 existing_meeting.analyzed_at = analyzed_at
                 existing_meeting.summary = analysis.summary
-                existing_meeting.key_decisions = analysis.key_decisions
-                existing_meeting.blockers = analysis.blockers
-                existing_meeting.action_items = action_items_data
+                existing_meeting.key_decisions = json.dumps(analysis.key_decisions) if analysis.key_decisions else None
+                existing_meeting.blockers = json.dumps(analysis.blockers) if analysis.blockers else None
+                existing_meeting.action_items = json.dumps(action_items_data) if action_items_data else None
                 existing_meeting.title = transcript['title']
                 existing_meeting.date = meeting_date
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
