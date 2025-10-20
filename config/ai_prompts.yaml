@@ -283,7 +283,7 @@ context_search:
   # Detail level instructions
   detail_levels:
     brief: "Keep response to 100-150 words. Write 1-2 short paragraphs maximum. Focus only on the most critical takeaway and current status."
-    normal: "Target 150-250 words across 2-3 paragraphs. Include current status, key decisions, and relevant details. Be concise but complete."
+    normal: "Aim for 150-300 words across 2-3 paragraphs. Adjust based on query intent and content complexity - be more concise if user asks for 'brief', 'summary', or 'quick' info; provide more detail if query asks 'why', 'how', or 'explain' or if the topic requires context. Include current status, key decisions, and relevant details. Prioritize clarity and completeness over strict word counts."
     detailed: "Write 300-400 words across 3-4 paragraphs. Include context, technical details, blockers, and next steps. Be thorough but avoid wordiness."
     slack: "CRITICAL: 200-250 words MAX (under 2000 characters). Write 2-3 short paragraphs in conversational tone. Use Slack markdown sparingly: *bold* for emphasis, `code` for ticket numbers. No formal headers. Focus on the most actionable information - what's happening now and why it matters."
 

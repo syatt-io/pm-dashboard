@@ -240,6 +240,34 @@ class QueryUnderstandingService:
         r'\b(?:that|this|it)\b',  # Pronouns referring to previous context
     ]
 
+    # Verbosity hint patterns for natural language detection
+    VERBOSITY_PATTERNS = {
+        'brief': [
+            r'\bbrief\b',
+            r'\bquick\b',
+            r'\btldr\b',
+            r'\btl;dr\b',
+            r'\bsummary\b',
+            r'\bsummarize\b',
+            r'\bconcise\b',
+            r'\bshort\b',
+            r'\bin a nutshell\b',
+            r'\bbottom line\b',
+        ],
+        'detailed': [
+            r'\bdetail\b',
+            r'\bdetailed\b',
+            r'\bthorough\b',
+            r'\bthoroughly\b',
+            r'\bcomprehensive\b',
+            r'\bexplain\b',
+            r'\bin-?depth\b',
+            r'\belaborate\b',
+            r'\bwhy\b',  # "why" questions often need more detail
+            r'\bhow does .+ work\b',  # "how does X work" implies detailed explanation
+        ],
+    }
+
     def understand_query(
         self,
         query: str,
@@ -265,6 +293,12 @@ class QueryUnderstandingService:
         if 'project' in extracted_params:
             # Override with explicit --project parameter if provided
             context.project_key = extracted_params['project']
+
+        # Detect natural language verbosity hints (only if --detail not explicitly set)
+        if 'detail_level' not in extracted_params:
+            detected_verbosity = self._detect_verbosity_hint(cleaned_query)
+            if detected_verbosity:
+                context.detail_level = detected_verbosity
 
         # Use cleaned query (without parameters) for further extraction
         query_for_extraction = cleaned_query
@@ -336,6 +370,30 @@ class QueryUnderstandingService:
             return True
 
         return False
+
+    def _detect_verbosity_hint(self, query: str) -> Optional[str]:
+        """Detect natural language hints about desired verbosity level.
+
+        Args:
+            query: User's query
+
+        Returns:
+            'brief' or 'detailed' if hints detected, None otherwise
+        """
+        query_lower = query.lower()
+
+        # Check for "brief" hints
+        for pattern in self.VERBOSITY_PATTERNS['brief']:
+            if re.search(pattern, query_lower, re.IGNORECASE):
+                return 'brief'
+
+        # Check for "detailed" hints
+        for pattern in self.VERBOSITY_PATTERNS['detailed']:
+            if re.search(pattern, query_lower, re.IGNORECASE):
+                return 'detailed'
+
+        # No hints detected - let AI use adaptive "normal" behavior
+        return None
 
     def _extract_parameters(self, query: str) -> Tuple[str, Dict[str, str]]:
         """Extract optional parameters from query (--detail, --project).
