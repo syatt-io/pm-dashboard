@@ -205,11 +205,18 @@ def analyze_meeting(meeting_id):
         if not transcript:
             return render_template('error.html', error="Could not fetch meeting transcript")
 
+        # Convert date from milliseconds to datetime if needed
+        meeting_date = transcript.get('date')
+        if isinstance(meeting_date, (int, float)) and meeting_date > 1000000000000:
+            meeting_date = datetime.fromtimestamp(meeting_date / 1000)
+        elif not isinstance(meeting_date, datetime):
+            meeting_date = datetime.now()
+
         # Analyze with AI
         analysis = analyzer.analyze_transcript(
-            transcript.transcript,
-            transcript.title,
-            transcript.date
+            transcript['transcript'],
+            transcript['title'],
+            meeting_date
         )
 
         # Store analysis results in database
@@ -237,8 +244,8 @@ def analyze_meeting(meeting_id):
                 existing_meeting.key_decisions = analysis.key_decisions
                 existing_meeting.blockers = analysis.blockers
                 existing_meeting.action_items = action_items_data
-                existing_meeting.title = transcript.title
-                existing_meeting.date = transcript.date
+                existing_meeting.title = transcript['title']
+                existing_meeting.date = meeting_date
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
             else:
                 # Create new record
@@ -247,8 +254,8 @@ def analyze_meeting(meeting_id):
                 processed_meeting = ProcessedMeeting(
                     id=str(uuid.uuid4()),
                     fireflies_id=meeting_id,
-                    title=transcript.title,
-                    date=transcript.date,
+                    title=transcript['title'],
+                    date=meeting_date,
                     analyzed_at=analyzed_at,
                     summary=analysis.summary,
                     key_decisions=json.dumps(analysis.key_decisions) if analysis.key_decisions else None,
@@ -261,8 +268,8 @@ def analyze_meeting(meeting_id):
         # Store in session for later processing
         session['current_analysis'] = {
             'meeting_id': meeting_id,
-            'meeting_title': transcript.title,
-            'meeting_date': transcript.date.isoformat(),
+            'meeting_title': transcript['title'],
+            'meeting_date': meeting_date.isoformat(),
             'summary': analysis.summary,
             'key_decisions': analysis.key_decisions,
             'blockers': analysis.blockers,
@@ -274,12 +281,12 @@ def analyze_meeting(meeting_id):
         breadcrumbs = [
             {'title': 'Home', 'url': '/'},
             {'title': 'Meetings', 'url': '/'},
-            {'title': f'{transcript.title}', 'url': f'/analyze/{meeting_id}'},
+            {'title': f"{transcript['title']}", 'url': f'/analyze/{meeting_id}'},
             {'title': 'Analysis Results', 'url': '#'}
         ]
 
         return render_template('analysis_new.html',
-                             meeting_title=transcript.title,
+                             meeting_title=transcript['title'],
                              analysis=analysis,
                              is_cached=False,
                              analyzed_at=analyzed_at,
@@ -553,14 +560,21 @@ def get_meeting_detail(user, meeting_id):
             if cached:
                 cached_dto = ProcessedMeetingDTO.from_orm(cached)
 
+        # Convert date from milliseconds to datetime if needed
+        meeting_date = transcript.get('date')
+        if isinstance(meeting_date, (int, float)) and meeting_date > 1000000000000:
+            meeting_date = datetime.fromtimestamp(meeting_date / 1000)
+        elif not isinstance(meeting_date, datetime):
+            meeting_date = datetime.now()
+
         # Build the response
         meeting_data = {
-            'id': transcript.id,
-            'meeting_id': transcript.id,
-            'title': transcript.title,
-            'date': transcript.date.isoformat(),
-            'duration': transcript.duration,
-            'transcript': transcript.transcript,
+            'id': transcript['id'],
+            'meeting_id': transcript['id'],
+            'title': transcript['title'],
+            'date': meeting_date.isoformat(),
+            'duration': transcript['duration'],
+            'transcript': transcript['transcript'],
             'action_items_count': 0,
             'relevance_score': 0,
             'confidence': 0,
