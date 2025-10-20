@@ -628,11 +628,18 @@ def analyze_meeting_api(user, meeting_id):
 
         logger.info(f"Starting API analysis for meeting {meeting_id}")
 
+        # Convert date from milliseconds to datetime if needed
+        meeting_date = transcript.get('date')
+        if isinstance(meeting_date, (int, float)) and meeting_date > 1000000000000:
+            meeting_date = datetime.fromtimestamp(meeting_date / 1000)
+        elif not isinstance(meeting_date, datetime):
+            meeting_date = datetime.now()
+
         # Analyze with AI using global analyzer
         analysis = analyzer.analyze_transcript(
-            transcript.transcript,
-            transcript.title,
-            transcript.date
+            transcript['transcript'],
+            transcript['title'],
+            meeting_date
         )
 
         # Store analysis results in database
@@ -660,8 +667,8 @@ def analyze_meeting_api(user, meeting_id):
                 existing_meeting.key_decisions = analysis.key_decisions
                 existing_meeting.blockers = analysis.blockers
                 existing_meeting.action_items = action_items_data
-                existing_meeting.title = transcript.title
-                existing_meeting.date = transcript.date
+                existing_meeting.title = transcript['title']
+                existing_meeting.date = meeting_date
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
             else:
                 # Create new record
@@ -670,8 +677,8 @@ def analyze_meeting_api(user, meeting_id):
                 processed_meeting = ProcessedMeeting(
                     id=str(uuid.uuid4()),
                     fireflies_id=meeting_id,
-                    title=transcript.title,
-                    date=transcript.date,
+                    title=transcript['title'],
+                    date=meeting_date,
                     analyzed_at=analyzed_at,
                     summary=analysis.summary,
                     key_decisions=json.dumps(analysis.key_decisions) if analysis.key_decisions else None,
