@@ -243,23 +243,49 @@ jobs:
     github:
       repo: syatt-io/pm-dashboard
       branch: main
-      deploy_on_push: false
+      deploy_on_push: true  # Deploy with each push
     source_dir: /
 
     build_command: pip install -r requirements.txt
 
-    run_command: python3 trigger_jira_backfill.py
+    run_command: python3 run_jira_backfill.py 30  # Backfill 30 days
 
     instance_count: 1
     instance_size_slug: basic-xxs
 
-    kind: POST_DEPLOY
+    kind: POST_DEPLOY  # Run after deployment completes
 
     envs:
-      # Admin API Key (to authenticate with the backend)
-      - key: ADMIN_API_KEY
+      # Database (PostgreSQL)
+      - key: DATABASE_URL
+        value: ${agentpm-db.DATABASE_URL}
+
+      # GCP Pub/Sub (for Celery if needed)
+      - key: GCP_PROJECT_ID
+        value: syatt-io
+      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
         type: SECRET
 
-      # Backend URL (since job runs as separate container)
-      - key: WEB_BASE_URL
-        value: "https://agent-pm-tsbbb.ondigitalocean.app"
+      # OpenAI (for embeddings)
+      - key: OPENAI_API_KEY
+        type: SECRET
+
+      # Jira Configuration
+      - key: JIRA_URL
+        value: https://syatt.atlassian.net
+      - key: JIRA_USERNAME
+        value: mike.samimi@syatt.io
+      - key: JIRA_API_TOKEN
+        type: SECRET
+
+      # Pinecone (vector database)
+      - key: PINECONE_API_KEY
+        type: SECRET
+      - key: PINECONE_ENVIRONMENT
+        value: us-east-1-aws
+      - key: PINECONE_INDEX_NAME
+        value: agent-pm-context
+      - key: PINECONE_DIMENSION
+        value: "1536"
+      - key: PINECONE_METRIC
+        value: cosine
