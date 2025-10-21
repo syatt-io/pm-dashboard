@@ -22,12 +22,25 @@ class VectorSearchService:
     """Service for hybrid vector + keyword search using Pinecone."""
 
     def __init__(self):
-        """Initialize vector search service."""
+        """Initialize vector search service.
+
+        Note: Vector embeddings always use OpenAI regardless of the configured
+        AI provider for LLM operations, since Anthropic and Google don't offer
+        comparable embedding models.
+        """
+        import os
         from config.settings import settings
         from openai import OpenAI
 
         self.settings = settings
-        self.openai_client = OpenAI(api_key=settings.ai.api_key)
+
+        # Always use OpenAI for embeddings (get from env, not from dynamic AI config)
+        openai_api_key = os.getenv('OPENAI_API_KEY')
+        if not openai_api_key:
+            logger.warning("OPENAI_API_KEY not set - vector search embeddings will fail")
+            logger.warning("Vector search requires OpenAI for embeddings regardless of LLM provider")
+
+        self.openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
         self.pinecone_index = None
         self._init_pinecone()
 
@@ -53,7 +66,15 @@ class VectorSearchService:
         return self.pinecone_index is not None
 
     def get_embedding(self, text: str) -> Optional[List[float]]:
-        """Get OpenAI embedding for query text."""
+        """Get OpenAI embedding for query text.
+
+        Note: Always uses OpenAI for embeddings regardless of configured LLM provider.
+        """
+        if not self.openai_client:
+            logger.error("OpenAI client not initialized - cannot generate embeddings")
+            logger.error("Set OPENAI_API_KEY environment variable for vector search")
+            return None
+
         try:
             response = self.openai_client.embeddings.create(
                 model="text-embedding-3-small",

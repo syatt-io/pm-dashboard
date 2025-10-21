@@ -52,6 +52,25 @@ The system automatically:
 - Update model → Next analysis uses new model
 - Modify temperature/tokens → Applied to next request
 
+## Important: Dual Provider Architecture
+
+**Vector Embeddings vs. LLM Operations**
+
+The system uses a dual-provider architecture:
+
+- **LLM Operations** (chat, analysis, summarization): Configurable via Admin UI
+  - Supports: OpenAI, Anthropic, Google
+  - Uses provider selected in Settings → AI Configuration
+
+- **Vector Embeddings** (semantic search): Always OpenAI
+  - Requires: `OPENAI_API_KEY` environment variable
+  - Cannot be changed (Anthropic/Google don't have comparable embeddings)
+
+**Why this matters:**
+- You can use Claude for analysis/chat while using OpenAI for search embeddings
+- Both API keys must be valid if you switch LLM provider away from OpenAI
+- Vector search will fail if `OPENAI_API_KEY` is missing/invalid
+
 ## Environment Variable Configuration
 
 If no database configuration exists, the system falls back to environment variables:
@@ -118,15 +137,23 @@ The following components automatically use fresh AI configuration:
    - Meeting transcript analysis
    - Action item extraction
    - Refreshes LLM before each `analyze_transcript()` call
+   - **Provider support**: OpenAI, Anthropic, Google
 
 2. **ContextSearchService** (`src/services/context_search.py`)
    - Context search summaries
    - Creates fresh LLM instance for each search
+   - **Provider support**: OpenAI, Anthropic, Google
 
 3. **ContextSummarizer** (`src/services/context_summarizer.py`)
    - AI-powered result summarization
    - Creates fresh client for each `summarize()` call
-   - **Note**: Currently OpenAI-only, logs warning if other provider configured
+   - **Provider support**: Currently OpenAI-only, logs warning if other provider configured
+
+4. **VectorSearchService** (`src/services/vector_search.py`)
+   - Vector embeddings for semantic search
+   - **Always uses OpenAI** for embeddings (regardless of configured LLM provider)
+   - Requires `OPENAI_API_KEY` environment variable
+   - **Reason**: Anthropic and Google don't offer comparable embedding models
 
 ## Verifying Active Configuration
 
