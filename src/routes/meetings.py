@@ -238,17 +238,17 @@ def analyze_meeting(meeting_id):
             existing_meeting = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
 
             if existing_meeting:
-                # Update existing record - use json.dumps() for consistency with CREATE path
+                # Update existing record - Always serialize to JSON, even empty lists
                 existing_meeting.analyzed_at = analyzed_at
                 existing_meeting.summary = analysis.summary
-                existing_meeting.key_decisions = json.dumps(analysis.key_decisions) if analysis.key_decisions else None
-                existing_meeting.blockers = json.dumps(analysis.blockers) if analysis.blockers else None
-                existing_meeting.action_items = json.dumps(action_items_data) if action_items_data else None
+                existing_meeting.key_decisions = json.dumps(analysis.key_decisions or [])
+                existing_meeting.blockers = json.dumps(analysis.blockers or [])
+                existing_meeting.action_items = json.dumps(action_items_data)  # Always serialize
                 existing_meeting.title = transcript['title']
                 existing_meeting.date = meeting_date
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
             else:
-                # Create new record
+                # Create new record - Always serialize to JSON, even empty lists
                 import uuid
                 import json
                 processed_meeting = ProcessedMeeting(
@@ -258,9 +258,9 @@ def analyze_meeting(meeting_id):
                     date=meeting_date,
                     analyzed_at=analyzed_at,
                     summary=analysis.summary,
-                    key_decisions=json.dumps(analysis.key_decisions) if analysis.key_decisions else None,
-                    blockers=json.dumps(analysis.blockers) if analysis.blockers else None,
-                    action_items=json.dumps(action_items_data) if action_items_data else None
+                    key_decisions=json.dumps(analysis.key_decisions or []),
+                    blockers=json.dumps(analysis.blockers or []),
+                    action_items=json.dumps(action_items_data)  # Always serialize
                 )
                 db_session.add(processed_meeting)
                 logger.info(f"Created new processed meeting record for {meeting_id}")
@@ -675,17 +675,17 @@ def analyze_meeting_api(user, meeting_id):
             existing_meeting = db_session.query(ProcessedMeeting).filter_by(fireflies_id=meeting_id).first()
 
             if existing_meeting:
-                # Update existing record - use json.dumps() for consistency with CREATE path
+                # Update existing record - Always serialize to JSON, even empty lists
                 existing_meeting.analyzed_at = analyzed_at
                 existing_meeting.summary = analysis.summary
-                existing_meeting.key_decisions = json.dumps(analysis.key_decisions) if analysis.key_decisions else None
-                existing_meeting.blockers = json.dumps(analysis.blockers) if analysis.blockers else None
-                existing_meeting.action_items = json.dumps(action_items_data) if action_items_data else None
+                existing_meeting.key_decisions = json.dumps(analysis.key_decisions or [])
+                existing_meeting.blockers = json.dumps(analysis.blockers or [])
+                existing_meeting.action_items = json.dumps(action_items_data)  # Always serialize
                 existing_meeting.title = transcript['title']
                 existing_meeting.date = meeting_date
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
             else:
-                # Create new record
+                # Create new record - Always serialize to JSON, even empty lists
                 import uuid
                 import json
                 processed_meeting = ProcessedMeeting(
@@ -695,9 +695,9 @@ def analyze_meeting_api(user, meeting_id):
                     date=meeting_date,
                     analyzed_at=analyzed_at,
                     summary=analysis.summary,
-                    key_decisions=json.dumps(analysis.key_decisions) if analysis.key_decisions else None,
-                    blockers=json.dumps(analysis.blockers) if analysis.blockers else None,
-                    action_items=json.dumps(action_items_data) if action_items_data else None
+                    key_decisions=json.dumps(analysis.key_decisions or []),
+                    blockers=json.dumps(analysis.blockers or []),
+                    action_items=json.dumps(action_items_data)  # Always serialize
                 )
                 db_session.add(processed_meeting)
                 logger.info(f"Created new processed meeting record for {meeting_id}")
