@@ -577,7 +577,8 @@ const WatchedProjectsNotice = () => {
 };
 
 const AnalysisStatusChip = ({ record }: { record: any }) => {
-  const hasAnalysis = record.action_items && record.action_items.length > 0;
+  // A meeting has analysis if it has an analyzed_at timestamp
+  const hasAnalysis = !!record.analyzed_at;
 
   if (hasAnalysis) {
     return (
@@ -674,7 +675,8 @@ const AnalysisStatusBanner = () => {
 
   if (!record) return null;
 
-  const isAnalyzed = record.analyzed_at && record.action_items && record.action_items.length > 0;
+  // A meeting is analyzed if it has an analyzed_at timestamp, regardless of action items count
+  const isAnalyzed = !!record.analyzed_at;
   const isRecent = isAnalyzed && new Date(record.analyzed_at) > new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const handleAnalyze = async () => {
