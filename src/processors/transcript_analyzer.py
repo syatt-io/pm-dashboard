@@ -9,10 +9,13 @@ from datetime import datetime, timedelta
 import json
 
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from src.utils.prompt_manager import get_prompt_manager
+from config.settings import settings
 
 
 logger = logging.getLogger(__name__)
@@ -60,12 +63,31 @@ class TranscriptAnalyzer:
 
     @staticmethod
     def _default_llm():
-        """Create default LLM instance."""
-        return ChatOpenAI(
-            model=os.getenv("OPENAI_MODEL", "gpt-4"),
-            temperature=float(os.getenv("AI_TEMPERATURE", "0.3")),
-            max_tokens=int(os.getenv("AI_MAX_TOKENS", "2000"))
-        )
+        """Create default LLM instance based on centralized settings."""
+        ai_config = settings.ai
+
+        if ai_config.provider == "openai":
+            return ChatOpenAI(
+                model=ai_config.model,
+                temperature=ai_config.temperature,
+                max_tokens=ai_config.max_tokens
+            )
+        elif ai_config.provider == "anthropic":
+            return ChatAnthropic(
+                model=ai_config.model,
+                anthropic_api_key=ai_config.api_key,
+                temperature=ai_config.temperature,
+                max_tokens=ai_config.max_tokens
+            )
+        elif ai_config.provider == "google":
+            return ChatGoogleGenerativeAI(
+                model=ai_config.model,
+                google_api_key=ai_config.api_key,
+                temperature=ai_config.temperature,
+                max_output_tokens=ai_config.max_tokens
+            )
+        else:
+            raise ValueError(f"Unsupported AI provider: {ai_config.provider}. Supported providers: openai, anthropic, google")
 
     def analyze_transcript(self, transcript: str, meeting_title: str = None,
                           meeting_date: datetime = None) -> MeetingAnalysis:

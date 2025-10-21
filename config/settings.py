@@ -58,8 +58,8 @@ class SlackChatConfig:
 class AIConfig:
     """AI model configuration."""
     api_key: str
-    provider: str = "openai"  # or "anthropic"
-    model: str = "gpt-4"  # Default - override with OPENAI_MODEL env var
+    provider: str = "openai"  # "openai", "anthropic", or "google"
+    model: str = "gpt-4"  # Default - override with provider-specific MODEL env var
     temperature: float = 0.3
     max_tokens: int = 2000
 
@@ -233,6 +233,13 @@ class Settings:
 
     @staticmethod
     def _load_ai_config() -> AIConfig:
+        """Load AI configuration from database if available, otherwise from environment."""
+        # Try to load from database first (admin-configured settings)
+        db_settings = Settings._load_ai_config_from_db()
+        if db_settings:
+            return db_settings
+
+        # Fallback to environment variables
         provider = os.getenv("AI_PROVIDER", "openai")
 
         if provider == "openai":
@@ -240,9 +247,12 @@ class Settings:
             model = os.getenv("OPENAI_MODEL", "gpt-4")
         elif provider == "anthropic":
             api_key = os.getenv("ANTHROPIC_API_KEY")
-            model = os.getenv("ANTHROPIC_MODEL", "claude-3-opus-20240229")
+            model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
+        elif provider == "google":
+            api_key = os.getenv("GOOGLE_API_KEY")
+            model = os.getenv("GOOGLE_MODEL", "gemini-1.5-pro")
         else:
-            raise ValueError(f"Unsupported AI provider: {provider}")
+            raise ValueError(f"Unsupported AI provider: {provider}. Supported providers: openai, anthropic, google")
 
         if not api_key:
             raise ValueError(f"{provider.upper()}_API_KEY not set in environment")
@@ -254,6 +264,63 @@ class Settings:
             temperature=float(os.getenv("AI_TEMPERATURE", "0.3")),
             max_tokens=int(os.getenv("AI_MAX_TOKENS", "2000"))
         )
+
+    @staticmethod
+    def _load_ai_config_from_db() -> AIConfig | None:
+        """Load AI configuration from database if available."""
+        try:
+            from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
+            from src.models.system_settings import SystemSettings
+
+            # Get database URL
+            database_url = os.getenv("DATABASE_URL", "sqlite:///database/pm_agent.db")
+
+            # Create engine and session
+            engine = create_engine(database_url)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+
+            try:
+                # Get system settings (there should only be one row)
+                system_settings = session.query(SystemSettings).first()
+
+                if not system_settings:
+                    return None
+
+                # Get the API key for the configured provider
+                api_key = system_settings.get_api_key(system_settings.ai_provider)
+
+                if not api_key:
+                    # No API key in database, fallback to env
+                    return None
+
+                # Use model from DB if set, otherwise use provider defaults
+                model = system_settings.ai_model
+                if not model:
+                    if system_settings.ai_provider == "openai":
+                        model = "gpt-4"
+                    elif system_settings.ai_provider == "anthropic":
+                        model = "claude-3-5-sonnet-20241022"
+                    elif system_settings.ai_provider == "google":
+                        model = "gemini-1.5-pro"
+
+                return AIConfig(
+                    provider=system_settings.ai_provider,
+                    model=model,
+                    api_key=api_key,
+                    temperature=system_settings.ai_temperature,
+                    max_tokens=system_settings.ai_max_tokens
+                )
+            finally:
+                session.close()
+
+        except Exception as e:
+            # If database doesn't exist or table doesn't exist yet, return None to fallback to env
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Could not load AI config from database: {e}")
+            return None
 
     @staticmethod
     def _load_agent_config() -> AgentConfig:

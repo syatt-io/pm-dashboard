@@ -197,6 +197,7 @@ from src.routes.user import user_bp
 from src.routes.dashboard import dashboard_bp
 from src.routes.feedback import feedback_bp
 from src.routes.backfill import backfill_bp
+from src.routes.admin_settings import admin_settings_bp
 
 app.register_blueprint(health_bp)
 app.register_blueprint(todos_bp)
@@ -211,6 +212,7 @@ app.register_blueprint(user_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(backfill_bp)
+app.register_blueprint(admin_settings_bp)
 
 # ✅ FIXED: Apply rate limiting to critical backfill endpoints (expensive operations)
 if limiter:
