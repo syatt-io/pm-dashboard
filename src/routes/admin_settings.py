@@ -236,24 +236,106 @@ def delete_ai_api_key(user, provider):
 @admin_required
 def get_available_models(user):
     """Get available models for each AI provider (admin only)."""
+    # Fetch OpenAI models dynamically from API
+    openai_models = _fetch_openai_models()
+
+    # Curated lists for Anthropic and Google (with custom input option)
     return jsonify({
         'success': True,
         'data': {
-            'openai': [
-                {'value': 'gpt-4o', 'label': 'GPT-4o (Latest)'},
-                {'value': 'gpt-4o-mini', 'label': 'GPT-4o Mini (Fast & Affordable)'},
-                {'value': 'gpt-4-turbo', 'label': 'GPT-4 Turbo'},
-                {'value': 'gpt-4', 'label': 'GPT-4'},
-            ],
+            'openai': openai_models,
             'anthropic': [
                 {'value': 'claude-3-5-sonnet-20241022', 'label': 'Claude 3.5 Sonnet (Latest)'},
                 {'value': 'claude-3-5-haiku-20241022', 'label': 'Claude 3.5 Haiku (Fast)'},
                 {'value': 'claude-3-opus-20240229', 'label': 'Claude 3 Opus'},
+                {'value': '__custom__', 'label': '✏️ Custom Model ID...'},
             ],
             'google': [
                 {'value': 'gemini-1.5-pro', 'label': 'Gemini 1.5 Pro (Latest)'},
                 {'value': 'gemini-1.5-flash', 'label': 'Gemini 1.5 Flash (Fast)'},
                 {'value': 'gemini-1.0-pro', 'label': 'Gemini 1.0 Pro'},
+                {'value': '__custom__', 'label': '✏️ Custom Model ID...'},
             ]
+        },
+        'supports_custom_input': {
+            'openai': False,  # Fetched from API
+            'anthropic': True,
+            'google': True
         }
     })
+
+
+def _fetch_openai_models():
+    """Fetch available models from OpenAI API."""
+    try:
+        import openai
+        import os
+
+        # Try to get API key from system settings or environment
+        api_key = None
+        try:
+            with session_scope() as db_session:
+                settings = db_session.query(SystemSettings).first()
+                if settings:
+                    api_key = settings.get_api_key('openai')
+        except Exception:
+            pass
+
+        if not api_key:
+            api_key = os.getenv('OPENAI_API_KEY')
+
+        if not api_key:
+            # Return fallback list if no API key
+            logger.warning("No OpenAI API key available, returning fallback model list")
+            return _get_fallback_openai_models()
+
+        # Fetch models from OpenAI API
+        client = openai.OpenAI(api_key=api_key)
+        models_response = client.models.list()
+
+        # Filter to only GPT models and sort by ID
+        gpt_models = []
+        for model in models_response.data:
+            model_id = model.id
+            # Filter for GPT models only (exclude embeddings, whisper, dall-e, etc.)
+            if model_id.startswith('gpt-'):
+                # Prioritize commonly used models
+                if model_id in ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']:
+                    priority = 0
+                else:
+                    priority = 1
+
+                gpt_models.append({
+                    'value': model_id,
+                    'label': model_id.upper().replace('-', ' ').replace('GPT ', 'GPT-'),
+                    'priority': priority
+                })
+
+        # Sort by priority and then by name
+        gpt_models.sort(key=lambda x: (x['priority'], x['value']))
+
+        # Remove priority from response
+        for model in gpt_models:
+            del model['priority']
+
+        # If we got models, return them
+        if gpt_models:
+            return gpt_models
+
+        # Otherwise fallback
+        return _get_fallback_openai_models()
+
+    except Exception as e:
+        logger.error(f"Failed to fetch OpenAI models: {e}")
+        return _get_fallback_openai_models()
+
+
+def _get_fallback_openai_models():
+    """Fallback OpenAI model list if API fetch fails."""
+    return [
+        {'value': 'gpt-4o', 'label': 'GPT-4o (Latest)'},
+        {'value': 'gpt-4o-mini', 'label': 'GPT-4o Mini (Fast & Affordable)'},
+        {'value': 'gpt-4-turbo', 'label': 'GPT-4 Turbo'},
+        {'value': 'gpt-4', 'label': 'GPT-4'},
+        {'value': 'gpt-3.5-turbo', 'label': 'GPT-3.5 Turbo'},
+    ]

@@ -144,6 +144,8 @@ export const Settings = () => {
   const [availableModels, setAvailableModels] = useState<AvailableModels | null>(null);
   const [loadingAI, setLoadingAI] = useState(false);
   const [savingAI, setSavingAI] = useState(false);
+  const [customModel, setCustomModel] = useState('');
+  const [showCustomModelInput, setShowCustomModelInput] = useState(false);
   const [aiApiKeys, setAIApiKeys] = useState({
     openai: '',
     anthropic: '',
@@ -1182,7 +1184,11 @@ export const Settings = () => {
                       <Select
                         value={aiSettings.ai_provider}
                         label="AI Provider"
-                        onChange={(e) => setAISettings({ ...aiSettings, ai_provider: e.target.value })}
+                        onChange={(e) => {
+                          setAISettings({ ...aiSettings, ai_provider: e.target.value, ai_model: null });
+                          setShowCustomModelInput(false);
+                          setCustomModel('');
+                        }}
                       >
                         <MenuItem value="openai">OpenAI (GPT)</MenuItem>
                         <MenuItem value="anthropic">Anthropic (Claude)</MenuItem>
@@ -1194,9 +1200,18 @@ export const Settings = () => {
                     <FormControl fullWidth sx={{ mb: 3 }}>
                       <InputLabel>Model</InputLabel>
                       <Select
-                        value={aiSettings.ai_model || ''}
+                        value={showCustomModelInput ? '__custom__' : (aiSettings.ai_model || '')}
                         label="Model"
-                        onChange={(e) => setAISettings({ ...aiSettings, ai_model: e.target.value })}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '__custom__') {
+                            setShowCustomModelInput(true);
+                            setCustomModel(aiSettings.ai_model || '');
+                          } else {
+                            setShowCustomModelInput(false);
+                            setAISettings({ ...aiSettings, ai_model: value });
+                          }
+                        }}
                       >
                         {availableModels && availableModels[aiSettings.ai_provider as keyof AvailableModels]?.map((model) => (
                           <MenuItem key={model.value} value={model.value}>
@@ -1206,6 +1221,21 @@ export const Settings = () => {
                       </Select>
                       <FormHelperText>Select the specific model version</FormHelperText>
                     </FormControl>
+
+                    {showCustomModelInput && (
+                      <TextField
+                        fullWidth
+                        label="Custom Model ID"
+                        value={customModel}
+                        onChange={(e) => {
+                          setCustomModel(e.target.value);
+                          setAISettings({ ...aiSettings, ai_model: e.target.value });
+                        }}
+                        placeholder={`e.g., ${aiSettings.ai_provider === 'anthropic' ? 'claude-3-5-sonnet-20241022' : 'gemini-1.5-pro-002'}`}
+                        helperText="Enter the exact model ID from the provider's documentation"
+                        sx={{ mb: 3 }}
+                      />
+                    )}
 
                     <Box sx={{ mb: 3 }}>
                       <Typography gutterBottom>
