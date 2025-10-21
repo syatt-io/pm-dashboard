@@ -250,7 +250,6 @@ def analyze_meeting(meeting_id):
             else:
                 # Create new record - Always serialize to JSON, even empty lists
                 import uuid
-                import json
                 processed_meeting = ProcessedMeeting(
                     id=str(uuid.uuid4()),
                     fireflies_id=meeting_id,
@@ -687,7 +686,6 @@ def analyze_meeting_api(user, meeting_id):
             else:
                 # Create new record - Always serialize to JSON, even empty lists
                 import uuid
-                import json
                 processed_meeting = ProcessedMeeting(
                     id=str(uuid.uuid4()),
                     fireflies_id=meeting_id,
