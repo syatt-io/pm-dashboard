@@ -10,9 +10,15 @@ if not admin_api_key:
     print("ERROR: ADMIN_API_KEY not set in environment")
     sys.exit(1)
 
-# Trigger backfill (using localhost since we're running from within the container)
+# Get backend URL (for job runs) or use localhost (for app container runs)
+web_base_url = os.getenv('WEB_BASE_URL', 'http://localhost:8080')
+api_url = f'{web_base_url}/api/backfill/jira?days=30'
+
+print(f"Triggering Jira backfill at {api_url}")
+
+# Trigger backfill
 response = requests.post(
-    'http://localhost:8080/api/backfill/jira?days=30',
+    api_url,
     headers={
         'X-Admin-Key': admin_api_key,
         'Content-Type': 'application/json'

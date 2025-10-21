@@ -236,3 +236,30 @@ services:
         value: syatt-io
       - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
         type: SECRET
+
+# Jobs - One-off tasks that can be triggered manually
+jobs:
+  - name: jira-backfill
+    github:
+      repo: syatt-io/pm-dashboard
+      branch: main
+      deploy_on_push: false
+    source_dir: /
+
+    build_command: pip install -r requirements.txt
+
+    run_command: python3 trigger_jira_backfill.py
+
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    kind: POST_DEPLOY
+
+    envs:
+      # Admin API Key (to authenticate with the backend)
+      - key: ADMIN_API_KEY
+        type: SECRET
+
+      # Backend URL (since job runs as separate container)
+      - key: WEB_BASE_URL
+        value: "https://agent-pm-tsbbb.ondigitalocean.app"
