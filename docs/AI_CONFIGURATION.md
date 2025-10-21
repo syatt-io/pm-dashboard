@@ -67,8 +67,8 @@ The system uses a dual-provider architecture:
   - Cannot be changed (Anthropic/Google don't have comparable embeddings)
 
 **Why this matters:**
-- You can use Claude for analysis/chat while using OpenAI for search embeddings
-- Both API keys must be valid if you switch LLM provider away from OpenAI
+- You can use Claude or Google for analysis/chat/summarization while using OpenAI for search embeddings
+- OpenAI API key must be valid for vector search regardless of LLM provider selection
 - Vector search will fail if `OPENAI_API_KEY` is missing/invalid
 
 ## Environment Variable Configuration
@@ -147,7 +147,7 @@ The following components automatically use fresh AI configuration:
 3. **ContextSummarizer** (`src/services/context_summarizer.py`)
    - AI-powered result summarization
    - Creates fresh client for each `summarize()` call
-   - **Provider support**: Currently OpenAI-only, logs warning if other provider configured
+   - **Provider support**: OpenAI, Anthropic, Google
 
 4. **VectorSearchService** (`src/services/vector_search.py`)
    - Vector embeddings for semantic search
@@ -211,11 +211,11 @@ If still not updating:
 2. Check application logs for errors
 3. Verify you're using the latest code with dynamic reload feature
 
-### ContextSummarizer using wrong provider
+### ContextSummarizer errors
 
-**Expected behavior**: ContextSummarizer currently only supports OpenAI
-**What happens**: Logs warning and uses OpenAI regardless of configured provider
-**Future**: Will be updated to support all three providers
+**Recent update**: ContextSummarizer now supports all three providers (OpenAI, Anthropic, Google)
+**Check logs**: Look for "Creating summarizer client with provider=..." to verify correct provider is being used
+**If errors occur**: Verify the API key for your selected provider is set correctly in admin settings
 
 ## Best Practices
 
@@ -227,7 +227,7 @@ If still not updating:
 
 ## Future Enhancements
 
-- [ ] Full Anthropic/Google support in ContextSummarizer
+- [x] Full Anthropic/Google support in ContextSummarizer ✅ **COMPLETED**
 - [ ] Model capability detection (temperature support, max tokens, etc.)
 - [ ] Cost tracking per provider/model
 - [ ] A/B testing framework for comparing providers

@@ -1,9 +1,11 @@
 """AI-powered context summarization with citations."""
 import logging
-from typing import List, Dict, Any, Tuple, Optional
+from typing import List, Dict, Any, Tuple, Optional, Union
 from dataclasses import dataclass
 from datetime import datetime
 from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
+import google.generativeai as genai
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -42,36 +44,40 @@ class ContextSummarizer:
     def __init__(self):
         """Initialize summarizer with AI client.
 
-        Note: Currently only supports OpenAI. Will use fresh config on each summarize() call.
+        Supports OpenAI, Anthropic, and Google providers. Will use fresh config on each summarize() call.
         """
         # Client will be created fresh on each summarize() call to support config updates
         self.client = None
         self.model = None
+        self.provider = None
 
         # Load prompts from configuration
         from src.utils.prompt_manager import get_prompt_manager
         self.prompt_manager = get_prompt_manager()
 
     def _get_fresh_client(self):
-        """Get fresh AI client with latest configuration."""
-        import os
+        """Get fresh AI client with latest configuration.
+
+        Returns:
+            Tuple of (client, model, provider) where client type depends on provider
+        """
         from config.settings import Settings
         ai_config = Settings.get_fresh_ai_config()
 
-        if ai_config.provider != "openai":
-            logger.warning(f"Context summarizer currently only supports OpenAI, but {ai_config.provider} is configured. Using OpenAI as fallback.")
-            # When not using OpenAI as LLM provider, get OpenAI key from environment for summarization
-            openai_api_key = os.getenv('OPENAI_API_KEY')
-            openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o')
+        logger.info(f"Creating summarizer client with provider={ai_config.provider}, model={ai_config.model}")
 
-            if not openai_api_key:
-                logger.error("OPENAI_API_KEY not set in environment - context summarization will fail")
-                logger.error("Set OPENAI_API_KEY to use summarization with non-OpenAI LLM providers")
+        if ai_config.provider == "openai":
+            return AsyncOpenAI(api_key=ai_config.api_key), ai_config.model, "openai"
 
-            return AsyncOpenAI(api_key=openai_api_key), openai_model
+        elif ai_config.provider == "anthropic":
+            return AsyncAnthropic(api_key=ai_config.api_key), ai_config.model, "anthropic"
 
-        # Using OpenAI as configured LLM provider
-        return AsyncOpenAI(api_key=ai_config.api_key), ai_config.model
+        elif ai_config.provider == "google":
+            genai.configure(api_key=ai_config.api_key)
+            return genai, ai_config.model, "google"
+
+        else:
+            raise ValueError(f"Unsupported AI provider: {ai_config.provider}")
 
     async def summarize(
         self,
@@ -139,7 +145,7 @@ class ContextSummarizer:
             )
 
         # Get fresh AI client with latest configuration
-        client, model = self._get_fresh_client()
+        client, model, provider = self._get_fresh_client()
 
         # Build prompt for LLM with optional project context, detail level, entity links, progress analysis, and conversation history
         prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level, entity_links, results, progress_analysis, conversation_history)
@@ -147,7 +153,7 @@ class ContextSummarizer:
         if debug:
             logger.info(f"📝 Summarization prompt: {len(prompt)} chars")
             logger.info(f"📊 Processing {len(results)} results into summary")
-            logger.info(f"🤖 Using AI model: {model}")
+            logger.info(f"🤖 Using AI provider: {provider}, model: {model}")
 
         try:
             # Get system message from configuration
@@ -157,32 +163,67 @@ class ContextSummarizer:
                 default="You are an expert technical analyst helping engineers understand project context."
             )
 
-            # Build API parameters - some models don't support temperature/max_completion_tokens
-            api_params = {
-                "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": system_message
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
-            }
+            # Call AI provider based on configured provider
+            if provider == "openai":
+                # Build API parameters - some models don't support temperature/max_completion_tokens
+                api_params = {
+                    "model": model,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": system_message
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                }
 
-            # Only add temperature and max_completion_tokens for models that support them
-            # Reasoning models like gpt-5/o1 don't support these parameters
-            if not model.startswith('o1') and not model.startswith('gpt-5'):
-                api_params["temperature"] = 0.2  # Very low temperature for maximum factual accuracy
-                api_params["max_completion_tokens"] = 4000  # Increased from 1500 to allow comprehensive summaries
+                # Only add temperature and max_completion_tokens for models that support them
+                # Reasoning models like gpt-5/o1 don't support these parameters
+                if not model.startswith('o1') and not model.startswith('gpt-5'):
+                    api_params["temperature"] = 0.2  # Very low temperature for maximum factual accuracy
+                    api_params["max_completion_tokens"] = 4000  # Increased from 1500 to allow comprehensive summaries
 
-            # Call OpenAI with fresh client
-            response = await client.chat.completions.create(**api_params)
+                response = await client.chat.completions.create(**api_params)
+                ai_response = response.choices[0].message.content
 
-            # Extract response
-            ai_response = response.choices[0].message.content
+            elif provider == "anthropic":
+                # Anthropic uses a different API structure
+                response = await client.messages.create(
+                    model=model,
+                    max_tokens=4000,
+                    temperature=0.2,
+                    system=system_message,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+                ai_response = response.content[0].text
+
+            elif provider == "google":
+                # Google uses a different API structure
+                from google.generativeai.types import GenerationConfig
+
+                # For Google, combine system message and prompt
+                combined_prompt = f"{system_message}\n\n{prompt}"
+
+                model_instance = genai.GenerativeModel(model)
+                response = await model_instance.generate_content_async(
+                    combined_prompt,
+                    generation_config=GenerationConfig(
+                        temperature=0.2,
+                        max_output_tokens=4000,
+                    )
+                )
+                ai_response = response.text
+
+            else:
+                raise ValueError(f"Unsupported provider: {provider}")
 
             if debug:
                 logger.info(f"🤖 RAW AI RESPONSE:\n{ai_response[:500]}...")
