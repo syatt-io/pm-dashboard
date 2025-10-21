@@ -515,6 +515,8 @@ class TodoScheduler:
                         logger.info("✅ Tempo sync notification sent successfully")
                     except Exception as notif_error:
                         logger.error(f"❌ Failed to send Tempo sync notification: {notif_error}", exc_info=True)
+                        # Re-raise to ensure Celery task is marked as failed
+                        raise
                 else:
                     logger.info(f"Skipping notification (not in production, FLASK_ENV={flask_env})")
             else:
@@ -530,10 +532,32 @@ class TodoScheduler:
 
                 import os
                 if os.getenv('FLASK_ENV') == 'production':
-                    asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                    try:
+                        asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                    except Exception as notif_error:
+                        logger.error(f"❌ Failed to send error notification: {notif_error}", exc_info=True)
+
+                # Raise exception to mark Celery task as failed
+                raise Exception(f"Tempo sync failed: {error_msg}")
 
         except Exception as e:
-            logger.error(f"Error in scheduled Tempo sync: {e}")
+            logger.error(f"Error in scheduled Tempo sync: {e}", exc_info=True)
+
+            # Send critical error notification
+            import os
+            if os.getenv('FLASK_ENV') == 'production':
+                try:
+                    content = NotificationContent(
+                        title="🚨 Tempo Hours Sync Critical Error",
+                        body=f"Critical error occurred during Tempo sync:\n\n{str(e)}\n\nPlease check logs immediately.",
+                        priority="urgent"
+                    )
+                    asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                except Exception as notif_error:
+                    logger.error(f"❌ Failed to send critical error notification: {notif_error}", exc_info=True)
+
+            # Re-raise exception to ensure Celery task is marked as failed
+            raise
 
     def _get_project_hours_summary(self):
         """Get summary of actual vs forecasted hours for current month."""
