@@ -25,10 +25,12 @@ This is an Autonomous PM Agent that processes Fireflies.ai meeting transcripts, 
    - GraphQL API for fetching meeting transcripts
    - Timestamp handling: Fireflies returns milliseconds, convert with `datetime.fromtimestamp(date_val / 1000)`
 
-2. **Meeting Analyzer** (`src/meeting_analyzer.py`)
-   - Uses OpenAI GPT-4 via LangChain
+2. **Meeting Analyzer** (`src/processors/transcript_analyzer.py`)
+   - Multi-provider AI support: OpenAI, Anthropic (Claude), Google (Gemini)
+   - Dynamic configuration: updates take effect immediately without restart
    - Extracts: summary, action items, decisions, risks
    - Returns structured ActionItem objects with title, description, assignee, priority
+   - **See**: [AI Configuration Guide](docs/AI_CONFIGURATION.md)
 
 3. **Jira Integration** (`src/integrations/jira_mcp.py`)
    - Direct REST API v3 calls with Basic Auth

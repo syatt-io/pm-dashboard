@@ -61,10 +61,23 @@ class TranscriptAnalyzer:
         self.parser = PydanticOutputParser(pydantic_object=MeetingAnalysis)
         self.prompt_manager = get_prompt_manager()
 
+    def refresh_llm(self):
+        """Refresh LLM instance with latest configuration from database.
+
+        Call this to pick up configuration changes without restarting the application.
+        """
+        self.llm = self._default_llm()
+
     @staticmethod
     def _default_llm():
-        """Create default LLM instance based on centralized settings."""
-        ai_config = settings.ai
+        """Create default LLM instance based on centralized settings.
+
+        Always fetches fresh configuration from database to support dynamic updates.
+        """
+        from config.settings import Settings
+        ai_config = Settings.get_fresh_ai_config()
+
+        logger.info(f"Creating LLM with provider={ai_config.provider}, model={ai_config.model}")
 
         if ai_config.provider == "openai":
             return ChatOpenAI(
@@ -91,7 +104,12 @@ class TranscriptAnalyzer:
 
     def analyze_transcript(self, transcript: str, meeting_title: str = None,
                           meeting_date: datetime = None) -> MeetingAnalysis:
-        """Analyze a meeting transcript to extract structured information."""
+        """Analyze a meeting transcript to extract structured information.
+
+        Automatically refreshes LLM configuration to pick up any changes from database.
+        """
+        # Refresh LLM to pick up any configuration changes
+        self.refresh_llm()
 
         # Get prompts from configuration
         system_prompt_base = self.prompt_manager.get_prompt(

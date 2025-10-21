@@ -1949,12 +1949,38 @@ IMPORTANT:
 
             context = "\n".join(context_parts)
 
-            # Generate summary
-            llm = ChatOpenAI(
-                model=settings.ai.model,
-                temperature=0.3,
-                api_key=settings.ai.api_key
-            )
+            # Generate summary with fresh AI config
+            from config.settings import Settings
+            ai_config = Settings.get_fresh_ai_config()
+
+            if ai_config.provider == "openai":
+                from langchain_openai import ChatOpenAI
+                llm = ChatOpenAI(
+                    model=ai_config.model,
+                    temperature=0.3,
+                    api_key=ai_config.api_key
+                )
+            elif ai_config.provider == "anthropic":
+                from langchain_anthropic import ChatAnthropic
+                llm = ChatAnthropic(
+                    model=ai_config.model,
+                    anthropic_api_key=ai_config.api_key,
+                    temperature=0.3
+                )
+            elif ai_config.provider == "google":
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                llm = ChatGoogleGenerativeAI(
+                    model=ai_config.model,
+                    google_api_key=ai_config.api_key,
+                    temperature=0.3
+                )
+            else:
+                from langchain_openai import ChatOpenAI
+                llm = ChatOpenAI(
+                    model=ai_config.model,
+                    temperature=0.3,
+                    api_key=ai_config.api_key
+                )
 
             prompt = f"""Based on the following search results for "{query}", provide:
 

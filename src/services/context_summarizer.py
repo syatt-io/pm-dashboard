@@ -40,13 +40,28 @@ class ContextSummarizer:
     """Generates AI summaries with citations from search results."""
 
     def __init__(self):
-        """Initialize summarizer with OpenAI client."""
-        self.client = AsyncOpenAI(api_key=settings.ai.api_key)
-        self.model = settings.ai.model  # Use configured model from OPENAI_MODEL env variable
+        """Initialize summarizer with AI client.
+
+        Note: Currently only supports OpenAI. Will use fresh config on each summarize() call.
+        """
+        # Client will be created fresh on each summarize() call to support config updates
+        self.client = None
+        self.model = None
 
         # Load prompts from configuration
         from src.utils.prompt_manager import get_prompt_manager
         self.prompt_manager = get_prompt_manager()
+
+    def _get_fresh_client(self):
+        """Get fresh AI client with latest configuration."""
+        from config.settings import Settings
+        ai_config = Settings.get_fresh_ai_config()
+
+        if ai_config.provider != "openai":
+            logger.warning(f"Context summarizer currently only supports OpenAI, but {ai_config.provider} is configured. Using OpenAI as fallback.")
+            # You could add anthropic/google support here in the future
+
+        return AsyncOpenAI(api_key=ai_config.api_key), ai_config.model
 
     async def summarize(
         self,
@@ -113,12 +128,16 @@ class ContextSummarizer:
                 f"Content: {result.content}\n"
             )
 
+        # Get fresh AI client with latest configuration
+        client, model = self._get_fresh_client()
+
         # Build prompt for LLM with optional project context, detail level, entity links, progress analysis, and conversation history
         prompt = self._build_summarization_prompt(query, context_blocks, project_context, detail_level, entity_links, results, progress_analysis, conversation_history)
 
         if debug:
             logger.info(f"📝 Summarization prompt: {len(prompt)} chars")
             logger.info(f"📊 Processing {len(results)} results into summary")
+            logger.info(f"🤖 Using AI model: {model}")
 
         try:
             # Get system message from configuration
@@ -130,7 +149,7 @@ class ContextSummarizer:
 
             # Build API parameters - some models don't support temperature/max_completion_tokens
             api_params = {
-                "model": self.model,
+                "model": model,
                 "messages": [
                     {
                         "role": "system",
@@ -145,12 +164,12 @@ class ContextSummarizer:
 
             # Only add temperature and max_completion_tokens for models that support them
             # Reasoning models like gpt-5/o1 don't support these parameters
-            if not self.model.startswith('o1') and not self.model.startswith('gpt-5'):
+            if not model.startswith('o1') and not model.startswith('gpt-5'):
                 api_params["temperature"] = 0.2  # Very low temperature for maximum factual accuracy
                 api_params["max_completion_tokens"] = 4000  # Increased from 1500 to allow comprehensive summaries
 
-            # Call OpenAI
-            response = await self.client.chat.completions.create(**api_params)
+            # Call OpenAI with fresh client
+            response = await client.chat.completions.create(**api_params)
 
             # Extract response
             ai_response = response.choices[0].message.content

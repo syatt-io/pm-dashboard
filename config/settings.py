@@ -322,6 +322,22 @@ class Settings:
             logger.debug(f"Could not load AI config from database: {e}")
             return None
 
+    def reload_ai_config(self):
+        """Reload AI configuration from database (for dynamic updates)."""
+        self.ai = self._load_ai_config()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"AI config reloaded: provider={self.ai.provider}, model={self.ai.model}")
+
+    @classmethod
+    def get_fresh_ai_config(cls) -> AIConfig:
+        """Get fresh AI configuration without affecting the singleton instance.
+
+        This is useful for getting the latest config from the database without
+        reloading the entire settings singleton.
+        """
+        return cls._load_ai_config()
+
     @staticmethod
     def _load_agent_config() -> AgentConfig:
         return AgentConfig(
