@@ -192,8 +192,18 @@ def run_tempo_sync():
     Entry point for the Tempo sync job.
     This function is called by the scheduler.
     """
-    job = TempoSyncJob()
-    return job.run()
+    try:
+        job = TempoSyncJob()
+        return job.run()
+    except Exception as e:
+        logger.error(f"Failed to initialize or run Tempo sync job: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "start_time": datetime.now().isoformat(),
+            "end_time": datetime.now().isoformat(),
+            "duration_seconds": 0
+        }
 
 
 if __name__ == "__main__":
