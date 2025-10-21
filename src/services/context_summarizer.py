@@ -54,13 +54,23 @@ class ContextSummarizer:
 
     def _get_fresh_client(self):
         """Get fresh AI client with latest configuration."""
+        import os
         from config.settings import Settings
         ai_config = Settings.get_fresh_ai_config()
 
         if ai_config.provider != "openai":
             logger.warning(f"Context summarizer currently only supports OpenAI, but {ai_config.provider} is configured. Using OpenAI as fallback.")
-            # You could add anthropic/google support here in the future
+            # When not using OpenAI as LLM provider, get OpenAI key from environment for summarization
+            openai_api_key = os.getenv('OPENAI_API_KEY')
+            openai_model = os.getenv('OPENAI_MODEL', 'gpt-4o')
 
+            if not openai_api_key:
+                logger.error("OPENAI_API_KEY not set in environment - context summarization will fail")
+                logger.error("Set OPENAI_API_KEY to use summarization with non-OpenAI LLM providers")
+
+            return AsyncOpenAI(api_key=openai_api_key), openai_model
+
+        # Using OpenAI as configured LLM provider
         return AsyncOpenAI(api_key=ai_config.api_key), ai_config.model
 
     async def summarize(
