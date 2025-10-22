@@ -1571,35 +1571,30 @@ export const ProjectList = () => {
                 </Typography>
               </Alert>
             ) : (
-              <TableContainer component={Paper}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Name</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Hours</TableCell>
-                      <TableCell>Meeting Day</TableCell>
-                      <TableCell># of TODOs</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {watchedProjects.map((project) => {
-                      const projectType = project.project_work_type || 'project-based';
-                      const todoCount = todoCounts[project.key] || 0;
+              <>
+                {/* Get current month name */}
+                {(() => {
+                  const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+                  return (
+                    <TableContainer component={Paper}>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Name</TableCell>
+                            <TableCell>Type</TableCell>
+                            <TableCell>{currentMonth} Hours</TableCell>
+                            <TableCell>Meeting Day</TableCell>
+                            <TableCell># of TODOs</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {watchedProjects.map((project) => {
+                            const projectType = project.project_work_type || 'project-based';
+                            const todoCount = todoCounts[project.key] || 0;
 
-                      // Determine current and forecasted hours based on project type
-                      let currentHours = 0;
-                      let forecastedHours = 0;
-
-                      if (projectType === 'growth-support') {
-                        // Retainer projects: use monthly hours
-                        currentHours = monthlyHours[project.key] || 0;
-                        forecastedHours = project.retainer_hours || 0;
-                      } else if (projectType === 'project-based') {
-                        // Project-based: use cumulative hours
-                        currentHours = project.cumulative_hours || 0;
-                        forecastedHours = project.total_hours || 0;
-                      }
+                            // Use current month hours and forecasted hours for all project types
+                            const currentHours = project.current_month_hours || 0;
+                            const forecastedHours = project.forecasted_hours_month || 0;
 
                       // Helper function to get color based on usage percentage
                       const getHoursColor = () => {
@@ -1664,11 +1659,14 @@ export const ProjectList = () => {
                             />
                           </TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  );
+                })()}
+              </>
             )}
           </TabPanel>
 
