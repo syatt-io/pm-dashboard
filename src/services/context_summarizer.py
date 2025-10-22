@@ -171,7 +171,7 @@ class ContextSummarizer:
             system_message = self.prompt_manager.get_prompt(
                 'context_search',
                 'system_message',
-                default="You are an expert technical analyst helping engineers understand project context."
+                default="You are an expert technical analyst helping engineers understand project context. IMPORTANT: When analyzing Jira tickets, always use the explicit Status, Priority, and Issue fields provided in the search results - DO NOT infer status from content text. If a result shows 'Status: Closed', treat it as closed regardless of what the content says."
             )
 
             # Call AI provider based on configured provider
