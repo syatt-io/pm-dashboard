@@ -1,7 +1,8 @@
 import React from 'react';
-import { Layout, AppBar, Sidebar, Menu, UserMenu } from 'react-admin';
+import { Layout, AppBar, Sidebar, Menu, UserMenu, Logout, MenuItemLink } from 'react-admin';
 import { Typography, Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import SettingsIcon from '@mui/icons-material/Settings';
 import OnboardingAlert from './OnboardingAlert';
 
 // Custom AppBar with Syatt branding
@@ -83,12 +84,15 @@ const CustomMenu = styled(Menu)(({ theme }) => ({
   },
 }));
 
-// Custom UserMenu
+// Custom UserMenu with Settings link
 const CustomUserMenu = () => (
   <UserMenu>
-    <Typography variant="body2" sx={{ px: 2, py: 1, color: 'rgba(255,255,255,0.8)' }}>
-      Mike Samimi
-    </Typography>
+    <MenuItemLink
+      to="/settings"
+      primaryText="Settings"
+      leftIcon={<SettingsIcon />}
+    />
+    <Logout />
   </UserMenu>
 );
 
