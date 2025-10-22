@@ -80,8 +80,15 @@ class ConversationContextManager:
                 masked_url = self._mask_redis_url(redis_url)
                 logger.info(f"✅ Using Redis for conversation context: {masked_url}")
             except Exception as e:
-                logger.warning(f"Redis not available, falling back to in-memory storage: {e}")
-                self.storage_backend = "memory"
+                # CRITICAL: Do NOT fall back to in-memory storage in multi-worker environments!
+                # In-memory storage is process-local and will break conversation context across workers.
+                # If Redis is required but unavailable, fail loudly to surface the issue.
+                logger.error(f"❌ CRITICAL: Redis connection required but failed! Multi-worker app cannot use in-memory fallback. Error: {e}")
+                raise RuntimeError(
+                    f"Redis connection failed: {e}. "
+                    "Conversation context requires Redis in multi-worker environment. "
+                    "Check REDIS_URL environment variable and Redis connectivity."
+                )
 
     def _mask_redis_url(self, url: str) -> str:
         """Mask password in Redis URL for logging.
@@ -142,11 +149,10 @@ class ConversationContextManager:
                     logger.info(f"⚠️  No history found in Redis for key: {thread_key}")
                     return []
             except Exception as e:
-                logger.error(f"❌ Error retrieving from Redis (falling back to memory): {e}")
-                # Fallback to memory storage
-                if thread_key in self._memory_storage:
-                    return self._memory_storage[thread_key][-max_turns:]
-                return []
+                # CRITICAL: Do NOT fall back to in-memory storage!
+                # Multi-worker environment requires Redis. Fail loudly to surface connectivity issues.
+                logger.error(f"❌ CRITICAL: Redis read failed for {thread_key}: {e}")
+                raise RuntimeError(f"Redis read failed: {e}. Check Redis connectivity.")
         else:
             # In-memory storage
             if thread_key in self._memory_storage:
@@ -208,12 +214,10 @@ class ConversationContextManager:
 
                 logger.info(f"✅ Saved conversation turn to Redis: {thread_key} (total turns: {len(history_data)}, TTL: {self._context_ttl}s)")
             except Exception as e:
-                logger.error(f"❌ Error saving to Redis (falling back to memory): {e}")
-                # Fallback: also save to memory storage
-                if thread_key not in self._memory_storage:
-                    self._memory_storage[thread_key] = []
-                self._memory_storage[thread_key].append(turn)
-                self._memory_storage[thread_key] = self._memory_storage[thread_key][-10:]
+                # CRITICAL: Do NOT fall back to in-memory storage!
+                # Multi-worker environment requires Redis. Fail loudly to surface connectivity issues.
+                logger.error(f"❌ CRITICAL: Redis write failed for {thread_key}: {e}")
+                raise RuntimeError(f"Redis write failed: {e}. Check Redis connectivity.")
         else:
             # In-memory storage
             if thread_key not in self._memory_storage:
