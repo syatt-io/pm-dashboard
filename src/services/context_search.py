@@ -14,13 +14,22 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SearchResult:
     """A single search result from any source."""
-    source: str  # 'slack', 'fireflies', 'jira'
+    source: str  # 'slack', 'fireflies', 'jira', 'notion', 'github'
     title: str
     content: str
     date: datetime
     url: Optional[str] = None
     author: Optional[str] = None
     relevance_score: float = 0.0
+
+    # Source-specific metadata (optional fields populated based on source)
+    # Jira-specific fields
+    status: Optional[str] = None
+    issue_key: Optional[str] = None
+    priority: Optional[str] = None
+    issue_type: Optional[str] = None
+    project_key: Optional[str] = None
+    assignee_name: Optional[str] = None
 
 
 @dataclass

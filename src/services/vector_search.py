@@ -158,15 +158,23 @@ class VectorSearchService:
                     project_key=project_key
                 )
 
-                # Create SearchResult
+                # Create SearchResult with source-specific metadata
+                source = metadata.get('source', 'unknown')
                 search_result = SearchResult(
-                    source=metadata.get('source', 'unknown'),
+                    source=source,
                     title=title,
                     content=metadata.get('content_preview', ''),
                     date=result_date,
                     url=metadata.get('url') or metadata.get('permalink'),
                     author=metadata.get('assignee') or metadata.get('user_id', 'Unknown'),
-                    relevance_score=boosted_score
+                    relevance_score=boosted_score,
+                    # Jira-specific metadata (only populated for Jira sources)
+                    status=metadata.get('status') if source == 'jira' else None,
+                    issue_key=metadata.get('issue_key') if source == 'jira' else None,
+                    priority=metadata.get('priority') if source == 'jira' else None,
+                    issue_type=metadata.get('issue_type') if source == 'jira' else None,
+                    project_key=metadata.get('project_key') if source == 'jira' else None,
+                    assignee_name=metadata.get('assignee_name') if source == 'jira' else None
                 )
 
                 search_results.append(search_result)
