@@ -136,13 +136,24 @@ class ContextSummarizer:
             )
             citations.append(citation)
 
-            # Format context block for LLM
-            context_blocks.append(
+            # Format context block for LLM with source-specific metadata
+            context_block = (
                 f"[{i}] {result.source.upper()} - {result.title}\n"
                 f"Date: {result.date.strftime('%Y-%m-%d')}\n"
                 f"Author: {citation.author}\n"
-                f"Content: {result.content}\n"
             )
+
+            # Add Jira-specific metadata if available
+            if result.source == 'jira' and hasattr(result, 'status'):
+                if result.status:
+                    context_block += f"Status: {result.status}\n"
+                if result.priority:
+                    context_block += f"Priority: {result.priority}\n"
+                if result.issue_key:
+                    context_block += f"Issue: {result.issue_key}\n"
+
+            context_block += f"Content: {result.content}\n"
+            context_blocks.append(context_block)
 
         # Get fresh AI client with latest configuration
         client, model, provider = self._get_fresh_client()
