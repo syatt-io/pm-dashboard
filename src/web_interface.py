@@ -102,16 +102,14 @@ try:
     redis_url = os.getenv('REDIS_URL')
     if redis_url:
         # Configure Redis connection with proper timeouts and connection pooling
-        # This matches the pattern used in slack_chat_service.py for GCP Memorystore
+        # Flatten parameters - connection_pool_kwargs is not a valid parameter
         storage_options = {
             'socket_connect_timeout': 5,
             'socket_timeout': 5,
             'retry_on_timeout': True,
             'health_check_interval': 30,
-            'connection_pool_kwargs': {
-                'max_connections': 50,
-                'socket_keepalive': True,
-            }
+            'max_connections': 50,
+            'socket_keepalive': True,
         }
         storage_uri = redis_url
         logger.info(f"Rate limiter using Redis: {redis_url.split('@')[0]}@***")
