@@ -60,13 +60,13 @@ def test_get_jira_projects_with_database_enhancement(client, mocker):
     ])
 
     # Mock database with project data
-    # New query returns: is_active, project_work_type, total_hours, cumulative_hours,
-    # slack_channel, weekly_meeting_day, retainer_hours, forecasted_hours, actual_monthly_hours
+    # Query returns: is_active, project_work_type, total_hours, cumulative_hours,
+    # weekly_meeting_day, retainer_hours, forecasted_hours, actual_monthly_hours
     mock_engine = mocker.patch('src.routes.jira.get_engine')
     mock_conn = Mock()
     mock_engine.return_value.connect.return_value.__enter__.return_value = mock_conn
     mock_result = Mock()
-    mock_result.__getitem__ = lambda self, idx: [True, 'project-based', 120.0, 155.0, '#test-channel', 'Monday', 0, 40.0, 35.0][idx]
+    mock_result.__getitem__ = lambda self, idx: [True, 'project-based', 120.0, 155.0, 'Monday', 0, 40.0, 35.0][idx]
     mock_conn.execute.return_value.fetchone.return_value = mock_result
 
     response = client.get('/api/jira/projects')
@@ -76,7 +76,7 @@ def test_get_jira_projects_with_database_enhancement(client, mocker):
     project = data['data']['projects'][0]
     assert project['forecasted_hours_month'] == 40.0
     assert project['is_active'] is True
-    assert project['slack_channel'] == '#test-channel'
+    assert project['weekly_meeting_day'] == 'Monday'
 
 
 def test_get_issue_types(client, mocker):
