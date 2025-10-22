@@ -55,7 +55,7 @@ class ConversationContextManager:
         self.storage_backend = storage_backend
         self._memory_storage: Dict[str, List[ConversationTurn]] = {}
         self._redis_client = None
-        self._context_ttl = 3600  # 1 hour
+        self._context_ttl = 86400  # 24 hours (increased from 1 hour to support longer conversations)
 
         if storage_backend == "redis":
             try:
@@ -126,6 +126,9 @@ class ConversationContextManager:
 
         if self.storage_backend == "redis" and self._redis_client:
             try:
+                # Check Redis connection health
+                self._redis_client.ping()
+
                 history_json = self._redis_client.get(thread_key)
                 if history_json:
                     history_data = json.loads(history_json)
@@ -133,15 +136,25 @@ class ConversationContextManager:
                         ConversationTurn(**turn)
                         for turn in history_data[-max_turns:]
                     ]
+                    logger.info(f"✅ Retrieved {len(turns)} turns from Redis: {thread_key}")
                     return turns
+                else:
+                    logger.info(f"⚠️  No history found in Redis for key: {thread_key}")
+                    return []
             except Exception as e:
-                logger.error(f"Error retrieving from Redis: {e}")
+                logger.error(f"❌ Error retrieving from Redis (falling back to memory): {e}")
+                # Fallback to memory storage
+                if thread_key in self._memory_storage:
+                    return self._memory_storage[thread_key][-max_turns:]
                 return []
         else:
             # In-memory storage
             if thread_key in self._memory_storage:
+                logger.info(f"✅ Retrieved {len(self._memory_storage[thread_key][-max_turns:])} turns from memory: {thread_key}")
                 return self._memory_storage[thread_key][-max_turns:]
-            return []
+            else:
+                logger.info(f"⚠️  No history found in memory for key: {thread_key}")
+                return []
 
     def add_conversation_turn(
         self,
@@ -170,6 +183,9 @@ class ConversationContextManager:
 
         if self.storage_backend == "redis" and self._redis_client:
             try:
+                # Check Redis connection health
+                self._redis_client.ping()
+
                 # Get existing history
                 history_json = self._redis_client.get(thread_key)
                 if history_json:
@@ -189,8 +205,15 @@ class ConversationContextManager:
                     self._context_ttl,
                     json.dumps(history_data)
                 )
+
+                logger.info(f"✅ Saved conversation turn to Redis: {thread_key} (total turns: {len(history_data)}, TTL: {self._context_ttl}s)")
             except Exception as e:
-                logger.error(f"Error saving to Redis: {e}")
+                logger.error(f"❌ Error saving to Redis (falling back to memory): {e}")
+                # Fallback: also save to memory storage
+                if thread_key not in self._memory_storage:
+                    self._memory_storage[thread_key] = []
+                self._memory_storage[thread_key].append(turn)
+                self._memory_storage[thread_key] = self._memory_storage[thread_key][-10:]
         else:
             # In-memory storage
             if thread_key not in self._memory_storage:
@@ -644,11 +667,20 @@ class SlackChatService:
             # Post "searching" message
             searching_msg = self.slack_client.chat_postMessage(
                 channel=channel_id,
-                thread_ts=thread_ts,
+                thread_ts=thread_ts,  # This ensures we reply in the correct thread
                 text=search_msg
             )
 
             search_ts = searching_msg['ts']
+
+            # CRITICAL: Ensure we use the correct thread_ts for conversation context
+            # If thread_ts was None, the bot's message creates a new thread
+            # We need to use the bot's message ts as the thread parent for future lookups
+            # BUT - we should have already received the correct thread_ts from slack_bot.py
+            # This is a safety check to ensure consistency
+            if thread_ts is None:
+                logger.warning(f"⚠️  thread_ts was None when posting message. This shouldn't happen!")
+                thread_ts = search_ts  # Fallback: use bot's message as thread parent
 
             # Add soft limit warning if needed
             if is_soft_exceeded:
