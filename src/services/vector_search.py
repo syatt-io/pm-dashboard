@@ -202,8 +202,14 @@ class VectorSearchService:
             # Sort by boosted relevance score
             search_results.sort(key=lambda x: x.relevance_score, reverse=True)
 
+            # Enrich with hierarchically related Jira issues (subtasks, linked issues)
+            enriched_results = self._enrich_with_related_issues(search_results, top_n_candidates=5)
+
+            # Re-sort after enrichment (new related issues might have high hierarchical scores)
+            enriched_results.sort(key=lambda x: x.relevance_score, reverse=True)
+
             # Apply source diversification to ensure balanced results
-            diversified_results = self._diversify_sources(search_results, top_k)
+            diversified_results = self._diversify_sources(enriched_results, top_k)
 
             # Debug: Log results by source for troubleshooting
             source_counts = {}
@@ -718,6 +724,172 @@ class VectorSearchService:
         logger.debug(f"   Round-robin added: {', '.join([f'{src}: {count}' for src, count in added_count.items() if count > 0])}")
 
         return diversified[:target_count]
+
+    def _enrich_with_related_issues(
+        self,
+        results: List[SearchResult],
+        top_n_candidates: int = 5
+    ) -> List[SearchResult]:
+        """Enrich search results with hierarchically related Jira issues.
+
+        When search results contain Jira epics or high-scoring tickets, automatically
+        fetch and include their subtasks and linked issues. This ensures complete
+        context even when semantic search only surfaces the parent issue.
+
+        Args:
+            results: Initial search results
+            top_n_candidates: Number of top Jira results to check for related issues
+
+        Returns:
+            Enhanced results list with related issues added (with hierarchical boost)
+        """
+        if not results:
+            return results
+
+        # Find top Jira candidates (epics or high-scoring tickets)
+        jira_results = [r for r in results if r.source == 'jira' and r.issue_key]
+        if not jira_results:
+            logger.debug("No Jira issues found - skipping hierarchical enrichment")
+            return results
+
+        # Take top N by relevance score
+        candidates = sorted(jira_results, key=lambda x: x.relevance_score, reverse=True)[:top_n_candidates]
+        logger.info(f"🔗 Checking {len(candidates)} Jira issues for related tickets...")
+
+        # Track existing issue keys to avoid duplicates
+        existing_keys = {r.issue_key for r in results if r.issue_key}
+
+        # Fetch related issues for each candidate
+        related_results = []
+        for candidate in candidates:
+            issue_key = candidate.issue_key
+            logger.debug(f"   Fetching related issues for {issue_key} (issue_type: {candidate.issue_type}, score: {candidate.relevance_score:.4f})")
+
+            # Fetch subtasks and linked issues via JQL
+            related_issues = self._fetch_related_jira_issues_sync(issue_key)
+
+            for issue_data in related_issues:
+                related_key = issue_data.get('key')
+
+                # Skip if already in results
+                if related_key in existing_keys:
+                    continue
+
+                # Convert to SearchResult with hierarchical boost
+                fields = issue_data.get('fields', {})
+                status = fields.get('status', {}).get('name', 'Unknown')
+                priority = fields.get('priority', {}).get('name', 'Medium')
+                issue_type = fields.get('issuetype', {}).get('name', 'Task')
+                assignee_name = fields.get('assignee', {}).get('displayName', 'Unassigned')
+                project_key = fields.get('project', {}).get('key', '')
+                summary = fields.get('summary', '')
+                description = fields.get('description', '')
+
+                # Parse dates
+                created_str = fields.get('created', '')
+                updated_str = fields.get('updated', '')
+                try:
+                    created_date = datetime.fromisoformat(created_str.replace('Z', '+00:00')) if created_str else datetime.now()
+                    updated_date = datetime.fromisoformat(updated_str.replace('Z', '+00:00')) if updated_str else datetime.now()
+                except:
+                    created_date = updated_date = datetime.now()
+
+                # Apply hierarchical boost (30% boost for being related to a high-scoring result)
+                base_score = candidate.relevance_score * 0.8  # Related issues get 80% of parent's score
+                hierarchical_score = base_score * 1.3  # Then apply 30% hierarchical boost
+
+                related_result = SearchResult(
+                    source='jira',
+                    title=summary,
+                    content=description[:500] if description else '',
+                    date=updated_date,
+                    url=f"{self.settings.jira.url}/browse/{related_key}",
+                    author=assignee_name,
+                    relevance_score=hierarchical_score,
+                    status=status,
+                    issue_key=related_key,
+                    priority=priority,
+                    issue_type=issue_type,
+                    project_key=project_key,
+                    assignee_name=assignee_name
+                )
+
+                related_results.append(related_result)
+                existing_keys.add(related_key)
+                logger.debug(f"      → Added {related_key}: {summary[:50]} (score: {hierarchical_score:.4f})")
+
+        if related_results:
+            logger.info(f"   ✅ Added {len(related_results)} related Jira issues via hierarchical retrieval")
+            return results + related_results
+        else:
+            logger.debug("   No new related issues found")
+            return results
+
+    def _fetch_related_jira_issues_sync(self, issue_key: str) -> List[Dict[str, Any]]:
+        """Fetch subtasks and linked issues for a Jira ticket (synchronous wrapper).
+
+        Args:
+            issue_key: Jira issue key (e.g., 'SUBS-617')
+
+        Returns:
+            List of issue dictionaries with fields
+        """
+        import asyncio
+
+        try:
+            # Run async fetch in sync context
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(self._fetch_related_jira_issues(issue_key))
+                return result
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error fetching related issues for {issue_key}: {e}")
+            return []
+
+    async def _fetch_related_jira_issues(self, issue_key: str) -> List[Dict[str, Any]]:
+        """Fetch subtasks and linked issues for a Jira ticket (async).
+
+        Uses JQL queries:
+        - Subtasks: parent = {issue_key}
+        - Linked issues: issue in linkedIssues({issue_key})
+
+        Args:
+            issue_key: Jira issue key (e.g., 'SUBS-617')
+
+        Returns:
+            List of issue dictionaries with fields
+        """
+        from src.integrations.jira_mcp import JiraMCPClient
+
+        jira_client = JiraMCPClient()
+        related_issues = []
+
+        try:
+            # Fetch subtasks
+            subtasks_jql = f"parent = {issue_key}"
+            subtasks_result = await jira_client.search_tickets(subtasks_jql, max_results=20)
+            subtasks = subtasks_result if isinstance(subtasks_result, list) else subtasks_result.get('issues', [])
+
+            if subtasks:
+                logger.debug(f"      Found {len(subtasks)} subtasks")
+                related_issues.extend(subtasks)
+
+            # Fetch linked issues
+            linked_jql = f"issue in linkedIssues({issue_key})"
+            linked_result = await jira_client.search_tickets(linked_jql, max_results=20)
+            linked = linked_result if isinstance(linked_result, list) else linked_result.get('issues', [])
+
+            if linked:
+                logger.debug(f"      Found {len(linked)} linked issues")
+                related_issues.extend(linked)
+
+        except Exception as e:
+            logger.error(f"Error in JQL queries for {issue_key}: {e}")
+
+        return related_issues
 
     def get_index_stats(self) -> Dict[str, Any]:
         """Get statistics about the Pinecone index.
