@@ -101,9 +101,8 @@ export const CustomLayout = (props: any) => (
     <Layout
       {...props}
       appBar={() => (
-        <CustomAppBar>
+        <CustomAppBar userMenu={<CustomUserMenu />}>
           <SyattTitle />
-          <CustomUserMenu />
         </CustomAppBar>
       )}
       sidebar={() => (
