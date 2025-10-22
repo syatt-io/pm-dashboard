@@ -58,26 +58,32 @@ class ConversationContextManager:
         self._context_ttl = 86400  # 24 hours (increased from 1 hour to support longer conversations)
 
         if storage_backend == "redis":
+            import redis
+            import os
+
+            # Use REDIS_URL environment variable (Upstash Redis in production)
+            self._redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+
+            # Create connection pool for better connection management
             try:
-                import redis
-                import os
-
-                # Use REDIS_URL environment variable (GCP Redis in production)
-                redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-
-                # Connect with retry and health check settings
-                self._redis_client = redis.from_url(
-                    redis_url,
+                self._redis_pool = redis.ConnectionPool.from_url(
+                    self._redis_url,
                     decode_responses=True,
+                    max_connections=10,  # Pool size for multi-worker env
                     socket_connect_timeout=5,
                     socket_timeout=5,
+                    socket_keepalive=True,  # Keep connections alive
+                    socket_keepalive_options={},
                     retry_on_timeout=True,
                     health_check_interval=30
                 )
+
+                # Initialize client from pool
+                self._redis_client = redis.Redis(connection_pool=self._redis_pool)
                 self._redis_client.ping()
 
                 # Mask password in log message
-                masked_url = self._mask_redis_url(redis_url)
+                masked_url = self._mask_redis_url(self._redis_url)
                 logger.info(f"✅ Using Redis for conversation context: {masked_url}")
             except Exception as e:
                 # CRITICAL: Do NOT fall back to in-memory storage in multi-worker environments!
@@ -113,6 +119,46 @@ class ConversationContextManager:
         else:
             return f"slack_conv:{channel_id}:dm"
 
+    def _execute_with_retry(self, operation, *args, max_retries=2, **kwargs):
+        """Execute Redis operation with automatic reconnection on connection errors.
+
+        Args:
+            operation: Redis operation function to execute
+            *args: Arguments to pass to the operation
+            max_retries: Maximum number of retry attempts (default: 2)
+            **kwargs: Keyword arguments to pass to the operation
+
+        Returns:
+            Result of the operation
+
+        Raises:
+            RuntimeError: If operation fails after all retries
+        """
+        import redis
+
+        for attempt in range(max_retries + 1):
+            try:
+                return operation(*args, **kwargs)
+            except (redis.ConnectionError, ConnectionError, BrokenPipeError) as e:
+                if attempt < max_retries:
+                    logger.warning(f"⚠️  Redis connection error (attempt {attempt + 1}/{max_retries + 1}): {e}. Retrying...")
+                    # Reconnect by creating new client from pool
+                    try:
+                        self._redis_client = redis.Redis(connection_pool=self._redis_pool)
+                        self._redis_client.ping()
+                        logger.info("✅ Redis reconnection successful")
+                    except Exception as reconnect_error:
+                        logger.error(f"❌ Redis reconnection failed: {reconnect_error}")
+                        if attempt == max_retries:
+                            raise RuntimeError(f"Redis operation failed after {max_retries + 1} attempts: {e}")
+                else:
+                    logger.error(f"❌ CRITICAL: Redis operation failed after {max_retries + 1} attempts: {e}")
+                    raise RuntimeError(f"Redis connection failed: {e}. Check Redis connectivity.")
+            except Exception as e:
+                # Other errors - don't retry
+                logger.error(f"❌ CRITICAL: Redis operation failed with non-connection error: {e}")
+                raise RuntimeError(f"Redis operation failed: {e}")
+
     def get_conversation_history(
         self,
         channel_id: str,
@@ -132,10 +178,9 @@ class ConversationContextManager:
         thread_key = self._get_thread_key(channel_id, thread_ts)
 
         if self.storage_backend == "redis" and self._redis_client:
-            try:
-                # Check Redis connection health
-                self._redis_client.ping()
-
+            def _redis_get_history():
+                """Inner function for retry wrapper."""
+                self._redis_client.ping()  # Health check
                 history_json = self._redis_client.get(thread_key)
                 if history_json:
                     history_data = json.loads(history_json)
@@ -148,11 +193,9 @@ class ConversationContextManager:
                 else:
                     logger.info(f"⚠️  No history found in Redis for key: {thread_key}")
                     return []
-            except Exception as e:
-                # CRITICAL: Do NOT fall back to in-memory storage!
-                # Multi-worker environment requires Redis. Fail loudly to surface connectivity issues.
-                logger.error(f"❌ CRITICAL: Redis read failed for {thread_key}: {e}")
-                raise RuntimeError(f"Redis read failed: {e}. Check Redis connectivity.")
+
+            # Use retry wrapper to handle connection errors
+            return self._execute_with_retry(_redis_get_history)
         else:
             # In-memory storage
             if thread_key in self._memory_storage:
@@ -188,9 +231,9 @@ class ConversationContextManager:
         )
 
         if self.storage_backend == "redis" and self._redis_client:
-            try:
-                # Check Redis connection health
-                self._redis_client.ping()
+            def _redis_save_turn():
+                """Inner function for retry wrapper."""
+                self._redis_client.ping()  # Health check
 
                 # Get existing history
                 history_json = self._redis_client.get(thread_key)
@@ -213,11 +256,9 @@ class ConversationContextManager:
                 )
 
                 logger.info(f"✅ Saved conversation turn to Redis: {thread_key} (total turns: {len(history_data)}, TTL: {self._context_ttl}s)")
-            except Exception as e:
-                # CRITICAL: Do NOT fall back to in-memory storage!
-                # Multi-worker environment requires Redis. Fail loudly to surface connectivity issues.
-                logger.error(f"❌ CRITICAL: Redis write failed for {thread_key}: {e}")
-                raise RuntimeError(f"Redis write failed: {e}. Check Redis connectivity.")
+
+            # Use retry wrapper to handle connection errors
+            self._execute_with_retry(_redis_save_turn)
         else:
             # In-memory storage
             if thread_key not in self._memory_storage:
