@@ -148,15 +148,35 @@ class VectorSearchService:
                 # Get base relevance score
                 base_score = float(match.get('score', 0.0))
 
-                # Apply title boost for Fireflies meetings with project keywords
+                # Apply multiple boost types (multiplicative)
                 title = metadata.get('title', 'Untitled')
-                boosted_score = self._apply_title_boost(
+                source = metadata.get('source', 'unknown')
+
+                # 1. Apply title boost for Fireflies meetings with project keywords
+                score = self._apply_title_boost(
                     base_score=base_score,
                     title=title,
-                    source=metadata.get('source', 'unknown'),
+                    source=source,
                     query=query,
                     project_key=project_key
                 )
+
+                # 2. Apply entity boost for exact ticket keys and project names
+                score = self._apply_entity_boost(
+                    base_score=score,
+                    query=query,
+                    metadata=metadata,
+                    source=source
+                )
+
+                # 3. Apply recency boost for recently updated Jira tickets
+                score = self._apply_recency_boost(
+                    base_score=score,
+                    source=source,
+                    updated_at=result_date
+                )
+
+                boosted_score = score
 
                 # Create SearchResult with source-specific metadata
                 source = metadata.get('source', 'unknown')
@@ -182,17 +202,20 @@ class VectorSearchService:
             # Sort by boosted relevance score
             search_results.sort(key=lambda x: x.relevance_score, reverse=True)
 
+            # Apply source diversification to ensure balanced results
+            diversified_results = self._diversify_sources(search_results, top_k)
+
             # Debug: Log results by source for troubleshooting
             source_counts = {}
-            for result in search_results:
+            for result in diversified_results:
                 source_counts[result.source] = source_counts.get(result.source, 0) + 1
 
-            logger.info(f"✅ Vector search found {len(search_results)} results for: {query}")
+            logger.info(f"✅ Vector search found {len(diversified_results)} results for: {query}")
             if source_counts:
                 source_breakdown = ', '.join([f"{src}: {count}" for src, count in source_counts.items()])
-                logger.info(f"   📊 Results by source: {source_breakdown}")
+                logger.info(f"   📊 Results by source (after diversification): {source_breakdown}")
 
-            return search_results[:top_k]
+            return diversified_results
 
         except Exception as e:
             logger.error(f"Error during vector search: {e}")
@@ -528,6 +551,173 @@ class VectorSearchService:
             return boosted_score
 
         return base_score
+
+    def _apply_entity_boost(
+        self,
+        base_score: float,
+        query: str,
+        metadata: dict,
+        source: str
+    ) -> float:
+        """Apply strong boost for exact entity matches (ticket keys, project names).
+
+        Args:
+            base_score: Original relevance score
+            query: Search query text
+            metadata: Result metadata with issue_key, project_key, title
+            source: Result source type
+
+        Returns:
+            Boosted score if entities match
+        """
+        query_upper = query.upper()
+        boost_applied = False
+        multiplier = 1.0
+
+        # Check for exact ticket key match (SUBS-123, PROJ-456)
+        if source == 'jira':
+            issue_key = metadata.get('issue_key', '')
+            if issue_key and issue_key in query_upper:
+                multiplier = 2.0  # 100% boost for exact ticket match
+                logger.debug(f"🎯 Exact ticket match: {issue_key} → 2.0x boost")
+                boost_applied = True
+
+        # Check for project key match (SUBS, PROJ)
+        if not boost_applied and source == 'jira':
+            project_key = metadata.get('project_key', '')
+            if project_key and project_key in query_upper:
+                multiplier = 1.5  # 50% boost for project match
+                logger.debug(f"📁 Project match: {project_key} → 1.5x boost")
+                boost_applied = True
+
+        # Check for project/client name in title or content
+        # Extract multi-word entities like "SearchSpring", "Snuggle Bugz"
+        if not boost_applied:
+            query_words = query.lower().split()
+            title_content = (metadata.get('title', '') + ' ' + metadata.get('summary', '')).lower()
+
+            # Check for 2-3 word phrases
+            for i in range(len(query_words) - 1):
+                phrase = ' '.join(query_words[i:i+3])
+                if len(phrase) > 8 and phrase in title_content:
+                    multiplier = 1.4  # 40% boost for multi-word entity match
+                    logger.debug(f"🔍 Entity phrase match: '{phrase}' → 1.4x boost")
+                    boost_applied = True
+                    break
+
+        return base_score * multiplier
+
+    def _apply_recency_boost(
+        self,
+        base_score: float,
+        source: str,
+        updated_at: Optional[datetime]
+    ) -> float:
+        """Apply recency boost to Jira tickets based on update time.
+
+        Args:
+            base_score: Original relevance score
+            source: Result source type
+            updated_at: Last update timestamp
+
+        Returns:
+            Boosted score with recency multiplier
+        """
+        # Only boost Jira tickets with valid timestamps
+        if source != 'jira' or not updated_at:
+            return base_score
+
+        # Calculate days since update
+        # Handle both timezone-aware and timezone-naive datetimes
+        now = datetime.now(updated_at.tzinfo) if updated_at.tzinfo else datetime.now()
+        days_old = (now - updated_at).days
+
+        # Apply graduated boost
+        if days_old <= 7:
+            multiplier = 1.5  # 50% boost for updates within a week
+        elif days_old <= 14:
+            multiplier = 1.3  # 30% boost for updates within 2 weeks
+        elif days_old <= 30:
+            multiplier = 1.15  # 15% boost for updates within a month
+        else:
+            multiplier = 1.0  # No boost for older items
+
+        if multiplier > 1.0:
+            logger.debug(f"📅 Recency boost: {days_old}d old → {multiplier}x multiplier")
+
+        return base_score * multiplier
+
+    def _diversify_sources(
+        self,
+        results: List[SearchResult],
+        target_count: int,
+        min_jira_pct: float = 0.30
+    ) -> List[SearchResult]:
+        """Rerank results to ensure diverse source representation.
+
+        Args:
+            results: Sorted results by relevance_score
+            target_count: Final number of results to return (top_k)
+            min_jira_pct: Minimum percentage of Jira results (default 30%)
+
+        Returns:
+            Reranked results with source diversification
+        """
+        # If we don't have enough results, just return what we have
+        if len(results) <= target_count:
+            return results
+
+        # Group by source
+        by_source = {'jira': [], 'slack': [], 'github': [], 'fireflies': []}
+        for result in results:
+            source_key = result.source if result.source in by_source else 'other'
+            if source_key == 'other':
+                by_source.setdefault('other', []).append(result)
+            else:
+                by_source[source_key].append(result)
+
+        # Calculate targets
+        min_jira = max(int(target_count * min_jira_pct), 5)  # At least 5 Jira results
+
+        # Phase 1: Ensure minimum Jira representation
+        diversified = []
+        jira_results = by_source['jira'][:min_jira]
+        diversified.extend(jira_results)
+        logger.debug(f"🎯 Diversification: Added {len(jira_results)} Jira results (min: {min_jira})")
+
+        # Phase 2: Round-robin from all sources for remaining slots
+        remaining_slots = target_count - len(diversified)
+        sources = ['slack', 'github', 'fireflies', 'jira']
+        source_ptrs = {s: min_jira if s == 'jira' else 0 for s in sources}
+
+        added_count = {s: 0 for s in sources}
+
+        while len(diversified) < target_count:
+            added_this_round = False
+
+            for source in sources:
+                if len(diversified) >= target_count:
+                    break
+
+                # Check if this source has more results to add
+                if source_ptrs[source] < len(by_source[source]):
+                    result = by_source[source][source_ptrs[source]]
+
+                    # Avoid duplicates from Phase 1
+                    if result not in diversified:
+                        diversified.append(result)
+                        added_count[source] += 1
+                        added_this_round = True
+
+                    source_ptrs[source] += 1
+
+            # If we couldn't add anything this round, we've exhausted all sources
+            if not added_this_round:
+                break
+
+        logger.debug(f"   Round-robin added: {', '.join([f'{src}: {count}' for src, count in added_count.items() if count > 0])}")
+
+        return diversified[:target_count]
 
     def get_index_stats(self) -> Dict[str, Any]:
         """Get statistics about the Pinecone index.
