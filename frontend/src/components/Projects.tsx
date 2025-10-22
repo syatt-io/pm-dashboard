@@ -2408,47 +2408,86 @@ export const ProjectEdit = () => (
         Edit Project
       </Typography>
 
-      <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column', width: '100%' }}>
-        <TextInput source="key" label="Project Key" disabled fullWidth />
-        <TextInput source="name" label="Project Name" fullWidth />
-        <TextInput source="description" label="Description" multiline rows={3} fullWidth />
+      <Grid container spacing={3}>
+        {/* Basic Information */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+            Basic Information
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+        </Grid>
 
-        <SelectInput
-          source="project_work_type"
-          label="Work Type"
-          choices={[
-            { id: 'retainer', name: 'Retainer' },
-            { id: 'project', name: 'Project' },
-            { id: 'internal', name: 'Internal' },
-          ]}
-          fullWidth
-        />
+        <Grid item xs={12} md={6}>
+          <TextInput source="key" label="Project Key" disabled fullWidth />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextInput source="name" label="Project Name" fullWidth />
+        </Grid>
 
-        <SelectInput
-          source="weekly_meeting_day"
-          label="Weekly Meeting Day"
-          choices={[
-            { id: 'Monday', name: 'Monday' },
-            { id: 'Tuesday', name: 'Tuesday' },
-            { id: 'Wednesday', name: 'Wednesday' },
-            { id: 'Thursday', name: 'Thursday' },
-            { id: 'Friday', name: 'Friday' },
-          ]}
-          fullWidth
-        />
+        <Grid item xs={12}>
+          <TextInput source="description" label="Description" multiline rows={3} fullWidth />
+        </Grid>
 
-        <NumberInput source="forecasted_hours_month" label="Forecasted Hours/Month" fullWidth />
-        <NumberInput source="total_hours" label="Total Hours" fullWidth />
+        {/* Project Settings */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, mt: 2 }}>
+            Project Settings
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+        </Grid>
 
-        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 600 }}>
-          Resource Mappings (comma-separated)
-        </Typography>
+        <Grid item xs={12} md={6}>
+          <SelectInput
+            source="project_work_type"
+            label="Work Type"
+            choices={[
+              { id: 'project-based', name: 'Project-based' },
+              { id: 'growth-support', name: 'Growth & Support' },
+              { id: 'n-a', name: 'N/A' },
+            ]}
+            fullWidth
+          />
+        </Grid>
 
-        <TextInput source="jira_project_keys" label="Jira Project Keys" fullWidth helperText="e.g., PROJ1, PROJ2" />
-        <TextInput source="slack_channel_ids" label="Slack Channel IDs" fullWidth helperText="e.g., C123456, C789012" />
-        <TextInput source="notion_page_ids" label="Notion Page IDs" fullWidth helperText="e.g., abc123, def456" />
-        <TextInput source="github_repos" label="GitHub Repos" fullWidth helperText="e.g., org/repo1, org/repo2" />
-      </Box>
+        <Grid item xs={12} md={6}>
+          <SelectInput
+            source="weekly_meeting_day"
+            label="Weekly Meeting Day"
+            choices={[
+              { id: '', name: 'None' },
+              { id: 'Monday', name: 'Monday' },
+              { id: 'Tuesday', name: 'Tuesday' },
+              { id: 'Wednesday', name: 'Wednesday' },
+              { id: 'Thursday', name: 'Thursday' },
+              { id: 'Friday', name: 'Friday' },
+            ]}
+            fullWidth
+          />
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <NumberInput source="forecasted_hours_month" label="Forecasted Hours/Month" fullWidth />
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <NumberInput source="total_hours" label="Total Hours" fullWidth />
+        </Grid>
+
+        {/* Resource Mappings */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, mt: 2 }}>
+            Resource Mappings
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Note: Resource mappings are managed in the project details view, not here.
+          </Typography>
+          <Divider sx={{ mb: 2, mt: 1 }} />
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <TextInput source="slack_channel" label="Slack Channel" fullWidth helperText="e.g., #project-channel" />
+        </Grid>
+      </Grid>
     </SimpleForm>
   </Edit>
 );

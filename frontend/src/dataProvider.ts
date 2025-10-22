@@ -339,6 +339,7 @@ export const dataProvider: DataProvider = {
             case 'todos':
                 url = `${API_URL}/todos/${params.id}`;
                 break;
+            case 'projects':
             case 'jira_projects':
                 url = `${API_URL}/jira/projects/${params.id}`;
                 break;
