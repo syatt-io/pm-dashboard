@@ -65,6 +65,11 @@ celery_app.conf.update(
     # ✅ FIXED: Clean up task results after 1 hour to prevent database bloat
     result_expires=3600,  # 1 hour in seconds
     result_backend_max_connections=10,  # Limit connections to result backend
+    # ✅ RESILIENCE FIX: Prevent task loss during deployments/restarts
+    # Late acknowledgment: only ack messages AFTER task completes successfully
+    task_acks_late=True,  # Don't ack until task finishes (prevents loss on restart)
+    task_reject_on_worker_lost=True,  # Requeue tasks if worker crashes
+    worker_prefetch_multiplier=1,  # Only fetch 1 task at a time (prevents task loss)
     # ✅ GCP Pub/Sub message retention and acknowledgment settings
     # Increase acknowledgment deadline to prevent message loss during worker restarts
     broker_transport_options={
@@ -73,6 +78,8 @@ celery_app.conf.update(
             'minimum_backoff': 10,  # Minimum backoff of 10 seconds
             'maximum_backoff': 600,  # Maximum backoff of 10 minutes
         },
+        # Message retention: keep unacked messages for up to 7 days
+        'message_retention_duration': 604800,  # 7 days in seconds
     },
 )
 
@@ -171,5 +178,16 @@ celery_app.conf.beat_schedule = {
         'schedule': crontab(hour=8, minute=0)
     },
 }
+
+# Register worker startup signal handler for missed task recovery
+try:
+    from celery.signals import worker_ready
+    from src.tasks.startup_checks import on_worker_ready
+
+    # Connect the signal handler
+    worker_ready.connect(on_worker_ready)
+    print("✓ Worker startup checks registered")
+except Exception as e:
+    print(f"⚠️  Could not register worker startup checks: {e}")
 
 __all__ = ['celery_app']

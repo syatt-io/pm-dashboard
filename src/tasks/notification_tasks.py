@@ -115,19 +115,34 @@ def check_urgent_items():
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.sync_tempo_hours')
-def sync_tempo_hours():
+@shared_task(
+    name='src.tasks.notification_tasks.sync_tempo_hours',
+    bind=True,  # Bind task instance to get retry info
+    autoretry_for=(Exception,),  # Auto-retry on any exception
+    retry_kwargs={'max_retries': 3, 'countdown': 300},  # Retry 3 times, wait 5 min between retries
+    retry_backoff=True,  # Exponential backoff
+    retry_backoff_max=1800,  # Max 30 min backoff
+    retry_jitter=True  # Add jitter to prevent thundering herd
+)
+def sync_tempo_hours(self):
     """
     Sync Tempo hours to database (Celery task wrapper).
-    Scheduled to run at 4 AM EST (9:00 UTC).
+    Scheduled to run at 4 AM EST (8:00 UTC).
+
+    Resilience features:
+    - Auto-retry up to 3 times with exponential backoff
+    - 5-minute initial wait, up to 30-minute max backoff
+    - Jitter to prevent simultaneous retries
     """
     try:
-        logger.info("⏰ Starting Tempo hours sync task...")
+        retry_info = f" (attempt {self.request.retries + 1}/4)" if self.request.retries > 0 else ""
+        logger.info(f"⏰ Starting Tempo hours sync task{retry_info}...")
         from src.services.scheduler import TodoScheduler
         scheduler = TodoScheduler()
         scheduler.sync_tempo_hours()
         logger.info("✅ Tempo hours sync completed")
-        return {'success': True, 'task': 'tempo_sync'}
+        return {'success': True, 'task': 'tempo_sync', 'retries': self.request.retries}
     except Exception as e:
-        logger.error(f"❌ Error in Tempo sync task: {e}", exc_info=True)
+        logger.error(f"❌ Error in Tempo sync task (attempt {self.request.retries + 1}/4): {e}", exc_info=True)
+        # Re-raise to trigger auto-retry
         raise
