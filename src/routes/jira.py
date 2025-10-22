@@ -83,7 +83,6 @@ def get_jira_projects():
                                 p.project_work_type,
                                 p.total_hours,
                                 p.cumulative_hours,
-                                p.slack_channel,
                                 p.weekly_meeting_day,
                                 p.retainer_hours,
                                 pmf.forecasted_hours,
@@ -100,18 +99,16 @@ def get_jira_projects():
                             enhanced_project["project_work_type"] = result[1] if result[1] else 'project-based'
                             enhanced_project["total_hours"] = float(result[2]) if result[2] else 0
                             enhanced_project["cumulative_hours"] = float(result[3]) if result[3] else 0
-                            enhanced_project["slack_channel"] = result[4] if result[4] else None
-                            enhanced_project["weekly_meeting_day"] = result[5] if result[5] else None
-                            enhanced_project["retainer_hours"] = float(result[6]) if result[6] else 0
-                            enhanced_project["forecasted_hours_month"] = float(result[7]) if result[7] else 0
-                            enhanced_project["current_month_hours"] = float(result[8]) if result[8] else 0
+                            enhanced_project["weekly_meeting_day"] = result[4] if result[4] else None
+                            enhanced_project["retainer_hours"] = float(result[5]) if result[5] else 0
+                            enhanced_project["forecasted_hours_month"] = float(result[6]) if result[6] else 0
+                            enhanced_project["current_month_hours"] = float(result[7]) if result[7] else 0
                         else:
                             # No database record - use defaults
                             enhanced_project["is_active"] = True
                             enhanced_project["project_work_type"] = 'project-based'
                             enhanced_project["total_hours"] = 0
                             enhanced_project["cumulative_hours"] = 0
-                            enhanced_project["slack_channel"] = None
                             enhanced_project["weekly_meeting_day"] = None
                             enhanced_project["retainer_hours"] = 0
                             enhanced_project["forecasted_hours_month"] = 0
@@ -124,7 +121,6 @@ def get_jira_projects():
                         enhanced_project["total_hours"] = 0
                         enhanced_project["current_month_hours"] = 0
                         enhanced_project["cumulative_hours"] = 0
-                        enhanced_project["slack_channel"] = None
                         enhanced_project["weekly_meeting_day"] = None
 
                     enhanced_projects.append(enhanced_project)
@@ -190,7 +186,6 @@ def get_jira_project(project_key):
                         p.project_work_type,
                         p.total_hours,
                         p.cumulative_hours,
-                        p.slack_channel,
                         p.weekly_meeting_day,
                         p.retainer_hours,
                         p.description,
@@ -208,19 +203,17 @@ def get_jira_project(project_key):
                     enhanced_project["project_work_type"] = result[1] if result[1] else 'project-based'
                     enhanced_project["total_hours"] = float(result[2]) if result[2] else 0
                     enhanced_project["cumulative_hours"] = float(result[3]) if result[3] else 0
-                    enhanced_project["slack_channel"] = result[4] if result[4] else None
-                    enhanced_project["weekly_meeting_day"] = result[5] if result[5] else None
-                    enhanced_project["retainer_hours"] = float(result[6]) if result[6] else 0
-                    enhanced_project["description"] = result[7] if result[7] else None
-                    enhanced_project["forecasted_hours_month"] = float(result[8]) if result[8] else 0
-                    enhanced_project["current_month_hours"] = float(result[9]) if result[9] else 0
+                    enhanced_project["weekly_meeting_day"] = result[4] if result[4] else None
+                    enhanced_project["retainer_hours"] = float(result[5]) if result[5] else 0
+                    enhanced_project["description"] = result[6] if result[6] else None
+                    enhanced_project["forecasted_hours_month"] = float(result[7]) if result[7] else 0
+                    enhanced_project["current_month_hours"] = float(result[8]) if result[8] else 0
                 else:
                     # No database record - use defaults
                     enhanced_project["is_active"] = True
                     enhanced_project["project_work_type"] = 'project-based'
                     enhanced_project["total_hours"] = 0
                     enhanced_project["cumulative_hours"] = 0
-                    enhanced_project["slack_channel"] = None
                     enhanced_project["weekly_meeting_day"] = None
                     enhanced_project["retainer_hours"] = 0
                     enhanced_project["description"] = None
@@ -233,7 +226,6 @@ def get_jira_project(project_key):
             enhanced_project["project_work_type"] = 'project-based'
             enhanced_project["total_hours"] = 0
             enhanced_project["cumulative_hours"] = 0
-            enhanced_project["slack_channel"] = None
             enhanced_project["weekly_meeting_day"] = None
             enhanced_project["retainer_hours"] = 0
             enhanced_project["description"] = None
@@ -387,7 +379,6 @@ def update_project(project_key):
                         total_hours = :total_hours,
                         retainer_hours = :retainer_hours,
                         name = :name,
-                        slack_channel = :slack_channel,
                         weekly_meeting_day = :weekly_meeting_day,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE key = :key
@@ -398,14 +389,13 @@ def update_project(project_key):
                     "total_hours": data.get('total_hours', 0),
                     "retainer_hours": data.get('retainer_hours', 0),
                     "name": data.get('name', existing[1] if existing else 'Unknown'),
-                    "slack_channel": data.get('slack_channel'),
                     "weekly_meeting_day": data.get('weekly_meeting_day')
                 })
             else:
                 # Insert new project
                 conn.execute(text("""
-                    INSERT INTO projects (key, name, is_active, project_work_type, total_hours, retainer_hours, slack_channel, weekly_meeting_day)
-                    VALUES (:key, :name, :is_active, :project_work_type, :total_hours, :retainer_hours, :slack_channel, :weekly_meeting_day)
+                    INSERT INTO projects (key, name, is_active, project_work_type, total_hours, retainer_hours, weekly_meeting_day)
+                    VALUES (:key, :name, :is_active, :project_work_type, :total_hours, :retainer_hours, :weekly_meeting_day)
                 """), {
                     "key": project_key,
                     "name": data.get('name', 'Unknown'),
@@ -413,7 +403,6 @@ def update_project(project_key):
                     "project_work_type": data.get('project_work_type', 'ongoing'),
                     "total_hours": data.get('total_hours', 0),
                     "retainer_hours": data.get('retainer_hours', 0),
-                    "slack_channel": data.get('slack_channel'),
                     "weekly_meeting_day": data.get('weekly_meeting_day')
                 })
 

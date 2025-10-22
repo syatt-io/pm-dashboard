@@ -2402,7 +2402,7 @@ export const ProjectShow = () => (
 );
 
 export const ProjectEdit = () => (
-  <Edit>
+  <Edit redirect="show">
     <SimpleForm>
       <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
         Edit Project
@@ -2471,21 +2471,6 @@ export const ProjectEdit = () => (
 
         <Grid item xs={12} md={6}>
           <NumberInput source="total_hours" label="Total Hours" fullWidth />
-        </Grid>
-
-        {/* Resource Mappings */}
-        <Grid item xs={12}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, mt: 2 }}>
-            Resource Mappings
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Note: Resource mappings are managed in the project details view, not here.
-          </Typography>
-          <Divider sx={{ mb: 2, mt: 1 }} />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <TextInput source="slack_channel" label="Slack Channel" fullWidth helperText="e.g., #project-channel" />
         </Grid>
       </Grid>
     </SimpleForm>
