@@ -7,6 +7,11 @@ import OnboardingAlert from './OnboardingAlert';
 
 // Custom AppBar with Syatt branding
 const CustomAppBar = styled(AppBar)(({ theme }) => ({
+  position: 'fixed',
+  zIndex: theme.zIndex.appBar,
+  '& .RaAppBar-toolbar': {
+    backgroundColor: theme.palette.primary.main,
+  },
   '& .RaAppBar-title': {
     flex: 1,
     textOverflow: 'ellipsis',
