@@ -80,7 +80,8 @@ const MyProjectsSection = () => {
 
         if (projectsResponse.ok) {
           const projectsData = await projectsResponse.json();
-          const allProjects = projectsData || [];
+          // API returns {success: true, data: {projects: [...]}}
+          const allProjects = projectsData?.data?.projects || [];
 
           // Filter to only watched projects
           const watched = allProjects.filter((p: Project) =>
