@@ -198,6 +198,13 @@ from src.routes.backfill import backfill_bp
 from src.routes.admin_settings import admin_settings_bp
 
 app.register_blueprint(health_bp)
+
+# Exempt health check from rate limiting to allow Kubernetes probes
+# Kubernetes makes health check requests every 10 seconds (360/hour), which exceeds 200/hour limit
+if limiter:
+    limiter.exempt(health_bp)
+    logger.info("✅ Health check endpoint exempted from rate limiting")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)

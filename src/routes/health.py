@@ -15,10 +15,23 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 health_bp = Blueprint('health', __name__, url_prefix='/api')
 
+# Import limiter for exempting health check from rate limiting
+# This will be set by web_interface.py after limiter is initialized
+_limiter = None
+
+def set_limiter(limiter):
+    """Set the limiter instance for this blueprint."""
+    global _limiter
+    _limiter = limiter
+
 
 @health_bp.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint for DigitalOcean App Platform."""
+    """Health check endpoint for DigitalOcean App Platform.
+
+    NOTE: This endpoint is exempted from rate limiting to allow
+    Kubernetes health probes to run every 10 seconds without hitting rate limits.
+    """
     try:
         # Basic health check - can add database check if needed
         return jsonify({
