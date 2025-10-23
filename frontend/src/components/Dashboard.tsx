@@ -349,7 +349,7 @@ const MyRecentMeetingsSection = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="center">
-                      {meeting.analyzed ? (
+                      {meeting.analyzed_at ? (
                         <Chip label="Yes" size="small" color="success" />
                       ) : (
                         <Chip label="No" size="small" color="default" />
