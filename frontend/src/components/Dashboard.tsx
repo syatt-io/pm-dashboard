@@ -292,7 +292,7 @@ const MyRecentMeetingsSection = () => {
         action={
           <MuiLink
             component="button"
-            onClick={() => redirect('/meetings')}
+            onClick={() => redirect('/analysis')}
             sx={{ cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem' }}
           >
             View All Meetings

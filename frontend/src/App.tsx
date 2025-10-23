@@ -15,7 +15,7 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 
 // Components
-import { MeetingList, MeetingShow, MeetingEdit } from './components/Meetings';
+import { MeetingShow, MeetingEdit } from './components/Meetings';
 import { TodoList, TodoShow, TodoEdit, TodoCreate } from './components/Todos';
 import { AnalysisList, AnalysisShow } from './components/Analysis';
 import { Dashboard } from './components/Dashboard';
@@ -92,9 +92,9 @@ const AdminApp = () => {
           icon={SettingsIcon}
           options={{ label: 'Settings' }}
         />
+        {/* Meetings resource hidden from nav - accessible via Analysis tabs */}
         <Resource
           name="meetings"
-          list={MeetingList}
           show={MeetingShow}
           edit={MeetingEdit}
         />
