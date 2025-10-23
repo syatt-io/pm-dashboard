@@ -7,91 +7,401 @@ import {
   Box,
   Chip,
   LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Alert,
+  Link as MuiLink,
 } from '@mui/material';
 import {
-  MeetingRoom,
-  Task,
-  CheckCircle,
-  Business,
+  Star,
+  Assignment as TaskIcon,
+  Feedback as FeedbackIcon,
+  Lightbulb as LearningIcon,
 } from '@mui/icons-material';
-import { useGetList } from 'react-admin';
+import { useGetList, useRedirect } from 'react-admin';
 import API_BASE_URL from '../config';
 
-const StatCard = ({ title, value, icon, color = 'primary', subtitle }: any) => (
-  <Card sx={{ height: '100%' }}>
-    <CardContent>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Box
-          sx={{
-            p: 1,
-            borderRadius: 2,
-            backgroundColor: `${color}.light`,
-            color: `${color}.contrastText`,
-            mr: 2,
-          }}
-        >
-          {icon}
-        </Box>
-        <Box>
-          <Typography variant="h4" component="div" fontWeight="bold">
-            {value}
-          </Typography>
-          <Typography color="text.secondary" variant="body2">
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography color="text.secondary" variant="caption">
-              {subtitle}
+interface Project {
+  key: string;
+  name: string;
+  current_month_hours?: number;
+  forecasted_hours_month?: number;
+  project_work_type?: string;
+}
+
+const MyProjectsSection = () => {
+  const [watchedProjects, setWatchedProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const redirect = useRedirect();
+  const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+
+  useEffect(() => {
+    const fetchWatchedProjects = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch watched project keys
+        const watchedResponse = await fetch(`${API_BASE_URL}/api/watched-projects`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!watchedResponse.ok) {
+          setLoading(false);
+          return;
+        }
+
+        const watchedData = await watchedResponse.json();
+        const watchedProjectKeys = watchedData.watched_projects || [];
+
+        if (watchedProjectKeys.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch all projects to get hours data
+        const projectsResponse = await fetch(`${API_BASE_URL}/api/jira_projects?filter={}&range=[0,200]&sort=["name","ASC"]`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (projectsResponse.ok) {
+          const projectsData = await projectsResponse.json();
+          const allProjects = projectsData || [];
+
+          // Filter to only watched projects
+          const watched = allProjects.filter((p: Project) =>
+            watchedProjectKeys.includes(p.key)
+          );
+
+          setWatchedProjects(watched);
+        }
+      } catch (error) {
+        console.error('Error fetching watched projects:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWatchedProjects();
+  }, []);
+
+  const getHoursColor = (currentHours: number, forecastedHours: number, projectType: string) => {
+    if (projectType === 'n-a') return 'text.primary';
+    if (!forecastedHours || forecastedHours === 0) return 'success.main';
+    const percentage = (currentHours / forecastedHours) * 100;
+    if (percentage > 100) return 'error.main';
+    if (percentage > 80) return 'warning.main';
+    return 'success.main';
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader title={`${currentMonth} - My Projects`} />
+        <CardContent>
+          <LinearProgress />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (watchedProjects.length === 0) {
+    return (
+      <Card>
+        <CardHeader title={`${currentMonth} - My Projects`} />
+        <CardContent>
+          <Alert severity="info">
+            <Typography variant="body2" gutterBottom>
+              You haven't followed any projects yet.
             </Typography>
-          )}
-        </Box>
-      </Box>
-    </CardContent>
-  </Card>
-);
-
-const RecentActivityCard = () => {
-  const { data: meetings, isLoading: meetingsLoading } = useGetList('meetings', {
-    pagination: { page: 1, perPage: 5 },
-    sort: { field: 'date', order: 'DESC' },
-  });
-
-  const { data: todos, isLoading: todosLoading } = useGetList('todos', {
-    pagination: { page: 1, perPage: 5 },
-    sort: { field: 'created_at', order: 'DESC' },
-  });
+            <Typography variant="body2">
+              <MuiLink
+                component="button"
+                onClick={() => redirect('/projects')}
+                sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Go to Projects
+              </MuiLink>
+              {' '}to follow projects and track their hours here.
+            </Typography>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
-      <CardHeader title="Recent Activity" />
+      <CardHeader
+        title={`${currentMonth} - My Projects`}
+        action={
+          <MuiLink
+            component="button"
+            onClick={() => redirect('/projects')}
+            sx={{ cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem' }}
+          >
+            View All Projects
+          </MuiLink>
+        }
+      />
       <CardContent>
-        {meetingsLoading || todosLoading ? (
+        <TableContainer component={Paper} variant="outlined">
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell align="right">{currentMonth} Hours</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {watchedProjects.map((project) => {
+                const currentHours = project.current_month_hours || 0;
+                const forecastedHours = project.forecasted_hours_month || 0;
+                const projectType = project.project_work_type || 'project-based';
+
+                return (
+                  <TableRow
+                    key={project.key}
+                    sx={{
+                      cursor: 'pointer',
+                      '&:hover': { backgroundColor: 'rgba(85, 77, 255, 0.08)' }
+                    }}
+                    onClick={() => redirect('show', 'projects', project.key)}
+                  >
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Star color="primary" fontSize="small" />
+                        <Box>
+                          <Typography variant="body2" fontWeight="medium">
+                            {project.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {project.key}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: getHoursColor(currentHours, forecastedHours, projectType),
+                          fontWeight: 'medium'
+                        }}
+                      >
+                        {currentHours.toFixed(1)} / {forecastedHours.toFixed(1)}h
+                      </Typography>
+                      {forecastedHours > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          ({((currentHours / forecastedHours) * 100).toFixed(0)}%)
+                        </Typography>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </CardContent>
+    </Card>
+  );
+};
+
+const MyRecentMeetingsSection = () => {
+  const [meetings, setMeetings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const redirect = useRedirect();
+
+  useEffect(() => {
+    const fetchMeetings = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch watched project keys
+        const watchedResponse = await fetch(`${API_BASE_URL}/api/watched-projects`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!watchedResponse.ok) {
+          setLoading(false);
+          return;
+        }
+
+        const watchedData = await watchedResponse.json();
+        const watchedProjectKeys = watchedData.watched_projects || [];
+
+        if (watchedProjectKeys.length === 0) {
+          setMeetings([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch meetings for watched projects (limit 10)
+        const projectsParam = watchedProjectKeys.join(',');
+        const meetingsResponse = await fetch(
+          `${API_BASE_URL}/api/meetings?resource_context=analysis&projects=${projectsParam}&sort_field=analyzed_at&sort_order=DESC&per_page=10`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (meetingsResponse.ok) {
+          const meetingsData = await meetingsResponse.json();
+          setMeetings(meetingsData.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching meetings:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMeetings();
+  }, []);
+
+  return (
+    <Card>
+      <CardHeader
+        title="My Recent Meetings"
+        action={
+          <MuiLink
+            component="button"
+            onClick={() => redirect('/meetings')}
+            sx={{ cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem' }}
+          >
+            View All Meetings
+          </MuiLink>
+        }
+      />
+      <CardContent>
+        {loading ? (
           <LinearProgress />
+        ) : meetings.length === 0 ? (
+          <Alert severity="info">
+            No recent meetings found for your followed projects.
+          </Alert>
         ) : (
           <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              Recent Meetings
-            </Typography>
-            {meetings?.slice(0, 3).map((meeting: any) => (
-              <Box key={meeting.id} sx={{ mb: 1, p: 1, borderRadius: 1, backgroundColor: 'grey.50' }}>
-                <Typography variant="body2" fontWeight="medium">
-                  {meeting.title}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {new Date(meeting.date).toLocaleDateString()}
-                </Typography>
+            {meetings.map((meeting: any) => (
+              <Box
+                key={meeting.id}
+                sx={{
+                  mb: 1,
+                  p: 1.5,
+                  borderRadius: 1,
+                  backgroundColor: 'grey.50',
+                  cursor: 'pointer',
+                  '&:hover': { backgroundColor: 'grey.100' }
+                }}
+                onClick={() => redirect('show', 'meetings', meeting.id)}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      {meeting.title || 'Untitled Meeting'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(meeting.date).toLocaleDateString()}
+                      {meeting.projects && meeting.projects.length > 0 && (
+                        <> • {meeting.projects.map((p: any) => p.key).join(', ')}</>
+                      )}
+                    </Typography>
+                  </Box>
+                  {meeting.analyzed && (
+                    <Chip label="Analyzed" size="small" color="success" />
+                  )}
+                </Box>
               </Box>
             ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
-            <Typography variant="subtitle2" gutterBottom sx={{ mt: 2 }}>
-              Recent TODOs
-            </Typography>
-            {todos?.slice(0, 3).map((todo: any) => (
-              <Box key={todo.id} sx={{ mb: 1, p: 1, borderRadius: 1, backgroundColor: 'grey.50' }}>
+const MyTodosSection = () => {
+  const { data: todos, isLoading } = useGetList('todos', {
+    pagination: { page: 1, perPage: 10 },
+    sort: { field: 'created_at', order: 'DESC' },
+  });
+  const redirect = useRedirect();
+
+  return (
+    <Card>
+      <CardHeader
+        title="My TODOs"
+        action={
+          <MuiLink
+            component="button"
+            onClick={() => redirect('/todos')}
+            sx={{ cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem' }}
+          >
+            View All TODOs
+          </MuiLink>
+        }
+      />
+      <CardContent>
+        {isLoading ? (
+          <LinearProgress />
+        ) : !todos || todos.length === 0 ? (
+          <Alert severity="info">
+            No TODOs found.
+          </Alert>
+        ) : (
+          <Box>
+            {todos.slice(0, 10).map((todo: any) => (
+              <Box
+                key={todo.id}
+                sx={{
+                  mb: 1,
+                  p: 1.5,
+                  borderRadius: 1,
+                  backgroundColor: 'grey.50',
+                  cursor: 'pointer',
+                  '&:hover': { backgroundColor: 'grey.100' }
+                }}
+                onClick={() => redirect('edit', 'todos', todo.id)}
+              >
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" fontWeight="medium">
-                    {todo.title}
-                  </Typography>
+                  <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TaskIcon fontSize="small" color="action" />
+                    <Box>
+                      <Typography variant="body2" fontWeight="medium">
+                        {todo.title}
+                      </Typography>
+                      {todo.project_key && (
+                        <Typography variant="caption" color="text.secondary">
+                          {todo.project_key}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
                   <Chip
                     label={todo.status}
                     size="small"
@@ -107,172 +417,167 @@ const RecentActivityCard = () => {
   );
 };
 
-export const Dashboard = () => {
-  const [stats, setStats] = useState({
-    total_meetings: 0,
-    total_todos: 0,
-    completed_todos: 0,
-    active_todos: 0,
-    total_projects: 0,
-    todo_completion_rate: 0,
+const MyFeedbackSection = () => {
+  const { data: feedback, isLoading } = useGetList('feedback', {
+    pagination: { page: 1, perPage: 10 },
+    sort: { field: 'submitted_at', order: 'DESC' },
   });
-  const [loading, setLoading] = useState(true);
+  const redirect = useRedirect();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const token = localStorage.getItem('auth_token');
-        const response = await fetch(`${API_BASE_URL}/api/dashboard/stats`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            setStats(data.data);
-          }
+  return (
+    <Card>
+      <CardHeader
+        title="My Feedback"
+        action={
+          <MuiLink
+            component="button"
+            onClick={() => redirect('/feedback')}
+            sx={{ cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem' }}
+          >
+            View All Feedback
+          </MuiLink>
         }
-      } catch (error) {
-        // Failed to fetch stats - will show zeros
-      } finally {
-        setLoading(false);
-      }
-    };
+      />
+      <CardContent>
+        {isLoading ? (
+          <LinearProgress />
+        ) : !feedback || feedback.length === 0 ? (
+          <Alert severity="info">
+            No feedback found.
+          </Alert>
+        ) : (
+          <Box>
+            {feedback.slice(0, 10).map((item: any) => (
+              <Box
+                key={item.id}
+                sx={{
+                  mb: 1,
+                  p: 1.5,
+                  borderRadius: 1,
+                  backgroundColor: 'grey.50',
+                  cursor: 'pointer',
+                  '&:hover': { backgroundColor: 'grey.100' }
+                }}
+                onClick={() => redirect('show', 'feedback', item.id)}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <FeedbackIcon fontSize="small" color="action" />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      {item.content ? item.content.substring(0, 100) + (item.content.length > 100 ? '...' : '') : 'No content'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : 'Unknown date'}
+                      {item.submitted_by && <> • {item.submitted_by}</>}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
-    fetchStats();
-  }, []);
+const MyLearningsSection = () => {
+  const { data: learnings, isLoading } = useGetList('learnings', {
+    pagination: { page: 1, perPage: 10 },
+    sort: { field: 'submitted_at', order: 'DESC' },
+  });
+  const redirect = useRedirect();
 
-  const totalMeetings = stats.total_meetings;
-  const totalTodos = stats.total_todos;
-  const completedTodos = stats.completed_todos;
-  const totalProjects = stats.total_projects;
-  const todoCompletionRate = stats.todo_completion_rate;
+  return (
+    <Card>
+      <CardHeader
+        title="My Learnings"
+        action={
+          <MuiLink
+            component="button"
+            onClick={() => redirect('/learnings')}
+            sx={{ cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem' }}
+          >
+            View All Learnings
+          </MuiLink>
+        }
+      />
+      <CardContent>
+        {isLoading ? (
+          <LinearProgress />
+        ) : !learnings || learnings.length === 0 ? (
+          <Alert severity="info">
+            No learnings found.
+          </Alert>
+        ) : (
+          <Box>
+            {learnings.slice(0, 10).map((learning: any) => (
+              <Box
+                key={learning.id}
+                sx={{
+                  mb: 1,
+                  p: 1.5,
+                  borderRadius: 1,
+                  backgroundColor: 'grey.50',
+                  cursor: 'pointer',
+                  '&:hover': { backgroundColor: 'grey.100' }
+                }}
+                onClick={() => redirect('show', 'learnings', learning.id)}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <LearningIcon fontSize="small" color="action" />
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      {learning.content ? learning.content.substring(0, 100) + (learning.content.length > 100 ? '...' : '') : 'No content'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {learning.submitted_at ? new Date(learning.submitted_at).toLocaleDateString() : 'Unknown date'}
+                      {learning.submitted_by && <> • {learning.submitted_by}</>}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
-  if (loading) {
-    return (
-      <Box p={3}>
-        <Typography variant="h4" gutterBottom fontWeight="bold">
-          🚀 PM Command Center
-        </Typography>
-        <LinearProgress sx={{ mt: 2 }} />
-      </Box>
-    );
-  }
-
+export const Dashboard = () => {
   return (
     <Box p={3}>
       <Typography variant="h4" gutterBottom fontWeight="bold">
-        🚀 PM Command Center
+        PM Command Center
       </Typography>
       <Typography variant="body1" color="text.secondary" gutterBottom sx={{ mb: 4 }}>
         Your autonomous project management dashboard
       </Typography>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* Stats Cards */}
+        {/* My Projects Section - Full Width */}
+        <Box>
+          <MyProjectsSection />
+        </Box>
+
+        {/* Two Column Layout: Meetings + TODOs */}
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          <Box sx={{ flex: '1 1 240px' }}>
-            <StatCard
-              title="Total Meetings"
-              value={totalMeetings}
-              icon={<MeetingRoom />}
-              color="primary"
-              subtitle="This week"
-            />
+          <Box sx={{ flex: '1 1 400px' }}>
+            <MyRecentMeetingsSection />
           </Box>
-          <Box sx={{ flex: '1 1 240px' }}>
-            <StatCard
-              title="Active TODOs"
-              value={totalTodos - completedTodos}
-              icon={<Task />}
-              color="warning"
-              subtitle={`${completedTodos} completed`}
-            />
-          </Box>
-          <Box sx={{ flex: '1 1 240px' }}>
-            <StatCard
-              title="Completion Rate"
-              value={`${todoCompletionRate}%`}
-              icon={<CheckCircle />}
-              color="success"
-              subtitle={`${completedTodos}/${totalTodos} done`}
-            />
-          </Box>
-          <Box sx={{ flex: '1 1 240px' }}>
-            <StatCard
-              title="Active Projects"
-              value={totalProjects}
-              icon={<Business />}
-              color="secondary"
-              subtitle="In Jira"
-            />
+          <Box sx={{ flex: '1 1 400px' }}>
+            <MyTodosSection />
           </Box>
         </Box>
 
-        {/* Recent Activity and Quick Actions */}
+        {/* Two Column Layout: Feedback + Learnings */}
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box sx={{ flex: '1 1 400px' }}>
-            <RecentActivityCard />
+            <MyFeedbackSection />
           </Box>
-
           <Box sx={{ flex: '1 1 400px' }}>
-            <Card>
-              <CardHeader title="Quick Actions" />
-              <CardContent>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      backgroundColor: 'primary.light',
-                      color: 'primary.contrastText',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s',
-                      '&:hover': { transform: 'translateY(-2px)' },
-                    }}
-                  >
-                    <Typography variant="h6">📋 Analyze Meeting</Typography>
-                    <Typography variant="body2">
-                      Process new meeting transcripts and extract action items
-                    </Typography>
-                  </Box>
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      backgroundColor: 'secondary.light',
-                      color: 'secondary.contrastText',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s',
-                      '&:hover': { transform: 'translateY(-2px)' },
-                    }}
-                  >
-                    <Typography variant="h6">🎫 Create Jira Tickets</Typography>
-                    <Typography variant="body2">
-                      Convert action items into Jira tickets
-                    </Typography>
-                  </Box>
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      backgroundColor: 'warning.light',
-                      color: 'warning.contrastText',
-                      cursor: 'pointer',
-                      transition: 'transform 0.2s',
-                      '&:hover': { transform: 'translateY(-2px)' },
-                    }}
-                  >
-                    <Typography variant="h6">📝 Manage TODOs</Typography>
-                    <Typography variant="body2">
-                      View and update your TODO list
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
+            <MyLearningsSection />
           </Box>
         </Box>
       </Box>
