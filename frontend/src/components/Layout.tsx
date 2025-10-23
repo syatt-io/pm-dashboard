@@ -97,20 +97,25 @@ const CustomUserMenu = () => {
   );
 };
 
+// Create stable component instances to avoid re-rendering
+const MyAppBar = (props: any) => (
+  <CustomAppBar {...props} userMenu={<CustomUserMenu />}>
+    <SyattTitle />
+  </CustomAppBar>
+);
+
+const MySidebar = (props: any) => (
+  <CustomSidebar {...props}>
+    <CustomMenu />
+  </CustomSidebar>
+);
+
 export const CustomLayout = (props: any) => (
   <>
     <Layout
       {...props}
-      appBar={() => (
-        <CustomAppBar userMenu={<CustomUserMenu />}>
-          <SyattTitle />
-        </CustomAppBar>
-      )}
-      sidebar={() => (
-        <CustomSidebar>
-          <CustomMenu />
-        </CustomSidebar>
-      )}
+      appBar={MyAppBar}
+      sidebar={MySidebar}
     />
     <OnboardingAlert />
   </>
