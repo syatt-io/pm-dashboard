@@ -1,9 +1,8 @@
 import React from 'react';
-import { Layout, AppBar, Sidebar, Menu, Logout } from 'react-admin';
-import { Typography, Box, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
+import { Layout, AppBar, Sidebar, Menu, Logout, MenuItemLink } from 'react-admin';
+import { Typography, Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SettingsIcon from '@mui/icons-material/Settings';
-import { useNavigate } from 'react-router-dom';
 import OnboardingAlert from './OnboardingAlert';
 
 // Custom AppBar with Syatt branding
@@ -23,10 +22,8 @@ const SyattTitle = () => (
       component="div"
       sx={{
         fontWeight: 700,
-        background: 'linear-gradient(45deg, #FFFFFF 30%, #00FFCE 90%)',
-        backgroundClip: 'text',
-        WebkitBackgroundClip: 'text',
-        WebkitTextFillColor: 'transparent',
+        color: '#FFFFFF',
+        textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
       }}
     >
       PM Command Center
@@ -34,7 +31,8 @@ const SyattTitle = () => (
     <Typography
       variant="caption"
       sx={{
-        background: 'rgba(255, 255, 255, 0.7)',
+        background: 'rgba(0, 255, 206, 0.2)',
+        color: '#00FFCE',
         px: 1,
         py: 0.5,
         borderRadius: 1,
@@ -87,16 +85,13 @@ const CustomMenu = styled(Menu)(({ theme }) => ({
 
 // Custom UserMenu with Settings link
 const CustomUserMenu = () => {
-  const navigate = useNavigate();
-
   return (
     <>
-      <MenuItem onClick={() => navigate('/settings')}>
-        <ListItemIcon>
-          <SettingsIcon fontSize="small" />
-        </ListItemIcon>
-        <ListItemText>Settings</ListItemText>
-      </MenuItem>
+      <MenuItemLink
+        to="/settings"
+        primaryText="Settings"
+        leftIcon={<SettingsIcon />}
+      />
       <Logout />
     </>
   );
