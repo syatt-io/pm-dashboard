@@ -12,6 +12,7 @@ from src.services.auth import auth_required
 from src.integrations.fireflies import FirefliesClient
 from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.utils.database import get_engine, session_scope
+from src.utils.cache_manager import cached_endpoint, invalidate_cache
 
 logger = logging.getLogger(__name__)
 
@@ -323,8 +324,13 @@ def review_items():
 
 @meetings_bp.route("/api/meetings", methods=["GET"])
 @auth_required
+@cached_endpoint('meetings', ttl=3600, user_specific=True)
 def get_meetings(user):
-    """Get meetings using live Fireflies data with cached analysis overlay."""
+    """Get meetings using live Fireflies data with cached analysis overlay.
+
+    Cached for 1 hour (3600 seconds) with per-user caching (user-specific filtering).
+    Cache is invalidated when meetings are analyzed.
+    """
     try:
         # Get pagination parameters
         page = int(request.args.get('page', 1))
@@ -699,6 +705,10 @@ def analyze_meeting_api(user, meeting_id):
                 )
                 db_session.add(processed_meeting)
                 logger.info(f"Created new processed meeting record for {meeting_id}")
+
+        # Invalidate meetings cache after successful analysis
+        invalidated = invalidate_cache('api_cache:meetings:*')
+        logger.info(f"Invalidated {invalidated} meetings cache entries after analysis")
 
         return jsonify({
             'success': True,

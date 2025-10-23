@@ -8,6 +8,7 @@ import asyncio
 from config.settings import settings
 from src.integrations.jira_mcp import JiraMCPClient
 from src.utils.database import get_engine
+from src.utils.cache_manager import cached_endpoint, invalidate_cache
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,13 @@ def error_response(error, status_code=500, details=None):
 # =============================================================================
 
 @jira_bp.route("/projects", methods=["GET"])
+@cached_endpoint('projects', ttl=3600, user_specific=False)
 def get_jira_projects():
-    """Get all Jira projects with local database enhancements."""
+    """Get all Jira projects with local database enhancements.
+
+    Cached for 1 hour (3600 seconds) with global caching (not user-specific).
+    Cache is invalidated when projects are updated.
+    """
     try:
         # Check if Jira credentials are configured
         if not settings.jira.url or not settings.jira.username or not settings.jira.api_token:
