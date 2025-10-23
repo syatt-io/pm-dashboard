@@ -819,12 +819,8 @@ export const Settings = () => {
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
           <Tab icon={<SettingsIcon />} label="My Integrations" iconPosition="start" />
           <Tab icon={<WorkIcon />} label="Project Settings" iconPosition="start" />
-          {settings.user.role === 'admin' && (
-            <>
-              <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />
-              <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />
-            </>
-          )}
+          {settings.user.role === 'admin' && <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />}
+          {settings.user.role === 'admin' && <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />}
         </Tabs>
       </Box>
 
