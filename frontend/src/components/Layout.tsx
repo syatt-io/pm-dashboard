@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, AppBar, Sidebar, Menu, UserMenu, Logout } from 'react-admin';
+import { Layout, AppBar, Sidebar, Menu, Logout } from 'react-admin';
 import { Typography, Box, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -90,7 +90,7 @@ const CustomUserMenu = () => {
   const navigate = useNavigate();
 
   return (
-    <UserMenu>
+    <>
       <MenuItem onClick={() => navigate('/settings')}>
         <ListItemIcon>
           <SettingsIcon fontSize="small" />
@@ -98,7 +98,7 @@ const CustomUserMenu = () => {
         <ListItemText>Settings</ListItemText>
       </MenuItem>
       <Logout />
-    </UserMenu>
+    </>
   );
 };
 
