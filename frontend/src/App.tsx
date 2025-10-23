@@ -1,5 +1,5 @@
 import React from 'react';
-import { Admin, Resource, radiantLightTheme, radiantDarkTheme } from 'react-admin';
+import { Admin, Resource, nanoLightTheme, nanoDarkTheme } from 'react-admin';
 import { dataProvider } from './dataProvider';
 import { authProvider } from './authProvider';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -39,8 +39,8 @@ const AdminApp = () => {
       dashboard={Dashboard}
       title="PM Command Center"
       layout={CustomLayout}
-      theme={radiantLightTheme}
-      darkTheme={radiantDarkTheme}
+      theme={nanoLightTheme}
+      darkTheme={nanoDarkTheme}
       loginPage={Login}
       requireAuth
       disableTelemetry
