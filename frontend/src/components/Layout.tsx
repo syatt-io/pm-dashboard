@@ -1,8 +1,9 @@
 import React from 'react';
-import { Layout, AppBar, Sidebar, Menu, UserMenu, Logout, MenuItemLink } from 'react-admin';
-import { Typography, Box } from '@mui/material';
+import { Layout, AppBar, Sidebar, Menu, UserMenu, Logout } from 'react-admin';
+import { Typography, Box, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SettingsIcon from '@mui/icons-material/Settings';
+import { useNavigate } from 'react-router-dom';
 import OnboardingAlert from './OnboardingAlert';
 
 // Custom AppBar with Syatt branding
@@ -85,16 +86,21 @@ const CustomMenu = styled(Menu)(({ theme }) => ({
 }));
 
 // Custom UserMenu with Settings link
-const CustomUserMenu = () => (
-  <UserMenu>
-    <MenuItemLink
-      to="/settings"
-      primaryText="Settings"
-      leftIcon={<SettingsIcon />}
-    />
-    <Logout />
-  </UserMenu>
-);
+const CustomUserMenu = () => {
+  const navigate = useNavigate();
+
+  return (
+    <UserMenu>
+      <MenuItem onClick={() => navigate('/settings')}>
+        <ListItemIcon>
+          <SettingsIcon fontSize="small" />
+        </ListItemIcon>
+        <ListItemText>Settings</ListItemText>
+      </MenuItem>
+      <Logout />
+    </UserMenu>
+  );
+};
 
 export const CustomLayout = (props: any) => (
   <>
