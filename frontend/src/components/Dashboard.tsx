@@ -159,7 +159,7 @@ const MyProjectsSection = () => {
           </MuiLink>
         }
       />
-      <CardContent>
+      <CardContent sx={{ maxHeight: '500px', overflow: 'auto', p: 0 }}>
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
@@ -169,7 +169,7 @@ const MyProjectsSection = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {watchedProjects.map((project) => {
+              {watchedProjects.slice(0, 10).map((project) => {
                 const currentHours = project.current_month_hours || 0;
                 const forecastedHours = project.forecasted_hours_month || 0;
                 const projectType = project.project_work_type || 'project-based';
@@ -299,7 +299,7 @@ const MyRecentMeetingsSection = () => {
           </MuiLink>
         }
       />
-      <CardContent>
+      <CardContent sx={{ maxHeight: '400px', overflow: 'auto' }}>
         {loading ? (
           <LinearProgress />
         ) : meetings.length === 0 ? (
@@ -367,7 +367,7 @@ const MyTodosSection = () => {
           </MuiLink>
         }
       />
-      <CardContent>
+      <CardContent sx={{ maxHeight: '400px', overflow: 'auto' }}>
         {isLoading ? (
           <LinearProgress />
         ) : !todos || todos.length === 0 ? (
@@ -439,7 +439,7 @@ const MyFeedbackSection = () => {
           </MuiLink>
         }
       />
-      <CardContent>
+      <CardContent sx={{ maxHeight: '400px', overflow: 'auto' }}>
         {isLoading ? (
           <LinearProgress />
         ) : !feedback || feedback.length === 0 ? (
@@ -503,7 +503,7 @@ const MyLearningsSection = () => {
           </MuiLink>
         }
       />
-      <CardContent>
+      <CardContent sx={{ maxHeight: '400px', overflow: 'auto' }}>
         {isLoading ? (
           <LinearProgress />
         ) : !learnings || learnings.length === 0 ? (
@@ -557,29 +557,29 @@ export const Dashboard = () => {
       </Typography>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* My Projects Section - Full Width */}
-        <Box>
-          <MyProjectsSection />
-        </Box>
-
-        {/* Two Column Layout: Meetings + TODOs */}
+        {/* Row 1: My Projects + My Meetings */}
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+          <Box sx={{ flex: '1 1 400px' }}>
+            <MyProjectsSection />
+          </Box>
           <Box sx={{ flex: '1 1 400px' }}>
             <MyRecentMeetingsSection />
           </Box>
+        </Box>
+
+        {/* Row 2: My TODOs + My Feedback */}
+        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box sx={{ flex: '1 1 400px' }}>
             <MyTodosSection />
           </Box>
-        </Box>
-
-        {/* Two Column Layout: Feedback + Learnings */}
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box sx={{ flex: '1 1 400px' }}>
             <MyFeedbackSection />
           </Box>
-          <Box sx={{ flex: '1 1 400px' }}>
-            <MyLearningsSection />
-          </Box>
+        </Box>
+
+        {/* Row 3: Team Learnings */}
+        <Box>
+          <MyLearningsSection />
         </Box>
       </Box>
     </Box>
