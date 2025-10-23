@@ -71,7 +71,7 @@ const MyProjectsSection = () => {
         }
 
         // Fetch all projects to get hours data
-        const projectsResponse = await fetch(`${API_BASE_URL}/api/jira_projects?filter={}&range=[0,200]&sort=["name","ASC"]`, {
+        const projectsResponse = await fetch(`${API_BASE_URL}/api/jira/projects`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
