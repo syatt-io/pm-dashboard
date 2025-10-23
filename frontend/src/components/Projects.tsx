@@ -1555,7 +1555,6 @@ export const ProjectList = () => {
           <Tabs value={tabValue} onChange={handleTabChange}>
             <Tab label={`📌 My Projects (${watchedProjects.length})`} />
             <Tab label={`⚙️ Active Projects (${activeProjects.length})`} />
-            <Tab label={`📋 All Projects (${allProjects.length})`} />
             <Tab label="📊 Monthly Forecasts" />
           </Tabs>
 
@@ -1886,39 +1885,6 @@ export const ProjectList = () => {
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              Toggle the "Active" switch to sync projects to local database and enable additional fields.
-            </Alert>
-
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Project Name</TableCell>
-                    <TableCell>Key</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {allProjects.map((project) => (
-                    <TableRow key={project.key}>
-                      <TableCell>{project.name}</TableCell>
-                      <TableCell>
-                        <Chip label={project.key} size="small" />
-                      </TableCell>
-                      <TableCell>{project.projectTypeKey || 'Unknown'}</TableCell>
-                      <TableCell>
-                        <ActiveToggle record={project} onToggle={handleActiveToggle} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </TabPanel>
-
-          <TabPanel value={tabValue} index={3}>
             <MonthlyForecastsPanel activeProjects={activeProjects} />
           </TabPanel>
         </CardContent>

@@ -26,6 +26,15 @@ import {
   InputLabel,
   Slider,
   FormHelperText,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Switch,
+  FormControlLabel,
 } from '@mui/material';
 import {
   Save,
@@ -38,9 +47,27 @@ import {
   Launch,
   Settings as SettingsIcon,
   SmartToy,
+  Work as WorkIcon,
+  People as PeopleIcon,
 } from '@mui/icons-material';
-import { Loading, Title } from 'react-admin';
+import { Loading, Title, useDataProvider, useNotify } from 'react-admin';
 import { getApiUrl } from '../config';
+import UserManagement from './UserManagement';
+
+interface Project {
+  key: string;
+  name: string;
+  projectTypeKey?: string;
+  is_active?: boolean;
+  forecasted_hours_month?: number;
+  project_work_type?: 'project-based' | 'growth-support' | 'n-a';
+  total_hours?: number;
+  description?: string;
+  current_month_hours?: number;
+  cumulative_hours?: number;
+  slack_channel?: string;
+  weekly_meeting_day?: string;
+}
 
 interface UserSettings {
   user: {
@@ -109,9 +136,15 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export const Settings = () => {
+  const notify = useNotify();
+  const dataProvider = useDataProvider();
   const [tabValue, setTabValue] = useState(0);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Projects state
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -174,6 +207,14 @@ export const Settings = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.user?.role]);
 
+  // Load projects when Project Settings tab is accessed
+  useEffect(() => {
+    if (tabValue === 1) { // Project Settings tab
+      loadProjects();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabValue]);
+
   // Handle OAuth callback messages from URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -220,6 +261,42 @@ export const Settings = () => {
       showSnackbar('Failed to load settings', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const { data } = await dataProvider.getList('jira_projects', {
+        pagination: { page: 1, perPage: 200 },
+        sort: { field: 'name', order: 'ASC' },
+        filter: {},
+      });
+      setAllProjects(data);
+    } catch (error) {
+      showSnackbar('Error fetching projects', 'error');
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const handleActiveToggle = async (project: Project) => {
+    try {
+      const updatedProject = {
+        ...project,
+        is_active: !project.is_active,
+      };
+
+      await dataProvider.update('jira_projects', {
+        id: project.key,
+        data: updatedProject,
+        previousData: project,
+      });
+
+      showSnackbar(`Project ${project.name} is now ${updatedProject.is_active ? 'active' : 'inactive'}`, 'success');
+      loadProjects();
+    } catch (error) {
+      showSnackbar('Error updating project status', 'error');
     }
   };
 
@@ -741,8 +818,12 @@ export const Settings = () => {
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
           <Tab icon={<SettingsIcon />} label="My Integrations" iconPosition="start" />
+          <Tab icon={<WorkIcon />} label="Project Settings" iconPosition="start" />
           {settings.user.role === 'admin' && (
-            <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />
+            <>
+              <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />
+              <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />
+            </>
           )}
         </Tabs>
       </Box>
@@ -1156,9 +1237,66 @@ export const Settings = () => {
         </Card>
       </TabPanel>
 
-      {/* Tab 2: AI Configuration (Admin Only) */}
+      {/* Tab 2: Project Settings */}
+      <TabPanel value={tabValue} index={1}>
+        {loadingProjects ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                🏢 All Projects
+              </Typography>
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Toggle the "Active" switch to sync projects to local database and enable additional fields.
+              </Alert>
+
+              <TableContainer component={Paper}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Project Name</TableCell>
+                      <TableCell>Key</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Status</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {allProjects.map((project) => (
+                      <TableRow key={project.key}>
+                        <TableCell>{project.name}</TableCell>
+                        <TableCell>
+                          <Chip label={project.key} size="small" />
+                        </TableCell>
+                        <TableCell>{project.projectTypeKey || 'Unknown'}</TableCell>
+                        <TableCell>
+                          <FormControlLabel
+                            control={
+                              <Switch
+                                checked={project.is_active || false}
+                                onChange={() => handleActiveToggle(project)}
+                                color="primary"
+                                size="small"
+                              />
+                            }
+                            label={project.is_active ? 'Active' : 'Inactive'}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        )}
+      </TabPanel>
+
+      {/* Tab 3: AI Configuration (Admin Only) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={1}>
+        <TabPanel value={tabValue} index={2}>
           {loadingAI ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <CircularProgress />
@@ -1348,6 +1486,13 @@ export const Settings = () => {
           ) : (
             <Alert severity="info">No AI settings configured yet.</Alert>
           )}
+        </TabPanel>
+      )}
+
+      {/* Tab 4: User Management (Admin Only) */}
+      {settings.user.role === 'admin' && (
+        <TabPanel value={tabValue} index={3}>
+          <UserManagement />
         </TabPanel>
       )}
 

@@ -7,12 +7,10 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 // NOTE: React Admin provides its own router - do NOT wrap in BrowserRouter!
 
 // Icons
-import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import TaskIcon from '@mui/icons-material/Task';
 import SettingsIcon from '@mui/icons-material/Settings';
 import BusinessIcon from '@mui/icons-material/Business';
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import PeopleIcon from '@mui/icons-material/People';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 
@@ -31,12 +29,9 @@ import { FeedbackList } from './components/FeedbackList';
 import { FeedbackCreate } from './components/FeedbackCreate';
 import { FeedbackEdit } from './components/FeedbackEdit';
 import Login from './components/Login';
-import UserManagement from './components/UserManagement';
 import Settings from './components/Settings';
 
 const AdminApp = () => {
-  const { isAdmin } = useAuth();
-
   return (
     <Admin
       dataProvider={dataProvider}
@@ -51,19 +46,19 @@ const AdminApp = () => {
       disableTelemetry
     >
         <Resource
+          name="projects"
+          list={ProjectList}
+          show={ProjectShow}
+          edit={ProjectEdit}
+          icon={BusinessIcon}
+          options={{ label: 'My Projects' }}
+        />
+        <Resource
           name="analysis"
           list={AnalysisList}
           show={AnalysisShow}
           icon={FavoriteIcon}
-          options={{ label: 'Meeting Analysis' }}
-        />
-        <Resource
-          name="meetings"
-          list={MeetingList}
-          show={MeetingShow}
-          edit={MeetingEdit}
-          icon={MeetingRoomIcon}
-          options={{ label: 'All Meetings' }}
+          options={{ label: 'My Meetings' }}
         />
         <Resource
           name="todos"
@@ -72,13 +67,15 @@ const AdminApp = () => {
           edit={TodoEdit}
           create={TodoCreate}
           icon={TaskIcon}
+          options={{ label: 'My TODOs' }}
         />
         <Resource
-          name="projects"
-          list={ProjectList}
-          show={ProjectShow}
-          edit={ProjectEdit}
-          icon={BusinessIcon}
+          name="feedback"
+          list={FeedbackList}
+          create={FeedbackCreate}
+          edit={FeedbackEdit}
+          icon={FeedbackIcon}
+          options={{ label: 'My Feedback' }}
         />
         <Resource
           name="learnings"
@@ -90,26 +87,16 @@ const AdminApp = () => {
           options={{ label: 'Team Learnings' }}
         />
         <Resource
-          name="feedback"
-          list={FeedbackList}
-          create={FeedbackCreate}
-          edit={FeedbackEdit}
-          icon={FeedbackIcon}
-          options={{ label: 'My Feedback' }}
-        />
-        {isAdmin && (
-          <Resource
-            name="users"
-            list={UserManagement}
-            icon={PeopleIcon}
-            options={{ label: 'User Management' }}
-          />
-        )}
-        <Resource
           name="settings"
           list={Settings}
           icon={SettingsIcon}
           options={{ label: 'Settings' }}
+        />
+        <Resource
+          name="meetings"
+          list={MeetingList}
+          show={MeetingShow}
+          edit={MeetingEdit}
         />
       </Admin>
   );

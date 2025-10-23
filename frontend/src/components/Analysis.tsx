@@ -38,6 +38,8 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
+  Tabs,
+  Tab,
 } from '@mui/material';
 import {
   Assignment,
@@ -46,6 +48,7 @@ import {
   TrendingUp,
   Create,
 } from '@mui/icons-material';
+import { MeetingList } from './Meetings';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -619,54 +622,75 @@ const MeetingTitle = ({ record }: { record: any }) => {
   );
 };
 
-export const AnalysisList = () => (
-  <Box>
-    <List
-      title="💜 My Projects - Meeting Coverage"
-      sort={{ field: 'date', order: 'DESC' }}
-      perPage={25}
-      actions={false}
-      filters={[]} // Disable default filters since we have custom
-    >
-      <WatchedProjectsNotice />
-      <AnalysisDateRangeFilter />
-      <Datagrid rowClick="show" bulkActionButtons={false}>
-        <FunctionField
-          label="Status"
-          render={(record: any) => <AnalysisStatusChip record={record} />}
-          sortable={false}
-        />
-        <FunctionField
-          label="Meeting"
-          render={(record: any) => <MeetingTitle record={record} />}
-        />
-        <DateField
-          source="date"
-          label="Meeting Date"
-          options={{
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          }}
-        />
-        <FunctionField
-          label="Action Items"
-          render={(record: any) => record.action_items?.length || 0}
-        />
-        <FunctionField
-          label="Decisions"
-          render={(record: any) => record.key_decisions?.length || 0}
-        />
-        <FunctionField
-          label="Blockers"
-          render={(record: any) => record.blockers?.length || 0}
-        />
-      </Datagrid>
-    </List>
-  </Box>
-);
+export const AnalysisList = () => {
+  const [tabValue, setTabValue] = useState(0);
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  return (
+    <Box>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+        <Tabs value={tabValue} onChange={handleTabChange} aria-label="meeting tabs">
+          <Tab label="My Meetings" />
+          <Tab label="All Meetings" />
+        </Tabs>
+      </Box>
+
+      {tabValue === 0 && (
+        <List
+          title="💜 My Projects - Meeting Coverage"
+          sort={{ field: 'date', order: 'DESC' }}
+          perPage={25}
+          actions={false}
+          filters={[]} // Disable default filters since we have custom
+        >
+          <WatchedProjectsNotice />
+          <AnalysisDateRangeFilter />
+          <Datagrid rowClick="show" bulkActionButtons={false}>
+            <FunctionField
+              label="Status"
+              render={(record: any) => <AnalysisStatusChip record={record} />}
+              sortable={false}
+            />
+            <FunctionField
+              label="Meeting"
+              render={(record: any) => <MeetingTitle record={record} />}
+            />
+            <DateField
+              source="date"
+              label="Meeting Date"
+              options={{
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }}
+            />
+            <FunctionField
+              label="Action Items"
+              render={(record: any) => record.action_items?.length || 0}
+            />
+            <FunctionField
+              label="Decisions"
+              render={(record: any) => record.key_decisions?.length || 0}
+            />
+            <FunctionField
+              label="Blockers"
+              render={(record: any) => record.blockers?.length || 0}
+            />
+          </Datagrid>
+        </List>
+      )}
+
+      {tabValue === 1 && (
+        <MeetingList />
+      )}
+    </Box>
+  );
+};
 
 const AnalysisStatusBanner = () => {
   const record = useRecordContext();
