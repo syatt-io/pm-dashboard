@@ -159,7 +159,7 @@ const MyProjectsSection = () => {
           </MuiLink>
         }
       />
-      <CardContent sx={{ maxHeight: '500px', overflow: 'auto', p: 0 }}>
+      <CardContent sx={{ maxHeight: '400px', overflow: 'auto', p: 0 }}>
         <TableContainer component={Paper} variant="outlined">
           <Table size="small">
             <TableHead>
@@ -169,7 +169,7 @@ const MyProjectsSection = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {watchedProjects.slice(0, 10).map((project) => {
+              {watchedProjects.map((project) => {
                 const currentHours = project.current_month_hours || 0;
                 const forecastedHours = project.forecasted_hours_month || 0;
                 const projectType = project.project_work_type || 'project-based';
@@ -299,7 +299,7 @@ const MyRecentMeetingsSection = () => {
           </MuiLink>
         }
       />
-      <CardContent sx={{ maxHeight: '400px', overflow: 'auto' }}>
+      <CardContent sx={{ maxHeight: '400px', overflow: 'auto', p: 0 }}>
         {loading ? (
           <LinearProgress />
         ) : meetings.length === 0 ? (
@@ -307,39 +307,59 @@ const MyRecentMeetingsSection = () => {
             No recent meetings found for your followed projects.
           </Alert>
         ) : (
-          <Box>
-            {meetings.map((meeting: any) => (
-              <Box
-                key={meeting.id}
-                sx={{
-                  mb: 1,
-                  p: 1.5,
-                  borderRadius: 1,
-                  backgroundColor: 'grey.50',
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'grey.100' }
-                }}
-                onClick={() => redirect('show', 'meetings', meeting.id)}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="body2" fontWeight="medium">
-                      {meeting.title || 'Untitled Meeting'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(meeting.date).toLocaleDateString()}
-                      {meeting.projects && meeting.projects.length > 0 && (
-                        <> • {meeting.projects.map((p: any) => p.key).join(', ')}</>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Title</TableCell>
+                  <TableCell>Meeting Day</TableCell>
+                  <TableCell>Project</TableCell>
+                  <TableCell align="center">Analyzed</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {meetings.map((meeting: any) => (
+                  <TableRow
+                    key={meeting.id}
+                    sx={{
+                      cursor: 'pointer',
+                      '&:hover': { backgroundColor: 'rgba(85, 77, 255, 0.08)' }
+                    }}
+                    onClick={() => redirect('show', 'meetings', meeting.id)}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="medium">
+                        {meeting.title || 'Untitled Meeting'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {new Date(meeting.date).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="text.secondary">
+                        {meeting.projects && meeting.projects.length > 0
+                          ? meeting.projects.map((p: any) => p.key).join(', ')
+                          : '-'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">
+                      {meeting.analyzed ? (
+                        <Chip label="Yes" size="small" color="success" />
+                      ) : (
+                        <Chip label="No" size="small" color="default" />
                       )}
-                    </Typography>
-                  </Box>
-                  {meeting.analyzed && (
-                    <Chip label="Analyzed" size="small" color="success" />
-                  )}
-                </Box>
-              </Box>
-            ))}
-          </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
       </CardContent>
     </Card>
@@ -376,7 +396,7 @@ const MyTodosSection = () => {
           </Alert>
         ) : (
           <Box>
-            {todos.slice(0, 10).map((todo: any) => (
+            {todos.map((todo: any) => (
               <Box
                 key={todo.id}
                 sx={{
@@ -448,7 +468,7 @@ const MyFeedbackSection = () => {
           </Alert>
         ) : (
           <Box>
-            {feedback.slice(0, 10).map((item: any) => (
+            {feedback.map((item: any) => (
               <Box
                 key={item.id}
                 sx={{
@@ -512,7 +532,7 @@ const MyLearningsSection = () => {
           </Alert>
         ) : (
           <Box>
-            {learnings.slice(0, 10).map((learning: any) => (
+            {learnings.map((learning: any) => (
               <Box
                 key={learning.id}
                 sx={{
