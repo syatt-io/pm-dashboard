@@ -139,9 +139,12 @@ def analyze_meeting(meeting_id):
             # Recreate analysis object from cached data
             class CachedAnalysis:
                 def __init__(self, cached_data):
-                    self.summary = cached_data.summary
-                    self.key_decisions = cached_data.key_decisions or []
-                    self.blockers = cached_data.blockers or []
+                    # Try new structure first, fall back to old structure
+                    self.executive_summary = cached_data.executive_summary or cached_data.summary or ""
+                    self.outcomes = cached_data.outcomes or cached_data.key_decisions or []
+                    self.blockers_and_constraints = cached_data.blockers_and_constraints or cached_data.blockers or []
+                    self.timeline_and_milestones = cached_data.timeline_and_milestones or []
+                    self.key_discussions = cached_data.key_discussions or []
                     # Convert action items back to objects
                     self.action_items = []
                     for item_data in (cached_data.action_items or []):
@@ -162,9 +165,11 @@ def analyze_meeting(meeting_id):
                 'meeting_id': meeting_id,
                 'meeting_title': cached_meeting_dto.title,
                 'meeting_date': cached_meeting_dto.date.isoformat() if cached_meeting_dto.date else '',
-                'summary': analysis.summary,
-                'key_decisions': analysis.key_decisions,
-                'blockers': analysis.blockers,
+                'executive_summary': analysis.executive_summary,
+                'outcomes': analysis.outcomes,
+                'blockers_and_constraints': analysis.blockers_and_constraints,
+                'timeline_and_milestones': analysis.timeline_and_milestones,
+                'key_discussions': analysis.key_discussions,
                 'action_items': [
                     {
                         'title': item.title,
@@ -241,12 +246,18 @@ def analyze_meeting(meeting_id):
             if existing_meeting:
                 # Update existing record - Always serialize to JSON, even empty lists
                 existing_meeting.analyzed_at = analyzed_at
-                existing_meeting.summary = analysis.summary
-                existing_meeting.key_decisions = json.dumps(analysis.key_decisions or [])
-                existing_meeting.blockers = json.dumps(analysis.blockers or [])
+                existing_meeting.executive_summary = analysis.executive_summary
+                existing_meeting.outcomes = json.dumps(analysis.outcomes or [])
+                existing_meeting.blockers_and_constraints = json.dumps(analysis.blockers_and_constraints or [])
+                existing_meeting.timeline_and_milestones = json.dumps(analysis.timeline_and_milestones or [])
+                existing_meeting.key_discussions = json.dumps(analysis.key_discussions or [])
                 existing_meeting.action_items = json.dumps(action_items_data)  # Always serialize
                 existing_meeting.title = transcript['title']
                 existing_meeting.date = meeting_date
+                # Keep legacy fields for backward compatibility
+                existing_meeting.summary = analysis.executive_summary
+                existing_meeting.key_decisions = json.dumps(analysis.outcomes or [])
+                existing_meeting.blockers = json.dumps(analysis.blockers_and_constraints or [])
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")
             else:
                 # Create new record - Always serialize to JSON, even empty lists
@@ -257,10 +268,16 @@ def analyze_meeting(meeting_id):
                     title=transcript['title'],
                     date=meeting_date,
                     analyzed_at=analyzed_at,
-                    summary=analysis.summary,
-                    key_decisions=json.dumps(analysis.key_decisions or []),
-                    blockers=json.dumps(analysis.blockers or []),
-                    action_items=json.dumps(action_items_data)  # Always serialize
+                    executive_summary=analysis.executive_summary,
+                    outcomes=json.dumps(analysis.outcomes or []),
+                    blockers_and_constraints=json.dumps(analysis.blockers_and_constraints or []),
+                    timeline_and_milestones=json.dumps(analysis.timeline_and_milestones or []),
+                    key_discussions=json.dumps(analysis.key_discussions or []),
+                    action_items=json.dumps(action_items_data),  # Always serialize
+                    # Keep legacy fields for backward compatibility
+                    summary=analysis.executive_summary,
+                    key_decisions=json.dumps(analysis.outcomes or []),
+                    blockers=json.dumps(analysis.blockers_and_constraints or [])
                 )
                 db_session.add(processed_meeting)
                 logger.info(f"Created new processed meeting record for {meeting_id}")
@@ -270,9 +287,11 @@ def analyze_meeting(meeting_id):
             'meeting_id': meeting_id,
             'meeting_title': transcript['title'],
             'meeting_date': meeting_date.isoformat(),
-            'summary': analysis.summary,
-            'key_decisions': analysis.key_decisions,
-            'blockers': analysis.blockers,
+            'executive_summary': analysis.executive_summary,
+            'outcomes': analysis.outcomes,
+            'blockers_and_constraints': analysis.blockers_and_constraints,
+            'timeline_and_milestones': analysis.timeline_and_milestones,
+            'key_discussions': analysis.key_discussions,
             'action_items': action_items_data,
             'is_cached': False,
             'analyzed_at': analyzed_at.isoformat()

@@ -40,8 +40,15 @@ class ProcessedMeeting(Base):
     fireflies_id = Column(String(255), unique=True)
     date = Column(DateTime)
     duration = Column(Integer)
+    # New structure fields
+    executive_summary = Column(Text)  # Renamed from summary
+    outcomes = Column(Text)  # JSON string - replaces key_decisions
+    action_items = Column(Text)  # JSON string - unchanged
+    blockers_and_constraints = Column(Text)  # JSON string - renamed from blockers
+    timeline_and_milestones = Column(Text)  # JSON string - new field
+    key_discussions = Column(Text)  # JSON string - new field (replaces follow_ups)
+    # Legacy fields for backward compatibility (can be removed after migration)
     summary = Column(Text)
-    action_items = Column(Text)  # JSON string
     key_decisions = Column(Text)  # JSON string
     blockers = Column(Text)  # JSON string
     analyzed_at = Column(DateTime)

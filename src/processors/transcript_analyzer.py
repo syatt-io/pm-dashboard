@@ -34,11 +34,12 @@ class ActionItem(BaseModel):
 
 class MeetingAnalysis(BaseModel):
     """Complete analysis of a meeting transcript."""
-    summary: str = Field(description="Executive summary of the meeting")
-    key_decisions: List[str] = Field(description="Important decisions made")
-    action_items: List[ActionItem] = Field(description="Action items identified")
-    blockers: List[str] = Field(description="Blockers or risks identified")
-    follow_ups: List[str] = Field(description="Topics requiring follow-up discussion")
+    executive_summary: str = Field(description="3-4 sentence executive summary (context, key outcome, critical next step, urgent issues)")
+    outcomes: List[str] = Field(description="What changed as a result of this meeting (decisions, direction changes, commitments, agreements)")
+    action_items: List[ActionItem] = Field(description="What we're doing next (concrete next steps)")
+    blockers_and_constraints: List[str] = Field(description="What's preventing progress (blockers, dependencies, constraints, risks)")
+    timeline_and_milestones: List[str] = Field(description="When things need to happen (deadlines, milestones, sequence)")
+    key_discussions: List[str] = Field(description="Important context and deliberation (debates, trade-offs, stakeholder perspectives)")
 
 
 @dataclass
@@ -158,11 +159,12 @@ class TranscriptAnalyzer:
             logger.error(f"Error analyzing transcript: {e}")
             # Return minimal analysis on error
             return MeetingAnalysis(
-                summary="Error analyzing meeting transcript",
-                key_decisions=[],
+                executive_summary="Error analyzing meeting transcript",
+                outcomes=[],
                 action_items=[],
-                blockers=[],
-                follow_ups=[]
+                blockers_and_constraints=[],
+                timeline_and_milestones=[],
+                key_discussions=[]
             )
 
     def extract_action_items(self, transcript: str) -> List[ActionItem]:

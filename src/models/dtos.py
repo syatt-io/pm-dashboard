@@ -17,10 +17,17 @@ class ProcessedMeetingDTO:
     date: Optional[datetime] = None
     processed_at: Optional[datetime] = None
     analyzed_at: Optional[datetime] = None
+    # New structure fields
+    executive_summary: Optional[str] = None
+    outcomes: List[str] = field(default_factory=list)
+    blockers_and_constraints: List[str] = field(default_factory=list)
+    timeline_and_milestones: List[str] = field(default_factory=list)
+    key_discussions: List[str] = field(default_factory=list)
+    action_items: List[Dict[str, Any]] = field(default_factory=list)
+    # Legacy fields for backward compatibility
     summary: Optional[str] = None
     key_decisions: List[str] = field(default_factory=list)
     blockers: List[str] = field(default_factory=list)
-    action_items: List[Dict[str, Any]] = field(default_factory=list)
     tickets_created: List[str] = field(default_factory=list)
     todos_created: List[str] = field(default_factory=list)
     success: bool = True
@@ -53,10 +60,17 @@ class ProcessedMeetingDTO:
             date=meeting.date,
             processed_at=meeting.processed_at,
             analyzed_at=meeting.analyzed_at,
+            # New structure fields (with fallback to legacy fields)
+            executive_summary=getattr(meeting, 'executive_summary', None) or meeting.summary,
+            outcomes=parse_json_field(getattr(meeting, 'outcomes', None), []) or parse_json_field(meeting.key_decisions, []),
+            blockers_and_constraints=parse_json_field(getattr(meeting, 'blockers_and_constraints', None), []) or parse_json_field(meeting.blockers, []),
+            timeline_and_milestones=parse_json_field(getattr(meeting, 'timeline_and_milestones', None), []),
+            key_discussions=parse_json_field(getattr(meeting, 'key_discussions', None), []),
+            action_items=parse_json_field(meeting.action_items, []),
+            # Legacy fields for backward compatibility
             summary=meeting.summary,
             key_decisions=parse_json_field(meeting.key_decisions, []),
             blockers=parse_json_field(meeting.blockers, []),
-            action_items=parse_json_field(meeting.action_items, []),
             tickets_created=parse_json_field(meeting.tickets_created, []),
             todos_created=parse_json_field(meeting.todos_created, []),
             success=meeting.success if hasattr(meeting, 'success') else True
@@ -70,10 +84,17 @@ class ProcessedMeetingDTO:
             'date': self.date.isoformat() if self.date else None,
             'processed_at': self.processed_at.isoformat() if self.processed_at else None,
             'analyzed_at': self.analyzed_at.isoformat() if self.analyzed_at else None,
+            # New structure fields
+            'executive_summary': self.executive_summary,
+            'outcomes': self.outcomes,
+            'blockers_and_constraints': self.blockers_and_constraints,
+            'timeline_and_milestones': self.timeline_and_milestones,
+            'key_discussions': self.key_discussions,
+            'action_items': self.action_items,
+            # Legacy fields for backward compatibility
             'summary': self.summary,
             'key_decisions': self.key_decisions,
             'blockers': self.blockers,
-            'action_items': self.action_items,
             'tickets_created': self.tickets_created,
             'todos_created': self.todos_created,
             'success': self.success

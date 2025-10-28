@@ -423,9 +423,9 @@ const AnalysisSummary = () => {
   if (!record) return null;
 
   const actionItemsCount = record.action_items?.length || 0;
-  const decisionsCount = record.key_decisions?.length || 0;
-  const blockersCount = record.blockers?.length || 0;
-  const followUpsCount = record.follow_ups?.length || 0;
+  const outcomesCount = record.outcomes?.length || 0;
+  const blockersCount = record.blockers_and_constraints?.length || 0;
+  const discussionsCount = record.key_discussions?.length || 0;
 
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -442,10 +442,10 @@ const AnalysisSummary = () => {
       <Box sx={{ flex: '1 1 auto', minWidth: 120 }}>
         <Paper sx={{ p: 2, textAlign: 'center' }}>
           <Typography variant="h4" color="success.main">
-            {decisionsCount}
+            {outcomesCount}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Decisions
+            Outcomes
           </Typography>
         </Paper>
       </Box>
@@ -455,17 +455,17 @@ const AnalysisSummary = () => {
             {blockersCount}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Blockers
+            Constraints
           </Typography>
         </Paper>
       </Box>
       <Box sx={{ flex: '1 1 auto', minWidth: 120 }}>
         <Paper sx={{ p: 2, textAlign: 'center' }}>
           <Typography variant="h4" color="info.main">
-            {followUpsCount}
+            {discussionsCount}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Follow-ups
+            Discussions
           </Typography>
         </Paper>
       </Box>
@@ -674,12 +674,12 @@ export const AnalysisList = () => {
               render={(record: any) => record.action_items?.length || 0}
             />
             <FunctionField
-              label="Decisions"
-              render={(record: any) => record.key_decisions?.length || 0}
+              label="Outcomes"
+              render={(record: any) => record.outcomes?.length || 0}
             />
             <FunctionField
-              label="Blockers"
-              render={(record: any) => record.blockers?.length || 0}
+              label="Constraints"
+              render={(record: any) => record.blockers_and_constraints?.length || 0}
             />
           </Datagrid>
         </List>
@@ -882,15 +882,15 @@ export const AnalysisShow = () => {
             </Card>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* Meeting Summary and Key Decisions Row */}
+        {/* Executive Summary and Outcomes Row */}
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box sx={{ flex: '1 1 400px' }}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  📝 Meeting Summary
+                  📝 Executive Summary
                 </Typography>
-                <TextField source="summary" label="" multiline />
+                <TextField source="executive_summary" label="" multiline />
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="subtitle2" gutterBottom>
                     Meeting Details
@@ -917,21 +917,21 @@ export const AnalysisShow = () => {
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <CheckCircle color="success" />
-                  Key Decisions
+                  Outcomes
                 </Typography>
                 <FunctionField
                   render={(record: any) => (
                     <MuiList>
-                      {record.key_decisions?.map((decision: string, index: number) => (
+                      {record.outcomes?.map((outcome: string, index: number) => (
                         <ListItem key={index}>
                           <ListItemIcon>
                             <CheckCircle color="success" />
                           </ListItemIcon>
-                          <ListItemText primary={decision} />
+                          <ListItemText primary={outcome} />
                         </ListItem>
                       )) || (
                         <Typography variant="body2" color="text.secondary">
-                          No key decisions recorded
+                          No outcomes recorded
                         </Typography>
                       )}
                     </MuiList>
@@ -958,19 +958,19 @@ export const AnalysisShow = () => {
           </CardContent>
         </Card>
 
-        {/* Blockers & Follow-ups Row */}
+        {/* Blockers & Timeline Row */}
         <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           <Box sx={{ flex: '1 1 400px' }}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Warning color="warning" />
-                  Blockers & Risks
+                  Blockers & Constraints
                 </Typography>
                 <FunctionField
                   render={(record: any) => (
                     <MuiList>
-                      {record.blockers?.map((blocker: string, index: number) => (
+                      {record.blockers_and_constraints?.map((blocker: string, index: number) => (
                         <ListItem key={index}>
                           <ListItemIcon>
                             <Warning color="warning" />
@@ -979,7 +979,7 @@ export const AnalysisShow = () => {
                         </ListItem>
                       )) || (
                         <Typography variant="body2" color="text.secondary">
-                          No blockers identified
+                          No blockers or constraints identified
                         </Typography>
                       )}
                     </MuiList>
@@ -994,21 +994,21 @@ export const AnalysisShow = () => {
               <CardContent>
                 <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <TrendingUp color="info" />
-                  Follow-up Topics
+                  Timeline & Milestones
                 </Typography>
                 <FunctionField
                   render={(record: any) => (
                     <MuiList>
-                      {record.follow_ups?.map((followUp: string, index: number) => (
+                      {record.timeline_and_milestones?.map((item: string, index: number) => (
                         <ListItem key={index}>
                           <ListItemIcon>
                             <TrendingUp color="info" />
                           </ListItemIcon>
-                          <ListItemText primary={followUp} />
+                          <ListItemText primary={item} />
                         </ListItem>
                       )) || (
                         <Typography variant="body2" color="text.secondary">
-                          No follow-up topics identified
+                          No timeline or milestones mentioned
                         </Typography>
                       )}
                     </MuiList>
@@ -1018,6 +1018,34 @@ export const AnalysisShow = () => {
             </Card>
           </Box>
         </Box>
+
+        {/* Key Discussions */}
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Assignment color="primary" />
+              Key Discussions
+            </Typography>
+            <FunctionField
+              render={(record: any) => (
+                <MuiList>
+                  {record.key_discussions?.map((discussion: string, index: number) => (
+                    <ListItem key={index}>
+                      <ListItemIcon>
+                        <CheckCircle color="primary" />
+                      </ListItemIcon>
+                      <ListItemText primary={discussion} />
+                    </ListItem>
+                  )) || (
+                    <Typography variant="body2" color="text.secondary">
+                      No key discussions recorded
+                    </Typography>
+                  )}
+                </MuiList>
+              )}
+            />
+          </CardContent>
+        </Card>
       </Box>
           </SimpleShowLayout>
         </Show>
