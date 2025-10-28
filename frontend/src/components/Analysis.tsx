@@ -70,6 +70,8 @@ const CreateJiraTicketDialog = ({
   const [selectedAssignee, setSelectedAssignee] = useState<any>(null);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedIssueType, setSelectedIssueType] = useState<string>('');
+  const [title, setTitle] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingIssueTypes, setLoadingIssueTypes] = useState(false);
@@ -80,8 +82,11 @@ const CreateJiraTicketDialog = ({
     if (open) {
       loadProjects();
       loadUsers();
+      // Initialize title and description from item
+      setTitle(item?.title || '');
+      setDescription(item?.description || '');
     }
-  }, [open]);
+  }, [open, item]);
 
   // Load issue types when project changes
   useEffect(() => {
@@ -133,6 +138,10 @@ const CreateJiraTicketDialog = ({
   };
 
   const handleSubmit = async () => {
+    if (!title.trim()) {
+      notify('Please enter a title', { type: 'warning' });
+      return;
+    }
     if (!selectedProject || !selectedIssueType) {
       notify('Please select project and issue type', { type: 'warning' });
       return;
@@ -141,8 +150,8 @@ const CreateJiraTicketDialog = ({
     setLoading(true);
     try {
       const ticketData = {
-        title: item.title,
-        description: item.description,
+        title: title,
+        description: description,
         assignee: selectedAssignee ? selectedAssignee.emailAddress || selectedAssignee.name : '',
         project: selectedProject,
         issueType: selectedIssueType,
@@ -158,7 +167,7 @@ const CreateJiraTicketDialog = ({
       });
 
       if (response.ok) {
-        notify(`Created Jira ticket for: ${item.title}`, { type: 'success' });
+        notify(`Created Jira ticket for: ${title}`, { type: 'success' });
         onSuccess();
         onClose();
       } else {
@@ -178,15 +187,16 @@ const CreateJiraTicketDialog = ({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
           <MuiTextField
             label="Title"
-            value={item?.title || ''}
-            disabled
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             fullWidth
+            required
           />
 
           <MuiTextField
             label="Description"
-            value={item?.description || ''}
-            disabled
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             multiline
             rows={3}
             fullWidth
@@ -390,88 +400,6 @@ const ActionItemsList = ({ actionItems }: { actionItems: any[] }) => {
   );
 };
 
-const CreateTicketsButton = () => {
-  const record = useRecordContext();
-  const redirect = useRedirect();
-  const notify = useNotify();
-
-  const handleCreateTickets = () => {
-    if (record?.action_items && record.action_items.length > 0) {
-      notify('Redirecting to ticket creation...', { type: 'info' });
-      // This would redirect to the ticket creation workflow
-      redirect('/review');
-    } else {
-      notify('No action items to create tickets for', { type: 'warning' });
-    }
-  };
-
-  return (
-    <AdminButton
-      onClick={handleCreateTickets}
-      label="Create Jira Tickets"
-      variant="contained"
-      color="primary"
-    >
-      <Create sx={{ mr: 1 }} />
-      Create Tickets
-    </AdminButton>
-  );
-};
-
-const AnalysisSummary = () => {
-  const record = useRecordContext();
-  if (!record) return null;
-
-  const actionItemsCount = record.action_items?.length || 0;
-  const outcomesCount = record.outcomes?.length || 0;
-  const blockersCount = record.blockers_and_constraints?.length || 0;
-  const discussionsCount = record.key_discussions?.length || 0;
-
-  return (
-    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-      <Box sx={{ flex: '1 1 auto', minWidth: 120 }}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="primary">
-            {actionItemsCount}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Action Items
-          </Typography>
-        </Paper>
-      </Box>
-      <Box sx={{ flex: '1 1 auto', minWidth: 120 }}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="success.main">
-            {outcomesCount}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Outcomes
-          </Typography>
-        </Paper>
-      </Box>
-      <Box sx={{ flex: '1 1 auto', minWidth: 120 }}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="warning.main">
-            {blockersCount}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Constraints
-          </Typography>
-        </Paper>
-      </Box>
-      <Box sx={{ flex: '1 1 auto', minWidth: 120 }}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="info.main">
-            {discussionsCount}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Discussions
-          </Typography>
-        </Paper>
-      </Box>
-    </Box>
-  );
-};
 
 const AnalysisDateRangeFilter = () => {
   const { filterValues, setFilters, refetch } = useListContext();
@@ -1019,13 +947,10 @@ export const AnalysisShow = () => {
         <Box sx={{ flex: '1 1 35%', position: 'sticky', top: 16 }}>
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Assignment color="primary" />
-                  Action Items
-                </Typography>
-                <CreateTicketsButton />
-              </Box>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Assignment color="primary" />
+                Action Items
+              </Typography>
               <FunctionField
                 render={(record: any) => <ActionItemsList actionItems={record.action_items} />}
               />
