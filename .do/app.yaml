@@ -221,7 +221,7 @@ services:
 
     build_command: pip install -r requirements.txt
 
-    run_command: celery -A src.tasks.celery_app beat --loglevel=info
+    run_command: celery -A src.tasks.celery_app beat --loglevel=debug
 
     instance_count: 1
     instance_size_slug: basic-xxs

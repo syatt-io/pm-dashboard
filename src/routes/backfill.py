@@ -464,7 +464,7 @@ def check_sync_status():
     """
     try:
         from sqlalchemy import text
-        from src.models import get_engine
+        from src.utils.database import get_engine
         from datetime import datetime
 
         logger.info("Checking vector sync status...")
