@@ -495,9 +495,15 @@ class TodoScheduler:
                     for project in project_summary:
                         status_emoji = project['emoji']
                         summary_body += f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
-                        summary_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
-                        summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
-                        summary_body += f"  • Usage: {project['percentage']:.1f}%\n"
+
+                        if project['forecasted_hours'] > 0:
+                            summary_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
+                            summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                            summary_body += f"  • Usage: {project['percentage']:.1f}%\n"
+                        else:
+                            # No forecast - just show actual hours
+                            summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                            summary_body += f"  • (No forecast set)\n"
 
                 # Only send notification if in production
                 import os
@@ -577,11 +583,14 @@ class TodoScheduler:
                         pmf.forecasted_hours,
                         pmf.actual_monthly_hours
                     FROM projects p
-                    INNER JOIN project_monthly_forecast pmf
+                    LEFT JOIN project_monthly_forecast pmf
                         ON p.key = pmf.project_key
-                    WHERE p.is_active = true
                         AND pmf.month_year = :current_month
-                        AND pmf.forecasted_hours > 0
+                    WHERE p.is_active = true
+                        AND (
+                            pmf.actual_monthly_hours > 0
+                            OR pmf.forecasted_hours > 0
+                        )
                     ORDER BY p.name
                 """), {"current_month": current_month})
 
@@ -590,16 +599,22 @@ class TodoScheduler:
                     forecasted = float(row[2]) if row[2] else 0
                     actual = float(row[3]) if row[3] else 0
 
-                    if forecasted > 0:
-                        percentage = (actual / forecasted) * 100
+                    # Show all projects with actual hours or forecasted hours
+                    if actual > 0 or forecasted > 0:
+                        if forecasted > 0:
+                            percentage = (actual / forecasted) * 100
 
-                        # Color coding based on usage
-                        if percentage >= 100:
-                            emoji = "🔴"  # Red - over budget
-                        elif percentage >= 80:
-                            emoji = "🟡"  # Yellow - close to budget
+                            # Color coding based on usage
+                            if percentage >= 100:
+                                emoji = "🔴"  # Red - over budget
+                            elif percentage >= 80:
+                                emoji = "🟡"  # Yellow - close to budget
+                            else:
+                                emoji = "🟢"  # Green - well within budget
                         else:
-                            emoji = "🟢"  # Green - well within budget
+                            # No forecast, just show actual hours
+                            percentage = 0
+                            emoji = "⚪"  # White - no forecast
 
                         projects.append({
                             'key': row[0],
