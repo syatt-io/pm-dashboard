@@ -1,6 +1,6 @@
 """Meeting management and analysis API endpoints."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from datetime import datetime
 import logging
 import asyncio
