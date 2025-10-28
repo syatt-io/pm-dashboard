@@ -717,10 +717,17 @@ def analyze_meeting_api(user, meeting_id):
                     title=transcript['title'],
                     date=meeting_date,
                     analyzed_at=analyzed_at,
-                    summary=analysis.summary,
-                    key_decisions=json.dumps(analysis.key_decisions or []),
-                    blockers=json.dumps(analysis.blockers or []),
-                    action_items=json.dumps(action_items_data)  # Always serialize
+                    # New structure fields
+                    executive_summary=analysis.executive_summary,
+                    outcomes=json.dumps(analysis.outcomes or []),
+                    blockers_and_constraints=json.dumps(analysis.blockers_and_constraints or []),
+                    timeline_and_milestones=json.dumps(analysis.timeline_and_milestones or []),
+                    key_discussions=json.dumps(analysis.key_discussions or []),
+                    action_items=json.dumps(action_items_data),  # Always serialize
+                    # Legacy fields for backward compatibility
+                    summary=analysis.executive_summary,
+                    key_decisions=json.dumps(analysis.outcomes or []),
+                    blockers=json.dumps(analysis.blockers_and_constraints or [])
                 )
                 db_session.add(processed_meeting)
                 logger.info(f"Created new processed meeting record for {meeting_id}")
