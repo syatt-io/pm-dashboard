@@ -881,171 +881,167 @@ export const AnalysisShow = () => {
               </CardContent>
             </Card>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* Executive Summary and Outcomes Row */}
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          <Box sx={{ flex: '1 1 400px' }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  📝 Executive Summary
-                </Typography>
-                <TextField source="executive_summary" label="" multiline />
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Meeting Details
-                  </Typography>
-                  <TextField source="meeting_title" label="Title" />
-                  <DateField
-                    source="analyzed_at"
-                    label="Analyzed At"
-                    options={{
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }}
-                  />
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-
-          <Box sx={{ flex: '1 1 400px' }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CheckCircle color="success" />
-                  Outcomes
-                </Typography>
-                <FunctionField
-                  render={(record: any) => (
-                    <MuiList>
-                      {record.outcomes?.map((outcome: string, index: number) => (
-                        <ListItem key={index}>
-                          <ListItemIcon>
-                            <CheckCircle color="success" />
-                          </ListItemIcon>
-                          <ListItemText primary={outcome} />
-                        </ListItem>
-                      )) || (
-                        <Typography variant="body2" color="text.secondary">
-                          No outcomes recorded
-                        </Typography>
-                      )}
-                    </MuiList>
-                  )}
-                />
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-
-        {/* Action Items */}
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Assignment color="primary" />
-                Action Items
+      {/* Two-Column Layout: Analysis (left) and Action Items (right) */}
+      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
+        {/* Left Column: All Analysis Content */}
+        <Box sx={{ flex: '1 1 65%', display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Executive Summary */}
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                📝 Executive Summary
               </Typography>
-              <CreateTicketsButton />
-            </Box>
-            <FunctionField
-              render={(record: any) => <ActionItemsList actionItems={record.action_items} />}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Blockers & Timeline Row */}
-        <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-          <Box sx={{ flex: '1 1 400px' }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Warning color="warning" />
-                  Blockers & Constraints
+              <TextField source="executive_summary" label="" multiline />
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  Meeting Details
                 </Typography>
-                <FunctionField
-                  render={(record: any) => (
-                    <MuiList>
-                      {record.blockers_and_constraints?.map((blocker: string, index: number) => (
-                        <ListItem key={index}>
-                          <ListItemIcon>
-                            <Warning color="warning" />
-                          </ListItemIcon>
-                          <ListItemText primary={blocker} />
-                        </ListItem>
-                      )) || (
-                        <Typography variant="body2" color="text.secondary">
-                          No blockers or constraints identified
-                        </Typography>
-                      )}
-                    </MuiList>
-                  )}
+                <TextField source="meeting_title" label="Title" />
+                <DateField
+                  source="analyzed_at"
+                  label="Analyzed At"
+                  options={{
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }}
                 />
-              </CardContent>
-            </Card>
-          </Box>
+              </Box>
+            </CardContent>
+          </Card>
 
-          <Box sx={{ flex: '1 1 400px' }}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <TrendingUp color="info" />
-                  Timeline & Milestones
-                </Typography>
-                <FunctionField
-                  render={(record: any) => (
-                    <MuiList>
-                      {record.timeline_and_milestones?.map((item: string, index: number) => (
-                        <ListItem key={index}>
-                          <ListItemIcon>
-                            <TrendingUp color="info" />
-                          </ListItemIcon>
-                          <ListItemText primary={item} />
-                        </ListItem>
-                      )) || (
-                        <Typography variant="body2" color="text.secondary">
-                          No timeline or milestones mentioned
-                        </Typography>
-                      )}
-                    </MuiList>
-                  )}
-                />
-              </CardContent>
-            </Card>
-          </Box>
+          {/* Outcomes */}
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CheckCircle color="success" />
+                Outcomes
+              </Typography>
+              <FunctionField
+                render={(record: any) => (
+                  <MuiList dense>
+                    {record.outcomes?.map((outcome: string, index: number) => (
+                      <ListItem key={index}>
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <CheckCircle color="success" />
+                        </ListItemIcon>
+                        <ListItemText primary={outcome} />
+                      </ListItem>
+                    )) || (
+                      <Typography variant="body2" color="text.secondary">
+                        No outcomes recorded
+                      </Typography>
+                    )}
+                  </MuiList>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Blockers & Constraints */}
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Warning color="warning" />
+                Blockers & Constraints
+              </Typography>
+              <FunctionField
+                render={(record: any) => (
+                  <MuiList dense>
+                    {record.blockers_and_constraints?.map((blocker: string, index: number) => (
+                      <ListItem key={index}>
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <Warning color="warning" />
+                        </ListItemIcon>
+                        <ListItemText primary={blocker} />
+                      </ListItem>
+                    )) || (
+                      <Typography variant="body2" color="text.secondary">
+                        No blockers or constraints identified
+                      </Typography>
+                    )}
+                  </MuiList>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Timeline & Milestones */}
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <TrendingUp color="info" />
+                Timeline & Milestones
+              </Typography>
+              <FunctionField
+                render={(record: any) => (
+                  <MuiList dense>
+                    {record.timeline_and_milestones?.map((item: string, index: number) => (
+                      <ListItem key={index}>
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <TrendingUp color="info" />
+                        </ListItemIcon>
+                        <ListItemText primary={item} />
+                      </ListItem>
+                    )) || (
+                      <Typography variant="body2" color="text.secondary">
+                        No timeline or milestones mentioned
+                      </Typography>
+                    )}
+                  </MuiList>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Key Discussions */}
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Assignment color="primary" />
+                Key Discussions
+              </Typography>
+              <FunctionField
+                render={(record: any) => (
+                  <MuiList dense>
+                    {record.key_discussions?.map((discussion: string, index: number) => (
+                      <ListItem key={index}>
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <CheckCircle color="primary" />
+                        </ListItemIcon>
+                        <ListItemText primary={discussion} />
+                      </ListItem>
+                    )) || (
+                      <Typography variant="body2" color="text.secondary">
+                        No key discussions recorded
+                      </Typography>
+                    )}
+                  </MuiList>
+                )}
+              />
+            </CardContent>
+          </Card>
         </Box>
 
-        {/* Key Discussions */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Assignment color="primary" />
-              Key Discussions
-            </Typography>
-            <FunctionField
-              render={(record: any) => (
-                <MuiList>
-                  {record.key_discussions?.map((discussion: string, index: number) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        <CheckCircle color="primary" />
-                      </ListItemIcon>
-                      <ListItemText primary={discussion} />
-                    </ListItem>
-                  )) || (
-                    <Typography variant="body2" color="text.secondary">
-                      No key discussions recorded
-                    </Typography>
-                  )}
-                </MuiList>
-              )}
-            />
-          </CardContent>
-        </Card>
+        {/* Right Column: Action Items */}
+        <Box sx={{ flex: '1 1 35%', position: 'sticky', top: 16 }}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Assignment color="primary" />
+                  Action Items
+                </Typography>
+                <CreateTicketsButton />
+              </Box>
+              <FunctionField
+                render={(record: any) => <ActionItemsList actionItems={record.action_items} />}
+              />
+            </CardContent>
+          </Card>
+        </Box>
       </Box>
           </SimpleShowLayout>
         </Show>
