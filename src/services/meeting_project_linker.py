@@ -130,7 +130,7 @@ class MeetingProjectLinker:
                 "meeting_title": transcript.title,
                 "meeting_date": transcript.date.isoformat(),
                 "relevant_projects": project_relevance,
-                "analysis_summary": analysis.summary,
+                "analysis_summary": analysis.executive_summary,
                 "action_items_count": len(analysis.action_items),
                 "suggested_projects": self._get_top_suggestions(project_relevance, 3)
             }
@@ -466,7 +466,7 @@ class MeetingProjectLinker:
                     recent_discussions.append({
                         "meeting_title": transcript.title,
                         "meeting_date": transcript.date.strftime("%Y-%m-%d"),
-                        "summary": analysis.summary[:200] + "..." if len(analysis.summary) > 200 else analysis.summary,
+                        "summary": analysis.executive_summary[:200] + "..." if len(analysis.executive_summary) > 200 else analysis.executive_summary,
                         "relevance_score": meeting["relevance_score"]
                     })
 

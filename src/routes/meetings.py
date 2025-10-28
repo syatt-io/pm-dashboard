@@ -701,10 +701,17 @@ def analyze_meeting_api(user, meeting_id):
             if existing_meeting:
                 # Update existing record - Always serialize to JSON, even empty lists
                 existing_meeting.analyzed_at = analyzed_at
-                existing_meeting.summary = analysis.summary
-                existing_meeting.key_decisions = json.dumps(analysis.key_decisions or [])
-                existing_meeting.blockers = json.dumps(analysis.blockers or [])
+                # New structure fields
+                existing_meeting.executive_summary = analysis.executive_summary
+                existing_meeting.outcomes = json.dumps(analysis.outcomes or [])
+                existing_meeting.blockers_and_constraints = json.dumps(analysis.blockers_and_constraints or [])
+                existing_meeting.timeline_and_milestones = json.dumps(analysis.timeline_and_milestones or [])
+                existing_meeting.key_discussions = json.dumps(analysis.key_discussions or [])
                 existing_meeting.action_items = json.dumps(action_items_data)  # Always serialize
+                # Legacy fields for backward compatibility
+                existing_meeting.summary = analysis.executive_summary
+                existing_meeting.key_decisions = json.dumps(analysis.outcomes or [])
+                existing_meeting.blockers = json.dumps(analysis.blockers_and_constraints or [])
                 existing_meeting.title = transcript['title']
                 existing_meeting.date = meeting_date
                 logger.info(f"Updated existing processed meeting record for {meeting_id}")

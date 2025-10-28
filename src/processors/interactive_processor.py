@@ -69,22 +69,34 @@ class InteractiveProcessor:
             title="Meeting Analysis"
         ))
 
-        # Summary
-        if analysis.summary:
-            self.console.print("\n[bold]Summary:[/bold]")
-            self.console.print(Markdown(analysis.summary))
+        # Executive Summary
+        if analysis.executive_summary:
+            self.console.print("\n[bold]Executive Summary:[/bold]")
+            self.console.print(Markdown(analysis.executive_summary))
 
-        # Key Decisions
-        if analysis.key_decisions:
-            self.console.print("\n[bold]Key Decisions:[/bold]")
-            for decision in analysis.key_decisions:
-                self.console.print(f"  • {decision}")
+        # Outcomes
+        if analysis.outcomes:
+            self.console.print("\n[bold]Outcomes:[/bold]")
+            for outcome in analysis.outcomes:
+                self.console.print(f"  • {outcome}")
 
-        # Blockers
-        if analysis.blockers:
-            self.console.print("\n[bold red]Blockers Identified:[/bold red]")
-            for blocker in analysis.blockers:
+        # Blockers & Constraints
+        if analysis.blockers_and_constraints:
+            self.console.print("\n[bold red]Blockers & Constraints:[/bold red]")
+            for blocker in analysis.blockers_and_constraints:
                 self.console.print(f"  ⚠️  {blocker}")
+
+        # Timeline & Milestones
+        if analysis.timeline_and_milestones:
+            self.console.print("\n[bold]Timeline & Milestones:[/bold]")
+            for milestone in analysis.timeline_and_milestones:
+                self.console.print(f"  📅 {milestone}")
+
+        # Key Discussions
+        if analysis.key_discussions:
+            self.console.print("\n[bold]Key Discussions:[/bold]")
+            for discussion in analysis.key_discussions:
+                self.console.print(f"  💬 {discussion}")
 
         self.console.print("\n" + "="*60 + "\n")
 

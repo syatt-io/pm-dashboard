@@ -48,9 +48,12 @@ def create_auth_blueprint(db_session_factory, limiter=None):
 
             # Check if user has access
             if not user.can_access():
+                logger.info(f"User {user.email} authenticated but pending admin approval (role: {user.role.value if user.role else 'unknown'})")
                 return jsonify({
-                    'error': 'Access denied. Please contact an administrator for access.',
-                    'status': 'no_access'
+                    'message': 'Account Created - Pending Approval',
+                    'error': 'Your account has been created successfully! An administrator needs to approve your access before you can use the app. Please contact an admin or wait for approval.',
+                    'status': 'pending_approval',
+                    'user_email': user.email
                 }), 403
 
             # Generate JWT token

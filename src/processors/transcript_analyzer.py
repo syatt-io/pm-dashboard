@@ -286,9 +286,9 @@ class TranscriptAnalyzer:
         score = 0.5  # Base score
 
         # Increase score based on completeness
-        if analysis.summary and len(analysis.summary) > 50:
+        if analysis.executive_summary and len(analysis.executive_summary) > 50:
             score += 0.1
-        if analysis.key_decisions:
+        if analysis.outcomes:
             score += 0.1
         if analysis.action_items:
             score += 0.2
