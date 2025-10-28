@@ -513,7 +513,14 @@ def check_sync_status():
                 last_sync = row[1]
 
                 if last_sync:
-                    age = datetime.now() - last_sync
+                    # Ensure last_sync is a datetime object (handle string from DB)
+                    if isinstance(last_sync, str):
+                        from dateutil import parser
+                        last_sync = parser.parse(last_sync)
+
+                    # Make both timezone-naive for comparison
+                    last_sync_naive = last_sync.replace(tzinfo=None) if last_sync.tzinfo else last_sync
+                    age = datetime.now() - last_sync_naive
                     days_old = age.days
                     hours_old = age.seconds // 3600
                     minutes_old = (age.seconds % 3600) // 60
