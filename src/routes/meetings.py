@@ -604,6 +604,13 @@ def get_meeting_detail(user, meeting_id):
             'confidence': 0,
             'analyzed_at': None,
             'action_items': [],
+            # New structure fields
+            'executive_summary': None,
+            'outcomes': [],
+            'blockers_and_constraints': [],
+            'timeline_and_milestones': [],
+            'key_discussions': [],
+            # Legacy fields
             'key_decisions': [],
             'blockers': [],
             'follow_ups': [],
@@ -618,6 +625,13 @@ def get_meeting_detail(user, meeting_id):
                 'confidence': 0,  # Not stored in DTO currently
                 'analyzed_at': cached_dto.analyzed_at.isoformat() if cached_dto.analyzed_at else None,
                 'action_items': cached_dto.action_items or [],
+                # New structure fields
+                'executive_summary': cached_dto.executive_summary,
+                'outcomes': cached_dto.outcomes or [],
+                'blockers_and_constraints': cached_dto.blockers_and_constraints or [],
+                'timeline_and_milestones': cached_dto.timeline_and_milestones or [],
+                'key_discussions': cached_dto.key_discussions or [],
+                # Legacy fields for backward compatibility
                 'key_decisions': cached_dto.key_decisions or [],
                 'blockers': cached_dto.blockers or [],
                 'follow_ups': [],  # Not stored in DTO currently
