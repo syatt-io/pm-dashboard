@@ -97,26 +97,48 @@ const CreateJiraTicketDialog = ({
 
   const loadUsers = async () => {
     try {
+      console.log('[DEBUG] Loading users from:', `${API_BASE_URL}/api/jira/users`);
       const response = await fetch(`${API_BASE_URL}/api/jira/users`);
-      const data = await response.json();
-      if (data.success) {
-        setAssignees(data.users || []);
+      console.log('[DEBUG] Users response status:', response.status);
+
+      if (!response.ok) {
+        console.error('[ERROR] Users API failed:', response.status, response.statusText);
+        return;
       }
+
+      const data = await response.json();
+      console.log('[DEBUG] Users data received:', data);
+
+      // Handle both response formats: {success: true, data: {users: []}} and {data: {users: []}}
+      const users = data.success ? (data.users || data.data?.users || []) : (data.data?.users || []);
+      console.log('[DEBUG] Setting assignees:', users.length, 'users');
+      setAssignees(users);
     } catch (error) {
-      // Failed to load users - will be handled by UI
+      console.error('[ERROR] Failed to load users:', error);
     }
   };
 
   const loadProjects = async () => {
     setLoadingProjects(true);
     try {
+      console.log('[DEBUG] Loading projects from:', `${API_BASE_URL}/api/jira/projects`);
       const response = await fetch(`${API_BASE_URL}/api/jira/projects`);
-      const data = await response.json();
-      if (data.success) {
-        setProjects(data.projects || []);
+      console.log('[DEBUG] Projects response status:', response.status);
+
+      if (!response.ok) {
+        console.error('[ERROR] Projects API failed:', response.status, response.statusText);
+        return;
       }
+
+      const data = await response.json();
+      console.log('[DEBUG] Projects data received:', data);
+
+      // Handle both response formats: {success: true, data: {projects: []}} and {data: {projects: []}}
+      const projects = data.success ? (data.projects || data.data?.projects || []) : (data.data?.projects || []);
+      console.log('[DEBUG] Setting projects:', projects.length, 'projects');
+      setProjects(projects);
     } catch (error) {
-      // Failed to load projects - will be handled by UI
+      console.error('[ERROR] Failed to load projects:', error);
     } finally {
       setLoadingProjects(false);
     }
@@ -125,13 +147,26 @@ const CreateJiraTicketDialog = ({
   const loadIssueTypes = async (projectKey: string) => {
     setLoadingIssueTypes(true);
     try {
+      console.log('[DEBUG] Loading issue types for project:', projectKey);
       const response = await fetch(`${API_BASE_URL}/api/jira/issue-types?project=${projectKey}`);
-      const data = await response.json();
-      if (data.success) {
-        setIssueTypes(data.issue_types || data.issueTypes || []);
+      console.log('[DEBUG] Issue types response status:', response.status);
+
+      if (!response.ok) {
+        console.error('[ERROR] Issue types API failed:', response.status, response.statusText);
+        return;
       }
+
+      const data = await response.json();
+      console.log('[DEBUG] Issue types data received:', data);
+
+      // Handle both response formats: {success: true, data: {issue_types: []}} and {data: {issue_types: []}}
+      const types = data.success
+        ? (data.issue_types || data.issueTypes || data.data?.issue_types || data.data?.issueTypes || [])
+        : (data.data?.issue_types || data.data?.issueTypes || []);
+      console.log('[DEBUG] Setting issue types:', types.length, 'types');
+      setIssueTypes(types);
     } catch (error) {
-      // Failed to load issue types - will be handled by UI
+      console.error('[ERROR] Failed to load issue types:', error);
     } finally {
       setLoadingIssueTypes(false);
     }
