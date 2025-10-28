@@ -453,6 +453,111 @@ def trigger_tempo_sync_notification():
         }), 500
 
 
+@backfill_bp.route('/sync-status', methods=['GET'])
+@admin_or_api_key_required
+def check_sync_status():
+    """
+    Check the last sync timestamp for all vector data sources.
+
+    Returns:
+        JSON with last sync timestamps and staleness warnings
+    """
+    try:
+        from sqlalchemy import text
+        from src.models import get_engine
+        from datetime import datetime
+
+        logger.info("Checking vector sync status...")
+
+        engine = get_engine()
+        with engine.connect() as conn:
+            # Check if table exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'vector_sync_status'
+                )
+            """))
+            table_exists = result.fetchone()[0]
+
+            if not table_exists:
+                return jsonify({
+                    "success": False,
+                    "error": "vector_sync_status table does not exist",
+                    "note": "Vector ingestion may not be configured or migration hasn't run"
+                }), 500
+
+            # Query sync status
+            result = conn.execute(text("""
+                SELECT source, last_sync
+                FROM vector_sync_status
+                ORDER BY last_sync DESC NULLS LAST
+            """))
+
+            rows = result.fetchall()
+
+            if not rows:
+                return jsonify({
+                    "success": True,
+                    "warning": "No sync records found",
+                    "note": "Vector ingestion tasks have never successfully completed",
+                    "sources": []
+                }), 200
+
+            # Process results
+            sources = []
+            stale_count = 0
+
+            for row in rows:
+                source = row[0]
+                last_sync = row[1]
+
+                if last_sync:
+                    age = datetime.now() - last_sync
+                    days_old = age.days
+                    hours_old = age.seconds // 3600
+                    minutes_old = (age.seconds % 3600) // 60
+
+                    is_stale = days_old >= 1
+
+                    sources.append({
+                        "source": source,
+                        "last_sync": last_sync.isoformat(),
+                        "age_days": days_old,
+                        "age_hours": hours_old,
+                        "age_minutes": minutes_old,
+                        "is_stale": is_stale
+                    })
+
+                    if is_stale:
+                        stale_count += 1
+                else:
+                    sources.append({
+                        "source": source,
+                        "last_sync": None,
+                        "age_days": None,
+                        "age_hours": None,
+                        "age_minutes": None,
+                        "is_stale": True
+                    })
+                    stale_count += 1
+
+            return jsonify({
+                "success": True,
+                "sources": sources,
+                "stale_count": stale_count,
+                "total_sources": len(sources),
+                "all_fresh": stale_count == 0
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error checking sync status: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @backfill_bp.route('/jira/check-projects', methods=['GET'])
 @admin_or_api_key_required
 def check_jira_projects():
