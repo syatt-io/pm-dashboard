@@ -94,7 +94,15 @@ meeting_analysis:
     Transcript:
     {transcript}
 
-    Please analyze this meeting transcript and extract structured information.
+    Please analyze this meeting transcript and extract ALL of the following:
+    1. Executive Summary (always provide - even if meeting was light, summarize what was discussed)
+    2. Outcomes (decisions, commitments, agreements - if none explicit, note key takeaways or implied outcomes)
+    3. Action Items (specific tasks with owners and deadlines)
+    4. Blockers and Constraints (any obstacles, dependencies, or concerns raised - if none, can be empty)
+    5. Timeline and Milestones (deadlines, dates, sequencing - if none explicit, can be empty)
+    6. Key Discussions (important topics, debates, context - always provide to capture the meeting's purpose)
+
+    IMPORTANT: Always provide content for Executive Summary, Outcomes, and Key Discussions even if the meeting seems light on concrete decisions. Extract the value and context from what WAS discussed.
 
   # Prompt for extracting just action items
   action_items_prompt: |
