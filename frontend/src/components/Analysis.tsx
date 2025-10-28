@@ -871,16 +871,6 @@ export const AnalysisShow = () => {
             {/* Analysis Status Banner */}
             <FunctionField render={() => <AnalysisStatusBanner />} />
 
-            {/* Summary Metrics */}
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Analysis Overview
-                </Typography>
-                <FunctionField render={() => <AnalysisSummary />} />
-              </CardContent>
-            </Card>
-
       {/* Two-Column Layout: Analysis (left) and Action Items (right) */}
       <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start' }}>
         {/* Left Column: All Analysis Content */}
