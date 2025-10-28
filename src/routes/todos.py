@@ -1,6 +1,6 @@
 """TODO management API endpoints."""
 
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request
 from datetime import datetime
 import logging
 import uuid
@@ -39,52 +39,6 @@ def error_response(error, status_code=500, details=None):
     return jsonify(response), status_code
 
 
-# =============================================================================
-# Page Routes
-# =============================================================================
-
-@todos_bp.route('/todos')
-def todo_dashboard():
-    """Display TODO dashboard with active TODOs."""
-    try:
-        # Get summary and categorized TODOs
-        summary = todo_manager.get_todo_summary()
-        overdue_todos = todo_manager.get_overdue_todos()
-        active_todos = todo_manager.get_active_todos()
-
-        breadcrumbs = [
-            {'title': 'Home', 'url': '/'},
-            {'title': 'TODO Dashboard', 'url': '/todos'}
-        ]
-
-        return render_template('todos.html',
-                             summary=summary,
-                             overdue_todos=overdue_todos,
-                             active_todos=active_todos,
-                             breadcrumbs=breadcrumbs)
-
-    except Exception as e:
-        return render_template('error.html', error=f"TODO Dashboard Error: {str(e)}")
-
-
-@todos_bp.route('/todos/edit/<todo_id>')
-def edit_todo_page(todo_id):
-    """Show edit page for a TODO item."""
-    try:
-        todo = todo_manager.session.query(TodoItem).filter_by(id=todo_id).first()
-        if not todo:
-            return render_template('error.html', error="TODO not found")
-
-        breadcrumbs = [
-            {'title': 'Home', 'url': '/'},
-            {'title': 'TODO Dashboard', 'url': '/todos'},
-            {'title': f'Edit: {todo.title[:30]}...', 'url': '#'}
-        ]
-
-        return render_template('edit_todo.html', todo=todo, breadcrumbs=breadcrumbs)
-
-    except Exception as e:
-        return render_template('error.html', error=f"Edit TODO Error: {str(e)}")
 
 
 # =============================================================================
