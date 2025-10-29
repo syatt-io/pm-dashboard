@@ -223,9 +223,13 @@ digest_generation:
 
     2. **achievements**: What shipped or was completed this week that clients care about.
        - **MUST use markdown bullet list format** - each item on new line starting with "* "
+       - **CRITICAL CONSTRAINT**: ONLY reference ticket keys from the "WORK COMPLETED (Jira)" section provided above
+       - **DO NOT invent, hallucinate, or fabricate any ticket numbers** - every ticket key MUST exist in the data provided
+       - **Every ticket MUST match the {project_key} prefix** - do not reference tickets from other projects
+       - If referencing a Jira ticket, verify it appears in completed_tickets or time_summary sections
        - Include: Completed features/tickets (outcomes, not just ticket numbers), merged PRs, user-facing improvements
        - Each point should explain what was done AND why it matters
-       - Example format:
+       - Example format (note: only use if actual SUBS tickets are in the provided data):
          ```
          * SUBS-608: Fixed mobile banner navigation - users can now swipe through hero images on mobile
          * Deployed new export feature - clients can download reports as CSV or PDF
@@ -234,6 +238,9 @@ digest_generation:
 
     3. **active_work**: What's in progress and what's planned for next week.
        - **MUST use markdown bullet list format** - each item on new line starting with "* "
+       - **CRITICAL CONSTRAINT**: ONLY reference tickets from the "ACTIVE WORK (Jira)" and "GITHUB ACTIVITY" sections provided above
+       - **DO NOT invent or hallucinate ticket numbers** - verify all ticket keys match {project_key} prefix
+       - If a ticket is mentioned, it MUST appear in the time_summary, in_review_prs, or open_prs data
        - Include: Current work status (tickets, PRs in review), expected deliverables, work ready for review
        - Example format:
          ```

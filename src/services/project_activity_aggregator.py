@@ -1124,10 +1124,16 @@ class ProjectActivityAggregator:
             # Use the LLM directly instead of the non-existent generate_insights method
             from langchain_core.messages import HumanMessage, SystemMessage
 
-            # Get system message from configuration
+            # Get system message from configuration with project-specific context
+            default_system_message = (
+                f"You are a project management assistant generating a Weekly Recap for the {activity.project_key} project. "
+                f"CRITICAL: You must ONLY reference Jira tickets that start with '{activity.project_key}-'. "
+                f"DO NOT reference or invent tickets from other projects (e.g., SUBS-, SATG-, KBNT-, etc. unless that IS the project key). "
+                f"Generate concise, accurate insights using ONLY the data provided in the prompt."
+            )
             system_message = self.prompt_manager.get_prompt(
                 'digest_generation', 'system_message',
-                default="You are a project management assistant. Generate concise, client-ready insights from project activity data."
+                default=default_system_message
             )
 
             messages = [
@@ -1163,13 +1169,52 @@ class ProjectActivityAggregator:
 
                     parsed_insights = json.loads(insights_clean)
 
-                    # Store new 6-section Weekly Recap format
-                    activity.executive_summary = parsed_insights.get('executive_summary', '')
-                    activity.achievements = parsed_insights.get('achievements', '')
-                    activity.active_work = parsed_insights.get('active_work', '')
-                    activity.blockers_and_asks = parsed_insights.get('blockers_and_asks', '')
-                    activity.proposed_agenda = parsed_insights.get('proposed_agenda', '')
-                    activity.progress_notes = parsed_insights.get('progress_notes', '')
+                    # Validate ticket references to prevent AI hallucination
+                    import re
+                    def validate_tickets_for_project(text: str, project_key: str) -> str:
+                        """Find all ticket references and check they match the project."""
+                        if not text:
+                            return text
+
+                        # Find all ticket patterns (e.g., SUBS-123, SATG-456)
+                        ticket_pattern = r'\b([A-Z]+-\d+)\b'
+                        matches = re.findall(ticket_pattern, text)
+
+                        if not matches:
+                            return text
+
+                        wrong_project_tickets = [t for t in matches if not t.startswith(f"{project_key}-")]
+
+                        if wrong_project_tickets:
+                            logger.error(f"🚨 AI HALLUCINATION DETECTED: Found tickets from wrong projects: {wrong_project_tickets}")
+                            logger.error(f"   Expected project: {project_key}")
+                            logger.error(f"   Full text: {text[:200]}...")
+                            # Remove wrong tickets from text
+                            for wrong_ticket in wrong_project_tickets:
+                                text = text.replace(wrong_ticket + ":", "[INVALID-TICKET]:")
+                                text = text.replace(wrong_ticket, "[INVALID-TICKET]")
+
+                        return text
+
+                    # Store new 6-section Weekly Recap format with validation
+                    activity.executive_summary = validate_tickets_for_project(
+                        parsed_insights.get('executive_summary', ''), activity.project_key
+                    )
+                    activity.achievements = validate_tickets_for_project(
+                        parsed_insights.get('achievements', ''), activity.project_key
+                    )
+                    activity.active_work = validate_tickets_for_project(
+                        parsed_insights.get('active_work', ''), activity.project_key
+                    )
+                    activity.blockers_and_asks = validate_tickets_for_project(
+                        parsed_insights.get('blockers_and_asks', ''), activity.project_key
+                    )
+                    activity.proposed_agenda = validate_tickets_for_project(
+                        parsed_insights.get('proposed_agenda', ''), activity.project_key
+                    )
+                    activity.progress_notes = validate_tickets_for_project(
+                        parsed_insights.get('progress_notes', ''), activity.project_key
+                    )
 
                     # Also populate legacy format for backward compatibility
                     activity.noteworthy_discussions = activity.executive_summary
