@@ -93,7 +93,8 @@ class VectorSearchService:
         days_back: int = 90,
         sources: Optional[List[str]] = None,
         user_email: Optional[str] = None,
-        project_key: Optional[str] = None
+        project_key: Optional[str] = None,
+        epic_key: Optional[str] = None
     ) -> List[SearchResult]:
         """Perform hybrid vector + metadata search.
 
@@ -104,6 +105,7 @@ class VectorSearchService:
             sources: Filter by sources (slack, fireflies, jira)
             user_email: User email for Fireflies permission filtering
             project_key: Filter by project key (e.g., 'SUBS', 'BC')
+            epic_key: Filter by epic key (e.g., 'SUBS-617') for Jira tickets
 
         Returns:
             List of SearchResult objects
@@ -119,7 +121,7 @@ class VectorSearchService:
             return []
 
         # Build metadata filter
-        filter_conditions = self._build_filter(days_back, sources, user_email, project_key)
+        filter_conditions = self._build_filter(days_back, sources, user_email, project_key, epic_key)
 
         # Debug: Log the actual Pinecone filter being applied
         logger.info(f"🔍 Pinecone filter conditions: {filter_conditions}")
@@ -232,7 +234,8 @@ class VectorSearchService:
         days_back: int,
         sources: Optional[List[str]] = None,
         user_email: Optional[str] = None,
-        project_key: Optional[str] = None
+        project_key: Optional[str] = None,
+        epic_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """Build Pinecone metadata filter.
 
@@ -241,6 +244,7 @@ class VectorSearchService:
             sources: Filter by sources
             user_email: User email for Fireflies permissions
             project_key: Filter by project key (Jira only)
+            epic_key: Filter by epic key (Jira only, e.g., 'SUBS-617')
 
         Returns:
             Pinecone filter dict
@@ -268,6 +272,16 @@ class VectorSearchService:
                 logger.warning(f"⚠️  Could not find project '{project_key}' - returning no results")
                 # Return a filter that matches nothing
                 conditions.append({"project_key": "__NONEXISTENT__"})
+
+        # Epic filter - for Jira tickets belonging to a specific epic
+        if epic_key:
+            logger.info(f"🎯 Applying epic filter: epic_key={epic_key}")
+            conditions.append({
+                "$or": [
+                    {"epic_key": epic_key},  # Child tickets of the epic
+                    {"issue_key": epic_key}  # The epic itself
+                ]
+            })
 
         # Source filter
         if sources:

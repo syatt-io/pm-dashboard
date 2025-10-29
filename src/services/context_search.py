@@ -702,6 +702,16 @@ class ContextSearchService:
         else:
             self.logger.warning(f"⚠️  NO user_id provided - Fireflies will only show PUBLIC meetings")
 
+        # Detect if query is asking for tickets in a specific epic
+        # Patterns: "tickets in EPIC-123", "belong to EPIC-123", "part of EPIC-123 epic"
+        import re
+        epic_key_filter = None
+        epic_pattern = r'(?:in|belong(?:s|ing)?\s+to|part\s+of|under|from)\s+(?:the\s+)?([A-Z]+-\d+)(?:\s+epic)?'
+        match = re.search(epic_pattern, query, re.IGNORECASE)
+        if match:
+            epic_key_filter = match.group(1).upper()
+            self.logger.info(f"🎯 Detected epic query - filtering by epic_key={epic_key_filter}")
+
         # Initialize vector search service
         vector_search = VectorSearchService()
 
@@ -722,7 +732,8 @@ class ContextSearchService:
             top_k=50,  # Retrieve top 50 most relevant documents
             sources=sources,
             user_email=user_email,  # For Fireflies access filtering
-            project_key=project  # Filter by project key
+            project_key=project,  # Filter by project key
+            epic_key=epic_key_filter  # Filter by epic key if detected
         )
 
         self.logger.info(f"✅ Vector search returned {len(all_results)} results")

@@ -275,6 +275,7 @@ class VectorIngestService:
 
                 # Check for parent/epic information to enrich child tickets
                 parent_info = ""
+                parent_key = None
                 parent = fields.get('parent')
                 if parent:
                     # This is a sub-task with a parent issue
@@ -287,6 +288,7 @@ class VectorIngestService:
 
                 # Also check for epic link (can be in various fields depending on Jira config)
                 epic_info = ""
+                epic_key = None
                 # Try the newer 'epic' field first
                 epic = fields.get('epic')
                 if epic and isinstance(epic, dict):
@@ -317,26 +319,37 @@ class VectorIngestService:
                 issue_date = datetime.fromisoformat(updated.replace('Z', '+00:00')) if updated else datetime.now()
 
                 # Create document with safe None checks
+                # Build metadata dict with optional parent/epic fields
+                metadata = {
+                    'issue_key': issue_key,
+                    'project_key': project_key,
+                    'issue_type': (fields.get('issuetype') or {}).get('name', 'Unknown'),
+                    'status': (fields.get('status') or {}).get('name', 'Unknown'),
+                    'priority': (fields.get('priority') or {}).get('name', 'Medium'),
+                    'assignee': (fields.get('assignee') or {}).get('displayName', 'Unassigned'),
+                    'reporter': (fields.get('reporter') or {}).get('displayName', 'Unknown'),
+                    'timestamp': issue_date.isoformat(),
+                    'timestamp_epoch': int(issue_date.timestamp()),  # Numeric for filtering
+                    'date': issue_date.strftime('%Y-%m-%d'),
+                    'url': f"{self.settings.jira.url}/browse/{issue_key}",
+                    # No access control needed - all users can see all Jira content
+                    'access_type': 'all'
+                }
+
+                # Add parent_key if exists (for subtasks)
+                if parent_key:
+                    metadata['parent_key'] = parent_key
+
+                # Add epic_key if exists (for epic children)
+                if epic_key:
+                    metadata['epic_key'] = epic_key
+
                 doc = VectorDocument(
                     id=doc_id,
                     source='jira',
                     title=f"{issue_key}: {summary}",
                     content=content,
-                    metadata={
-                        'issue_key': issue_key,
-                        'project_key': project_key,
-                        'issue_type': (fields.get('issuetype') or {}).get('name', 'Unknown'),
-                        'status': (fields.get('status') or {}).get('name', 'Unknown'),
-                        'priority': (fields.get('priority') or {}).get('name', 'Medium'),
-                        'assignee': (fields.get('assignee') or {}).get('displayName', 'Unassigned'),
-                        'reporter': (fields.get('reporter') or {}).get('displayName', 'Unknown'),
-                        'timestamp': issue_date.isoformat(),
-                        'timestamp_epoch': int(issue_date.timestamp()),  # Numeric for filtering
-                        'date': issue_date.strftime('%Y-%m-%d'),
-                        'url': f"{self.settings.jira.url}/browse/{issue_key}",
-                        # No access control needed - all users can see all Jira content
-                        'access_type': 'all'
-                    }
+                    metadata=metadata
                 )
 
                 documents.append(doc)
