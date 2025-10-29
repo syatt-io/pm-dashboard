@@ -971,7 +971,19 @@ class ProjectActivityAggregator:
 
             if insights:
                 try:
-                    parsed_insights = json.loads(insights)
+                    # Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+                    insights_clean = insights.strip()
+                    if insights_clean.startswith('```'):
+                        # Remove opening fence (```json or ```)
+                        lines = insights_clean.split('\n')
+                        if lines[0].startswith('```'):
+                            lines = lines[1:]
+                        # Remove closing fence
+                        if lines and lines[-1].strip() == '```':
+                            lines = lines[:-1]
+                        insights_clean = '\n'.join(lines).strip()
+
+                    parsed_insights = json.loads(insights_clean)
 
                     # Map new structure fields
                     activity.noteworthy_discussions = parsed_insights.get('noteworthy_discussions', '')
