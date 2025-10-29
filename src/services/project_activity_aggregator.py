@@ -49,17 +49,30 @@ class ProjectActivity:
     time_entries: List[Dict[str, Any]]
     total_hours: float
 
+    # GitHub activity
+    github_prs_merged: List[Dict[str, Any]]
+    github_prs_in_review: List[Dict[str, Any]]
+    github_prs_open: List[Dict[str, Any]]
+
     # AI-generated insights (legacy format)
     progress_summary: Optional[str] = None
     key_achievements: Optional[List[str]] = None
     blockers_risks: Optional[List[str]] = None
     next_steps: Optional[List[str]] = None
 
-    # New structured digest format
+    # Legacy digest format (4 sections - kept for backward compatibility)
     noteworthy_discussions: Optional[str] = None
     work_completed: Optional[str] = None
     topics_for_discussion: Optional[str] = None
     attention_required: Optional[str] = None
+
+    # New Weekly Recap format (6 sections)
+    executive_summary: Optional[str] = None
+    achievements: Optional[str] = None
+    active_work: Optional[str] = None
+    blockers_and_asks: Optional[str] = None
+    proposed_agenda: Optional[str] = None
+    progress_notes: Optional[str] = None
 
     # Raw meeting insights
     meeting_action_items: Optional[List[Dict[str, Any]]] = None
@@ -182,7 +195,10 @@ class ProjectActivityAggregator:
             slack_messages=[],
             key_discussions=[],
             time_entries=[],
-            total_hours=0.0
+            total_hours=0.0,
+            github_prs_merged=[],
+            github_prs_in_review=[],
+            github_prs_open=[]
         )
 
         try:
@@ -191,6 +207,7 @@ class ProjectActivityAggregator:
             await self._collect_jira_activity(activity, start_date, end_date)
             await self._collect_slack_messages(activity, start_date, end_date)
             await self._collect_time_tracking_data(activity, start_date, end_date)
+            await self._collect_github_activity(activity, days_back)
 
             # Generate AI insights
             await self._generate_insights(activity)
@@ -711,6 +728,68 @@ class ProjectActivityAggregator:
             activity.time_entries = []
             activity.total_hours = 0.0
 
+    async def _collect_github_activity(
+        self,
+        activity: ProjectActivity,
+        days_back: int
+    ):
+        """Collect GitHub PR activity for the project."""
+        try:
+            from src.integrations.github_client import GitHubClient
+            from config.settings import settings
+
+            # Check if GitHub is configured
+            is_configured = False
+            if settings.github.app_id and settings.github.private_key and settings.github.installation_id:
+                is_configured = True
+            elif settings.github.api_token:
+                is_configured = True
+
+            if not is_configured:
+                logger.info("GitHub not configured - skipping PR collection")
+                return
+
+            # Initialize GitHub client
+            github_client = GitHubClient(
+                api_token=settings.github.api_token,
+                organization=settings.github.organization,
+                app_id=settings.github.app_id,
+                private_key=settings.github.private_key,
+                installation_id=settings.github.installation_id
+            )
+
+            # Generate project keywords from project name (split into words)
+            project_keywords = [word.lower() for word in activity.project_name.split() if len(word) > 2]
+            # Add project key as keyword
+            project_keywords.append(activity.project_key.lower())
+
+            logger.info(f"Fetching GitHub PRs for {activity.project_key} with keywords: {project_keywords}")
+
+            # Get PRs organized by state
+            pr_data = await github_client.get_prs_by_date_and_state(
+                project_key=activity.project_key,
+                project_keywords=project_keywords,
+                repo_name=None,  # Auto-detect
+                days_back=days_back
+            )
+
+            # Store PR data in activity
+            activity.github_prs_merged = pr_data.get("merged", [])
+            activity.github_prs_in_review = pr_data.get("in_review", [])
+            activity.github_prs_open = pr_data.get("open", [])
+
+            logger.info(
+                f"GitHub activity collected: {len(activity.github_prs_merged)} merged, "
+                f"{len(activity.github_prs_in_review)} in review, {len(activity.github_prs_open)} open"
+            )
+
+        except Exception as e:
+            logger.warning(f"Error collecting GitHub activity: {e}")
+            # Don't fail the entire aggregation if GitHub fails
+            activity.github_prs_merged = []
+            activity.github_prs_in_review = []
+            activity.github_prs_open = []
+
     async def _fetch_tempo_direct(self, project_key: str, start_date: str, end_date: str) -> tuple[float, list]:
         """Direct Tempo API call as fallback when MCP fails."""
         try:
@@ -925,6 +1004,22 @@ class ProjectActivityAggregator:
                 for key, data in list(issue_hours.items())[:5]:  # Top 5 issues by time
                     time_summary.append(f"• {key} ({data['hours']}h): {data['summary'][:50]}...")
 
+            # Format GitHub PR summaries
+            merged_prs_summary = []
+            for pr in activity.github_prs_merged[:10]:  # Top 10 merged
+                author = pr.get('author', 'Unknown')
+                merged_prs_summary.append(f"• #{pr.get('number')} - {pr.get('title')} (by {author})")
+
+            in_review_prs_summary = []
+            for pr in activity.github_prs_in_review[:10]:  # Top 10 in review
+                author = pr.get('author', 'Unknown')
+                in_review_prs_summary.append(f"• #{pr.get('number')} - {pr.get('title')} (by {author})")
+
+            open_prs_summary = []
+            for pr in activity.github_prs_open[:10]:  # Top 10 open
+                author = pr.get('author', 'Unknown')
+                open_prs_summary.append(f"• #{pr.get('number')} - {pr.get('title')} (by {author})")
+
             # Format the insights prompt from configuration
             insights_prompt = self.prompt_manager.format_prompt(
                 'digest_generation', 'insights_prompt_template',
@@ -940,7 +1035,10 @@ class ProjectActivityAggregator:
                 slack_discussions=chr(10).join(f'- {discussion}' for discussion in activity.key_discussions[:5]) if activity.key_discussions else '- No significant Slack discussions',
                 completed_tickets=chr(10).join(f'- {ticket.get("key", "Unknown")}: {ticket.get("summary", "No summary")}' for ticket in activity.completed_tickets[:5]) or '- No tickets completed',
                 time_summary=chr(10).join(time_summary) or '- No time tracking data available',
-                blockers=chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified'
+                blockers=chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified',
+                merged_prs=chr(10).join(merged_prs_summary) or '- No PRs merged this week',
+                in_review_prs=chr(10).join(in_review_prs_summary) or '- No PRs currently in review',
+                open_prs=chr(10).join(open_prs_summary) or '- No open PRs'
             )
 
             # Use the LLM directly instead of the non-existent generate_insights method
@@ -985,30 +1083,25 @@ class ProjectActivityAggregator:
 
                     parsed_insights = json.loads(insights_clean)
 
-                    # Map new structure fields
-                    activity.noteworthy_discussions = parsed_insights.get('noteworthy_discussions', '')
-                    activity.work_completed = parsed_insights.get('work_completed', '')
-                    activity.topics_for_discussion = parsed_insights.get('topics_for_discussion', '')
-                    activity.attention_required = parsed_insights.get('attention_required', '')
+                    # Store new 6-section Weekly Recap format
+                    activity.executive_summary = parsed_insights.get('executive_summary', '')
+                    activity.achievements = parsed_insights.get('achievements', '')
+                    activity.active_work = parsed_insights.get('active_work', '')
+                    activity.blockers_and_asks = parsed_insights.get('blockers_and_asks', '')
+                    activity.proposed_agenda = parsed_insights.get('proposed_agenda', '')
+                    activity.progress_notes = parsed_insights.get('progress_notes', '')
 
-                    # Keep backward compatibility with old format for display
-                    activity.progress_summary = f"{activity.work_completed[:100]}..." if activity.work_completed else ""
+                    # Also populate legacy format for backward compatibility
+                    activity.noteworthy_discussions = activity.executive_summary
+                    activity.work_completed = activity.achievements
+                    activity.topics_for_discussion = activity.proposed_agenda
+                    activity.attention_required = activity.blockers_and_asks
 
-                    # Extract key achievements and blockers from new format
-                    key_achievements = [activity.work_completed] if activity.work_completed else []
-                    if isinstance(key_achievements, str):
-                        key_achievements = [key_achievements]
-                    activity.key_achievements = key_achievements
-
-                    blockers_risks = [activity.topics_for_discussion] if activity.topics_for_discussion else []
-                    if isinstance(blockers_risks, str):
-                        blockers_risks = [blockers_risks]
-                    activity.blockers_risks = blockers_risks
-
-                    next_steps = parsed_insights.get('next_steps', [])
-                    if isinstance(next_steps, str):
-                        next_steps = [next_steps]
-                    activity.next_steps = next_steps
+                    # Map to very old format fields
+                    activity.progress_summary = activity.progress_notes or f"{activity.achievements[:100]}..." if activity.achievements else ""
+                    activity.key_achievements = [activity.achievements] if activity.achievements else []
+                    activity.blockers_risks = [activity.blockers_and_asks] if activity.blockers_and_asks else []
+                    activity.next_steps = [activity.active_work] if activity.active_work else []
 
                     # Also store the raw action items and blockers for additional context
                     max_action_items = self.prompt_manager.get_setting('max_action_items_in_digest', 10)
@@ -1292,30 +1385,61 @@ class ProjectActivityAggregator:
                     new_tickets_section += f" (Assigned to: {assignee})"
                 new_tickets_section += "\n"
 
+        # Build GitHub PR section
+        github_section = ""
+        total_prs = len(activity.github_prs_merged) + len(activity.github_prs_in_review) + len(activity.github_prs_open)
+        if total_prs > 0:
+            github_section = "\n## 🔀 GitHub Activity\n"
+            if activity.github_prs_merged:
+                github_section += f"\n**Merged PRs ({len(activity.github_prs_merged)}):**\n"
+                for pr in activity.github_prs_merged[:5]:
+                    github_section += f"* #{pr.get('number')} - {pr.get('title')} (by {pr.get('author', 'Unknown')})\n"
+            if activity.github_prs_in_review:
+                github_section += f"\n**In Code Review ({len(activity.github_prs_in_review)}):**\n"
+                for pr in activity.github_prs_in_review[:5]:
+                    github_section += f"* #{pr.get('number')} - {pr.get('title')} (by {pr.get('author', 'Unknown')})\n"
+
+        # Format blockers section (conditional)
+        blockers_section = ""
+        if activity.blockers_and_asks:
+            # Handle both string and list formats
+            blockers_content = activity.blockers_and_asks
+            if isinstance(blockers_content, str) and blockers_content.strip():
+                blockers_section = f"""
+## 🚨 Blockers & Client Action Items
+{self._format_section_content(activity.blockers_and_asks, "")}
+"""
+
+        # Format progress notes section (conditional)
+        progress_section = ""
+        if activity.progress_notes:
+            progress_content = activity.progress_notes
+            if isinstance(progress_content, str) and progress_content.strip():
+                progress_section = f"""
+## 📈 Progress Notes
+{self._format_section_content(activity.progress_notes, "")}
+"""
+
+        # New 6-section Weekly Recap format
         agenda = f"""
-# {activity.project_name} - Weekly Status Update
+# Weekly Recap: {activity.project_name}
 **Period:** {activity.start_date[:10]} to {activity.end_date[:10]} ({days} days)
-{attention_section}
-## 💬 Noteworthy Discussions
-{self._format_section_content(activity.noteworthy_discussions, "No significant discussions this period")}
 
-## ✅ Work Completed
-{self._format_section_content(activity.work_completed, "No work completed this period")}
+## 📊 Executive Summary
+{self._format_section_content(activity.executive_summary, "No summary available")}
 
-## 🔄 Topics for Discussion
-{self._format_section_content(activity.topics_for_discussion, "No discussion topics identified")}
-{ticket_changes_section}
-{time_section}
-{new_tickets_section}
-## 📈 Activity Summary
-- **Meetings Held:** {len(activity.meetings)}
-- **Tickets Completed:** {len(activity.completed_tickets)}
-- **Tickets Updated:** {len(set(change.get('ticket_key') for change in activity.jira_ticket_changes)) if activity.jira_ticket_changes else 0}
-- **Tickets Worked On:** {len(set(entry.get('issue_key') for entry in activity.time_entries)) if activity.time_entries else 0}
-- **New Tickets Created:** {len(activity.new_tickets)}
-- **Slack Messages Analyzed:** {len(activity.slack_messages)}
+## ✅ This Week's Achievements
+{self._format_section_content(activity.achievements, "No achievements recorded this period")}
 
+## 🔄 Active Work & Next Week
+{self._format_section_content(activity.active_work, "No active work tracked")}
+{blockers_section}
+## 📋 Proposed Agenda for Upcoming Call
+{self._format_section_content(activity.proposed_agenda, "No agenda items identified")}
+{progress_section}{github_section}{time_section}
 ---
-*Generated automatically by PM Agent*
+**Team Activity:** {len(activity.meetings)} meetings • {activity.total_hours:.1f}h logged • {len(activity.completed_tickets)} tickets completed
+
+*Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}*
 """
         return agenda.strip()

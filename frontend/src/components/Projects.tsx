@@ -957,8 +957,6 @@ const ProjectDetailDialog = ({
                     border: '1px solid #e9ecef',
                     borderRadius: 1,
                     p: 3,
-                    maxHeight: '600px',
-                    overflow: 'auto',
                     '& h1': { fontSize: '1.75rem', fontWeight: 600, mt: 2, mb: 2, color: '#2c3e50' },
                     '& h2': { fontSize: '1.5rem', fontWeight: 600, mt: 2, mb: 1.5, color: '#34495e', borderBottom: '2px solid #e9ecef', pb: 1 },
                     '& h3': { fontSize: '1.25rem', fontWeight: 600, mt: 2, mb: 1, color: '#34495e' },
@@ -2122,7 +2120,7 @@ const ProjectShowContent = () => {
           disabled={generatingDigest}
           sx={{ textTransform: 'none' }}
         >
-          {generatingDigest ? 'Generating Digest...' : 'Generate Weekly Digest'}
+          {generatingDigest ? 'Generating Recap...' : 'Generate Weekly Recap'}
         </MuiButton>
       </Box>
 
@@ -2425,11 +2423,11 @@ const ProjectShowContent = () => {
           </Grid>
         </Grid>
 
-        {/* Digest Modal */}
+        {/* Weekly Recap Modal */}
         <Dialog
           open={digestModalOpen}
           onClose={() => setDigestModalOpen(false)}
-          maxWidth="md"
+          maxWidth="lg"
           fullWidth
           PaperProps={{
             sx: { maxHeight: '90vh' }
@@ -2438,7 +2436,7 @@ const ProjectShowContent = () => {
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
               <Box>
-                <Typography variant="h6">📋 Project Digest - Last 7 Days</Typography>
+                <Typography variant="h6">📋 Weekly Recap - Last 7 Days</Typography>
                 {digestData?.from_cache && (
                   <Typography variant="caption" color="text.secondary">
                     Cached result from {new Date(digestData.cached_at).toLocaleString()}

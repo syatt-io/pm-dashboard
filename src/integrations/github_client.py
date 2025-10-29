@@ -413,3 +413,160 @@ class GitHubClient:
             except Exception as e:
                 logger.error(f"Error listing accessible repos: {e}")
                 return []
+
+    async def get_prs_by_date_and_state(
+        self,
+        project_key: str,
+        project_keywords: List[str],
+        repo_name: Optional[str] = None,
+        days_back: int = 7
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Get PRs organized by state (merged, in_review, open) for a project.
+
+        Args:
+            project_key: Project key for auto-detecting repo
+            project_keywords: Keywords for repo detection
+            repo_name: Optional specific repo name (auto-detected if not provided)
+            days_back: Number of days to look back
+
+        Returns:
+            Dict with keys: 'merged', 'in_review', 'open', each containing list of PRs
+        """
+        # Check if authentication is configured
+        if self.auth_mode == "token" and not self.api_token:
+            logger.warning("GitHub authentication not configured - skipping PR fetch")
+            return {"merged": [], "in_review": [], "open": []}
+        elif self.auth_mode == "app" and not all([self.app_id, self.private_key, self.installation_id]):
+            logger.warning("GitHub App authentication incomplete - skipping PR fetch")
+            return {"merged": [], "in_review": [], "open": []}
+
+        try:
+            # Auto-detect repo if not provided
+            if not repo_name:
+                accessible_repos = await self.list_accessible_repos()
+                detected_name = self.detect_repo_name(project_key, project_keywords)
+                if detected_name in accessible_repos:
+                    repo_name = detected_name
+                    logger.info(f"Auto-detected repo '{repo_name}' for project {project_key}")
+                else:
+                    logger.warning(f"Could not find matching repo for project {project_key}")
+                    # Fall back to org-wide search
+                    repo_name = None
+
+            # Calculate date range
+            since_date = datetime.now() - timedelta(days=days_back)
+            since_iso = since_date.strftime("%Y-%m-%d")
+
+            # Fetch PRs by state
+            merged_prs = await self._fetch_prs_by_query(
+                repo_name=repo_name,
+                since_date=since_iso,
+                additional_filters="is:pr is:merged"
+            )
+
+            # In review: open PRs with review activity
+            in_review_prs = await self._fetch_prs_by_query(
+                repo_name=repo_name,
+                since_date=since_iso,
+                additional_filters="is:pr is:open review:approved,review:changes_requested"
+            )
+
+            # Open PRs without review activity
+            open_prs = await self._fetch_prs_by_query(
+                repo_name=repo_name,
+                since_date=since_iso,
+                additional_filters="is:pr is:open -review:approved -review:changes_requested"
+            )
+
+            logger.info(f"Found {len(merged_prs)} merged, {len(in_review_prs)} in review, {len(open_prs)} open PRs")
+
+            return {
+                "merged": merged_prs,
+                "in_review": in_review_prs,
+                "open": open_prs
+            }
+
+        except Exception as e:
+            logger.error(f"Error fetching PRs by state: {e}")
+            return {"merged": [], "in_review": [], "open": []}
+
+    async def _fetch_prs_by_query(
+        self,
+        repo_name: Optional[str],
+        since_date: str,
+        additional_filters: str
+    ) -> List[Dict[str, Any]]:
+        """Fetch PRs with specific query filters.
+
+        Args:
+            repo_name: Repository name (None for org-wide search)
+            since_date: ISO date string for created:>= filter
+            additional_filters: Additional GitHub search filters (e.g., "is:pr is:merged")
+
+        Returns:
+            List of PR dictionaries
+        """
+        query_parts = []
+
+        # Add repo or org filter
+        if repo_name:
+            repo_filter = f"repo:{self.organization}/{repo_name}" if self.organization else f"repo:{repo_name}"
+            query_parts.append(repo_filter)
+        elif self.organization:
+            query_parts.append(f"org:{self.organization}")
+
+        # Add date and state filters
+        query_parts.append(f"created:>={since_date}")
+        query_parts.append(additional_filters)
+
+        search_query = " ".join(query_parts)
+
+        # Get auth headers
+        headers = await self._get_auth_headers()
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/search/issues",
+                    headers=headers,
+                    params={
+                        "q": search_query,
+                        "sort": "updated",
+                        "order": "desc",
+                        "per_page": 50  # Get more results for weekly recap
+                    },
+                    timeout=15.0
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    items = data.get("items", [])
+
+                    prs = []
+                    for item in items:
+                        pr_data = {
+                            "number": item.get("number"),
+                            "title": item.get("title"),
+                            "body": item.get("body", "")[:200],  # Truncate body
+                            "state": item.get("state"),
+                            "url": item.get("html_url"),
+                            "created_at": item.get("created_at"),
+                            "updated_at": item.get("updated_at"),
+                            "author": item.get("user", {}).get("login"),
+                            "repo": item.get("repository_url", "").split("/")[-1] if item.get("repository_url") else ""
+                        }
+
+                        # Add merged_at if available
+                        if item.get("pull_request", {}).get("merged_at"):
+                            pr_data["merged_at"] = item["pull_request"]["merged_at"]
+
+                        prs.append(pr_data)
+
+                    return prs
+                else:
+                    logger.warning(f"GitHub PR query returned status {response.status_code}: {search_query}")
+                    return []
+
+            except Exception as e:
+                logger.error(f"Error querying GitHub PRs: {e}")
+                return []
