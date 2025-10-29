@@ -265,6 +265,43 @@ def trigger_celery_tempo_sync():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@scheduler_bp.route("/scheduler/meeting-analysis-sync", methods=["POST"])
+@admin_or_api_key_required
+def trigger_meeting_analysis_sync():
+    """
+    Trigger nightly meeting analysis sync job.
+
+    Analyzes meetings from active projects (3-day lookback) and stores results.
+    This endpoint is used by the nightly GitHub Actions workflow.
+
+    Authentication: Requires either admin JWT or X-Admin-Key header.
+    """
+    try:
+        from src.jobs.meeting_analysis_sync import run_meeting_analysis_sync
+
+        logger.info("Starting meeting analysis sync job via API trigger...")
+        stats = run_meeting_analysis_sync()
+
+        if stats.get("success"):
+            logger.info(f"Meeting analysis sync completed: {stats}")
+            return jsonify({
+                "success": True,
+                "message": "Meeting analysis sync completed",
+                **stats
+            })
+        else:
+            logger.error(f"Meeting analysis sync failed: {stats}")
+            return jsonify({
+                "success": False,
+                "error": stats.get("error", "Unknown error"),
+                **stats
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Error triggering meeting analysis sync: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @scheduler_bp.route("/scheduler/celery/test-all", methods=["POST"])
 def trigger_all_celery_tasks():
     """Trigger all notification tasks via Celery for testing."""

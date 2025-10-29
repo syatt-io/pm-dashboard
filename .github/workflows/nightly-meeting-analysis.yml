@@ -1,0 +1,44 @@
+name: Nightly Meeting Analysis
+
+# Runs daily at 7 AM UTC (3 AM EST) to analyze meetings from active projects
+# Runs 1 hour after vector sync to ensure Fireflies meetings are available
+on:
+  schedule:
+    - cron: '0 7 * * *'  # 7 AM UTC daily (3 AM EST)
+  workflow_dispatch:  # Allow manual trigger for testing
+
+jobs:
+  analyze-meetings:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for vector sync to complete
+        run: |
+          echo "⏰ Waiting 30 seconds to ensure vector sync job has completed..."
+          sleep 30
+
+      - name: Trigger Meeting Analysis Sync
+        run: |
+          echo "🔍 Analyzing meetings from active projects (3-day lookback)..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "X-Admin-Key: ${{ secrets.ADMIN_API_KEY }}" \
+            "https://agent-pm-tsbbb.ondigitalocean.app/api/scheduler/meeting-analysis-sync")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Meeting analysis sync completed successfully"
+          else
+            echo "❌ Meeting analysis sync failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Verify Analysis Results
+        run: |
+          echo "📊 Checking analysis results..."
+          sleep 10
+          curl -s -H "X-Admin-Key: ${{ secrets.ADMIN_API_KEY }}" \
+            "https://agent-pm-tsbbb.ondigitalocean.app/api/meetings" \
+            || echo "❌ Analysis results check failed"

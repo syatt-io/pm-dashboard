@@ -60,6 +60,8 @@ Implements Syatt Design System:
 ```bash
 # Fireflies API
 FIREFLIES_API_KEY=your_api_key
+# System-level API key for nightly meeting analysis job
+FIREFLIES_SYSTEM_API_KEY=your_system_api_key
 
 # OpenAI
 OPENAI_API_KEY=your_api_key
@@ -270,6 +272,35 @@ function populateProjectDropdowns() {
 - Slack bot with slash commands
 - Email via SendGrid
 - Real-time updates on ticket creation
+
+### 5. Scheduled Jobs
+#### Nightly Meeting Analysis (`src/jobs/meeting_analysis_sync.py`)
+- **Schedule**: Runs daily at 7 AM UTC (3 AM EST)
+- **Purpose**: Automatically analyzes meetings from active projects
+- **Process**:
+  1. Fetches active projects and their keywords from database
+  2. Retrieves meetings from last 3 days via Fireflies API
+  3. Filters meetings by project keywords (title matching)
+  4. Checks for unanalyzed meetings (not in processed_meetings table)
+  5. Runs AI analysis for each matched meeting
+  6. Stores results in processed_meetings table
+  7. Sends Slack notification with stats
+- **Authentication**: Uses `FIREFLIES_SYSTEM_API_KEY` (org-wide access required)
+- **Manual Testing**: `python src/jobs/meeting_analysis_sync.py`
+- **API Trigger**: `POST /api/scheduler/meeting-analysis-sync` (requires X-Admin-Key header)
+- **GitHub Actions**: `.github/workflows/nightly-meeting-analysis.yml`
+
+**Key Features**:
+- 3-day lookback window (catches meetings if job fails one night)
+- Rate limiting: 2-second delay between analyses
+- Slack notifications with success/error stats
+- Duplicate prevention via processed_meetings check
+- Project-based filtering via keywords
+
+**Requirements**:
+- FIREFLIES_SYSTEM_API_KEY must have org-wide access to all meetings
+- Active projects must have keywords defined in project_keywords table
+- SLACK_BOT_TOKEN and SLACK_CHANNEL for notifications
 
 ## Testing Checklist
 
