@@ -2118,7 +2118,7 @@ const ProjectShowContent = () => {
           variant="contained"
           color="primary"
           startIcon={generatingDigest ? <CircularProgress size={20} color="inherit" /> : <DigestIcon />}
-          onClick={handleGenerateDigest}
+          onClick={() => handleGenerateDigest()}
           disabled={generatingDigest}
           sx={{ textTransform: 'none' }}
         >
