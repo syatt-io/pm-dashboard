@@ -84,7 +84,9 @@ class ProjectDigestCache(Base):
     def is_expired(self, ttl_hours: int = 6) -> bool:
         """Check if cache entry is expired (default 6 hours)."""
         from datetime import timedelta
-        expiry_time = self.created_at + timedelta(hours=ttl_hours)
+        # Ensure created_at is timezone-aware for comparison
+        created_at_aware = self.created_at.replace(tzinfo=timezone.utc) if self.created_at.tzinfo is None else self.created_at
+        expiry_time = created_at_aware + timedelta(hours=ttl_hours)
         return datetime.now(timezone.utc) > expiry_time
 
 # Import DTOs
