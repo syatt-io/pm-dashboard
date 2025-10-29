@@ -52,13 +52,22 @@ jobs:
             || echo "❌ Fireflies sync failed"
           sleep 5
 
-      - name: Trigger Tempo Sync (1 day)
+      - name: Trigger Tempo Vector Sync (1 day)
         run: |
-          echo "🔄 Triggering Tempo ingestion..."
+          echo "🔄 Triggering Tempo vector database ingestion..."
           curl -X POST \
             -H "X-Admin-Key: ${{ secrets.ADMIN_API_KEY }}" \
             "https://agent-pm-tsbbb.ondigitalocean.app/api/backfill/tempo?days=1" \
-            || echo "❌ Tempo sync failed"
+            || echo "❌ Tempo vector sync failed"
+          sleep 5
+
+      - name: Trigger Tempo Hours Sync
+        run: |
+          echo "⏰ Triggering Tempo hours sync (project cumulative & monthly hours)..."
+          curl -X POST \
+            -H "X-Admin-Key: ${{ secrets.ADMIN_API_KEY }}" \
+            "https://agent-pm-tsbbb.ondigitalocean.app/api/scheduler/celery/tempo-sync" \
+            || echo "❌ Tempo hours sync failed"
 
       - name: Verify Sync Status
         run: |

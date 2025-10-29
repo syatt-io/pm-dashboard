@@ -3,12 +3,33 @@ from flask import Blueprint, jsonify, request
 import asyncio
 import logging
 import schedule
+import os
+from functools import wraps
 
 from src.services.scheduler import get_scheduler, start_scheduler, stop_scheduler
+from src.services.auth import admin_required
 
 logger = logging.getLogger(__name__)
 
 scheduler_bp = Blueprint('scheduler', __name__, url_prefix='/api')
+
+
+def admin_or_api_key_required(f):
+    """Decorator that allows either admin JWT auth or API key from environment."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check for API key in header
+        api_key = request.headers.get('X-Admin-Key')
+        admin_api_key = os.getenv('ADMIN_API_KEY')
+
+        if api_key and admin_api_key and api_key == admin_api_key:
+            # Valid API key - proceed without JWT auth
+            return f(*args, **kwargs)
+
+        # Fall back to JWT admin auth
+        return admin_required(f)(*args, **kwargs)
+
+    return decorated_function
 
 
 # ============================================================================
@@ -219,11 +240,21 @@ def trigger_celery_weekly_summary():
 
 
 @scheduler_bp.route("/scheduler/celery/tempo-sync", methods=["POST"])
+@admin_or_api_key_required
 def trigger_celery_tempo_sync():
-    """Trigger Tempo sync via Celery task."""
+    """
+    Trigger Tempo hours sync via Celery task.
+
+    Updates cumulative_hours and actual_monthly_hours for all active projects.
+    This endpoint is used by the nightly GitHub Actions workflow as a fallback
+    for the Celery Beat scheduler.
+
+    Authentication: Requires either admin JWT or X-Admin-Key header.
+    """
     try:
         from src.tasks.celery_app import celery_app
         task = celery_app.send_task('src.tasks.notification_tasks.sync_tempo_hours')
+        logger.info(f"Tempo sync task queued successfully: {task.id}")
         return jsonify({
             "success": True,
             "message": "Tempo sync task queued",
