@@ -337,21 +337,21 @@ digest_generation:
 
     **CORRECT JSON EXAMPLE:**
     ```json
-    {
+    {{
       "executive_summary": "Strong progress this week with 3 major features deployed...",
       "achievements": "* SUBS-608: Fixed mobile banner navigation\n* Deployed new CSV export feature\n* Performance improvements reduced load time by 40%",
       "active_work": "* Dashboard redesign in code review\n* API integration work continuing\n* Planning notification system for next week",
       "blockers_and_asks": "* Need approval on mobile designs\n* Waiting on API credentials from vendor",
       "proposed_agenda": "1. Demo: New dashboard features (5 min)\n2. Review mobile navigation UX options\n3. Discuss next sprint priorities",
       "progress_notes": ""
-    }
+    }}
     ```
 
     **INCORRECT (DO NOT DO THIS):**
     ```json
-    {
+    {{
       "achievements": "Fixed mobile banner navigation, deployed CSV export, improved performance"
-    }
+    }}
     ```
 
     Return as JSON with these 6 keys: executive_summary, achievements, active_work, blockers_and_asks, proposed_agenda, progress_notes
