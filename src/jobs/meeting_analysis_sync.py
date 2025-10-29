@@ -9,6 +9,7 @@ import logging
 import time
 import json
 import uuid
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import os
@@ -17,6 +18,8 @@ from sqlalchemy.orm import sessionmaker
 
 from src.integrations.fireflies import FirefliesClient
 from src.processors.transcript_analyzer import TranscriptAnalyzer
+from src.managers.notifications import NotificationManager
+from src.utils.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +41,15 @@ class MeetingAnalysisSyncJob:
         # Initialize clients
         self.fireflies_client = FirefliesClient(api_key=self.fireflies_api_key)
         self.analyzer = TranscriptAnalyzer()
+
+        # Initialize notification manager for sending meeting emails
+        try:
+            config = Settings()
+            self.notification_manager = NotificationManager(config)
+            logger.info("Notification manager initialized for meeting emails")
+        except Exception as e:
+            logger.warning(f"Failed to initialize notification manager: {e}")
+            self.notification_manager = None
 
         # Create database engine and session
         self.engine = create_engine(self.database_url)
@@ -246,6 +258,60 @@ class MeetingAnalysisSyncJob:
                     f"{len(analysis.outcomes)} outcomes, "
                     f"{len(analysis.blockers_and_constraints)} blockers"
                 )
+
+                # Check if project has email notifications enabled
+                try:
+                    result = session.execute(
+                        text("SELECT send_meeting_emails FROM projects WHERE key = :key"),
+                        {"key": project["key"]}
+                    )
+                    row = result.fetchone()
+                    send_emails = row[0] if row else False
+
+                    if send_emails and self.notification_manager:
+                        # Extract participant emails from meeting data
+                        attendees = transcript_data.get("attendees", [])
+                        recipient_emails = [
+                            attendee.get("email")
+                            for attendee in attendees
+                            if isinstance(attendee, dict) and attendee.get("email")
+                        ]
+
+                        if recipient_emails:
+                            logger.info(
+                                f"Sending meeting analysis email to {len(recipient_emails)} participants for project {project['key']}"
+                            )
+
+                            # Send email asynchronously
+                            email_result = asyncio.run(
+                                self.notification_manager.send_meeting_analysis_email(
+                                    meeting_title=meeting_title,
+                                    meeting_date=meeting_date,
+                                    recipients=recipient_emails,
+                                    executive_summary=analysis.executive_summary,
+                                    action_items=action_items_data,
+                                    outcomes=analysis.outcomes or [],
+                                    blockers=analysis.blockers_and_constraints or [],
+                                    timeline=analysis.timeline_and_milestones or [],
+                                    key_discussions=analysis.key_discussions or []
+                                )
+                            )
+
+                            if email_result.get("success"):
+                                logger.info(f"✅ Meeting analysis email sent successfully to {email_result.get('recipients')}")
+                            else:
+                                logger.error(f"Failed to send meeting analysis email: {email_result.get('error')}")
+                        else:
+                            logger.warning(f"No participant emails found for meeting {meeting_id}")
+                    elif send_emails and not self.notification_manager:
+                        logger.warning(f"Email notifications enabled for project {project['key']} but notification manager not available")
+                    else:
+                        logger.debug(f"Email notifications disabled for project {project['key']}")
+
+                except Exception as email_error:
+                    logger.error(f"Error sending meeting analysis email: {email_error}", exc_info=True)
+                    # Don't fail the whole meeting analysis if email fails
+
                 return True
 
             except Exception as e:

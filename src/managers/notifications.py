@@ -3,6 +3,7 @@
 import logging
 import smtplib
 import asyncio
+import os
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
@@ -37,6 +38,15 @@ class NotificationManager:
         self.slack_client = None
         self.smtp_config = None
         self.teams_webhook = None
+
+        # Test mode configuration for meeting emails
+        self.meeting_email_test_mode = os.getenv("MEETING_EMAIL_TEST_MODE", "false").lower() == "true"
+        self.meeting_email_test_recipient = os.getenv("MEETING_EMAIL_TEST_RECIPIENT", "")
+
+        if self.meeting_email_test_mode:
+            logger.warning(
+                f"⚠️  MEETING EMAIL TEST MODE ENABLED - All meeting analysis emails will be sent ONLY to: {self.meeting_email_test_recipient}"
+            )
 
         self._setup_channels()
 
@@ -326,6 +336,213 @@ class NotificationManager:
         )
 
         await self.send_notification(content, channels=["slack"])
+
+    async def send_meeting_analysis_email(
+        self,
+        meeting_title: str,
+        meeting_date: datetime,
+        recipients: List[str],
+        executive_summary: str,
+        action_items: List[Dict],
+        outcomes: List[str],
+        blockers: List[str],
+        timeline: List[str],
+        key_discussions: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Send meeting analysis email to participants.
+
+        Args:
+            meeting_title: Title of the meeting
+            meeting_date: Date when meeting occurred
+            recipients: List of email addresses to send to
+            executive_summary: AI-generated executive summary
+            action_items: List of action items from analysis
+            outcomes: List of key outcomes
+            blockers: List of blockers and constraints
+            timeline: List of timeline/milestone items
+            key_discussions: List of key discussion points
+
+        Returns:
+            Dict with success status and details
+        """
+        if not self.smtp_config:
+            logger.error("SMTP not configured, cannot send meeting analysis email")
+            return {"success": False, "error": "SMTP not configured"}
+
+        if not recipients:
+            logger.warning("No recipients provided for meeting analysis email")
+            return {"success": False, "error": "No recipients provided"}
+
+        # Apply test mode override if enabled
+        original_recipients = recipients.copy()
+        if self.meeting_email_test_mode:
+            if not self.meeting_email_test_recipient:
+                logger.error("Test mode enabled but no test recipient configured")
+                return {"success": False, "error": "Test mode enabled but MEETING_EMAIL_TEST_RECIPIENT not set"}
+
+            logger.info(
+                f"🧪 Test mode active - Redirecting email from {recipients} to {self.meeting_email_test_recipient}"
+            )
+            recipients = [self.meeting_email_test_recipient]
+
+        try:
+            # Build HTML email
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = f"Meeting Analysis: {meeting_title}"
+            msg["From"] = self.smtp_config["user"]
+            msg["To"] = ", ".join(recipients)
+
+            # Create HTML body with test mode banner if needed
+            test_mode_banner = ""
+            if self.meeting_email_test_mode:
+                test_mode_banner = f"""
+                <div style="background-color: #fff3cd; border: 2px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+                    <h3 style="color: #856404; margin: 0 0 10px 0;">🧪 TEST MODE - Email Redirected</h3>
+                    <p style="color: #856404; margin: 0;">
+                        <strong>Original Recipients:</strong> {", ".join(original_recipients)}<br>
+                        <strong>Actual Recipient:</strong> {self.meeting_email_test_recipient}
+                    </p>
+                </div>
+                """
+
+            html_body = f"""
+            <html>
+                <head>
+                    <style>
+                        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }}
+                        h1 {{ color: #554DFF; }}
+                        h2 {{ color: #666; border-bottom: 2px solid #554DFF; padding-bottom: 5px; }}
+                        h3 {{ color: #777; }}
+                        .section {{ margin: 20px 0; }}
+                        .action-item {{ background-color: #f8f9fa; padding: 10px; margin: 10px 0; border-left: 4px solid #554DFF; }}
+                        .action-title {{ font-weight: bold; color: #554DFF; }}
+                        ul {{ list-style-type: none; padding-left: 0; }}
+                        li {{ padding: 5px 0; }}
+                        li:before {{ content: "▸ "; color: #554DFF; font-weight: bold; }}
+                        .footer {{ margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }}
+                    </style>
+                </head>
+                <body>
+                    {test_mode_banner}
+
+                    <h1>📊 Meeting Analysis: {meeting_title}</h1>
+                    <p><strong>Date:</strong> {meeting_date.strftime("%B %d, %Y at %I:%M %p")}</p>
+
+                    <div class="section">
+                        <h2>Executive Summary</h2>
+                        <p>{executive_summary}</p>
+                    </div>
+
+                    <div class="section">
+                        <h2>Action Items ({len(action_items)})</h2>
+            """
+
+            # Add action items
+            if action_items:
+                for item in action_items:
+                    assignee = item.get("assignee", "Unassigned")
+                    priority = item.get("priority", "Medium")
+                    html_body += f"""
+                        <div class="action-item">
+                            <div class="action-title">{item.get("title", "Untitled")}</div>
+                            <p>{item.get("description", "No description")}</p>
+                            <p><strong>Assignee:</strong> {assignee} | <strong>Priority:</strong> {priority}</p>
+                        </div>
+                    """
+            else:
+                html_body += "<p>No action items identified.</p>"
+
+            # Add outcomes
+            html_body += """
+                    </div>
+                    <div class="section">
+                        <h2>Key Outcomes</h2>
+            """
+            if outcomes:
+                html_body += "<ul>"
+                for outcome in outcomes:
+                    html_body += f"<li>{outcome}</li>"
+                html_body += "</ul>"
+            else:
+                html_body += "<p>No key outcomes identified.</p>"
+
+            # Add blockers
+            html_body += """
+                    </div>
+                    <div class="section">
+                        <h2>Blockers & Constraints</h2>
+            """
+            if blockers:
+                html_body += "<ul>"
+                for blocker in blockers:
+                    html_body += f"<li>{blocker}</li>"
+                html_body += "</ul>"
+            else:
+                html_body += "<p>No blockers identified.</p>"
+
+            # Add timeline
+            html_body += """
+                    </div>
+                    <div class="section">
+                        <h2>Timeline & Milestones</h2>
+            """
+            if timeline:
+                html_body += "<ul>"
+                for item in timeline:
+                    html_body += f"<li>{item}</li>"
+                html_body += "</ul>"
+            else:
+                html_body += "<p>No timeline items identified.</p>"
+
+            # Add key discussions
+            html_body += """
+                    </div>
+                    <div class="section">
+                        <h2>Key Discussions</h2>
+            """
+            if key_discussions:
+                html_body += "<ul>"
+                for discussion in key_discussions:
+                    html_body += f"<li>{discussion}</li>"
+                html_body += "</ul>"
+            else:
+                html_body += "<p>No key discussions identified.</p>"
+
+            # Add footer
+            html_body += f"""
+                    </div>
+                    <div class="footer">
+                        <p>This meeting analysis was automatically generated by the PM Agent.</p>
+                        <p>Analysis completed on {datetime.now().strftime("%B %d, %Y at %I:%M %p")}</p>
+                    </div>
+                </body>
+            </html>
+            """
+
+            part = MIMEText(html_body, "html")
+            msg.attach(part)
+
+            # Send email
+            with smtplib.SMTP(self.smtp_config["host"], self.smtp_config["port"]) as server:
+                server.starttls()
+                server.login(self.smtp_config["user"], self.smtp_config["password"])
+                server.send_message(msg)
+
+            logger.info(
+                f"✅ Meeting analysis email sent to {', '.join(recipients)} for meeting: {meeting_title}"
+            )
+
+            return {
+                "success": True,
+                "recipients": recipients,
+                "original_recipients": original_recipients if self.meeting_email_test_mode else recipients,
+                "test_mode": self.meeting_email_test_mode
+            }
+
+        except Exception as e:
+            logger.error(f"Error sending meeting analysis email: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
 
     async def test_channels(self) -> Dict[str, bool]:
         """Test all configured notification channels."""

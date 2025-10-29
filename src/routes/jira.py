@@ -386,6 +386,7 @@ def update_project(project_key):
                         retainer_hours = :retainer_hours,
                         name = :name,
                         weekly_meeting_day = :weekly_meeting_day,
+                        send_meeting_emails = :send_meeting_emails,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE key = :key
                 """), {
@@ -395,13 +396,14 @@ def update_project(project_key):
                     "total_hours": data.get('total_hours', 0),
                     "retainer_hours": data.get('retainer_hours', 0),
                     "name": data.get('name', existing[1] if existing else 'Unknown'),
-                    "weekly_meeting_day": data.get('weekly_meeting_day')
+                    "weekly_meeting_day": data.get('weekly_meeting_day'),
+                    "send_meeting_emails": data.get('send_meeting_emails', False)
                 })
             else:
                 # Insert new project
                 conn.execute(text("""
-                    INSERT INTO projects (key, name, is_active, project_work_type, total_hours, retainer_hours, weekly_meeting_day)
-                    VALUES (:key, :name, :is_active, :project_work_type, :total_hours, :retainer_hours, :weekly_meeting_day)
+                    INSERT INTO projects (key, name, is_active, project_work_type, total_hours, retainer_hours, weekly_meeting_day, send_meeting_emails)
+                    VALUES (:key, :name, :is_active, :project_work_type, :total_hours, :retainer_hours, :weekly_meeting_day, :send_meeting_emails)
                 """), {
                     "key": project_key,
                     "name": data.get('name', 'Unknown'),
@@ -409,7 +411,8 @@ def update_project(project_key):
                     "project_work_type": data.get('project_work_type', 'ongoing'),
                     "total_hours": data.get('total_hours', 0),
                     "retainer_hours": data.get('retainer_hours', 0),
-                    "weekly_meeting_day": data.get('weekly_meeting_day')
+                    "weekly_meeting_day": data.get('weekly_meeting_day'),
+                    "send_meeting_emails": data.get('send_meeting_emails', False)
                 })
 
             # Upsert forecasted hours for current month if provided

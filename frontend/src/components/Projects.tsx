@@ -15,6 +15,7 @@ import {
   TextInput,
   SelectInput,
   NumberInput,
+  BooleanInput,
   EditButton,
   TopToolbar,
 } from 'react-admin';
@@ -90,6 +91,7 @@ interface Project {
   cumulative_hours?: number;
   slack_channel?: string;
   weekly_meeting_day?: string;
+  send_meeting_emails?: boolean;
 }
 
 interface TabPanelProps {
@@ -648,6 +650,23 @@ const ProjectDetailDialog = ({
                   ))}
                 </Select>
               </FormControl>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={editedProject.send_meeting_emails || false}
+                    onChange={(e) => setEditedProject({
+                      ...editedProject,
+                      send_meeting_emails: e.target.checked
+                    })}
+                  />
+                }
+                label="Send Meeting Analysis Emails"
+                sx={{ mt: 2 }}
+              />
+              <Typography variant="caption" display="block" color="text.secondary" sx={{ ml: 4, mt: -1 }}>
+                When enabled, meeting participants will receive email notifications with AI-generated analysis
+              </Typography>
             </Box>
           </Grid>
 
@@ -2727,6 +2746,22 @@ export const ProjectEdit = () => (
 
         <Grid item xs={12} md={6}>
           <NumberInput source="total_hours" label="Total Hours" fullWidth />
+        </Grid>
+
+        {/* Notifications */}
+        <Grid item xs={12}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1, mt: 2 }}>
+            Notifications
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+        </Grid>
+
+        <Grid item xs={12}>
+          <BooleanInput
+            source="send_meeting_emails"
+            label="Send Meeting Analysis Emails"
+            helperText="When enabled, meeting participants will receive email notifications with AI-generated analysis after meetings are processed"
+          />
         </Grid>
       </Grid>
     </SimpleForm>
