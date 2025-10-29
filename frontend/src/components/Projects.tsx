@@ -1618,20 +1618,35 @@ export const ProjectList = () => {
                         <TableRow
                           key={project.key}
                           sx={{
-                            cursor: 'pointer',
                             '&:hover': {
                               backgroundColor: 'rgba(85, 77, 255, 0.08)'
                             }
                           }}
-                          onClick={() => redirect('show', 'projects', project.key)}
                         >
                           <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {project.name}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {project.key}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" fontWeight="medium">
+                                  {project.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {project.key}
+                                </Typography>
+                              </Box>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleCardClick(project)}
+                                title="Generate Digest"
+                                sx={{
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(85, 77, 255, 0.1)'
+                                  }
+                                }}
+                              >
+                                <DigestIcon />
+                              </IconButton>
+                            </Box>
                           </TableCell>
                           <TableCell>{getTypeLabel(projectType)}</TableCell>
                           <TableCell>
@@ -1755,7 +1770,24 @@ export const ProjectList = () => {
                               }
                             }}
                           >
-                            <TableCell>{project.name}</TableCell>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="body2">{project.name}</Typography>
+                                <IconButton
+                                  size="small"
+                                  color="primary"
+                                  onClick={() => handleCardClick(project)}
+                                  title="Generate Digest"
+                                  sx={{
+                                    '&:hover': {
+                                      backgroundColor: 'rgba(85, 77, 255, 0.1)'
+                                    }
+                                  }}
+                                >
+                                  <DigestIcon />
+                                </IconButton>
+                              </Box>
+                            </TableCell>
                             <TableCell>
                               <Chip label={project.key} size="small" />
                             </TableCell>
