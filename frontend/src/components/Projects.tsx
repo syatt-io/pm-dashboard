@@ -25,6 +25,7 @@ import {
   Box,
   Chip,
   Switch,
+  Checkbox,
   FormControlLabel,
   Alert,
   Tabs,
@@ -1930,6 +1931,7 @@ const ProjectShowContent = () => {
   const [generatingDigest, setGeneratingDigest] = useState(false);
   const [digestModalOpen, setDigestModalOpen] = useState(false);
   const [digestData, setDigestData] = useState<any>(null);
+  const [includeHistoricalContext, setIncludeHistoricalContext] = useState(false);
 
   // Load keywords and resource mappings when component mounts
   useEffect(() => {
@@ -2074,6 +2076,7 @@ const ProjectShowContent = () => {
           days: 7,
           project_name: record.name,
           force_refresh: forceRefresh,
+          include_context: includeHistoricalContext,
         }),
       });
 
@@ -2111,7 +2114,18 @@ const ProjectShowContent = () => {
   return (
     <Box sx={{ p: 3 }}>
       {/* Digest Generator Button */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={includeHistoricalContext}
+              onChange={(e) => setIncludeHistoricalContext(e.target.checked)}
+              disabled={generatingDigest}
+            />
+          }
+          label="Include historical context"
+          sx={{ mr: 2 }}
+        />
         <MuiButton
           variant="contained"
           color="primary"
