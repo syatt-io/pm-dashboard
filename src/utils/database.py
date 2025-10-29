@@ -114,7 +114,7 @@ def init_database():
 
         # Import all models to ensure they're registered
         from src.models.user import Base, User, UserRole, UserWatchedProject
-        from src.models import ProcessedMeeting, TodoItem
+        from src.models import ProcessedMeeting, TodoItem, ProjectDigestCache
         from src.models.learning import Learning
 
         # Create all tables

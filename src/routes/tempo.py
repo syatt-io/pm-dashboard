@@ -288,9 +288,9 @@ def generate_project_digest(project_key):
         # Check cache first unless force refresh
         if not force_refresh:
             from src.models import ProjectDigestCache
-            from src.utils.database import get_db_session
+            from src.utils.database import get_session
 
-            session = get_db_session()
+            session = get_session()
             try:
                 # Find most recent cache entry for this project/days combo
                 cache_entry = session.query(ProjectDigestCache).filter(
@@ -350,10 +350,10 @@ def generate_project_digest(project_key):
 
         # Cache the result
         from src.models import ProjectDigestCache
-        from src.utils.database import get_db_session
+        from src.utils.database import get_session
         import json
 
-        session = get_db_session()
+        session = get_session()
         try:
             cache_entry = ProjectDigestCache(
                 project_key=project_key,
