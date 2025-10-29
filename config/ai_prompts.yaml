@@ -217,41 +217,56 @@ digest_generation:
 
     1. **executive_summary**: 2-3 sentences capturing project health and this week's highlight. Conversational tone. Lead with the most important takeaway.
 
-    2. **achievements**: What shipped or was completed this week that clients care about. Include:
-       - Completed features/tickets (outcomes, not just ticket numbers)
-       - Merged PRs representing visible progress
-       - User-facing improvements
-       - Format: Bullet points with business context, not just technical details
+    2. **achievements**: What shipped or was completed this week that clients care about.
+       - **MUST use markdown bullet list format** - each item on new line starting with "* "
+       - Include: Completed features/tickets (outcomes, not just ticket numbers), merged PRs, user-facing improvements
        - Each point should explain what was done AND why it matters
+       - Example format:
+         ```
+         * SUBS-608: Fixed mobile banner navigation - users can now swipe through hero images on mobile
+         * Deployed new export feature - clients can download reports as CSV or PDF
+         * Performance improvements reduced page load time by 40%
+         ```
 
-    3. **active_work**: What's in progress and what's planned for next week. Include:
-       - Current work status (tickets, PRs in review)
-       - Expected deliverables for next week
-       - Work ready for client review/feedback
-       - Format: Brief status updates with context ("Team is finishing X, should be ready for review by Friday")
+    3. **active_work**: What's in progress and what's planned for next week.
+       - **MUST use markdown bullet list format** - each item on new line starting with "* "
+       - Include: Current work status (tickets, PRs in review), expected deliverables, work ready for review
+       - Example format:
+         ```
+         * Dashboard redesign is in code review, should deploy by Friday
+         * Working on API integration with vendor X, blocked on their API key
+         * Planning to start notification system next week
+         ```
 
-    4. **blockers_and_asks**: Clear, specific items that need client action or input. Include:
-       - Blockers requiring client decisions/resources
-       - Questions needing answers
-       - Approvals or feedback needed
-       - Format: Each item should be actionable and specific
+    4. **blockers_and_asks**: Clear, specific items that need client action or input.
+       - **MUST use markdown bullet list format** - each item on new line starting with "* "
+       - Include: Blockers requiring decisions/resources, questions needing answers, approvals needed
+       - Each item should be actionable and specific
        - **OMIT THIS SECTION ENTIRELY if no blockers exist** (set to empty string "")
+       - Example format:
+         ```
+         * Need approval on final mobile designs before we can proceed with build
+         * Waiting on production credentials for payment gateway integration
+         * Decision needed: should we prioritize feature A or B for next sprint?
+         ```
 
-    5. **proposed_agenda**: Suggested discussion topics for the upcoming call, prioritized by importance:
-       - Demos of completed work (if any exist)
-       - UX/UI decisions needed (if any)
-       - Priority discussions/changes
-       - Technical approach decisions (if any require input)
-       - Topics that came up in Slack/meetings worth discussing
-       - Next week's priorities and planning
-       - Format: Ordered list with time suggestions if helpful (e.g., "Demo: New dashboard (5 min)")
-       - Be specific: "Discuss mobile navigation UX (3 options to review)" not just "UX discussion"
+    5. **proposed_agenda**: Suggested discussion topics for the upcoming call, prioritized by importance.
+       - **MUST use numbered markdown list format** - each item on new line starting with "1. ", "2. ", etc.
+       - Include: Demos, UX/UI decisions, priority discussions, technical decisions, next week's priorities
+       - Be specific with references to actual features/tickets
+       - Example format:
+         ```
+         1. Demo: New dashboard features (5 min)
+         2. Review mobile navigation UX - 3 design options to choose from
+         3. Discuss API rate limiting strategy for vendor integration
+         4. Plan next sprint priorities - review backlog
+         ```
 
-    6. **progress_notes**: Brief observations about velocity, trends, or context (OPTIONAL):
-       - Project momentum (speeding up, steady, slowing down)
-       - Team capacity notes
-       - Risks on the horizon
+    6. **progress_notes**: Brief observations about velocity, trends, or context (OPTIONAL).
+       - Can be paragraph OR bullet list format depending on content
+       - Include: Project momentum, team capacity notes, risks on the horizon
        - **OMIT THIS SECTION if nothing notable** (set to empty string "")
+       - Keep brief - 1-3 sentences or 2-4 bullet points maximum
 
     ## LENGTH MANAGEMENT
 
@@ -302,16 +317,37 @@ digest_generation:
 
     ## CRITICAL FORMAT REQUIREMENTS
 
+    - **LISTS MUST USE PROPER MARKDOWN**: Each list item on new line starting with "* " (bullets) or "1. " (numbered)
+    - **NO PARAGRAPH-FORMAT LISTS**: Never write lists as comma-separated sentences
     - RETURN COMPLETE SENTENCES AND PHRASES: Never break text into individual characters
-    - Use proper markdown list format: each point starts with "* " on new line
-    - NO DOUBLE ASTERISKS for bullets: Use single asterisk "* "
     - Include full Jira ticket titles with keys: "SUBS-608: Hero Rotating Banner Mobile Arrows Hidden"
     - Each bullet point should be a complete, readable sentence or phrase
     - ABSOLUTELY NEVER split words or sentences into individual letters
 
+    **CORRECT JSON EXAMPLE:**
+    ```json
+    {
+      "executive_summary": "Strong progress this week with 3 major features deployed...",
+      "achievements": "* SUBS-608: Fixed mobile banner navigation\n* Deployed new CSV export feature\n* Performance improvements reduced load time by 40%",
+      "active_work": "* Dashboard redesign in code review\n* API integration work continuing\n* Planning notification system for next week",
+      "blockers_and_asks": "* Need approval on mobile designs\n* Waiting on API credentials from vendor",
+      "proposed_agenda": "1. Demo: New dashboard features (5 min)\n2. Review mobile navigation UX options\n3. Discuss next sprint priorities",
+      "progress_notes": ""
+    }
+    ```
+
+    **INCORRECT (DO NOT DO THIS):**
+    ```json
+    {
+      "achievements": "Fixed mobile banner navigation, deployed CSV export, improved performance"
+    }
+    ```
+
     Return as JSON with these 6 keys: executive_summary, achievements, active_work, blockers_and_asks, proposed_agenda, progress_notes
 
     Set blockers_and_asks="" and progress_notes="" if those sections should be omitted.
+
+    **REMEMBER**: Use "\n" for newlines between list items in the JSON string values.
 
 context_search:
   system_message: |
