@@ -74,6 +74,9 @@ class ProjectActivity:
     proposed_agenda: Optional[str] = None
     progress_notes: Optional[str] = None
 
+    # Historical context from Pinecone (optional)
+    historical_context: Optional[List[Dict[str, Any]]] = None
+
     # Raw meeting insights
     meeting_action_items: Optional[List[Dict[str, Any]]] = None
     meeting_blockers: Optional[List[str]] = None
@@ -161,7 +164,8 @@ class ProjectActivityAggregator:
         self,
         project_key: str,
         project_name: str,
-        days_back: int = 7
+        days_back: int = 7,
+        include_context: bool = False
     ) -> ProjectActivity:
         """
         Aggregate activity for a specific project over the specified time period.
@@ -170,6 +174,7 @@ class ProjectActivityAggregator:
             project_key: Jira project key (e.g., 'PROJ')
             project_name: Human-readable project name
             days_back: Number of days to look back (default: 7)
+            include_context: Whether to include historical context from Pinecone (default: False)
 
         Returns:
             ProjectActivity containing all aggregated data
@@ -209,8 +214,12 @@ class ProjectActivityAggregator:
             await self._collect_time_tracking_data(activity, start_date, end_date)
             await self._collect_github_activity(activity, days_back)
 
+            # Collect historical context from Pinecone if requested
+            if include_context:
+                await self._collect_historical_context(activity, days_back)
+
             # Generate AI insights
-            await self._generate_insights(activity)
+            await self._generate_insights(activity, include_context=include_context)
 
             logger.info(f"Successfully aggregated activity for {project_key}")
             return activity
@@ -790,6 +799,55 @@ class ProjectActivityAggregator:
             activity.github_prs_in_review = []
             activity.github_prs_open = []
 
+    async def _collect_historical_context(
+        self,
+        activity: ProjectActivity,
+        days_back: int
+    ):
+        """Collect historical context from Pinecone for richer AI insights."""
+        try:
+            from src.services.vector_search import VectorSearchService
+
+            logger.info(f"Collecting historical context for {activity.project_key}")
+
+            # Initialize vector search service
+            vector_search = VectorSearchService()
+
+            # Check if Pinecone is available
+            if not vector_search.is_available():
+                logger.warning("Pinecone not available - skipping historical context")
+                activity.historical_context = []
+                return
+
+            # Build search query based on project context
+            search_query = f"{activity.project_name} {activity.project_key} past decisions discussions blockers solutions"
+
+            # Search for relevant historical documents
+            results = vector_search.search(
+                query=search_query,
+                top_k=10,  # Get top 10 most relevant historical docs
+                days_back=max(90, days_back * 4),  # Look back 90 days or 4x the current window
+                project_key=activity.project_key
+            )
+
+            # Format results for AI consumption
+            formatted_context = []
+            for result in results:
+                formatted_context.append({
+                    'source': result.source,
+                    'title': result.title,
+                    'content': result.content[:500],  # Limit content length
+                    'date': result.date.isoformat() if result.date else None,
+                    'relevance_score': result.relevance_score
+                })
+
+            activity.historical_context = formatted_context
+            logger.info(f"Collected {len(formatted_context)} historical context items")
+
+        except Exception as e:
+            logger.warning(f"Error collecting historical context: {e}")
+            activity.historical_context = []
+
     async def _fetch_tempo_direct(self, project_key: str, start_date: str, end_date: str) -> tuple[float, list]:
         """Direct Tempo API call as fallback when MCP fails."""
         try:
@@ -951,8 +1009,13 @@ class ProjectActivityAggregator:
         logger.info(f"Tempo MCP for {project_key}: found {worklog_count} worklogs totaling {total_hours} hours")
         return total_hours, time_entries
 
-    async def _generate_insights(self, activity: ProjectActivity):
-        """Generate AI-powered insights from the aggregated data."""
+    async def _generate_insights(self, activity: ProjectActivity, include_context: bool = False):
+        """Generate AI-powered insights from the aggregated data.
+
+        Args:
+            activity: ProjectActivity containing all aggregated data
+            include_context: Whether to include historical context in AI prompt
+        """
         try:
             # Extract insights from available meeting and ticket data
             # Skip database queries and use existing data directly
@@ -1020,6 +1083,22 @@ class ProjectActivityAggregator:
                 author = pr.get('author', 'Unknown')
                 open_prs_summary.append(f"• #{pr.get('number')} - {pr.get('title')} (by {author})")
 
+            # Format historical context if included
+            historical_context_summary = ""
+            if include_context and activity.historical_context:
+                context_items = []
+                for item in activity.historical_context[:5]:  # Top 5 most relevant
+                    date_str = item.get('date', 'Unknown date')
+                    source = item.get('source', 'Unknown source')
+                    title = item.get('title', 'No title')
+                    content_preview = item.get('content', '')[:200]
+                    relevance = item.get('relevance_score', 0)
+                    context_items.append(
+                        f"• [{date_str}] {title} (from {source}, relevance: {relevance:.2f})\n  {content_preview}..."
+                    )
+                historical_context_summary = chr(10).join(context_items)
+                logger.info(f"Formatted {len(context_items)} historical context items for AI prompt")
+
             # Format the insights prompt from configuration
             insights_prompt = self.prompt_manager.format_prompt(
                 'digest_generation', 'insights_prompt_template',
@@ -1038,7 +1117,8 @@ class ProjectActivityAggregator:
                 blockers=chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified',
                 merged_prs=chr(10).join(merged_prs_summary) or '- No PRs merged this week',
                 in_review_prs=chr(10).join(in_review_prs_summary) or '- No PRs currently in review',
-                open_prs=chr(10).join(open_prs_summary) or '- No open PRs'
+                open_prs=chr(10).join(open_prs_summary) or '- No open PRs',
+                historical_context=historical_context_summary or '- No historical context available'
             )
 
             # Use the LLM directly instead of the non-existent generate_insights method

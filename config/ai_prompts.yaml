@@ -209,6 +209,10 @@ digest_generation:
     Current blockers:
     {blockers}
 
+    ### HISTORICAL CONTEXT (Optional)
+    Relevant past discussions, decisions, and blockers for context:
+    {historical_context}
+
     ---
 
     ## YOUR TASK
