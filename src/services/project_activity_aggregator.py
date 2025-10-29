@@ -1035,7 +1035,9 @@ class ProjectActivityAggregator:
             activity.progress_summary = f"Project {activity.project_name} had {len(activity.meetings)} meetings and {len(activity.completed_tickets)} completed tickets in the past week."
 
             # Set the new structure fields to fallback content with error info
-            activity.noteworthy_discussions = f"Error generating AI insights ({type(e).__name__}: {str(e)[:100]}) - {len(activity.meetings)} meetings were held"
+            error_msg = str(e) if str(e) else repr(e)
+            error_info = f"{type(e).__name__}: {error_msg[:100]}" if error_msg else type(e).__name__
+            activity.noteworthy_discussions = f"Error generating AI insights ({error_info}) - {len(activity.meetings)} meetings were held"
             activity.work_completed = f"Generated fallback: {len(activity.completed_tickets)} tickets completed this period"
             activity.topics_for_discussion = "Review meeting notes for detailed discussion topics"
             activity.attention_required = ""
