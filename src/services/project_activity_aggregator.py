@@ -88,14 +88,34 @@ class ProjectActivityAggregator:
             api_token=settings.jira.api_token
         )
 
-        # Initialize TranscriptAnalyzer with properly configured LLM
-        from langchain_openai import ChatOpenAI
-        llm = ChatOpenAI(
-            model=settings.ai.model,
-            temperature=settings.ai.temperature,
-            max_tokens=settings.ai.max_tokens,
-            api_key=settings.ai.api_key
-        )
+        # Initialize TranscriptAnalyzer with properly configured LLM based on provider
+        if settings.ai.provider == "openai":
+            from langchain_openai import ChatOpenAI
+            llm = ChatOpenAI(
+                model=settings.ai.model,
+                temperature=settings.ai.temperature,
+                max_tokens=settings.ai.max_tokens,
+                api_key=settings.ai.api_key
+            )
+        elif settings.ai.provider == "anthropic":
+            from langchain_anthropic import ChatAnthropic
+            llm = ChatAnthropic(
+                model=settings.ai.model,
+                temperature=settings.ai.temperature,
+                max_tokens=settings.ai.max_tokens,
+                api_key=settings.ai.api_key
+            )
+        elif settings.ai.provider == "google":
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            llm = ChatGoogleGenerativeAI(
+                model=settings.ai.model,
+                temperature=settings.ai.temperature,
+                max_tokens=settings.ai.max_tokens,
+                google_api_key=settings.ai.api_key
+            )
+        else:
+            raise ValueError(f"Unsupported AI provider: {settings.ai.provider}")
+
         self.analyzer = TranscriptAnalyzer(llm=llm)
 
         # Initialize Slack bot
