@@ -269,10 +269,10 @@ def trigger_celery_tempo_sync():
 @admin_or_api_key_required
 def trigger_meeting_analysis_sync():
     """
-    Trigger nightly meeting analysis sync job.
+    Trigger nightly meeting analysis sync job (synchronous).
 
     Analyzes meetings from active projects (3-day lookback) and stores results.
-    This endpoint is used by the nightly GitHub Actions workflow.
+    Runs synchronously within the Flask app - use Celery endpoint for production.
 
     Authentication: Requires either admin JWT or X-Admin-Key header.
     """
@@ -299,6 +299,36 @@ def trigger_meeting_analysis_sync():
 
     except Exception as e:
         logger.error(f"Error triggering meeting analysis sync: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@scheduler_bp.route("/scheduler/celery/meeting-analysis-sync", methods=["POST"])
+@admin_or_api_key_required
+def trigger_celery_meeting_analysis_sync():
+    """
+    Trigger meeting analysis sync via Celery task (asynchronous - recommended).
+
+    Analyzes meetings from active projects (3-day lookback) and stores results.
+    This endpoint is used by the nightly GitHub Actions workflow.
+
+    Features:
+    - Runs asynchronously in Celery worker
+    - Auto-retry up to 2 times with exponential backoff
+    - No HTTP timeout issues
+
+    Authentication: Requires either admin JWT or X-Admin-Key header.
+    """
+    try:
+        from src.tasks.celery_app import celery_app
+        task = celery_app.send_task('src.tasks.notification_tasks.analyze_meetings')
+        logger.info(f"Meeting analysis sync task queued successfully: {task.id}")
+        return jsonify({
+            "success": True,
+            "message": "Meeting analysis sync task queued",
+            "task_id": task.id
+        })
+    except Exception as e:
+        logger.error(f"Error queuing meeting analysis sync: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

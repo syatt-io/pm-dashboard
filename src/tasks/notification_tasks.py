@@ -146,3 +146,47 @@ def sync_tempo_hours(self):
         logger.error(f"❌ Error in Tempo sync task (attempt {self.request.retries + 1}/4): {e}", exc_info=True)
         # Re-raise to trigger auto-retry
         raise
+
+
+@shared_task(
+    name='src.tasks.notification_tasks.analyze_meetings',
+    bind=True,  # Bind task instance to get retry info
+    autoretry_for=(Exception,),  # Auto-retry on any exception
+    retry_kwargs={'max_retries': 2, 'countdown': 600},  # Retry 2 times, wait 10 min between retries
+    retry_backoff=True,  # Exponential backoff
+    retry_backoff_max=3600,  # Max 60 min backoff
+    retry_jitter=True  # Add jitter to prevent thundering herd
+)
+def analyze_meetings(self):
+    """
+    Analyze meetings from active projects (Celery task wrapper).
+    Scheduled to run at 7 AM UTC (3 AM EST).
+
+    Resilience features:
+    - Auto-retry up to 2 times with exponential backoff
+    - 10-minute initial wait, up to 60-minute max backoff
+    - Jitter to prevent simultaneous retries
+    """
+    try:
+        retry_info = f" (attempt {self.request.retries + 1}/3)" if self.request.retries > 0 else ""
+        logger.info(f"🔍 Starting meeting analysis sync task{retry_info}...")
+        from src.jobs.meeting_analysis_sync import run_meeting_analysis_sync
+        stats = run_meeting_analysis_sync()
+
+        if stats.get('success'):
+            logger.info(f"✅ Meeting analysis completed: {stats.get('meetings_analyzed', 0)} meetings analyzed")
+            return {
+                'success': True,
+                'task': 'meeting_analysis',
+                'retries': self.request.retries,
+                **stats
+            }
+        else:
+            error_msg = stats.get('error', 'Unknown error')
+            logger.error(f"❌ Meeting analysis failed: {error_msg}")
+            raise Exception(f"Meeting analysis failed: {error_msg}")
+
+    except Exception as e:
+        logger.error(f"❌ Error in meeting analysis task (attempt {self.request.retries + 1}/3): {e}", exc_info=True)
+        # Re-raise to trigger auto-retry
+        raise
