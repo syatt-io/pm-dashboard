@@ -71,6 +71,22 @@ class FeedbackItem(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
+class ProjectDigestCache(Base):
+    """Cache for project digest results to avoid redundant AI calls."""
+    __tablename__ = 'project_digest_cache'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_key = Column(String(50), nullable=False, index=True)
+    days = Column(Integer, nullable=False)  # Number of days back (7 or 30)
+    digest_data = Column(Text, nullable=False)  # JSON string of full digest result
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+
+    def is_expired(self, ttl_hours: int = 6) -> bool:
+        """Check if cache entry is expired (default 6 hours)."""
+        from datetime import timedelta
+        expiry_time = self.created_at + timedelta(hours=ttl_hours)
+        return datetime.now(timezone.utc) > expiry_time
+
 # Import DTOs
 from .dtos import (
     ProcessedMeetingDTO,
@@ -91,6 +107,7 @@ __all__ = [
     'TodoItem',
     'ProcessedMeeting',
     'FeedbackItem',
+    'ProjectDigestCache',
     'BackfillProgress',
     'SystemSettings',
     'Base',

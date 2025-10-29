@@ -275,13 +275,43 @@ def sync_hours():
 
 @tempo_bp.route('/project-digest/<project_key>', methods=['POST'])
 def generate_project_digest(project_key):
-    """Generate a comprehensive project digest for client meetings."""
+    """Generate a comprehensive project digest for client meetings.
+
+    Supports caching with 6-hour TTL. Use force_refresh=true to bypass cache.
+    """
     try:
         data = request.json or {}
         days_back = int(data.get('days', 7))
         project_name = data.get('project_name', project_key)
+        force_refresh = data.get('force_refresh', False)
 
-        logger.info(f"Generating project digest for {project_key} ({days_back} days)")
+        # Check cache first unless force refresh
+        if not force_refresh:
+            from src.models import ProjectDigestCache
+            from src.utils.database import get_db_session
+
+            session = get_db_session()
+            try:
+                # Find most recent cache entry for this project/days combo
+                cache_entry = session.query(ProjectDigestCache).filter(
+                    ProjectDigestCache.project_key == project_key,
+                    ProjectDigestCache.days == days_back
+                ).order_by(ProjectDigestCache.created_at.desc()).first()
+
+                if cache_entry and not cache_entry.is_expired(ttl_hours=6):
+                    logger.info(f"Returning cached digest for {project_key} ({days_back} days), created at {cache_entry.created_at}")
+                    import json
+                    cached_data = json.loads(cache_entry.digest_data)
+                    cached_data['from_cache'] = True
+                    cached_data['cached_at'] = cache_entry.created_at.isoformat()
+                    return jsonify(cached_data)
+                else:
+                    if cache_entry:
+                        logger.info(f"Cache expired for {project_key}, regenerating digest")
+            finally:
+                session.close()
+
+        logger.info(f"Generating fresh project digest for {project_key} ({days_back} days)")
 
         async def generate_digest():
             from src.services.project_activity_aggregator import ProjectActivityAggregator
@@ -311,11 +341,34 @@ def generate_project_digest(project_key):
                     'blockers_risks': activity.blockers_risks,
                     'next_steps': activity.next_steps
                 },
-                'formatted_agenda': markdown_agenda
+                'formatted_agenda': markdown_agenda,
+                'from_cache': False
             }
 
         # Run the async function
         result = asyncio.run(generate_digest())
+
+        # Cache the result
+        from src.models import ProjectDigestCache
+        from src.utils.database import get_db_session
+        import json
+
+        session = get_db_session()
+        try:
+            cache_entry = ProjectDigestCache(
+                project_key=project_key,
+                days=days_back,
+                digest_data=json.dumps(result)
+            )
+            session.add(cache_entry)
+            session.commit()
+            logger.info(f"Cached digest for {project_key} ({days_back} days)")
+        except Exception as cache_error:
+            logger.error(f"Failed to cache digest: {cache_error}")
+            session.rollback()
+        finally:
+            session.close()
+
         return jsonify(result)
 
     except Exception as e:

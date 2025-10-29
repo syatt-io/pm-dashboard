@@ -1758,16 +1758,33 @@ class SlackTodoBot:
         import random  # Move import outside try block
 
         try:
-            # Import OpenAI
-            from langchain_openai import ChatOpenAI
-
-            # Initialize LLM (settings is already imported at the top)
-            llm = ChatOpenAI(
-                model=settings.ai.model,
-                temperature=1.2,  # Higher temperature for more creative jokes
-                max_tokens=200,
-                api_key=settings.ai.api_key
-            )
+            # Initialize LLM based on configured provider
+            if settings.ai.provider == "openai":
+                from langchain_openai import ChatOpenAI
+                llm = ChatOpenAI(
+                    model=settings.ai.model,
+                    temperature=1.2,  # Higher temperature for more creative jokes
+                    max_tokens=200,
+                    api_key=settings.ai.api_key
+                )
+            elif settings.ai.provider == "anthropic":
+                from langchain_anthropic import ChatAnthropic
+                llm = ChatAnthropic(
+                    model=settings.ai.model,
+                    temperature=1.2,
+                    max_tokens=200,
+                    api_key=settings.ai.api_key
+                )
+            elif settings.ai.provider == "google":
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                llm = ChatGoogleGenerativeAI(
+                    model=settings.ai.model,
+                    temperature=1.2,
+                    max_output_tokens=200,
+                    google_api_key=settings.ai.api_key
+                )
+            else:
+                raise ValueError(f"Unsupported AI provider: {settings.ai.provider}")
 
             # Build the prompt
             prompt_parts = ["Generate a single dad joke"]

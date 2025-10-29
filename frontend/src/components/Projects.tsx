@@ -2060,7 +2060,7 @@ const ProjectShowContent = () => {
     }
   };
 
-  const handleGenerateDigest = async () => {
+  const handleGenerateDigest = async (forceRefresh: boolean = false) => {
     if (!record?.key) return;
 
     setGeneratingDigest(true);
@@ -2075,6 +2075,7 @@ const ProjectShowContent = () => {
         body: JSON.stringify({
           days: 7,
           project_name: record.name,
+          force_refresh: forceRefresh,
         }),
       });
 
@@ -2435,17 +2436,39 @@ const ProjectShowContent = () => {
           }}
         >
           <DialogTitle>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="h6">📋 Project Digest - Last 7 Days</Typography>
-              <MuiButton
-                size="small"
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-                onClick={downloadDigest}
-                sx={{ textTransform: 'none' }}
-              >
-                Download MD
-              </MuiButton>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+              <Box>
+                <Typography variant="h6">📋 Project Digest - Last 7 Days</Typography>
+                {digestData?.from_cache && (
+                  <Typography variant="caption" color="text.secondary">
+                    Cached result from {new Date(digestData.cached_at).toLocaleString()}
+                  </Typography>
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <MuiButton
+                  size="small"
+                  variant="outlined"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => {
+                    setDigestModalOpen(false);
+                    handleGenerateDigest(true);
+                  }}
+                  disabled={generatingDigest}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Refresh
+                </MuiButton>
+                <MuiButton
+                  size="small"
+                  variant="outlined"
+                  startIcon={<DownloadIcon />}
+                  onClick={downloadDigest}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Download MD
+                </MuiButton>
+              </Box>
             </Box>
           </DialogTitle>
 
