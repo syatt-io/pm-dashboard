@@ -1618,35 +1618,20 @@ export const ProjectList = () => {
                         <TableRow
                           key={project.key}
                           sx={{
+                            cursor: 'pointer',
                             '&:hover': {
                               backgroundColor: 'rgba(85, 77, 255, 0.08)'
                             }
                           }}
+                          onClick={() => redirect('show', 'projects', project.key)}
                         >
                           <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box sx={{ flex: 1 }}>
-                                <Typography variant="body2" fontWeight="medium">
-                                  {project.name}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  {project.key}
-                                </Typography>
-                              </Box>
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handleCardClick(project)}
-                                title="Generate Digest"
-                                sx={{
-                                  '&:hover': {
-                                    backgroundColor: 'rgba(85, 77, 255, 0.1)'
-                                  }
-                                }}
-                              >
-                                <DigestIcon />
-                              </IconButton>
-                            </Box>
+                            <Typography variant="body2" fontWeight="medium">
+                              {project.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {project.key}
+                            </Typography>
                           </TableCell>
                           <TableCell>{getTypeLabel(projectType)}</TableCell>
                           <TableCell>
@@ -1770,24 +1755,7 @@ export const ProjectList = () => {
                               }
                             }}
                           >
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="body2">{project.name}</Typography>
-                                <IconButton
-                                  size="small"
-                                  color="primary"
-                                  onClick={() => handleCardClick(project)}
-                                  title="Generate Digest"
-                                  sx={{
-                                    '&:hover': {
-                                      backgroundColor: 'rgba(85, 77, 255, 0.1)'
-                                    }
-                                  }}
-                                >
-                                  <DigestIcon />
-                                </IconButton>
-                              </Box>
-                            </TableCell>
+                            <TableCell>{project.name}</TableCell>
                             <TableCell>
                               <Chip label={project.key} size="small" />
                             </TableCell>
@@ -1960,6 +1928,11 @@ const ProjectShowContent = () => {
   });
   const [loadingMappings, setLoadingMappings] = useState(false);
 
+  // Digest generator state
+  const [generatingDigest, setGeneratingDigest] = useState(false);
+  const [digestModalOpen, setDigestModalOpen] = useState(false);
+  const [digestData, setDigestData] = useState<any>(null);
+
   // Load keywords and resource mappings when component mounts
   useEffect(() => {
     if (record?.key) {
@@ -2087,10 +2060,71 @@ const ProjectShowContent = () => {
     }
   };
 
+  const handleGenerateDigest = async () => {
+    if (!record?.key) return;
+
+    setGeneratingDigest(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/api/project-digest/${record.key}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          days: 7,
+          project_name: record.name,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDigestData(data);
+        setDigestModalOpen(true);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        notify(`Error generating digest: ${errorData.error || response.statusText}`, { type: 'error' });
+      }
+    } catch (error) {
+      notify(`Error generating digest: ${error.message}`, { type: 'error' });
+    } finally {
+      setGeneratingDigest(false);
+    }
+  };
+
+  const downloadDigest = () => {
+    if (!digestData || !digestData.formatted_agenda) return;
+
+    const blob = new Blob([digestData.formatted_agenda], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${record?.key}_digest_7days_${new Date().toISOString().split('T')[0]}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   if (!record) return null;
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Digest Generator Button */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+        <MuiButton
+          variant="contained"
+          color="primary"
+          startIcon={generatingDigest ? <CircularProgress size={20} color="inherit" /> : <DigestIcon />}
+          onClick={handleGenerateDigest}
+          disabled={generatingDigest}
+          sx={{ textTransform: 'none' }}
+        >
+          {generatingDigest ? 'Generating Digest...' : 'Generate Weekly Digest'}
+        </MuiButton>
+      </Box>
+
         <Grid container spacing={3}>
           {/* Project Information */}
           <Grid item xs={12} md={6}>
@@ -2389,6 +2423,133 @@ const ProjectShowContent = () => {
             </Card>
           </Grid>
         </Grid>
+
+        {/* Digest Modal */}
+        <Dialog
+          open={digestModalOpen}
+          onClose={() => setDigestModalOpen(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: { maxHeight: '90vh' }
+          }}
+        >
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography variant="h6">📋 Project Digest - Last 7 Days</Typography>
+              <MuiButton
+                size="small"
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={downloadDigest}
+                sx={{ textTransform: 'none' }}
+              >
+                Download MD
+              </MuiButton>
+            </Box>
+          </DialogTitle>
+
+          <DialogContent dividers>
+            {digestData && (
+              <>
+                {/* Activity Summary */}
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    📊 Activity Summary
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6} sm={3}>
+                      <Box sx={{ textAlign: 'center', p: 2, backgroundColor: 'rgba(85, 77, 255, 0.08)', borderRadius: 1 }}>
+                        <Typography variant="h4" color="primary.main">
+                          {digestData.activity_data?.meetings_count || 0}
+                        </Typography>
+                        <Typography variant="caption">Meetings</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Box sx={{ textAlign: 'center', p: 2, backgroundColor: 'rgba(76, 175, 80, 0.08)', borderRadius: 1 }}>
+                        <Typography variant="h4" color="success.main">
+                          {digestData.activity_data?.tickets_completed || 0}
+                        </Typography>
+                        <Typography variant="caption">Completed</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Box sx={{ textAlign: 'center', p: 2, backgroundColor: 'rgba(33, 150, 243, 0.08)', borderRadius: 1 }}>
+                        <Typography variant="h4" color="info.main">
+                          {digestData.activity_data?.tickets_created || 0}
+                        </Typography>
+                        <Typography variant="caption">New Tickets</Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6} sm={3}>
+                      <Box sx={{ textAlign: 'center', p: 2, backgroundColor: 'rgba(255, 152, 0, 0.08)', borderRadius: 1 }}>
+                        <Typography variant="h4" color="warning.main">
+                          {digestData.activity_data?.hours_logged?.toFixed(1) || 0}h
+                        </Typography>
+                        <Typography variant="caption">Hours Logged</Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Box>
+
+                {/* Full Digest Content */}
+                <Box sx={{
+                  backgroundColor: '#f8f9fa',
+                  border: '1px solid #e9ecef',
+                  borderRadius: 1,
+                  p: 3,
+                  maxHeight: '500px',
+                  overflow: 'auto',
+                  '& h1': { fontSize: '1.75rem', fontWeight: 600, mt: 2, mb: 2, color: '#2c3e50' },
+                  '& h2': { fontSize: '1.5rem', fontWeight: 600, mt: 2, mb: 1.5, color: '#34495e', borderBottom: '2px solid #e9ecef', pb: 1 },
+                  '& h3': { fontSize: '1.25rem', fontWeight: 600, mt: 2, mb: 1, color: '#34495e' },
+                  '& h4': { fontSize: '1.1rem', fontWeight: 600, mt: 1.5, mb: 1, color: '#34495e' },
+                  '& p': { mb: 1.5, lineHeight: 1.7, color: '#495057' },
+                  '& ul, & ol': { pl: 3, mb: 2 },
+                  '& li': { mb: 0.75, lineHeight: 1.6, color: '#495057' },
+                  '& strong': { fontWeight: 600, color: '#2c3e50' },
+                  '& em': { fontStyle: 'italic' },
+                  '& code': {
+                    backgroundColor: '#e9ecef',
+                    padding: '2px 6px',
+                    borderRadius: '3px',
+                    fontSize: '0.9em',
+                    fontFamily: 'monospace',
+                    color: '#c7254e'
+                  },
+                  '& pre': {
+                    backgroundColor: '#f5f5f5',
+                    p: 2,
+                    borderRadius: 1,
+                    overflow: 'auto',
+                    border: '1px solid #ddd'
+                  },
+                  '& blockquote': {
+                    borderLeft: '4px solid #554DFF',
+                    pl: 2,
+                    ml: 0,
+                    fontStyle: 'italic',
+                    color: '#6c757d'
+                  },
+                  '& a': { color: '#554DFF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } },
+                  '& hr': { border: 'none', borderTop: '1px solid #dee2e6', my: 2 }
+                }}>
+                  <ReactMarkdown>{digestData.formatted_agenda || ''}</ReactMarkdown>
+                </Box>
+              </>
+            )}
+          </DialogContent>
+
+          <DialogActions>
+            <MuiButton onClick={() => setDigestModalOpen(false)}>
+              Close
+            </MuiButton>
+            <MuiButton variant="contained" color="primary" onClick={downloadDigest} startIcon={<DownloadIcon />}>
+              Download
+            </MuiButton>
+          </DialogActions>
+        </Dialog>
     </Box>
   );
 };
