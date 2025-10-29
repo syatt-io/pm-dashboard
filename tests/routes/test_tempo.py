@@ -271,3 +271,183 @@ class TestProjectDigest:
         response = client.post('/api/project-digest/')
 
         assert response.status_code in [404, 405]  # Not Found or Method Not Allowed
+
+    @patch('src.routes.tempo.asyncio.run')
+    @patch('src.utils.database.get_session')
+    def test_generate_digest_cache_hit(self, mock_get_session, mock_async, client):
+        """Test that cached digest is returned without calling aggregator."""
+        from src.models import ProjectDigestCache
+        from datetime import datetime, timezone
+        import json
+
+        # Create a mock cache entry that is not expired
+        mock_cache = MagicMock(spec=ProjectDigestCache)
+        mock_cache.project_key = 'PROJ1'
+        mock_cache.days = 7
+        mock_cache.created_at = datetime.now(timezone.utc)
+        mock_cache.digest_data = json.dumps({
+            'success': True,
+            'project_key': 'PROJ1',
+            'project_name': 'Cached Project',
+            'days_back': 7,
+            'activity_data': {'cached': True},
+            'formatted_agenda': 'Cached agenda'
+        })
+        mock_cache.is_expired.return_value = False
+
+        # Mock database session
+        mock_session = MagicMock()
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_order_by = mock_filter.order_by.return_value
+        mock_order_by.first.return_value = mock_cache
+        mock_get_session.return_value = mock_session
+
+        response = client.post('/api/project-digest/PROJ1', json={
+            'days': 7,
+            'project_name': 'Test Project'
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['from_cache'] is True
+        assert data['activity_data']['cached'] is True
+        # Aggregator should NOT be called
+        mock_async.assert_not_called()
+
+    @patch('src.routes.tempo.asyncio.run')
+    @patch('src.utils.database.get_session')
+    def test_generate_digest_cache_miss(self, mock_get_session, mock_async, client):
+        """Test that digest is generated and cached when no cache exists."""
+        import json
+
+        # Mock no cache entry found
+        mock_session = MagicMock()
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_order_by = mock_filter.order_by.return_value
+        mock_order_by.first.return_value = None
+        mock_get_session.return_value = mock_session
+
+        # Mock aggregator response
+        def async_side_effect(coro):
+            return {
+                'success': True,
+                'project_key': 'PROJ1',
+                'project_name': 'Fresh Project',
+                'days_back': 7,
+                'activity_data': {'fresh': True},
+                'formatted_agenda': 'Fresh agenda'
+            }
+
+        mock_async.side_effect = async_side_effect
+
+        response = client.post('/api/project-digest/PROJ1', json={
+            'days': 7,
+            'project_name': 'Test Project'
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert 'from_cache' not in data  # Fresh generation
+        # Aggregator should be called
+        mock_async.assert_called_once()
+        # Cache should be saved
+        assert mock_session.add.called
+        assert mock_session.commit.called
+
+    @patch('src.routes.tempo.asyncio.run')
+    @patch('src.utils.database.get_session')
+    def test_generate_digest_force_refresh(self, mock_get_session, mock_async, client):
+        """Test that force_refresh bypasses cache."""
+        from src.models import ProjectDigestCache
+        from datetime import datetime, timezone
+        import json
+
+        # Create a mock cache entry (should be ignored)
+        mock_cache = MagicMock(spec=ProjectDigestCache)
+        mock_cache.is_expired.return_value = False
+        mock_cache.digest_data = json.dumps({'cached': True})
+
+        mock_session = MagicMock()
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_order_by = mock_filter.order_by.return_value
+        mock_order_by.first.return_value = mock_cache
+        mock_get_session.return_value = mock_session
+
+        # Mock aggregator response
+        def async_side_effect(coro):
+            return {
+                'success': True,
+                'project_key': 'PROJ1',
+                'project_name': 'Refreshed Project',
+                'days_back': 7,
+                'activity_data': {'refreshed': True},
+                'formatted_agenda': 'Refreshed agenda'
+            }
+
+        mock_async.side_effect = async_side_effect
+
+        response = client.post('/api/project-digest/PROJ1', json={
+            'days': 7,
+            'project_name': 'Test Project',
+            'force_refresh': True
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert 'from_cache' not in data
+        # Aggregator SHOULD be called despite cache existing
+        mock_async.assert_called_once()
+
+    @patch('src.routes.tempo.asyncio.run')
+    @patch('src.utils.database.get_session')
+    def test_generate_digest_expired_cache(self, mock_get_session, mock_async, client):
+        """Test that expired cache triggers regeneration."""
+        from src.models import ProjectDigestCache
+        from datetime import datetime, timezone
+        import json
+
+        # Create a mock cache entry that IS expired
+        mock_cache = MagicMock(spec=ProjectDigestCache)
+        mock_cache.project_key = 'PROJ1'
+        mock_cache.days = 7
+        mock_cache.created_at = datetime.now(timezone.utc)
+        mock_cache.digest_data = json.dumps({'old': True})
+        mock_cache.is_expired.return_value = True  # Expired!
+
+        mock_session = MagicMock()
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_order_by = mock_filter.order_by.return_value
+        mock_order_by.first.return_value = mock_cache
+        mock_get_session.return_value = mock_session
+
+        # Mock aggregator response
+        def async_side_effect(coro):
+            return {
+                'success': True,
+                'project_key': 'PROJ1',
+                'project_name': 'New Project',
+                'days_back': 7,
+                'activity_data': {'new': True},
+                'formatted_agenda': 'New agenda'
+            }
+
+        mock_async.side_effect = async_side_effect
+
+        response = client.post('/api/project-digest/PROJ1', json={
+            'days': 7,
+            'project_name': 'Test Project'
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert 'from_cache' not in data
+        # Aggregator SHOULD be called because cache is expired
+        mock_async.assert_called_once()
