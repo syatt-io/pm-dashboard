@@ -1438,6 +1438,7 @@ class ProjectActivityAggregator:
 {self._format_section_content(activity.proposed_agenda, "No agenda items identified")}
 {progress_section}{github_section}{time_section}
 ---
+
 **Team Activity:** {len(activity.meetings)} meetings • {activity.total_hours:.1f}h logged • {len(activity.completed_tickets)} tickets completed
 
 *Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}*
