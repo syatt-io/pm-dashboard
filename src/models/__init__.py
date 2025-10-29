@@ -78,6 +78,7 @@ class ProjectDigestCache(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_key = Column(String(50), nullable=False, index=True)
     days = Column(Integer, nullable=False)  # Number of days back (7 or 30)
+    include_context = Column(Boolean, nullable=False, default=False)  # Whether Pinecone context was included
     digest_data = Column(Text, nullable=False)  # JSON string of full digest result
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
 

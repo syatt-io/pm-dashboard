@@ -293,14 +293,16 @@ def generate_project_digest(project_key):
 
             session = get_session()
             try:
-                # Find most recent cache entry for this project/days combo
+                # Find most recent cache entry for this project/days/include_context combo
                 cache_entry = session.query(ProjectDigestCache).filter(
                     ProjectDigestCache.project_key == project_key,
-                    ProjectDigestCache.days == days_back
+                    ProjectDigestCache.days == days_back,
+                    ProjectDigestCache.include_context == include_context
                 ).order_by(ProjectDigestCache.created_at.desc()).first()
 
                 if cache_entry and not cache_entry.is_expired(ttl_hours=6):
-                    logger.info(f"Returning cached digest for {project_key} ({days_back} days), created at {cache_entry.created_at}")
+                    context_str = "with context" if include_context else "without context"
+                    logger.info(f"Returning cached digest for {project_key} ({days_back} days, {context_str}), created at {cache_entry.created_at}")
                     import json
                     cached_data = json.loads(cache_entry.digest_data)
                     cached_data['from_cache'] = True
@@ -360,11 +362,13 @@ def generate_project_digest(project_key):
             cache_entry = ProjectDigestCache(
                 project_key=project_key,
                 days=days_back,
+                include_context=include_context,
                 digest_data=json.dumps(result)
             )
             session.add(cache_entry)
             session.commit()
-            logger.info(f"Cached digest for {project_key} ({days_back} days)")
+            context_str = "with context" if include_context else "without context"
+            logger.info(f"Cached digest for {project_key} ({days_back} days, {context_str})")
         except Exception as cache_error:
             logger.error(f"Failed to cache digest: {cache_error}")
             session.rollback()
@@ -375,6 +379,134 @@ def generate_project_digest(project_key):
 
     except Exception as e:
         logger.error(f"Error generating project digest: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@tempo_bp.route('/project-digest-compare/<project_key>', methods=['POST'])
+def compare_project_digests(project_key):
+    """Generate A/B comparison of Weekly Recaps with and without Pinecone context.
+
+    Returns both versions side-by-side for comparison. Respects cache with 6-hour TTL.
+    """
+    try:
+        data = request.json or {}
+        days_back = int(data.get('days', 7))
+        project_name = data.get('project_name', project_key)
+
+        logger.info(f"Generating A/B comparison for {project_key} ({days_back} days)")
+
+        async def generate_both_versions():
+            """Generate both digest versions in parallel."""
+            from src.services.project_activity_aggregator import ProjectActivityAggregator
+            from src.models import ProjectDigestCache
+            from src.utils.database import get_session
+            import json
+
+            # Helper to check cache and generate if needed
+            async def get_or_generate_digest(include_ctx: bool):
+                session = get_session()
+                try:
+                    # Check cache first
+                    cache_entry = session.query(ProjectDigestCache).filter(
+                        ProjectDigestCache.project_key == project_key,
+                        ProjectDigestCache.days == days_back,
+                        ProjectDigestCache.include_context == include_ctx
+                    ).order_by(ProjectDigestCache.created_at.desc()).first()
+
+                    if cache_entry and not cache_entry.is_expired(ttl_hours=6):
+                        context_str = "with context" if include_ctx else "without context"
+                        logger.info(f"Using cached digest for {project_key} ({context_str})")
+                        cached_data = json.loads(cache_entry.digest_data)
+                        cached_data['from_cache'] = True
+                        cached_data['cached_at'] = cache_entry.created_at.isoformat()
+                        return cached_data
+                finally:
+                    session.close()
+
+                # Generate fresh digest
+                context_str = "with context" if include_ctx else "without context"
+                logger.info(f"Generating fresh digest for {project_key} ({context_str})")
+
+                aggregator = ProjectActivityAggregator()
+                activity = await aggregator.aggregate_project_activity(
+                    project_key=project_key,
+                    project_name=project_name,
+                    days_back=days_back,
+                    include_context=include_ctx
+                )
+
+                # Format the digest
+                markdown_agenda = aggregator.format_client_agenda(activity)
+
+                result = {
+                    'success': True,
+                    'project_key': project_key,
+                    'project_name': project_name,
+                    'days_back': days_back,
+                    'activity_data': {
+                        'meetings_count': len(activity.meetings),
+                        'tickets_completed': len(activity.completed_tickets),
+                        'tickets_created': len(activity.new_tickets),
+                        'hours_logged': activity.total_hours,
+                        'progress_summary': activity.progress_summary,
+                        'key_achievements': activity.key_achievements,
+                        'blockers_risks': activity.blockers_risks,
+                        'next_steps': activity.next_steps
+                    },
+                    'formatted_agenda': markdown_agenda,
+                    'from_cache': False
+                }
+
+                # Cache the result
+                session = get_session()
+                try:
+                    cache_entry = ProjectDigestCache(
+                        project_key=project_key,
+                        days=days_back,
+                        include_context=include_ctx,
+                        digest_data=json.dumps(result)
+                    )
+                    session.add(cache_entry)
+                    session.commit()
+                    logger.info(f"Cached digest for {project_key} ({context_str})")
+                except Exception as cache_error:
+                    logger.error(f"Failed to cache digest: {cache_error}")
+                    session.rollback()
+                finally:
+                    session.close()
+
+                return result
+
+            # Generate both versions in parallel
+            without_context, with_context = await asyncio.gather(
+                get_or_generate_digest(False),
+                get_or_generate_digest(True)
+            )
+
+            return {
+                'without_context': without_context,
+                'with_context': with_context
+            }
+
+        # Run the async function
+        result = asyncio.run(generate_both_versions())
+
+        return jsonify({
+            'success': True,
+            'project_key': project_key,
+            'project_name': project_name,
+            'days_back': days_back,
+            'without_context': result['without_context'],
+            'with_context': result['with_context']
+        })
+
+    except Exception as e:
+        logger.error(f"Error generating digest comparison: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({

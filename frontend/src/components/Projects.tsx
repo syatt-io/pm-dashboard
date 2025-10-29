@@ -72,6 +72,7 @@ import {
   GetApp as DownloadIcon,
 } from '@mui/icons-material';
 import { ResourceMappingCell } from './ResourceMappingCell';
+import WeeklyRecapComparison from './WeeklyRecapComparison';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -1933,6 +1934,11 @@ const ProjectShowContent = () => {
   const [digestData, setDigestData] = useState<any>(null);
   const [includeHistoricalContext, setIncludeHistoricalContext] = useState(false);
 
+  // A/B comparison state
+  const [comparisonModalOpen, setComparisonModalOpen] = useState(false);
+  const [comparisonData, setComparisonData] = useState<any>(null);
+  const [generatingComparison, setGeneratingComparison] = useState(false);
+
   // Load keywords and resource mappings when component mounts
   useEffect(() => {
     if (record?.key) {
@@ -2109,6 +2115,43 @@ const ProjectShowContent = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleGenerateComparison = async () => {
+    if (!record?.key) return;
+
+    setGeneratingComparison(true);
+    setComparisonData(null);
+    setComparisonModalOpen(true); // Open modal immediately to show loading state
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/api/project-digest-compare/${record.key}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          days: 7,
+          project_name: record.name,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setComparisonData(data);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        notify(`Error generating comparison: ${errorData.error || response.statusText}`, { type: 'error' });
+        setComparisonModalOpen(false); // Close modal on error
+      }
+    } catch (error) {
+      notify(`Error generating comparison: ${error.message}`, { type: 'error' });
+      setComparisonModalOpen(false); // Close modal on error
+    } finally {
+      setGeneratingComparison(false);
+    }
+  };
+
   if (!record) return null;
 
   return (
@@ -2135,6 +2178,16 @@ const ProjectShowContent = () => {
           sx={{ textTransform: 'none' }}
         >
           {generatingDigest ? 'Generating Recap...' : 'Generate Weekly Recap'}
+        </MuiButton>
+        <MuiButton
+          variant="outlined"
+          color="secondary"
+          startIcon={generatingComparison ? <CircularProgress size={20} color="inherit" /> : <DigestIcon />}
+          onClick={handleGenerateComparison}
+          disabled={generatingComparison || generatingDigest}
+          sx={{ textTransform: 'none' }}
+        >
+          {generatingComparison ? 'Generating A/B...' : 'A/B Test Context'}
         </MuiButton>
       </Box>
 
@@ -2585,6 +2638,15 @@ const ProjectShowContent = () => {
             </MuiButton>
           </DialogActions>
         </Dialog>
+
+        {/* A/B Comparison Modal */}
+        <WeeklyRecapComparison
+          open={comparisonModalOpen}
+          onClose={() => setComparisonModalOpen(false)}
+          comparisonData={comparisonData}
+          loading={generatingComparison}
+          projectName={record?.name || record?.key || 'Project'}
+        />
     </Box>
   );
 };
