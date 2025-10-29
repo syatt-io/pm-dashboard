@@ -1003,12 +1003,19 @@ class ProjectActivityAggregator:
                     activity.next_steps = ["Follow up on meeting action items", "Address identified blockers"]
 
         except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
             logger.error(f"Error generating insights: {e}")
+            logger.error(f"Full traceback:\n{error_details}")
+            logger.error(f"AI Provider: {self.analyzer.llm.__class__.__name__}")
+            logger.error(f"Meeting count: {len(activity.meetings)}")
+            logger.error(f"Ticket count: {len(activity.completed_tickets)}")
+
             # Provide basic insights even if AI processing fails
             activity.progress_summary = f"Project {activity.project_name} had {len(activity.meetings)} meetings and {len(activity.completed_tickets)} completed tickets in the past week."
 
-            # Set the new structure fields to fallback content
-            activity.noteworthy_discussions = f"Error generating AI insights - {len(activity.meetings)} meetings were held"
+            # Set the new structure fields to fallback content with error info
+            activity.noteworthy_discussions = f"Error generating AI insights ({type(e).__name__}: {str(e)[:100]}) - {len(activity.meetings)} meetings were held"
             activity.work_completed = f"Generated fallback: {len(activity.completed_tickets)} tickets completed this period"
             activity.topics_for_discussion = "Review meeting notes for detailed discussion topics"
             activity.attention_required = ""
