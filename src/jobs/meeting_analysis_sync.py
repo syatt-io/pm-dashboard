@@ -30,10 +30,10 @@ class MeetingAnalysisSyncJob:
         if not self.database_url:
             raise ValueError("DATABASE_URL environment variable is required")
 
-        # Get system-level Fireflies API key
-        self.fireflies_api_key = os.getenv("FIREFLIES_SYSTEM_API_KEY")
+        # Get system-level Fireflies API key (fallback to regular key if not set)
+        self.fireflies_api_key = os.getenv("FIREFLIES_SYSTEM_API_KEY") or os.getenv("FIREFLIES_API_KEY")
         if not self.fireflies_api_key:
-            raise ValueError("FIREFLIES_SYSTEM_API_KEY environment variable is required")
+            raise ValueError("FIREFLIES_SYSTEM_API_KEY or FIREFLIES_API_KEY environment variable is required")
 
         # Initialize clients
         self.fireflies_client = FirefliesClient(api_key=self.fireflies_api_key)
