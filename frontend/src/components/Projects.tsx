@@ -159,7 +159,7 @@ const WatchToggle = ({ record }: { record: any }) => {
     };
 
     loadWatchedProjectsFromAPI();
-  }, [record.key, loading]); // Only re-run when record.key changes
+  }, [record.key]); // Only re-run when record.key changes
 
   const handleToggle = async () => {
     try {
