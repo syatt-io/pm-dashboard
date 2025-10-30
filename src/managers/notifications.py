@@ -63,7 +63,9 @@ class NotificationManager:
                 "host": self.config.smtp_host,
                 "port": self.config.smtp_port,
                 "user": self.config.smtp_user,
-                "password": self.config.smtp_password
+                "password": self.config.smtp_password,
+                "from_email": os.getenv("SMTP_FROM_EMAIL", self.config.smtp_user),
+                "from_name": os.getenv("SMTP_FROM_NAME", "PM Agent")
             }
             logger.info("Email notification channel configured")
 
@@ -188,7 +190,7 @@ class NotificationManager:
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = f"[PM Agent] {content.title}"
-            msg["From"] = self.smtp_config["user"]
+            msg["From"] = f"{self.smtp_config['from_name']} <{self.smtp_config['from_email']}>"
             msg["To"] = self.smtp_config["user"]  # Send to self by default
 
             # Create HTML version
@@ -390,7 +392,7 @@ class NotificationManager:
             # Build HTML email
             msg = MIMEMultipart("alternative")
             msg["Subject"] = f"Meeting Analysis: {meeting_title}"
-            msg["From"] = self.smtp_config["user"]
+            msg["From"] = f"{self.smtp_config['from_name']} <{self.smtp_config['from_email']}>"
             msg["To"] = ", ".join(recipients)
 
             # Create HTML body with test mode banner if needed

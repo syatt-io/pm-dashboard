@@ -83,6 +83,20 @@ services:
       - key: SLACK_CHANNEL
         value: "#mikes-minion"
 
+      # SMTP Email Configuration (for meeting analysis emails)
+      - key: SMTP_HOST
+        type: SECRET
+      - key: SMTP_PORT
+        type: SECRET
+      - key: SMTP_USER
+        type: SECRET
+      - key: SMTP_PASSWORD
+        type: SECRET
+      - key: SMTP_FROM_EMAIL
+        type: SECRET
+      - key: SMTP_FROM_NAME
+        type: SECRET
+
       # Tempo (optional)
       - key: TEMPO_API_TOKEN
         type: SECRET
