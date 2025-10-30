@@ -239,7 +239,7 @@ class Settings:
         )
 
     @staticmethod
-    def _load_ai_config() -> AIConfig:
+    def _load_ai_config() -> Optional[AIConfig]:
         """Load AI configuration from database if available, otherwise from environment."""
         # Try to load from database first (admin-configured settings)
         db_settings = Settings._load_ai_config_from_db()
@@ -259,10 +259,14 @@ class Settings:
             api_key = os.getenv("GOOGLE_API_KEY")
             model = os.getenv("GOOGLE_MODEL", "gemini-1.5-pro")
         else:
-            raise ValueError(f"Unsupported AI provider: {provider}. Supported providers: openai, anthropic, google")
+            import warnings
+            warnings.warn(f"Unsupported AI provider: {provider}. AI features will be disabled.")
+            return None
 
         if not api_key:
-            raise ValueError(f"{provider.upper()}_API_KEY not set in environment")
+            import warnings
+            warnings.warn(f"{provider.upper()}_API_KEY not set in environment. AI features will be disabled.")
+            return None
 
         return AIConfig(
             provider=provider,
