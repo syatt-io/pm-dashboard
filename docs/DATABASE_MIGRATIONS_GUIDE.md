@@ -326,17 +326,57 @@ PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" < migrations/ad
 PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" -c "\d users"
 ```
 
-## Future Improvement: Automated Alembic Migrations
+## Automated Alembic Migrations (Recommended Solution)
 
-To enable automatic Alembic migrations on deployment, update the app spec:
+### Why Migrations Were Disabled
 
-```yaml
-services:
-- name: app
-  run_command: alembic upgrade head && gunicorn --bind 0.0.0.0:$PORT --workers 4 --timeout 120 src.web_interface:app
+Previously, `run_database_migrations()` was called on app startup but was **disabled** due to:
+
+```python
+# src/web_interface.py line 382-384
+# TEMPORARILY DISABLED: Causing health check failures due to blocking each gunicorn worker
+# TODO: Move migrations to a separate pre-deployment step or run only in master process
+# run_database_migrations()
 ```
 
-**Note**: This hasn't been implemented yet due to permission issues and deployment complexity.
+**The Problem**:
+- With 4 gunicorn workers, each worker ran migrations on startup
+- 4 parallel migration attempts = race conditions + slow startup (30-60+ seconds)
+- DigitalOcean health checks timeout after ~30 seconds
+- Result: **Failed health checks = failed deployments**
+
+### The Solution: PRE_DEPLOY Job
+
+DigitalOcean App Platform supports **PRE_DEPLOY jobs** that run once before the app starts:
+
+```yaml
+# .do/app.yaml
+jobs:
+- name: migrations
+  kind: PRE_DEPLOY
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  run_command: alembic upgrade head
+  source_dir: /
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${agentpm-db.DATABASE_URL}
+  - key: REDIS_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${redis.REDIS_URL}
+  # Add other environment variables needed for migrations
+```
+
+**Benefits**:
+- ✅ Runs **once** per deployment (not per worker)
+- ✅ Runs **before** app starts (no health check failures)
+- ✅ **Automatic rollback** if migration fails
+- ✅ Proper deployment pipeline
+- ✅ No race conditions
+- ✅ Fast app startup
+
+**Implementation Status**: Added to `.do/app.yaml` in this commit.
 
 ## Related Files
 
