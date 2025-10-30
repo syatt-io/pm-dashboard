@@ -1,7 +1,8 @@
 name: Nightly Vector Database Sync
 
-# Runs daily at 6 AM UTC (2 AM EST) to keep vector database fresh
-# This is a workaround while investigating Celery Beat scheduler issue
+# Runs daily at 6 AM UTC (2 AM EST) to keep vector database fresh with recent data
+# Vector syncs: Notion, Slack, Jira, Fireflies, Tempo (1-day incremental)
+# Note: Tempo hours sync (cumulative/monthly) now runs via Celery Beat at 4 AM EST
 on:
   schedule:
     - cron: '0 6 * * *'  # 6 AM UTC daily (2 AM EST)
@@ -61,13 +62,8 @@ jobs:
             || echo "❌ Tempo vector sync failed"
           sleep 5
 
-      - name: Trigger Tempo Hours Sync
-        run: |
-          echo "⏰ Triggering Tempo hours sync (project cumulative & monthly hours)..."
-          curl -X POST \
-            -H "X-Admin-Key: ${{ secrets.ADMIN_API_KEY }}" \
-            "https://agent-pm-tsbbb.ondigitalocean.app/api/scheduler/celery/tempo-sync" \
-            || echo "❌ Tempo hours sync failed"
+      # Tempo hours sync (cumulative/monthly) now handled by Celery Beat at 4 AM EST
+      # See: src/tasks/celery_app.py:176-179 ('tempo-sync-daily' schedule)
 
       - name: Verify Sync Status
         run: |
