@@ -257,7 +257,7 @@ jobs:
     github:
       repo: syatt-io/pm-dashboard
       branch: main
-      deploy_on_push: true  # Deploy with each push
+      deploy_on_push: false  # Manual trigger only - was blocking deployments
     source_dir: /
 
     build_command: pip install -r requirements.txt
@@ -267,7 +267,7 @@ jobs:
     instance_count: 1
     instance_size_slug: basic-xxs
 
-    kind: POST_DEPLOY  # Run after deployment completes
+    kind: MANUAL  # Changed from POST_DEPLOY - was causing 35+ minute deployment hangs
 
     envs:
       # Database (PostgreSQL)
