@@ -5,6 +5,7 @@ import {
   TextField,
   useNotify,
   useDataProvider,
+  useRefresh,
   Button,
   useRedirect,
   Show,
@@ -74,6 +75,10 @@ import {
 } from '@mui/icons-material';
 import { ResourceMappingCell } from './ResourceMappingCell';
 import WeeklyRecapComparison from './WeeklyRecapComparison';
+import { InlineTextField } from './InlineEdit/InlineTextField';
+import { InlineSelectField } from './InlineEdit/InlineSelectField';
+import { InlineNumberField } from './InlineEdit/InlineNumberField';
+import { InlineToggleField } from './InlineEdit/InlineToggleField';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -1921,13 +1926,15 @@ export const ProjectList = () => {
 
 const ProjectShowActions = () => (
   <TopToolbar>
-    <EditButton />
+    {/* EditButton hidden - using inline editing instead */}
   </TopToolbar>
 );
 
 const ProjectShowContent = () => {
   const record = useRecordContext();
   const notify = useNotify();
+  const dataProvider = useDataProvider();
+  const refresh = useRefresh();
   const [keywords, setKeywords] = useState<string[]>([]);
   const [loadingKeywords, setLoadingKeywords] = useState(false);
   const [editingKeywords, setEditingKeywords] = useState(false);
@@ -2007,6 +2014,21 @@ const ProjectShowContent = () => {
       // Silently fail
     } finally {
       setLoadingMappings(false);
+    }
+  };
+
+  const handleFieldUpdate = async (field: string, value: any) => {
+    try {
+      await dataProvider.update('projects', {
+        id: record.key,
+        data: { [field]: value },
+        previousData: record
+      });
+      notify('Project updated successfully', { type: 'success' });
+      refresh();
+    } catch (error) {
+      notify('Error updating project', { type: 'error' });
+      throw error;
     }
   };
 
@@ -2233,36 +2255,71 @@ const ProjectShowContent = () => {
                   <Typography variant="caption" color="text.secondary">
                     Project Name
                   </Typography>
-                  <Typography variant="body1">
-                    {record.name || 'N/A'}
-                  </Typography>
+                  <InlineTextField
+                    value={record.name || ''}
+                    label="Project Name"
+                    onSave={(newValue) => handleFieldUpdate('name', newValue)}
+                    placeholder="Enter project name"
+                    required
+                  />
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary">
                     Description
                   </Typography>
-                  <Typography variant="body1">
-                    {record.description || 'No description'}
-                  </Typography>
+                  <InlineTextField
+                    value={record.description || ''}
+                    label="Description"
+                    onSave={(newValue) => handleFieldUpdate('description', newValue)}
+                    placeholder="Enter project description"
+                    multiline
+                  />
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary">
                     Work Type
                   </Typography>
-                  <Typography variant="body1">
-                    {record.project_work_type || 'N/A'}
-                  </Typography>
+                  <InlineSelectField
+                    value={record.project_work_type || ''}
+                    label="Work Type"
+                    options={[
+                      { value: 'project-based', label: 'Project-Based' },
+                      { value: 'growth-support', label: 'Growth Support' },
+                      { value: 'n-a', label: 'N/A' }
+                    ]}
+                    onSave={(newValue) => handleFieldUpdate('project_work_type', newValue)}
+                    placeholder="Select work type"
+                  />
                 </Box>
 
-                <Box>
+                <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary">
                     Weekly Meeting Day
                   </Typography>
-                  <Typography variant="body1">
-                    {record.weekly_meeting_day || 'Not set'}
-                  </Typography>
+                  <InlineSelectField
+                    value={record.weekly_meeting_day || ''}
+                    label="Weekly Meeting Day"
+                    options={[
+                      { value: 'monday', label: 'Monday' },
+                      { value: 'tuesday', label: 'Tuesday' },
+                      { value: 'wednesday', label: 'Wednesday' },
+                      { value: 'thursday', label: 'Thursday' },
+                      { value: 'friday', label: 'Friday' }
+                    ]}
+                    onSave={(newValue) => handleFieldUpdate('weekly_meeting_day', newValue)}
+                    placeholder="Select meeting day"
+                  />
+                </Box>
+
+                <Box>
+                  <InlineToggleField
+                    value={record.send_meeting_emails || false}
+                    label="Send Meeting Emails"
+                    onSave={(newValue) => handleFieldUpdate('send_meeting_emails', newValue)}
+                    helperText="Automatically send email notifications for meetings"
+                  />
                 </Box>
               </CardContent>
             </Card>
@@ -2281,18 +2338,26 @@ const ProjectShowContent = () => {
                   <Typography variant="caption" color="text.secondary">
                     Forecasted Hours/Month
                   </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                    {record.forecasted_hours_month || 0} hours
-                  </Typography>
+                  <InlineNumberField
+                    value={record.forecasted_hours_month}
+                    label="Forecasted Hours/Month"
+                    onSave={(newValue) => handleFieldUpdate('forecasted_hours_month', newValue)}
+                    placeholder="Enter forecasted hours"
+                    min={0}
+                  />
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="caption" color="text.secondary">
                     Total Hours
                   </Typography>
-                  <Typography variant="body1">
-                    {record.total_hours || 0} hours
-                  </Typography>
+                  <InlineNumberField
+                    value={record.total_hours}
+                    label="Total Hours"
+                    onSave={(newValue) => handleFieldUpdate('total_hours', newValue)}
+                    placeholder="Enter total hours"
+                    min={0}
+                  />
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
