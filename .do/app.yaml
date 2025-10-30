@@ -248,8 +248,8 @@ jobs:
 
     build_command: pip install -r requirements.txt
 
-    # Run Alembic migrations, then ensure watched_projects table exists
-    run_command: alembic upgrade head && python3 scripts/ensure_watched_projects_table.py
+    # Run Alembic migrations only (no longer need ensure_watched_projects_table.py)
+    run_command: alembic upgrade head
 
     instance_count: 1
     instance_size_slug: basic-xxs
