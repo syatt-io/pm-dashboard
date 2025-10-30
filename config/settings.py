@@ -206,18 +206,22 @@ class Settings:
 
     @staticmethod
     def _load_notification_config() -> NotificationConfig:
+        # Handle empty string env vars by treating them as None/defaults
+        smtp_port_str = os.getenv("SMTP_PORT", "587")
+        smtp_port = int(smtp_port_str) if smtp_port_str else 587
+
         return NotificationConfig(
-            slack_bot_token=os.getenv("SLACK_BOT_TOKEN"),
-            slack_signing_secret=os.getenv("SLACK_SIGNING_SECRET"),
-            slack_channel=os.getenv("SLACK_CHANNEL", "#mikes-minion"),
-            slack_urgent_channel=os.getenv("SLACK_URGENT_CHANNEL", "#mikes-minion"),
-            smtp_host=os.getenv("SMTP_HOST"),
-            smtp_port=int(os.getenv("SMTP_PORT", "587")),
-            smtp_user=os.getenv("SMTP_USER"),
-            smtp_password=os.getenv("SMTP_PASS"),
-            teams_webhook_url=os.getenv("TEAMS_WEBHOOK_URL"),
-            morning_digest_time=os.getenv("MORNING_DIGEST_TIME", "08:00"),
-            evening_digest_time=os.getenv("EVENING_DIGEST_TIME", "17:00")
+            slack_bot_token=os.getenv("SLACK_BOT_TOKEN") or None,
+            slack_signing_secret=os.getenv("SLACK_SIGNING_SECRET") or None,
+            slack_channel=os.getenv("SLACK_CHANNEL") or "#mikes-minion",
+            slack_urgent_channel=os.getenv("SLACK_URGENT_CHANNEL") or "#mikes-minion",
+            smtp_host=os.getenv("SMTP_HOST") or None,
+            smtp_port=smtp_port,
+            smtp_user=os.getenv("SMTP_USER") or None,
+            smtp_password=os.getenv("SMTP_PASSWORD") or None,
+            teams_webhook_url=os.getenv("TEAMS_WEBHOOK_URL") or None,
+            morning_digest_time=os.getenv("MORNING_DIGEST_TIME") or "08:00",
+            evening_digest_time=os.getenv("EVENING_DIGEST_TIME") or "17:00"
         )
 
     @staticmethod
