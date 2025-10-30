@@ -289,3 +289,25 @@ jobs:
         value: "1536"
       - key: PINECONE_METRIC
         value: cosine
+
+  # Database Migration Job - Add send_meeting_emails column
+  - name: db-migration-send-emails
+    github:
+      repo: syatt-io/pm-dashboard
+      branch: main
+      deploy_on_push: false  # Manual trigger only
+    source_dir: /
+
+    build_command: pip install -r requirements.txt
+
+    run_command: python3 scripts/migrate_add_send_meeting_emails.py
+
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    kind: MANUAL  # Triggered manually via API/CLI
+
+    envs:
+      # Database (PostgreSQL) - only env var needed
+      - key: DATABASE_URL
+        value: ${agentpm-db.DATABASE_URL}
