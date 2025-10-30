@@ -254,58 +254,9 @@ workers:
         type: SECRET
 
 # Jobs - One-off tasks that can be triggered manually
+# NOTE: jira-backfill job removed from spec (was causing 30+ min deployment hangs)
+# To run Jira backfill manually: python3 run_jira_backfill.py 30
 jobs:
-  - name: jira-backfill
-    github:
-      repo: syatt-io/pm-dashboard
-      branch: main
-      deploy_on_push: false  # Manual trigger only - was blocking deployments
-    source_dir: /
-
-    build_command: pip install -r requirements.txt
-
-    run_command: python3 run_jira_backfill.py 30  # Backfill 30 days
-
-    instance_count: 1
-    instance_size_slug: basic-xxs
-
-    kind: MANUAL  # Changed from POST_DEPLOY - was causing 35+ minute deployment hangs
-
-    envs:
-      # Database (PostgreSQL)
-      - key: DATABASE_URL
-        value: ${agentpm-db.DATABASE_URL}
-
-      # GCP Pub/Sub (for Celery if needed)
-      - key: GCP_PROJECT_ID
-        value: syatt-io
-      - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
-        type: SECRET
-
-      # OpenAI (for embeddings)
-      - key: OPENAI_API_KEY
-        type: SECRET
-
-      # Jira Configuration
-      - key: JIRA_URL
-        value: https://syatt.atlassian.net
-      - key: JIRA_USERNAME
-        value: mike.samimi@syatt.io
-      - key: JIRA_API_TOKEN
-        type: SECRET
-
-      # Pinecone (vector database)
-      - key: PINECONE_API_KEY
-        type: SECRET
-      - key: PINECONE_ENVIRONMENT
-        value: us-east-1-aws
-      - key: PINECONE_INDEX_NAME
-        value: agent-pm-context
-      - key: PINECONE_DIMENSION
-        value: "1536"
-      - key: PINECONE_METRIC
-        value: cosine
-
   # Database Migration Job - Add send_meeting_emails column
   - name: db-migration-send-emails
     github:
