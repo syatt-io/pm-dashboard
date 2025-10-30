@@ -239,32 +239,6 @@ services:
 
 # Jobs - One-off tasks that can be triggered manually
 jobs:
-  # Alembic Migration Job - Runs before each deployment
-  - name: alembic-migrations
-    github:
-      repo: syatt-io/pm-dashboard
-      branch: main
-      deploy_on_push: true  # Run automatically on each deploy
-    source_dir: /
-
-    build_command: pip install -r requirements.txt
-
-    run_command: alembic upgrade head
-
-    instance_count: 1
-    instance_size_slug: basic-xxs
-
-    kind: PRE_DEPLOY  # Run BEFORE app starts (prevents health check failures)
-
-    envs:
-      # Database (PostgreSQL) - primary env var for migrations
-      - key: DATABASE_URL
-        value: ${agentpm-db.DATABASE_URL}
-
-      # Encryption key (needed if models reference encrypted fields)
-      - key: ENCRYPTION_KEY
-        type: SECRET
-
   - name: jira-backfill
     github:
       repo: syatt-io/pm-dashboard

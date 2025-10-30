@@ -376,7 +376,19 @@ jobs:
 - ✅ No race conditions
 - ✅ Fast app startup
 
-**Implementation Status**: Added to `.do/app.yaml` in this commit.
+**Implementation Status**: ⚠️ A `db-migrations` PRE_DEPLOY job already exists in production with run command:
+```bash
+alembic upgrade head && python3 scripts/ensure_watched_projects_table.py
+```
+
+**Current Issue**: The `ensure_watched_projects_table.py` script sometimes fails due to permission errors or missing table dependencies, causing deployments to fail.
+
+**Recommended Fix**: Modify the PRE_DEPLOY job to only run Alembic migrations:
+```yaml
+run_command: alembic upgrade head
+```
+
+The watched_projects table creation should be handled by an Alembic migration instead of a separate script.
 
 ## Related Files
 
