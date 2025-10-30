@@ -3,10 +3,13 @@ region: nyc
 
 # Databases
 databases:
-  - name: agentpm-db
+  - cluster_name: app-3e774e03-7ffb-4138-a401-13c2fd3f09b4
+    db_name: agentpm-db
+    db_user: agentpm-db
     engine: PG
+    name: agentpm-db
+    production: true
     version: "15"
-    production: true  # ✅ FIXED: Enable automated backups and production features
 
 # Single service for both backend and frontend
 services:
@@ -253,28 +256,44 @@ workers:
       - key: GOOGLE_APPLICATION_CREDENTIALS_JSON
         type: SECRET
 
-# Jobs - One-off tasks that can be triggered manually
-# NOTE: jira-backfill job removed from spec (was causing 30+ min deployment hangs)
+# Jobs - One-off tasks
+# NOTE: jira-backfill POST_DEPLOY job removed (was causing 30+ min deployment hangs)
 # To run Jira backfill manually: python3 run_jira_backfill.py 30
 jobs:
-  # Database Migration Job - Add send_meeting_emails column
-  - name: db-migration-send-emails
+  # Database Migration - runs before deployment
+  - name: db-migrations
     github:
       repo: syatt-io/pm-dashboard
       branch: main
-      deploy_on_push: false  # Manual trigger only
+      deploy_on_push: true
     source_dir: /
 
     build_command: pip install -r requirements.txt
 
-    run_command: python3 scripts/migrate_add_send_meeting_emails.py
+    run_command: alembic upgrade head
 
     instance_count: 1
     instance_size_slug: basic-xxs
 
-    kind: MANUAL  # Triggered manually via API/CLI
+    kind: PRE_DEPLOY
 
     envs:
-      # Database (PostgreSQL) - only env var needed
+      # Database
       - key: DATABASE_URL
         value: ${agentpm-db.DATABASE_URL}
+
+      # OpenAI (for migrations that need it)
+      - key: OPENAI_API_KEY
+        type: SECRET
+
+      # Jira
+      - key: JIRA_URL
+        value: https://syatt.atlassian.net
+      - key: JIRA_USERNAME
+        value: mike.samimi@syatt.io
+      - key: JIRA_API_TOKEN
+        type: SECRET
+
+      # Encryption Key
+      - key: ENCRYPTION_KEY
+        type: SECRET
