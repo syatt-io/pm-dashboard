@@ -239,28 +239,6 @@ services:
 
 # Jobs - One-off tasks that can be triggered manually
 jobs:
-  - name: db-migrations
-    github:
-      repo: syatt-io/pm-dashboard
-      branch: main
-      deploy_on_push: true
-    source_dir: /
-
-    build_command: pip install -r requirements.txt
-
-    # Run Alembic migrations only (no longer need ensure_watched_projects_table.py)
-    run_command: alembic upgrade head
-
-    instance_count: 1
-    instance_size_slug: basic-xxs
-
-    kind: PRE_DEPLOY  # Run before deployment starts
-
-    envs:
-      # Database (PostgreSQL)
-      - key: DATABASE_URL
-        value: ${agentpm-db.DATABASE_URL}
-
   - name: jira-backfill
     github:
       repo: syatt-io/pm-dashboard
