@@ -144,13 +144,16 @@ class Settings:
         )
 
     @staticmethod
-    def _load_jira_config() -> JiraConfig:
+    def _load_jira_config() -> Optional[JiraConfig]:
         jira_url = os.getenv("JIRA_URL")
         username = os.getenv("JIRA_USERNAME")
         api_token = os.getenv("JIRA_API_TOKEN")
 
         if not all([jira_url, username, api_token]):
-            raise ValueError("JIRA_URL, JIRA_USERNAME, and JIRA_API_TOKEN must be set")
+            # JIRA config is optional - warn but don't fail
+            import warnings
+            warnings.warn("JIRA_URL, JIRA_USERNAME, and JIRA_API_TOKEN not set. JIRA integration will be disabled.")
+            return None
 
         return JiraConfig(
             url=jira_url,
