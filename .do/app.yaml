@@ -145,6 +145,8 @@ services:
       success_threshold: 1
       failure_threshold: 3
 
+# Workers - Background processes (no HTTP health checks)
+workers:
   # Celery Worker - Background task processor
   - name: celery-worker
     github:
