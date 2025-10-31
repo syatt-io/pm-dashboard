@@ -358,6 +358,7 @@ def update_project(project_key):
     """Update project data in local database."""
     try:
         data = request.json
+        print(f"[DEBUG] update_project called for {project_key} with data: {data}", flush=True)
 
         # Connect to database
         from sqlalchemy import text

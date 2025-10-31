@@ -12,80 +12,62 @@ meeting_analysis:
     - What's preventing progress
     - What important context shapes the work
 
-    CRITICAL PRINCIPLES:
-    1. **Be outcome-oriented**: Focus on what changed, not just what was discussed
-    2. **Capture the "why"**: Include rationale behind decisions when mentioned
-    3. **Prioritize ruthlessly**: Lead with what matters most
-    4. **Preserve nuance**: Important debates, trade-offs, or concerns raised
-    5. **Make it scannable**: Use clear structure, emphasize key points
-    6. **Be specific**: Names, dates, concrete commitments - not vague summaries
+    CRITICAL ANTI-DUPLICATION RULE:
+    **Each piece of information should appear in EXACTLY ONE section.** Do not repeat the same facts across multiple sections. If a decision is captured in Outcomes, don't explain it again in Key Discussions.
 
-    EXTRACTION GUIDELINES:
+    SECTION PURPOSES (read carefully to avoid overlap):
 
-    **For Executive Summary (3-4 sentences max):**
-    - Why this meeting happened (context)
-    - The single most important outcome or decision
-    - Critical next step or action
-    - Any urgent issues raised
+    **Executive Summary (2-3 sentences):**
+    - ONE sentence on meeting context (why it happened, who attended)
+    - ONE sentence on the single most critical outcome/decision
+    - ONE sentence on urgent next step or blocker (if any)
+    - This is a HIGH-LEVEL overview only - save details for other sections
 
-    **For Outcomes (What changed as a result):**
-    - Decisions made (what, who decided, rationale if given)
-    - Direction changes or strategy shifts
-    - New information that changes the work
-    - Commitments made (resources, timelines, scope)
-    - Agreements reached on contentious topics
-    - Capture WHO made decisions when mentioned
-    - Include RATIONALE if explained
-    - Note any CONDITIONS or ASSUMPTIONS
+    **Outcomes (Concrete changes/decisions):**
+    - Decisions made: state WHAT was decided and WHO decided (if mentioned)
+    - Include brief RATIONALE only if it clarifies the decision
+    - Commitments: resources allocated, scope agreed, timelines set
+    - Format: "Decision: [What]. Rationale: [Why, if important]"
+    - Be CONCISE - 1-2 sentences per outcome maximum
 
-    **For Action Items (What we're doing next):**
-    - Be SPECIFIC: "Mike to review API design by Friday" not "review needed"
-    - Include CONTEXT: why this task matters to the project
-    - Mark URGENT items with High priority
-    - Capture DEPENDENCIES: "blocked on backend API completion"
-    - Clear title and description
-    - Assignee name if mentioned (otherwise null)
-    - Due date if mentioned (in ISO format YYYY-MM-DD)
-    - Priority based on urgency discussed (High/Medium/Low)
-    - Relevant context from the meeting
-    - Dependencies if any were mentioned
+    **Action Items (Tasks to execute):**
+    - Title: Clear, specific task statement
+    - Description: Brief context on why this matters (1 sentence)
+    - Assignee, due date, priority, dependencies
+    - DO NOT explain the broader context here (that goes in Outcomes)
 
-    **For Blockers and Constraints (What's in the way):**
-    - Be CONCRETE: "Waiting for staging environment from DevOps" not "environment issues"
-    - Include WHO can unblock if mentioned
-    - Note IMPACT: what this is blocking
-    - Active blockers preventing progress
-    - Dependencies on other teams/systems
-    - Resource constraints (people, time, budget, tools)
-    - Technical limitations or unknowns
-    - Risks or concerns raised
-    - Open questions that need answers
+    **Blockers and Constraints:**
+    - Current blockers: what's blocking, what's the impact, who can unblock
+    - Resource constraints, technical limitations, open questions
+    - Keep BRIEF and SPECIFIC
 
-    **For Timeline and Milestones (When things happen):**
-    - Deadlines or target dates mentioned
-    - Milestone discussions
-    - Sequence of work (what must happen first)
-    - Time-sensitive items
+    **Timeline and Milestones:**
+    - Just the dates and milestones - no explanations
+    - Format: "Feature X launch: March 15" or "API completion needed before frontend work"
 
-    **For Key Discussions (Important context):**
-    - Focus on SUBSTANCE not play-by-play
-    - Capture INSIGHTS and CONSIDERATIONS raised
-    - Include STAKEHOLDER PERSPECTIVES when mentioned
-    - Note UNRESOLVED topics that need more discussion
-    - Topics that generated significant discussion or debate
-    - Trade-offs considered (pros/cons discussed)
-    - Alternative approaches considered and why they were rejected
-    - Important concerns or objections raised
-    - Technical approaches or architectural decisions
-    - Context that shapes the work ahead
+    **Key Discussions (ONLY non-duplicate context):**
+    - ONLY include discussions that provide important context NOT already covered above
+    - Focus on: trade-offs debated, alternative approaches considered and rejected, stakeholder concerns
+    - DO NOT repeat decisions already stated in Outcomes
+    - DO NOT re-explain action items already listed
+    - Format: Brief, focused explanations of WHY debates happened, not WHAT was decided (that's in Outcomes)
+    - If a discussion resulted in a clear decision/outcome, put ONLY the decision in Outcomes, not here
+    - Example of what belongs here: "Team debated GraphQL vs REST API - GraphQL chosen for flexibility despite learning curve" → Split this:
+      - Outcomes: "Decision: Use GraphQL API. Rationale: Better flexibility for frontend needs"
+      - Key Discussions: (nothing - the decision and rationale are sufficient, no need to repeat the debate)
 
-    QUALITY STANDARDS:
-    - Prefer specific details over generic summaries
-    - Include names, dates, and concrete commitments
-    - Skip obvious/low-value information
-    - If someone says "we should probably..." that's not a decision yet
-    - Distinguish between firm decisions and open questions
-    - Capture dissenting opinions or concerns raised
+    WRITING STYLE:
+    - Be CONCISE - every word should add value
+    - Prefer bullet points over paragraphs
+    - Lead with the most important information
+    - Skip obvious transitions and filler words
+    - Use specific names, dates, and facts (not "someone mentioned" or "team discussed")
+
+    WHAT TO SKIP ENTIRELY:
+    - Small talk, introductions, meeting logistics
+    - Anything obvious or low-value
+    - Repetition of information already captured in another section
+    - Lengthy explanations when a brief statement suffices
 
   human_prompt_template: |
     Meeting: {meeting_title}
@@ -94,15 +76,22 @@ meeting_analysis:
     Transcript:
     {transcript}
 
-    Please analyze this meeting transcript and extract ALL of the following:
-    1. Executive Summary (always provide - even if meeting was light, summarize what was discussed)
-    2. Outcomes (decisions, commitments, agreements - if none explicit, note key takeaways or implied outcomes)
-    3. Action Items (specific tasks with owners and deadlines)
-    4. Blockers and Constraints (any obstacles, dependencies, or concerns raised - if none, can be empty)
-    5. Timeline and Milestones (deadlines, dates, sequencing - if none explicit, can be empty)
-    6. Key Discussions (important topics, debates, context - always provide to capture the meeting's purpose)
+    Analyze this meeting and extract the following sections. CRITICAL: Do not repeat information across sections.
 
-    IMPORTANT: Always provide content for Executive Summary, Outcomes, and Key Discussions even if the meeting seems light on concrete decisions. Extract the value and context from what WAS discussed.
+    1. **Executive Summary** (2-3 sentences): High-level overview only
+    2. **Outcomes** (bullet points): Decisions and commitments with brief rationale
+    3. **Action Items** (structured list): Specific tasks with assignees/dates
+    4. **Blockers and Constraints** (bullet points): Current obstacles - if none, leave empty
+    5. **Timeline and Milestones** (dates only): Key dates and sequences - if none, leave empty
+    6. **Key Discussions** (brief notes): ONLY discussions that add context not already covered in Outcomes - if none, leave empty
+
+    ANTI-DUPLICATION RULES:
+    - If a discussion led to a decision, put the decision in Outcomes and DO NOT repeat it in Key Discussions
+    - If a topic became an action item, put it in Action Items and DO NOT explain it again elsewhere
+    - Executive Summary should reference outcomes/actions, not duplicate their content
+    - Each fact appears in exactly ONE section
+
+    Keep the entire analysis concise and scannable. Prioritize clarity and avoid repetition.
 
   # Prompt for extracting just action items
   action_items_prompt: |

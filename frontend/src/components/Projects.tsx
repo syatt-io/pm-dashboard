@@ -2019,6 +2019,8 @@ const ProjectShowContent = () => {
   };
 
   const handleFieldUpdate = async (field: string, value: any) => {
+    console.log('[Projects] handleFieldUpdate called:', { field, value, recordKey: record.key });
+    console.log('[Projects] Full record:', record);
     try {
       await update(
         'projects',
@@ -2028,16 +2030,19 @@ const ProjectShowContent = () => {
           previousData: { ...record, [field]: value }
         },
         {
-          onSuccess: () => {
+          onSuccess: (data) => {
+            console.log('[Projects] Update success:', data);
             notify('Project updated successfully', { type: 'success' });
             refresh();
           },
-          onError: () => {
+          onError: (error) => {
+            console.error('[Projects] Update error:', error);
             notify('Error updating project', { type: 'error' });
           }
         }
       );
     } catch (error) {
+      console.error('[Projects] Update exception:', error);
       notify('Error updating project', { type: 'error' });
       throw error;
     }
