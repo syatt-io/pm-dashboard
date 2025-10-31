@@ -52,26 +52,33 @@ class NotificationManager:
 
     def _setup_channels(self):
         """Set up notification channels based on configuration."""
-        # Setup Slack
-        if self.config.slack_bot_token:
-            self.slack_client = WebClient(token=self.config.slack_bot_token)
+        # Setup Slack - Read from config if available, otherwise from environment
+        slack_token = self.config.slack_bot_token if self.config and hasattr(self.config, 'slack_bot_token') else os.getenv("SLACK_BOT_TOKEN")
+        if slack_token:
+            self.slack_client = WebClient(token=slack_token)
             logger.info("Slack notification channel configured")
 
-        # Setup Email
-        if all([self.config.smtp_host, self.config.smtp_user, self.config.smtp_password]):
+        # Setup Email - Read from config if available, otherwise from environment
+        smtp_host = self.config.smtp_host if self.config and hasattr(self.config, 'smtp_host') else os.getenv("SMTP_HOST")
+        smtp_user = self.config.smtp_user if self.config and hasattr(self.config, 'smtp_user') else os.getenv("SMTP_USER")
+        smtp_password = self.config.smtp_password if self.config and hasattr(self.config, 'smtp_password') else os.getenv("SMTP_PASSWORD")
+        smtp_port = self.config.smtp_port if self.config and hasattr(self.config, 'smtp_port') else int(os.getenv("SMTP_PORT", "587"))
+
+        if all([smtp_host, smtp_user, smtp_password]):
             self.smtp_config = {
-                "host": self.config.smtp_host,
-                "port": self.config.smtp_port,
-                "user": self.config.smtp_user,
-                "password": self.config.smtp_password,
-                "from_email": os.getenv("SMTP_FROM_EMAIL", self.config.smtp_user),
+                "host": smtp_host,
+                "port": smtp_port,
+                "user": smtp_user,
+                "password": smtp_password,
+                "from_email": os.getenv("SMTP_FROM_EMAIL", smtp_user),
                 "from_name": os.getenv("SMTP_FROM_NAME", "PM Agent")
             }
             logger.info("Email notification channel configured")
 
-        # Setup Teams
-        if self.config.teams_webhook_url:
-            self.teams_webhook = self.config.teams_webhook_url
+        # Setup Teams - Read from config if available, otherwise from environment
+        teams_webhook = self.config.teams_webhook_url if self.config and hasattr(self.config, 'teams_webhook_url') else os.getenv("TEAMS_WEBHOOK_URL")
+        if teams_webhook:
+            self.teams_webhook = teams_webhook
             logger.info("Teams notification channel configured")
 
     async def send_notification(self, content: NotificationContent, channels: List[str] = None):
@@ -99,8 +106,10 @@ class NotificationManager:
         def _send_slack_sync():
             """Synchronous Slack sending (runs in executor)."""
             try:
-                # Determine channel based on priority
-                channel_name = self.config.slack_urgent_channel if content.priority == "urgent" else self.config.slack_channel
+                # Determine channel based on priority - Read from config if available, otherwise from environment
+                urgent_channel = self.config.slack_urgent_channel if self.config and hasattr(self.config, 'slack_urgent_channel') else os.getenv("SLACK_URGENT_CHANNEL")
+                default_channel = self.config.slack_channel if self.config and hasattr(self.config, 'slack_channel') else os.getenv("SLACK_CHANNEL", "#general")
+                channel_name = urgent_channel if content.priority == "urgent" else default_channel
 
                 # Convert channel name to ID if it starts with # (channel name)
                 # Slack API requires channel IDs, not names
