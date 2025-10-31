@@ -15,6 +15,25 @@ When working with `.do/app.yaml` or any production configuration files:
 
 ---
 
+## 🔧 Deployment Troubleshooting
+
+If you encounter deployment failures or environment variable issues, see **[docs/DEPLOYMENT_TROUBLESHOOTING_2025-10-31.md](docs/DEPLOYMENT_TROUBLESHOOTING_2025-10-31.md)** for:
+- Complete troubleshooting guide for DigitalOcean deployments
+- Environment variable loading issues and fixes
+- Known issues and workarounds
+- Commands reference
+
+**Quick Fix for Missing Environment Variables:**
+```bash
+# Update app spec with secrets from .env
+doctl apps spec get a2255a3b-23cc-4fd0-baa8-91d622bb912a --format json > app-spec.json
+# Edit app-spec.json to replace EV[1:...] values with actual secrets
+doctl apps update a2255a3b-23cc-4fd0-baa8-91d622bb912a --spec app-spec.json
+doctl apps create-deployment a2255a3b-23cc-4fd0-baa8-91d622bb912a
+```
+
+---
+
 ## Project Overview
 This is an Autonomous PM Agent that processes Fireflies.ai meeting transcripts, extracts action items using AI, and creates Jira tickets via Model Context Protocol (MCP). The system provides both automated and interactive modes for ticket creation.
 
