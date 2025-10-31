@@ -1934,7 +1934,6 @@ const ProjectShowActions = () => (
 const ProjectShowContent = () => {
   const record = useRecordContext();
   const notify = useNotify();
-  const dataProvider = useDataProvider();
   const refresh = useRefresh();
   const [update] = useUpdate();
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -2031,6 +2030,7 @@ const ProjectShowContent = () => {
         {
           onSuccess: () => {
             notify('Project updated successfully', { type: 'success' });
+            refresh();
           },
           onError: () => {
             notify('Error updating project', { type: 'error' });
