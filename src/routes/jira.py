@@ -377,28 +377,44 @@ def update_project(project_key):
             existing = result.fetchone()
 
             if existing:
-                # Update existing project
-                conn.execute(text("""
-                    UPDATE projects
-                    SET is_active = :is_active,
-                        project_work_type = :project_work_type,
-                        total_hours = :total_hours,
-                        retainer_hours = :retainer_hours,
-                        name = :name,
-                        weekly_meeting_day = :weekly_meeting_day,
-                        send_meeting_emails = :send_meeting_emails,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE key = :key
-                """), {
-                    "key": project_key,
-                    "is_active": data.get('is_active', True),
-                    "project_work_type": data.get('project_work_type', 'ongoing'),
-                    "total_hours": data.get('total_hours', 0),
-                    "retainer_hours": data.get('retainer_hours', 0),
-                    "name": data.get('name', existing[1] if existing else 'Unknown'),
-                    "weekly_meeting_day": data.get('weekly_meeting_day'),
-                    "send_meeting_emails": data.get('send_meeting_emails', False)
-                })
+                # Update existing project - DYNAMIC UPDATE (only update provided fields)
+                update_fields = []
+                update_params = {"key": project_key}
+
+                # Only include fields that were actually sent from the frontend
+                if 'is_active' in data:
+                    update_fields.append("is_active = :is_active")
+                    update_params['is_active'] = data['is_active']
+
+                if 'project_work_type' in data:
+                    update_fields.append("project_work_type = :project_work_type")
+                    update_params['project_work_type'] = data['project_work_type']
+
+                if 'total_hours' in data:
+                    update_fields.append("total_hours = :total_hours")
+                    update_params['total_hours'] = data['total_hours']
+
+                if 'retainer_hours' in data:
+                    update_fields.append("retainer_hours = :retainer_hours")
+                    update_params['retainer_hours'] = data['retainer_hours']
+
+                if 'name' in data:
+                    update_fields.append("name = :name")
+                    update_params['name'] = data['name']
+
+                if 'weekly_meeting_day' in data:
+                    update_fields.append("weekly_meeting_day = :weekly_meeting_day")
+                    update_params['weekly_meeting_day'] = data['weekly_meeting_day']
+
+                if 'send_meeting_emails' in data:
+                    update_fields.append("send_meeting_emails = :send_meeting_emails")
+                    update_params['send_meeting_emails'] = data['send_meeting_emails']
+
+                # Always update the timestamp
+                if update_fields:
+                    update_fields.append("updated_at = CURRENT_TIMESTAMP")
+                    query = f"UPDATE projects SET {', '.join(update_fields)} WHERE key = :key"
+                    conn.execute(text(query), update_params)
             else:
                 # Insert new project
                 conn.execute(text("""
