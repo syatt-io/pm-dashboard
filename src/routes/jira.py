@@ -434,10 +434,13 @@ def update_project(project_key):
 
             conn.commit()
 
-            # Fetch and return updated project data
+            # Fetch and return updated project data with explicit column selection
             try:
                 result = conn.execute(text("""
-                    SELECT * FROM projects WHERE key = :key
+                    SELECT key, name, is_active, project_work_type, total_hours, retainer_hours,
+                           weekly_meeting_day, send_meeting_emails, updated_at
+                    FROM projects
+                    WHERE key = :key
                 """), {"key": project_key})
                 updated_project = result.fetchone()
 
@@ -454,8 +457,9 @@ def update_project(project_key):
                         'updated_at': updated_project[8].isoformat() if updated_project[8] else None
                     }
                     return success_response(data=project_dict, message='Project updated successfully')
-            except (IndexError, TypeError, AttributeError):
-                # If we can't build the full project dict (e.g., in tests), return simple success
+            except (IndexError, TypeError, AttributeError) as e:
+                # If we can't build the full project dict (e.g., in tests or schema mismatch), return simple success
+                logger.warning(f"Could not return full project data for {project_key}: {e}")
                 pass
 
             return success_response(message='Project updated successfully')
