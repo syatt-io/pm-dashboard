@@ -19,6 +19,7 @@ import {
   BooleanInput,
   EditButton,
   TopToolbar,
+  useUpdate,
 } from 'react-admin';
 import {
   Card,
@@ -1935,6 +1936,7 @@ const ProjectShowContent = () => {
   const notify = useNotify();
   const dataProvider = useDataProvider();
   const refresh = useRefresh();
+  const [update] = useUpdate();
   const [keywords, setKeywords] = useState<string[]>([]);
   const [loadingKeywords, setLoadingKeywords] = useState(false);
   const [editingKeywords, setEditingKeywords] = useState(false);
@@ -2019,13 +2021,22 @@ const ProjectShowContent = () => {
 
   const handleFieldUpdate = async (field: string, value: any) => {
     try {
-      await dataProvider.update('projects', {
-        id: record.key,
-        data: { [field]: value },
-        previousData: record
-      });
-      notify('Project updated successfully', { type: 'success' });
-      refresh();
+      await update(
+        'projects',
+        {
+          id: record.key,
+          data: { [field]: value },
+          previousData: record
+        },
+        {
+          onSuccess: () => {
+            notify('Project updated successfully', { type: 'success' });
+          },
+          onError: () => {
+            notify('Error updating project', { type: 'error' });
+          }
+        }
+      );
     } catch (error) {
       notify('Error updating project', { type: 'error' });
       throw error;
