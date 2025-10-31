@@ -19,7 +19,6 @@ from sqlalchemy.orm import sessionmaker
 from src.integrations.fireflies import FirefliesClient
 from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.managers.notifications import NotificationManager
-from src.utils.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +43,8 @@ class MeetingAnalysisSyncJob:
 
         # Initialize notification manager for sending meeting emails
         try:
-            config = Settings()
-            self.notification_manager = NotificationManager(config)
+            # Pass None for config since NotificationManager uses environment variables
+            self.notification_manager = NotificationManager(None)
             logger.info("Notification manager initialized for meeting emails")
         except Exception as e:
             logger.warning(f"Failed to initialize notification manager: {e}")
