@@ -357,8 +357,10 @@ export const dataProvider: DataProvider = {
             method: 'PUT',
             body: JSON.stringify(params.data),
         }).then(({ json }) => {
+            // Use server response if available, otherwise fallback to params.data
+            const responseData = json.data || params.data;
             return {
-                data: { ...params.data, id: params.id } as any,
+                data: { ...responseData, id: responseData.key || responseData.id || params.id } as any,
             };
         }).catch(error => {
             return Promise.reject(error);

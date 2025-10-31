@@ -434,7 +434,27 @@ def update_project(project_key):
 
             conn.commit()
 
-        return success_response(message='Project updated successfully')
+            # Fetch and return updated project data
+            result = conn.execute(text("""
+                SELECT * FROM projects WHERE key = :key
+            """), {"key": project_key})
+            updated_project = result.fetchone()
+
+            if updated_project:
+                project_dict = {
+                    'key': updated_project[0],
+                    'name': updated_project[1],
+                    'is_active': updated_project[2],
+                    'project_work_type': updated_project[3],
+                    'total_hours': updated_project[4],
+                    'retainer_hours': updated_project[5],
+                    'weekly_meeting_day': updated_project[6],
+                    'send_meeting_emails': updated_project[7],
+                    'updated_at': updated_project[8].isoformat() if updated_project[8] else None
+                }
+                return success_response(data=project_dict, message='Project updated successfully')
+
+            return success_response(message='Project updated successfully')
 
     except Exception as e:
         logger.error(f"Error updating project {project_key}: {e}")
