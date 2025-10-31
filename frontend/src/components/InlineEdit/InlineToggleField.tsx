@@ -23,6 +23,7 @@ export const InlineToggleField: React.FC<InlineToggleFieldProps> = ({
   variant = 'body1',
 }) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingValue, setPendingValue] = useState<boolean | null>(null);
 
   const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = event.target.checked;
@@ -31,11 +32,17 @@ export const InlineToggleField: React.FC<InlineToggleFieldProps> = ({
       return;
     }
 
+    // Store the pending value and set loading state
+    setPendingValue(newValue);
     setIsLoading(true);
+
     try {
       await onSave(newValue);
+      setPendingValue(null);
     } catch (error) {
       console.error('Failed to save:', error);
+      // Reset to original value on error
+      setPendingValue(null);
     } finally {
       setIsLoading(false);
     }
@@ -47,7 +54,7 @@ export const InlineToggleField: React.FC<InlineToggleFieldProps> = ({
         <FormControlLabel
           control={
             <Switch
-              checked={value}
+              checked={pendingValue !== null ? pendingValue : value}
               onChange={handleChange}
               disabled={isLoading}
               color="primary"

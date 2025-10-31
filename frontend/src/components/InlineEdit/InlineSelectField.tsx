@@ -64,7 +64,12 @@ export const InlineSelectField: React.FC<InlineSelectFieldProps> = ({
   };
 
   const handleBlur = () => {
-    setIsEditing(false);
+    // Delay closing to allow async save operation to complete
+    setTimeout(() => {
+      if (!isLoading) {
+        setIsEditing(false);
+      }
+    }, 150);
   };
 
   const getDisplayValue = () => {
