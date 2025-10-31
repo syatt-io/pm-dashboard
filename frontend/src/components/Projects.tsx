@@ -2025,7 +2025,7 @@ const ProjectShowContent = () => {
         {
           id: record.key,
           data: { [field]: value },
-          previousData: record
+          previousData: { ...record, [field]: value }
         },
         {
           onSuccess: () => {
