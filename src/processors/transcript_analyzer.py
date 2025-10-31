@@ -74,9 +74,14 @@ class TranscriptAnalyzer:
         """Create default LLM instance based on centralized settings.
 
         Always fetches fresh configuration from database to support dynamic updates.
+        Returns None if AI config is not available.
         """
         from config.settings import Settings
         ai_config = Settings.get_fresh_ai_config()
+
+        if not ai_config:
+            logger.warning("AI configuration not available - TranscriptAnalyzer will not be functional until AI config is set")
+            return None
 
         logger.info(f"Creating LLM with provider={ai_config.provider}, model={ai_config.model}")
 
@@ -111,6 +116,18 @@ class TranscriptAnalyzer:
         """
         # Refresh LLM to pick up any configuration changes
         self.refresh_llm()
+
+        # Check if LLM is available
+        if not self.llm:
+            logger.error("Cannot analyze transcript: AI configuration not available")
+            return MeetingAnalysis(
+                executive_summary="AI configuration not available - cannot analyze transcript",
+                outcomes=[],
+                action_items=[],
+                blockers_and_constraints=[],
+                timeline_and_milestones=[],
+                key_discussions=[]
+            )
 
         # Get prompts from configuration
         system_prompt_base = self.prompt_manager.get_prompt(
@@ -170,6 +187,10 @@ class TranscriptAnalyzer:
     def extract_action_items(self, transcript: str) -> List[ActionItem]:
         """Extract just action items from a transcript."""
 
+        if not self.llm:
+            logger.error("Cannot extract action items: AI configuration not available")
+            return []
+
         # Get action items prompt from configuration
         prompt = self.prompt_manager.get_prompt(
             'meeting_analysis', 'action_items_prompt',
@@ -211,6 +232,10 @@ class TranscriptAnalyzer:
     def identify_blockers(self, transcript: str) -> List[str]:
         """Identify blockers and risks from the transcript."""
 
+        if not self.llm:
+            logger.error("Cannot identify blockers: AI configuration not available")
+            return []
+
         # Get blockers prompt from configuration
         prompt = self.prompt_manager.get_prompt(
             'meeting_analysis', 'blockers_prompt',
@@ -232,6 +257,10 @@ class TranscriptAnalyzer:
 
     def generate_meeting_summary(self, transcript: str, max_length: int = 500) -> str:
         """Generate a concise meeting summary."""
+
+        if not self.llm:
+            logger.error("Cannot generate summary: AI configuration not available")
+            return "AI configuration not available"
 
         # Get summary prompt from configuration and format it
         prompt = self.prompt_manager.format_prompt(
