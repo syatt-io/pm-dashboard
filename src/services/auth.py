@@ -29,12 +29,12 @@ class AuthService:
         self.jwt_secret = os.getenv('JWT_SECRET_KEY')
 
         if not self.jwt_secret:
-            error_msg = (
-                "CRITICAL: JWT_SECRET_KEY is not set. Application startup aborted. "
-                "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            logger.warning(
+                "JWT_SECRET_KEY is not set - generating random secret (NOT RECOMMENDED FOR PRODUCTION). "
+                "Set JWT_SECRET_KEY env var with: python -c 'import secrets; print(secrets.token_hex(32))'"
             )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            import secrets
+            self.jwt_secret = secrets.token_hex(32)
 
         self.jwt_expiry_hours = int(os.getenv('JWT_EXPIRY_HOURS', '24'))
 
