@@ -348,6 +348,11 @@ def get_meeting_detail(user, meeting_id):
 
         # Add cached analysis data if available
         if cached_dto:
+            logger.info(f"Found cached analysis for meeting {meeting_id}")
+            logger.info(f"  executive_summary length: {len(cached_dto.executive_summary) if cached_dto.executive_summary else 0}")
+            logger.info(f"  outcomes count: {len(cached_dto.outcomes) if cached_dto.outcomes else 0}")
+            logger.info(f"  action_items count: {len(cached_dto.action_items) if cached_dto.action_items else 0}")
+
             meeting_data.update({
                 'action_items_count': len(cached_dto.action_items) if cached_dto.action_items else 0,
                 'relevance_score': 0,  # Not stored in DTO currently
@@ -366,6 +371,10 @@ def get_meeting_detail(user, meeting_id):
                 'follow_ups': [],  # Not stored in DTO currently
                 'summary': cached_dto.summary
             })
+
+            logger.info(f"Returning meeting_data with {len(meeting_data.get('outcomes', []))} outcomes")
+        else:
+            logger.warning(f"No cached analysis found for meeting {meeting_id}")
 
         return jsonify(meeting_data)
 
