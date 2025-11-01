@@ -12,16 +12,23 @@ meeting_analysis:
     - What's preventing progress
     - What important context shapes the work
 
+    **CRITICAL: ANALYZE THE ENTIRE TRANSCRIPT THOROUGHLY**
+    - Read through the COMPLETE transcript from beginning to end
+    - Pay special attention to discussions in the middle and latter portions of the meeting
+    - Many important topics are discussed 10-15 minutes into meetings - DO NOT miss these
+    - Capture substantive discussions about technical approaches, design decisions, implementation details
+    - Look for topics that may not have resulted in formal decisions but provide important context
+
     CRITICAL ANTI-DUPLICATION RULE:
     **Each piece of information should appear in EXACTLY ONE section.** Do not repeat the same facts across multiple sections. If a decision is captured in Outcomes, don't explain it again in Key Discussions.
 
     SECTION PURPOSES (read carefully to avoid overlap):
 
-    **Executive Summary (2-3 sentences):**
-    - ONE sentence on meeting context (why it happened, who attended)
-    - ONE sentence on the single most critical outcome/decision
-    - ONE sentence on urgent next step or blocker (if any)
-    - This is a HIGH-LEVEL overview only - save details for other sections
+    **Executive Summary (3-4 sentences):**
+    - ONE sentence on meeting context (why it happened, who attended, what topics were covered)
+    - ONE-TWO sentences summarizing the main discussions and their significance
+    - ONE sentence on the single most critical outcome/decision or next step
+    - Be slightly more descriptive to capture the breadth of topics discussed
 
     **Outcomes (Concrete changes/decisions):**
     - Decisions made: state WHAT was decided and WHO decided (if mentioned)
@@ -45,23 +52,29 @@ meeting_analysis:
     - Just the dates and milestones - no explanations
     - Format: "Feature X launch: March 15" or "API completion needed before frontend work"
 
-    **Key Discussions (ONLY non-duplicate context):**
-    - ONLY include discussions that provide important context NOT already covered above
-    - Focus on: trade-offs debated, alternative approaches considered and rejected, stakeholder concerns
-    - DO NOT repeat decisions already stated in Outcomes
+    **Key Discussions (Important context and deliberation):**
+    - CAPTURE SUBSTANTIVE DISCUSSIONS from throughout the entire meeting, especially the middle and latter portions
+    - Include: technical approaches discussed, implementation strategies, design considerations, trade-offs evaluated
+    - Include: alternative approaches that were considered (even if not chosen), pros/cons discussed
+    - Include: questions raised, concerns expressed, technical challenges explored
+    - Include: context about why certain approaches were taken or avoided
+    - Focus on discussions that provide valuable context for understanding the work
+    - DO NOT repeat final decisions already stated in Outcomes - focus on the deliberation and rationale
     - DO NOT re-explain action items already listed
-    - Format: Brief, focused explanations of WHY debates happened, not WHAT was decided (that's in Outcomes)
-    - If a discussion resulted in a clear decision/outcome, put ONLY the decision in Outcomes, not here
-    - Example of what belongs here: "Team debated GraphQL vs REST API - GraphQL chosen for flexibility despite learning curve" → Split this:
-      - Outcomes: "Decision: Use GraphQL API. Rationale: Better flexibility for frontend needs"
-      - Key Discussions: (nothing - the decision and rationale are sufficient, no need to repeat the debate)
+    - Format: Brief but comprehensive notes on important discussions and considerations
+    - Aim for 5-8 substantial discussion points when the meeting had significant technical/strategic content
+    - Example good entries:
+      * "Discussed authentication approach - considered OAuth vs JWT, team leaning toward JWT for simplicity"
+      * "Reviewed database schema options, concerns raised about scaling with current approach"
+      * "Explored caching strategies, debated Redis vs in-memory, need to benchmark both"
 
     WRITING STYLE:
-    - Be CONCISE - every word should add value
+    - Be CONCISE yet COMPREHENSIVE - capture important discussions without repetition
     - Prefer bullet points over paragraphs
     - Lead with the most important information
     - Skip obvious transitions and filler words
     - Use specific names, dates, and facts (not "someone mentioned" or "team discussed")
+    - For Key Discussions, provide enough detail to understand what was talked about and why it matters
 
     WHAT TO SKIP ENTIRELY:
     - Small talk, introductions, meeting logistics
@@ -76,14 +89,24 @@ meeting_analysis:
     Transcript:
     {transcript}
 
+    **IMPORTANT: Read the COMPLETE transcript from beginning to end before analyzing.**
+    Many meetings have significant discussions 10-15 minutes in that are easy to miss if you only focus on the opening.
+
     Analyze this meeting and extract the following sections. CRITICAL: Do not repeat information across sections.
 
-    1. **Executive Summary** (2-3 sentences): High-level overview only
+    1. **Executive Summary** (3-4 sentences): High-level overview capturing the main topics and outcome
     2. **Outcomes** (bullet points): Decisions and commitments with brief rationale
     3. **Action Items** (structured list): Specific tasks with assignees/dates
     4. **Blockers and Constraints** (bullet points): Current obstacles - if none, leave empty
     5. **Timeline and Milestones** (dates only): Key dates and sequences - if none, leave empty
-    6. **Key Discussions** (brief notes): ONLY discussions that add context not already covered in Outcomes - if none, leave empty
+    6. **Key Discussions** (comprehensive notes): Substantive discussions from throughout the meeting - capture 5-8 points for meetings with significant content
+
+    KEY DISCUSSIONS GUIDANCE:
+    - Scan the ENTIRE transcript for important technical/strategic discussions
+    - Include discussions from the beginning, middle, AND end of the meeting
+    - Capture topics that were deliberated even if no final decision was made
+    - Include technical approaches, design considerations, trade-offs, concerns raised
+    - Provide enough context so someone not in the meeting understands what was discussed and why it matters
 
     ANTI-DUPLICATION RULES:
     - If a discussion led to a decision, put the decision in Outcomes and DO NOT repeat it in Key Discussions
@@ -91,7 +114,7 @@ meeting_analysis:
     - Executive Summary should reference outcomes/actions, not duplicate their content
     - Each fact appears in exactly ONE section
 
-    Keep the entire analysis concise and scannable. Prioritize clarity and avoid repetition.
+    Be comprehensive yet concise. Prioritize clarity and avoid repetition while ensuring important discussions are captured.
 
   # Prompt for extracting just action items
   action_items_prompt: |

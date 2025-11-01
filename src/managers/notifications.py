@@ -446,30 +446,9 @@ class NotificationManager:
                     </div>
 
                     <div class="section">
-                        <h2>Action Items ({len(action_items)})</h2>
-            """
-
-            # Add action items
-            if action_items:
-                for item in action_items:
-                    assignee = item.get("assignee", "Unassigned")
-                    priority = item.get("priority", "Medium")
-                    html_body += f"""
-                        <div class="action-item">
-                            <div class="action-title">{item.get("title", "Untitled")}</div>
-                            <p>{item.get("description", "No description")}</p>
-                            <p><strong>Assignee:</strong> {assignee} | <strong>Priority:</strong> {priority}</p>
-                        </div>
-                    """
-            else:
-                html_body += "<p>No action items identified.</p>"
-
-            # Add outcomes
-            html_body += """
-                    </div>
-                    <div class="section">
                         <h2>Key Outcomes</h2>
             """
+            # Add outcomes
             if outcomes:
                 html_body += "<ul>"
                 for outcome in outcomes:
@@ -477,6 +456,20 @@ class NotificationManager:
                 html_body += "</ul>"
             else:
                 html_body += "<p>No key outcomes identified.</p>"
+
+            # Add key discussions
+            html_body += """
+                    </div>
+                    <div class="section">
+                        <h2>Key Discussions</h2>
+            """
+            if key_discussions:
+                html_body += "<ul>"
+                for discussion in key_discussions:
+                    html_body += f"<li>{discussion}</li>"
+                html_body += "</ul>"
+            else:
+                html_body += "<p>No key discussions identified.</p>"
 
             # Add blockers
             html_body += """
@@ -506,19 +499,25 @@ class NotificationManager:
             else:
                 html_body += "<p>No timeline items identified.</p>"
 
-            # Add key discussions
-            html_body += """
+            # Add action items (moved to bottom)
+            html_body += f"""
                     </div>
                     <div class="section">
-                        <h2>Key Discussions</h2>
+                        <h2>Action Items ({len(action_items)})</h2>
             """
-            if key_discussions:
-                html_body += "<ul>"
-                for discussion in key_discussions:
-                    html_body += f"<li>{discussion}</li>"
-                html_body += "</ul>"
+            if action_items:
+                for item in action_items:
+                    assignee = item.get("assignee", "Unassigned")
+                    priority = item.get("priority", "Medium")
+                    html_body += f"""
+                        <div class="action-item">
+                            <div class="action-title">{item.get("title", "Untitled")}</div>
+                            <p>{item.get("description", "No description")}</p>
+                            <p><strong>Assignee:</strong> {assignee} | <strong>Priority:</strong> {priority}</p>
+                        </div>
+                    """
             else:
-                html_body += "<p>No key discussions identified.</p>"
+                html_body += "<p>No action items identified.</p>"
 
             # Add footer
             html_body += f"""
