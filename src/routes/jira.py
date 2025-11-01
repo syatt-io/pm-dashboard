@@ -195,6 +195,7 @@ def get_jira_project(project_key):
                         p.weekly_meeting_day,
                         p.retainer_hours,
                         p.description,
+                        p.send_meeting_emails,
                         pmf.forecasted_hours,
                         pmf.actual_monthly_hours
                     FROM projects p
@@ -212,8 +213,9 @@ def get_jira_project(project_key):
                     enhanced_project["weekly_meeting_day"] = result[4] if result[4] else None
                     enhanced_project["retainer_hours"] = float(result[5]) if result[5] else 0
                     enhanced_project["description"] = result[6] if result[6] else None
-                    enhanced_project["forecasted_hours_month"] = float(result[7]) if result[7] else 0
-                    enhanced_project["current_month_hours"] = float(result[8]) if result[8] else 0
+                    enhanced_project["send_meeting_emails"] = bool(result[7]) if result[7] is not None else False
+                    enhanced_project["forecasted_hours_month"] = float(result[8]) if result[8] else 0
+                    enhanced_project["current_month_hours"] = float(result[9]) if result[9] else 0
                 else:
                     # No database record - use defaults
                     enhanced_project["is_active"] = True
@@ -223,6 +225,7 @@ def get_jira_project(project_key):
                     enhanced_project["weekly_meeting_day"] = None
                     enhanced_project["retainer_hours"] = 0
                     enhanced_project["description"] = None
+                    enhanced_project["send_meeting_emails"] = False
                     enhanced_project["forecasted_hours_month"] = 0
                     enhanced_project["current_month_hours"] = 0
         except Exception as e:
@@ -235,6 +238,7 @@ def get_jira_project(project_key):
             enhanced_project["weekly_meeting_day"] = None
             enhanced_project["retainer_hours"] = 0
             enhanced_project["description"] = None
+            enhanced_project["send_meeting_emails"] = False
             enhanced_project["forecasted_hours_month"] = 0
             enhanced_project["current_month_hours"] = 0
 
@@ -406,6 +410,10 @@ def update_project(project_key):
                 if 'weekly_meeting_day' in data:
                     update_fields.append("weekly_meeting_day = :weekly_meeting_day")
                     update_params['weekly_meeting_day'] = data['weekly_meeting_day']
+
+                if 'description' in data:
+                    update_fields.append("description = :description")
+                    update_params['description'] = data['description']
 
                 if 'send_meeting_emails' in data:
                     update_fields.append("send_meeting_emails = :send_meeting_emails")
