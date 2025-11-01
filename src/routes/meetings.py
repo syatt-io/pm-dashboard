@@ -333,13 +333,14 @@ def get_meeting_detail(user, meeting_id):
             'confidence': 0,
             'analyzed_at': None,
             'action_items': [],
-            # New structure fields
+            # New topic-based structure
+            'topics': [],
+            # Legacy fields for backward compatibility (deprecated)
             'executive_summary': None,
             'outcomes': [],
             'blockers_and_constraints': [],
             'timeline_and_milestones': [],
             'key_discussions': [],
-            # Legacy fields
             'key_decisions': [],
             'blockers': [],
             'follow_ups': [],
@@ -349,8 +350,7 @@ def get_meeting_detail(user, meeting_id):
         # Add cached analysis data if available
         if cached_dto:
             logger.info(f"Found cached analysis for meeting {meeting_id}")
-            logger.info(f"  executive_summary length: {len(cached_dto.executive_summary) if cached_dto.executive_summary else 0}")
-            logger.info(f"  outcomes count: {len(cached_dto.outcomes) if cached_dto.outcomes else 0}")
+            logger.info(f"  topics count: {len(cached_dto.topics) if cached_dto.topics else 0}")
             logger.info(f"  action_items count: {len(cached_dto.action_items) if cached_dto.action_items else 0}")
 
             meeting_data.update({
@@ -359,20 +359,21 @@ def get_meeting_detail(user, meeting_id):
                 'confidence': 0,  # Not stored in DTO currently
                 'analyzed_at': cached_dto.analyzed_at.isoformat() if cached_dto.analyzed_at else None,
                 'action_items': cached_dto.action_items or [],
-                # New structure fields
-                'executive_summary': cached_dto.executive_summary,
-                'outcomes': cached_dto.outcomes or [],
-                'blockers_and_constraints': cached_dto.blockers_and_constraints or [],
-                'timeline_and_milestones': cached_dto.timeline_and_milestones or [],
-                'key_discussions': cached_dto.key_discussions or [],
-                # Legacy fields for backward compatibility
-                'key_decisions': cached_dto.key_decisions or [],
-                'blockers': cached_dto.blockers or [],
+                # New topic-based structure
+                'topics': cached_dto.topics or [],
+                # Legacy fields for backward compatibility (deprecated)
+                'executive_summary': cached_dto.executive_summary if hasattr(cached_dto, 'executive_summary') else None,
+                'outcomes': cached_dto.outcomes or [] if hasattr(cached_dto, 'outcomes') else [],
+                'blockers_and_constraints': cached_dto.blockers_and_constraints or [] if hasattr(cached_dto, 'blockers_and_constraints') else [],
+                'timeline_and_milestones': cached_dto.timeline_and_milestones or [] if hasattr(cached_dto, 'timeline_and_milestones') else [],
+                'key_discussions': cached_dto.key_discussions or [] if hasattr(cached_dto, 'key_discussions') else [],
+                'key_decisions': cached_dto.key_decisions or [] if hasattr(cached_dto, 'key_decisions') else [],
+                'blockers': cached_dto.blockers or [] if hasattr(cached_dto, 'blockers') else [],
                 'follow_ups': [],  # Not stored in DTO currently
-                'summary': cached_dto.summary
+                'summary': cached_dto.summary if hasattr(cached_dto, 'summary') else None
             })
 
-            logger.info(f"Returning meeting_data with {len(meeting_data.get('outcomes', []))} outcomes")
+            logger.info(f"Returning meeting_data with {len(meeting_data.get('topics', []))} topics")
         else:
             logger.warning(f"No cached analysis found for meeting {meeting_id}")
 
@@ -453,43 +454,61 @@ def analyze_meeting_api(user, meeting_id):
             if existing_meeting:
                 # Update existing record - Always serialize to JSON, even empty lists
                 existing_meeting.analyzed_at = analyzed_at
-                # New structure fields
-                existing_meeting.executive_summary = analysis.executive_summary
-                existing_meeting.outcomes = json.dumps(analysis.outcomes or [])
-                existing_meeting.blockers_and_constraints = json.dumps(analysis.blockers_and_constraints or [])
-                existing_meeting.timeline_and_milestones = json.dumps(analysis.timeline_and_milestones or [])
-                existing_meeting.key_discussions = json.dumps(analysis.key_discussions or [])
+                # New topic-based structure
+                topics_data = [
+                    {
+                        "title": topic.title,
+                        "content_items": topic.content_items
+                    }
+                    for topic in analysis.topics
+                ] if analysis.topics else []
+                existing_meeting.topics = json.dumps(topics_data)
                 existing_meeting.action_items = json.dumps(action_items_data)  # Always serialize
-                # Legacy fields for backward compatibility
-                existing_meeting.summary = analysis.executive_summary
-                existing_meeting.key_decisions = json.dumps(analysis.outcomes or [])
-                existing_meeting.blockers = json.dumps(analysis.blockers_and_constraints or [])
+                # Legacy fields for backward compatibility (deprecated, will be removed in future)
+                existing_meeting.executive_summary = None  # No longer generated
+                existing_meeting.outcomes = json.dumps([])
+                existing_meeting.blockers_and_constraints = json.dumps([])
+                existing_meeting.timeline_and_milestones = json.dumps([])
+                existing_meeting.key_discussions = json.dumps([])
+                existing_meeting.summary = None
+                existing_meeting.key_decisions = json.dumps([])
+                existing_meeting.blockers = json.dumps([])
                 existing_meeting.title = transcript['title']
                 existing_meeting.date = meeting_date
-                logger.info(f"Updated existing processed meeting record for {meeting_id}")
+                logger.info(f"Updated existing processed meeting record for {meeting_id} with {len(topics_data)} topics")
             else:
                 # Create new record - Always serialize to JSON, even empty lists
                 import uuid
+                # Convert topics to dict format for JSON storage
+                topics_data = [
+                    {
+                        "title": topic.title,
+                        "content_items": topic.content_items
+                    }
+                    for topic in analysis.topics
+                ] if analysis.topics else []
+
                 processed_meeting = ProcessedMeeting(
                     id=str(uuid.uuid4()),
                     fireflies_id=meeting_id,
                     title=transcript['title'],
                     date=meeting_date,
                     analyzed_at=analyzed_at,
-                    # New structure fields
-                    executive_summary=analysis.executive_summary,
-                    outcomes=json.dumps(analysis.outcomes or []),
-                    blockers_and_constraints=json.dumps(analysis.blockers_and_constraints or []),
-                    timeline_and_milestones=json.dumps(analysis.timeline_and_milestones or []),
-                    key_discussions=json.dumps(analysis.key_discussions or []),
+                    # New topic-based structure
+                    topics=json.dumps(topics_data),
                     action_items=json.dumps(action_items_data),  # Always serialize
-                    # Legacy fields for backward compatibility
-                    summary=analysis.executive_summary,
-                    key_decisions=json.dumps(analysis.outcomes or []),
-                    blockers=json.dumps(analysis.blockers_and_constraints or [])
+                    # Legacy fields for backward compatibility (deprecated, will be removed in future)
+                    executive_summary=None,  # No longer generated
+                    outcomes=json.dumps([]),
+                    blockers_and_constraints=json.dumps([]),
+                    timeline_and_milestones=json.dumps([]),
+                    key_discussions=json.dumps([]),
+                    summary=None,
+                    key_decisions=json.dumps([]),
+                    blockers=json.dumps([])
                 )
                 db_session.add(processed_meeting)
-                logger.info(f"Created new processed meeting record for {meeting_id}")
+                logger.info(f"Created new processed meeting record for {meeting_id} with {len(topics_data)} topics")
 
         # Invalidate meetings cache after successful analysis
         invalidated = invalidate_cache('api_cache:meetings:*')

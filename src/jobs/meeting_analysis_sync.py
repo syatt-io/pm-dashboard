@@ -282,17 +282,22 @@ class MeetingAnalysisSyncJob:
                             )
 
                             # Send email asynchronously
+                            # Convert topics to dict format for email template
+                            topics_data = [
+                                {
+                                    "title": topic.title,
+                                    "content_items": topic.content_items
+                                }
+                                for topic in analysis.topics
+                            ] if analysis.topics else []
+
                             email_result = asyncio.run(
                                 self.notification_manager.send_meeting_analysis_email(
                                     meeting_title=meeting_title,
                                     meeting_date=meeting_date,
                                     recipients=recipient_emails,
-                                    executive_summary=analysis.executive_summary,
-                                    action_items=action_items_data,
-                                    outcomes=analysis.outcomes or [],
-                                    blockers=analysis.blockers_and_constraints or [],
-                                    timeline=analysis.timeline_and_milestones or [],
-                                    key_discussions=analysis.key_discussions or []
+                                    topics=topics_data,
+                                    action_items=action_items_data
                                 )
                             )
 

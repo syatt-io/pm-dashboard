@@ -32,14 +32,16 @@ class ActionItem(BaseModel):
     dependencies: Optional[List[str]] = Field(description="Other tasks this depends on", default=None)
 
 
+class TopicSection(BaseModel):
+    """A topic section with title and bullet points."""
+    title: str = Field(description="Clear, specific topic header (e.g., 'Japan Site Launch', 'Database Schema Discussion')")
+    content_items: List[str] = Field(description="List of bullet points for this topic. Each item should be a concise statement. Use nested structure by prefixing sub-items with '  * ' (two spaces + asterisk)")
+
+
 class MeetingAnalysis(BaseModel):
-    """Complete analysis of a meeting transcript."""
-    executive_summary: str = Field(description="3-4 sentence executive summary (context, key outcome, critical next step, urgent issues)")
-    outcomes: List[str] = Field(description="What changed as a result of this meeting (decisions, direction changes, commitments, agreements)")
-    action_items: List[ActionItem] = Field(description="What we're doing next (concrete next steps)")
-    blockers_and_constraints: List[str] = Field(description="What's preventing progress (blockers, dependencies, constraints, risks)")
-    timeline_and_milestones: List[str] = Field(description="When things need to happen (deadlines, milestones, sequence)")
-    key_discussions: List[str] = Field(description="Important context and deliberation (debates, trade-offs, stakeholder perspectives)")
+    """Complete analysis of a meeting transcript with topic-based sections."""
+    topics: List[TopicSection] = Field(description="Natural topic sections based on what was discussed. Let the number emerge from content (could be 2, could be 10). Group related discussions under same topic.")
+    action_items: List[ActionItem] = Field(description="What we're doing next (concrete next steps with owner and task)")
 
 
 @dataclass

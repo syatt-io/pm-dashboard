@@ -353,12 +353,8 @@ class NotificationManager:
         meeting_title: str,
         meeting_date: datetime,
         recipients: List[str],
-        executive_summary: str,
-        action_items: List[Dict],
-        outcomes: List[str],
-        blockers: List[str],
-        timeline: List[str],
-        key_discussions: List[str]
+        topics: List[Dict],  # New: List of topic sections with title and content_items
+        action_items: List[Dict]
     ) -> Dict[str, Any]:
         """
         Send meeting analysis email to participants.
@@ -367,12 +363,8 @@ class NotificationManager:
             meeting_title: Title of the meeting
             meeting_date: Date when meeting occurred
             recipients: List of email addresses to send to
-            executive_summary: AI-generated executive summary
+            topics: List of topic sections (each with title and content_items)
             action_items: List of action items from analysis
-            outcomes: List of key outcomes
-            blockers: List of blockers and constraints
-            timeline: List of timeline/milestone items
-            key_discussions: List of key discussion points
 
         Returns:
             Dict with success status and details
@@ -424,13 +416,16 @@ class NotificationManager:
                         body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }}
                         h1 {{ color: #554DFF; }}
                         h2 {{ color: #666; border-bottom: 2px solid #554DFF; padding-bottom: 5px; }}
-                        h3 {{ color: #777; }}
+                        h3 {{ color: #777; margin-top: 15px; margin-bottom: 10px; font-size: 1.1em; }}
                         .section {{ margin: 20px 0; }}
+                        .topic-section {{ margin: 15px 0; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #00FFCE; }}
                         .action-item {{ background-color: #f8f9fa; padding: 10px; margin: 10px 0; border-left: 4px solid #554DFF; }}
                         .action-title {{ font-weight: bold; color: #554DFF; }}
                         ul {{ list-style-type: none; padding-left: 0; }}
-                        li {{ padding: 5px 0; }}
-                        li:before {{ content: "▸ "; color: #554DFF; font-weight: bold; }}
+                        li {{ padding: 5px 0; padding-left: 20px; }}
+                        li:before {{ content: "▸ "; color: #554DFF; font-weight: bold; margin-left: -20px; }}
+                        .sub-item {{ padding-left: 40px; }}
+                        .sub-item:before {{ content: "• "; color: #00FFCE; font-weight: bold; margin-left: -20px; }}
                         .footer {{ margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }}
                     </style>
                 </head>
@@ -441,65 +436,38 @@ class NotificationManager:
                     <p><strong>Date:</strong> {meeting_date.strftime("%B %d, %Y at %I:%M %p")}</p>
 
                     <div class="section">
-                        <h2>Executive Summary</h2>
-                        <p>{executive_summary}</p>
-                    </div>
-
-                    <div class="section">
-                        <h2>Key Outcomes</h2>
+                        <h2>Discussion Topics</h2>
             """
-            # Add outcomes
-            if outcomes:
-                html_body += "<ul>"
-                for outcome in outcomes:
-                    html_body += f"<li>{outcome}</li>"
-                html_body += "</ul>"
-            else:
-                html_body += "<p>No key outcomes identified.</p>"
 
-            # Add key discussions
-            html_body += """
-                    </div>
-                    <div class="section">
-                        <h2>Key Discussions</h2>
-            """
-            if key_discussions:
-                html_body += "<ul>"
-                for discussion in key_discussions:
-                    html_body += f"<li>{discussion}</li>"
-                html_body += "</ul>"
-            else:
-                html_body += "<p>No key discussions identified.</p>"
+            # Add topics sections
+            if topics:
+                for topic in topics:
+                    topic_title = topic.get("title", "Untitled Topic")
+                    content_items = topic.get("content_items", [])
 
-            # Add blockers
-            html_body += """
-                    </div>
-                    <div class="section">
-                        <h2>Blockers & Constraints</h2>
-            """
-            if blockers:
-                html_body += "<ul>"
-                for blocker in blockers:
-                    html_body += f"<li>{blocker}</li>"
-                html_body += "</ul>"
-            else:
-                html_body += "<p>No blockers identified.</p>"
+                    html_body += f"""
+                        <div class="topic-section">
+                            <h3>{topic_title}</h3>
+                            <ul>
+                    """
 
-            # Add timeline
-            html_body += """
-                    </div>
-                    <div class="section">
-                        <h2>Timeline & Milestones</h2>
-            """
-            if timeline:
-                html_body += "<ul>"
-                for item in timeline:
-                    html_body += f"<li>{item}</li>"
-                html_body += "</ul>"
-            else:
-                html_body += "<p>No timeline items identified.</p>"
+                    for item in content_items:
+                        # Check if this is a sub-item (starts with "  * ")
+                        if item.startswith("  * "):
+                            # Sub-bullet point
+                            html_body += f'<li class="sub-item">{item[4:]}</li>'
+                        else:
+                            # Main bullet point
+                            html_body += f'<li>{item}</li>'
 
-            # Add action items (moved to bottom)
+                    html_body += """
+                            </ul>
+                        </div>
+                    """
+            else:
+                html_body += "<p>No topics identified.</p>"
+
+            # Add action items
             html_body += f"""
                     </div>
                     <div class="section">
