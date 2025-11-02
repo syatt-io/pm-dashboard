@@ -66,20 +66,52 @@ app = Flask(__name__,
             static_folder=react_build_dir,
             static_url_path='')
 
-# Production-ready secret key
-# Handle empty string as missing (DigitalOcean SECRET type issue)
-jwt_secret = os.getenv('JWT_SECRET_KEY', '')
-app.secret_key = jwt_secret if jwt_secret else None
+# ✅ SECURITY: Production-ready secret key validation
+# CRITICAL: JWT_SECRET_KEY must be set in production - no fallbacks allowed
+jwt_secret = os.getenv('JWT_SECRET_KEY', '').strip()  # Handle DigitalOcean SECRET type whitespace
+is_production = os.getenv('FLASK_ENV') == 'production'
 
-if not app.secret_key:
-    if os.getenv('FLASK_ENV') == 'production':
-        logger.warning("JWT_SECRET_KEY not set in production - using fallback (security warning!)")
-        # Use a fallback in production to allow app to start
-        import secrets
-        app.secret_key = secrets.token_hex(32)
+# Validate JWT_SECRET_KEY
+if not jwt_secret:
+    if is_production:
+        # FAIL FAST in production - do not start with missing JWT secret
+        error_msg = (
+            "CRITICAL SECURITY ERROR: JWT_SECRET_KEY is not set in production!\n"
+            "The application cannot start without a secure JWT secret.\n"
+            "Generate a secure secret with: python -c 'import secrets; print(secrets.token_hex(32))'\n"
+            "Then set JWT_SECRET_KEY environment variable."
+        )
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     else:
-        logger.warning("JWT_SECRET_KEY not set - using development fallback (NOT FOR PRODUCTION)")
-        app.secret_key = 'dev-secret-key-change-in-production'
+        # Development: use a fixed (but clearly insecure) secret
+        logger.warning("⚠️  JWT_SECRET_KEY not set - using development secret (NOT FOR PRODUCTION)")
+        jwt_secret = 'dev-secret-DO-NOT-USE-IN-PRODUCTION-' + 'a' * 32
+
+# Validate minimum secret length (at least 32 characters for HS256)
+MIN_SECRET_LENGTH = 32
+if len(jwt_secret) < MIN_SECRET_LENGTH:
+    error_msg = (
+        f"CRITICAL SECURITY ERROR: JWT_SECRET_KEY is too short ({len(jwt_secret)} chars)!\n"
+        f"Minimum length: {MIN_SECRET_LENGTH} characters.\n"
+        "Generate a secure secret with: python -c 'import secrets; print(secrets.token_hex(32))'"
+    )
+    logger.error(error_msg)
+    if is_production:
+        raise ValueError(error_msg)
+    else:
+        logger.warning("⚠️  Continuing in development with weak secret (NOT FOR PRODUCTION)")
+
+# Warn about common weak secrets
+WEAK_SECRETS = ['dev', 'test', 'secret', 'password', 'changeme', '12345']
+if any(weak in jwt_secret.lower() for weak in WEAK_SECRETS):
+    logger.warning(
+        f"⚠️  JWT_SECRET_KEY appears to contain common weak patterns. "
+        f"Use a cryptographically secure random value in production."
+    )
+
+app.secret_key = jwt_secret
+logger.info("✅ JWT_SECRET_KEY validated and configured")
 
 # Configure CORS for development and production
 # ✅ FIXED: Strict CORS configuration - production only allows single domain

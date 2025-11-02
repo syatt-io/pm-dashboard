@@ -24,17 +24,38 @@ class AuthService:
         self.allowed_domain = os.getenv('ALLOWED_EMAIL_DOMAIN', '@syatt.io')
         self.admin_email = os.getenv('ADMIN_EMAIL', 'mike.samimi@syatt.io')
 
-        # JWT Configuration - FAIL FAST if not configured
-        # ✅ FIXED: Always require JWT_SECRET_KEY - no fallback
-        self.jwt_secret = os.getenv('JWT_SECRET_KEY')
+        # ✅ SECURITY: JWT Configuration - FAIL FAST in production if not configured
+        self.jwt_secret = os.getenv('JWT_SECRET_KEY', '').strip()  # Handle whitespace
+        is_production = os.getenv('FLASK_ENV') == 'production'
 
         if not self.jwt_secret:
-            logger.warning(
-                "JWT_SECRET_KEY is not set - generating random secret (NOT RECOMMENDED FOR PRODUCTION). "
-                "Set JWT_SECRET_KEY env var with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            if is_production:
+                # FAIL FAST in production - do not start without JWT secret
+                error_msg = (
+                    "CRITICAL SECURITY ERROR: JWT_SECRET_KEY is not set in production!\n"
+                    "Generate a secure secret with: python -c 'import secrets; print(secrets.token_hex(32))'\n"
+                    "Then set JWT_SECRET_KEY environment variable."
+                )
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+            else:
+                # Development: use a fixed (but clearly insecure) secret
+                logger.warning("⚠️  JWT_SECRET_KEY not set - using development secret (NOT FOR PRODUCTION)")
+                import secrets
+                self.jwt_secret = 'dev-secret-DO-NOT-USE-IN-PRODUCTION-' + secrets.token_hex(16)
+
+        # Validate minimum secret length
+        MIN_SECRET_LENGTH = 32
+        if len(self.jwt_secret) < MIN_SECRET_LENGTH:
+            error_msg = (
+                f"CRITICAL SECURITY ERROR: JWT_SECRET_KEY is too short ({len(self.jwt_secret)} chars)!\n"
+                f"Minimum length: {MIN_SECRET_LENGTH} characters."
             )
-            import secrets
-            self.jwt_secret = secrets.token_hex(32)
+            logger.error(error_msg)
+            if is_production:
+                raise ValueError(error_msg)
+            else:
+                logger.warning("⚠️  Continuing in development with weak secret")
 
         self.jwt_expiry_hours = int(os.getenv('JWT_EXPIRY_HOURS', '24'))
 

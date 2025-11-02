@@ -62,9 +62,10 @@ def mock_user(db_session):
     user = User(
         email='test@example.com',
         name='Test User',
-        role=UserRole.USER,
-        fireflies_api_key=None,
-        google_oauth_token=None
+        google_id='test_google_id_123',
+        role=UserRole.MEMBER,
+        fireflies_api_key_encrypted=None,
+        google_oauth_token_encrypted=None
     )
     db_session.add(user)
     db_session.commit()
@@ -90,10 +91,25 @@ def mock_admin_user(db_session):
 
 @pytest.fixture
 def auth_headers(mock_user):
-    """Create authorization headers with mock JWT token."""
-    # In real tests, generate actual JWT token
+    """Create authorization headers with valid JWT token."""
+    # Generate actual JWT token for testing
+    import jwt
+    from datetime import datetime, timedelta, timezone
+
+    jwt_secret = os.getenv('JWT_SECRET_KEY', 'test-jwt-secret-key-32-bytes-long-for-testing-only!')
+
+    payload = {
+        'user_id': mock_user.id,
+        'email': mock_user.email,
+        'role': mock_user.role.value,
+        'exp': datetime.now(timezone.utc) + timedelta(hours=24),
+        'iat': datetime.now(timezone.utc)
+    }
+
+    token = jwt.encode(payload, jwt_secret, algorithm='HS256')
+
     return {
-        'Authorization': 'Bearer test-token',
+        'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
 
