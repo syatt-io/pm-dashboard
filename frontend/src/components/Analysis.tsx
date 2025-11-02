@@ -47,6 +47,7 @@ import {
   Warning,
   TrendingUp,
   Create,
+  Download,
 } from '@mui/icons-material';
 import { MeetingList } from './Meetings';
 
@@ -816,6 +817,79 @@ const AnalysisShowErrorFallback = ({ error }: { error: any }) => {
 export const AnalysisShow = () => {
   const [error, setError] = React.useState<any>(null);
 
+  const downloadAnalysisAsMarkdown = (record: any) => {
+    if (!record) return;
+
+    let markdown = `# ${record.meeting_title || record.title || 'Meeting Analysis'}\n\n`;
+    markdown += `**Meeting Date:** ${record.date ? new Date(record.date).toLocaleString() : 'N/A'}\n`;
+    markdown += `**Analyzed At:** ${record.analyzed_at ? new Date(record.analyzed_at).toLocaleString() : 'N/A'}\n\n`;
+    markdown += '---\n\n';
+
+    // Add topics if available (new format)
+    if (record.topics && record.topics.length > 0) {
+      record.topics.forEach((topic: any) => {
+        markdown += `## ${topic.title}\n\n`;
+        topic.content_items?.forEach((item: string) => {
+          const isSubBullet = item.startsWith('  * ');
+          const content = isSubBullet ? item.substring(4) : item;
+          markdown += isSubBullet ? `  * ${content}\n` : `* ${content}\n`;
+        });
+        markdown += '\n';
+      });
+    }
+
+    // Add action items
+    if (record.action_items && record.action_items.length > 0) {
+      markdown += '## Action Items\n\n';
+      record.action_items.forEach((item: any) => {
+        markdown += `### ${item.title}\n\n`;
+        markdown += `${item.description}\n\n`;
+        if (item.assignee) markdown += `**Assignee:** ${item.assignee}\n`;
+        if (item.priority) markdown += `**Priority:** ${item.priority}\n`;
+        if (item.due_date) markdown += `**Due Date:** ${new Date(item.due_date).toLocaleDateString()}\n`;
+        markdown += '\n';
+      });
+    }
+
+    // Fallback to legacy format if no topics
+    if ((!record.topics || record.topics.length === 0)) {
+      if (record.executive_summary) {
+        markdown += `## Executive Summary\n\n${record.executive_summary}\n\n`;
+      }
+      if (record.outcomes && record.outcomes.length > 0) {
+        markdown += '## Outcomes\n\n';
+        record.outcomes.forEach((outcome: string) => markdown += `* ${outcome}\n`);
+        markdown += '\n';
+      }
+      if (record.blockers_and_constraints && record.blockers_and_constraints.length > 0) {
+        markdown += '## Blockers & Constraints\n\n';
+        record.blockers_and_constraints.forEach((blocker: string) => markdown += `* ${blocker}\n`);
+        markdown += '\n';
+      }
+      if (record.timeline_and_milestones && record.timeline_and_milestones.length > 0) {
+        markdown += '## Timeline & Milestones\n\n';
+        record.timeline_and_milestones.forEach((item: string) => markdown += `* ${item}\n`);
+        markdown += '\n';
+      }
+      if (record.key_discussions && record.key_discussions.length > 0) {
+        markdown += '## Key Discussions\n\n';
+        record.key_discussions.forEach((discussion: string) => markdown += `* ${discussion}\n`);
+        markdown += '\n';
+      }
+    }
+
+    // Create blob and trigger download
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${record.id || 'meeting'}_analysis_${new Date().toISOString().split('T')[0]}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       {error ? (
@@ -841,9 +915,25 @@ export const AnalysisShow = () => {
           {/* Meeting Details Header */}
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Meeting Details
-              </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">
+                  Meeting Details
+                </Typography>
+                <FunctionField
+                  render={(record: any) => (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      size="medium"
+                      startIcon={<Download />}
+                      onClick={() => downloadAnalysisAsMarkdown(record)}
+                      sx={{ textTransform: 'none' }}
+                    >
+                      Download as Markdown
+                    </Button>
+                  )}
+                />
+              </Box>
               <TextField source="meeting_title" label="Title" />
               <DateField
                 source="analyzed_at"
