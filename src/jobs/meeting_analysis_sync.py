@@ -210,6 +210,14 @@ class MeetingAnalysisSyncJob:
                     "dependencies": item.dependencies or []
                 })
 
+            # Prepare topics for storage
+            topics_data = []
+            for topic in analysis.topics:
+                topics_data.append({
+                    "title": topic.title,
+                    "content_items": topic.content_items
+                })
+
             # Store in database
             session = self.Session()
             try:
@@ -221,14 +229,12 @@ class MeetingAnalysisSyncJob:
                     text("""
                         INSERT INTO processed_meetings (
                             id, fireflies_id, title, date, duration,
-                            executive_summary, outcomes, action_items,
-                            blockers_and_constraints, timeline_and_milestones,
-                            key_discussions, analyzed_at, created_at, updated_at
+                            topics, action_items,
+                            analyzed_at, created_at, updated_at
                         ) VALUES (
                             :id, :fireflies_id, :title, :date, :duration,
-                            :executive_summary, :outcomes, :action_items,
-                            :blockers_and_constraints, :timeline_and_milestones,
-                            :key_discussions, :analyzed_at, :created_at, :updated_at
+                            :topics, :action_items,
+                            :analyzed_at, :created_at, :updated_at
                         )
                     """),
                     {
@@ -237,12 +243,8 @@ class MeetingAnalysisSyncJob:
                         "title": meeting_title,
                         "date": meeting_date,
                         "duration": meeting.get("duration", 0),
-                        "executive_summary": analysis.executive_summary,
-                        "outcomes": json.dumps(analysis.outcomes or []),
+                        "topics": json.dumps(topics_data),
                         "action_items": json.dumps(action_items_data),
-                        "blockers_and_constraints": json.dumps(analysis.blockers_and_constraints or []),
-                        "timeline_and_milestones": json.dumps(analysis.timeline_and_milestones or []),
-                        "key_discussions": json.dumps(analysis.key_discussions or []),
                         "analyzed_at": now,
                         "created_at": now,
                         "updated_at": now
@@ -253,9 +255,8 @@ class MeetingAnalysisSyncJob:
 
                 logger.info(
                     f"Successfully analyzed meeting {meeting_id}: "
-                    f"{len(analysis.action_items)} action items, "
-                    f"{len(analysis.outcomes)} outcomes, "
-                    f"{len(analysis.blockers_and_constraints)} blockers"
+                    f"{len(analysis.topics)} topics, "
+                    f"{len(analysis.action_items)} action items"
                 )
 
                 # Check if project has email notifications enabled
