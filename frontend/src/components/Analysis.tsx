@@ -843,10 +843,10 @@ export const AnalysisShow = () => {
       markdown += '## Action Items\n\n';
       record.action_items.forEach((item: any) => {
         markdown += `### ${item.title}\n\n`;
-        markdown += `${item.description}\n\n`;
-        if (item.assignee) markdown += `**Assignee:** ${item.assignee}\n`;
-        if (item.priority) markdown += `**Priority:** ${item.priority}\n`;
-        if (item.due_date) markdown += `**Due Date:** ${new Date(item.due_date).toLocaleDateString()}\n`;
+        if (item.description) markdown += `* **Description:** ${item.description}\n`;
+        if (item.assignee) markdown += `* **Assignee:** ${item.assignee}\n`;
+        if (item.priority) markdown += `* **Priority:** ${item.priority}\n`;
+        if (item.due_date) markdown += `* **Due Date:** ${new Date(item.due_date).toLocaleDateString()}\n`;
         markdown += '\n';
       });
     }
@@ -966,7 +966,10 @@ export const AnalysisShow = () => {
                             {topic.content_items?.map((item: string, itemIndex: number) => {
                               // Check if it's a sub-bullet (starts with "  * ")
                               const isSubBullet = item.startsWith('  * ');
-                              const content = isSubBullet ? item.substring(4) : item;
+                              // Strip the prefix AND any leading asterisk from the actual content
+                              let content = isSubBullet ? item.substring(4) : item;
+                              // Remove any leading asterisk and whitespace
+                              content = content.replace(/^\*\s*/, '').trim();
 
                               return (
                                 <ListItem
