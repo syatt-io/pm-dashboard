@@ -977,7 +977,8 @@ export const AnalysisShow = () => {
                                 <ListItem
                                   key={itemIndex}
                                   sx={{
-                                    pl: isSubBullet ? 8 : 2,
+                                    pl: 2,
+                                    ml: isSubBullet ? 4 : 0,
                                     py: 0.25,
                                     display: 'list-item',
                                     listStyleType: isSubBullet ? 'circle' : 'disc',
