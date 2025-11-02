@@ -123,12 +123,8 @@ class TranscriptAnalyzer:
         if not self.llm:
             logger.error("Cannot analyze transcript: AI configuration not available")
             return MeetingAnalysis(
-                executive_summary="AI configuration not available - cannot analyze transcript",
-                outcomes=[],
-                action_items=[],
-                blockers_and_constraints=[],
-                timeline_and_milestones=[],
-                key_discussions=[]
+                topics=[],
+                action_items=[]
             )
 
         # Get prompts from configuration
@@ -178,12 +174,8 @@ class TranscriptAnalyzer:
             logger.error(f"Error analyzing transcript: {e}")
             # Return minimal analysis on error
             return MeetingAnalysis(
-                executive_summary="Error analyzing meeting transcript",
-                outcomes=[],
-                action_items=[],
-                blockers_and_constraints=[],
-                timeline_and_milestones=[],
-                key_discussions=[]
+                topics=[],
+                action_items=[]
             )
 
     def extract_action_items(self, transcript: str) -> List[ActionItem]:
