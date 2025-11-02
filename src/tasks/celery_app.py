@@ -2,6 +2,8 @@
 
 import os
 import json
+import tempfile
+import atexit
 from celery import Celery
 from celery.schedules import crontab
 
@@ -9,12 +11,30 @@ from celery.schedules import crontab
 # The credentials JSON is stored as GOOGLE_APPLICATION_CREDENTIALS_JSON
 gcp_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
 if gcp_creds_json:
-    # Write credentials to a temporary file that google-cloud-pubsub can use
-    creds_path = '/tmp/gcp-credentials.json'
-    with open(creds_path, 'w') as f:
+    # SECURITY FIX: Use secure temporary file with proper permissions and cleanup
+    # Create secure temporary file with restrictive permissions (0o600 = owner read/write only)
+    fd, creds_path = tempfile.mkstemp(suffix='.json', prefix='gcp-creds-')
+
+    # Set restrictive file permissions (owner read/write only)
+    os.chmod(creds_path, 0o600)
+
+    # Write credentials using the file descriptor
+    with os.fdopen(fd, 'w') as f:
         f.write(gcp_creds_json)
+
+    # Set environment variable for google-cloud-pubsub
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = creds_path
-    print("✓ GCP credentials configured from environment")
+
+    # Register cleanup function to delete credentials on exit
+    def cleanup_gcp_credentials():
+        try:
+            if os.path.exists(creds_path):
+                os.unlink(creds_path)
+        except Exception:
+            pass  # Silently fail on cleanup errors
+
+    atexit.register(cleanup_gcp_credentials)
+    print("✓ GCP credentials configured from environment (secure tempfile)")
 else:
     print("⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
 
