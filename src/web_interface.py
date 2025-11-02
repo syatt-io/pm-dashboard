@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, s
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect, generate_csrf
 import asyncio
 import uuid
 import logging
@@ -99,8 +100,13 @@ else:
     logger.info(f"Development CORS: {cors_origins}")
 
 CORS(app, origins=cors_origins, supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization'],
+     allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token'],
      methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+
+# ✅ SECURITY: Initialize CSRF protection for state-changing operations
+# CSRF tokens provide defense in depth beyond SameSite cookies
+csrf = CSRFProtect(app)
+logger.info("✅ CSRF protection initialized")
 
 # ✅ FIXED: Initialize rate limiter for API protection
 # Use Redis if available (production), otherwise in-memory (development)
@@ -217,6 +223,11 @@ if limiter:
     limiter.exempt(health_bp)
     logger.info("✅ Health check endpoint exempted from rate limiting")
 
+# ✅ SECURITY: Exempt health check from CSRF protection
+# Health checks don't modify state and need to work without CSRF tokens
+csrf.exempt(health_bp)
+logger.info("✅ Health check endpoint exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
@@ -230,6 +241,23 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(backfill_bp)
 app.register_blueprint(admin_settings_bp)
+
+# ✅ SECURITY: CSRF token endpoint for frontend to fetch tokens
+@app.route('/api/csrf-token', methods=['GET'])
+def get_csrf_token():
+    """
+    Return a CSRF token for the frontend.
+
+    This endpoint allows the frontend to fetch a CSRF token before making
+    state-changing requests (POST, PUT, DELETE).
+
+    The token should be included in the X-CSRF-Token header for all
+    state-changing requests.
+    """
+    token = generate_csrf()
+    return jsonify({'csrf_token': token}), 200
+
+logger.info("✅ CSRF token endpoint registered at /api/csrf-token")
 
 # ✅ FIXED: Apply rate limiting to critical backfill endpoints (expensive operations)
 if limiter:
