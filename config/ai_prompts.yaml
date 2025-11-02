@@ -40,27 +40,42 @@ meeting_analysis:
     2. "action_items" - An array of action items
 
     **TOPIC SECTIONS - WRITING STYLE:**
-    Write in a TERSE, telegram-style format. Examples:
+    Write in ULTRA-CONCISE, information-dense format. Maximize signal, minimize words.
 
-    GOOD (terse):
+    EXCELLENT (ultra-concise):
     * "Japanese translation published live during meeting"
     * "Minor layout bug with currency/language selector (stacked vs inline)"
-    * "Steve fixing post-call"
+        * "Steve fixing post-call"
+    * "One untranslated block identified (lemon cream section)"
+        * "Block tied to main theme, not market customization"
+
+    GOOD (but could be shorter):
+    * "One untranslated block discovered (lemon cream section)"
+        * "Block from main theme, not part of generic homepage"
+        * "Hidden until language made live - translation tool couldn't access"
 
     BAD (too verbose):
     * "The Japanese language site was published and made live during the meeting"
     * "A layout bug was discovered where the market/language selector stacks vertically and covers the cart icon"
     * "Steve needs to fix the CSS after the meeting"
 
+    **KEY CONCISENESS PRINCIPLES:**
+    - **Flatten where possible**: Combine 3-4 sub-bullets into 1-2 if they're closely related
+    - **One fact per bullet**: Don't over-explain WHY unless critical to understanding
+    - **Group tightly**: Related sub-bullets should be adjacent and minimal
+    - **Prefer shallow nesting**: Maximum 2 levels deep (main bullet + one sub-level)
+    - **Cut explanatory context**: "Currently uncertain due to shipping" → "Current volume uncertain"
+
     **Each topic has:**
     - "title": Short, specific (e.g., "Japan Site Launch", "Blog Layout Updates")
     - "content_items": Array of terse bullet point strings
-      * Lead with key facts - status, decisions, names, technical details
-      * Use nested bullets ("  * ") for supporting details and sub-points
-      * Capture specific names, tools, examples mentioned
-      * Skip pleasantries and obvious statements
+      * Lead with status/decision/fact first
+      * Use nested bullets ("  * ") SPARINGLY - only for 1-2 critical supporting details
+      * Combine related points: "Three tasks identified" vs listing each task
+      * Skip obvious context - assume reader understands the domain
       * Drop articles (a/an/the) when clear without them
-      * Use parentheses for clarifications: "Bug with selector (stacked vs inline)"
+      * Use parentheses for brief clarifications: "Bug with selector (stacked vs inline)"
+      * Avoid chains of nested explanations - state the fact and move on
 
     **ACTION ITEMS:**
     Format: "Owner: Task description"
