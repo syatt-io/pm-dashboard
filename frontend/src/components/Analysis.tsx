@@ -831,7 +831,9 @@ export const AnalysisShow = () => {
         markdown += `## ${topic.title}\n\n`;
         topic.content_items?.forEach((item: string) => {
           const isSubBullet = item.startsWith('  * ');
-          const content = isSubBullet ? item.substring(4) : item;
+          let content = isSubBullet ? item.substring(4) : item;
+          // Remove any leading asterisk and whitespace
+          content = content.replace(/^\*\s*/, '').trim();
           markdown += isSubBullet ? `  * ${content}\n` : `* ${content}\n`;
         });
         markdown += '\n';
@@ -979,7 +981,7 @@ export const AnalysisShow = () => {
                                     py: 0.5,
                                     display: 'list-item',
                                     listStyleType: isSubBullet ? 'circle' : 'disc',
-                                    listStylePosition: 'inside'
+                                    listStylePosition: 'outside'
                                   }}
                                 >
                                   <ListItemText
