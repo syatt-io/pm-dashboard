@@ -114,4 +114,4 @@ jspm_packages/
 # DigitalOcean App Platform
 app.yaml
 do-app-spec.yaml
-app-spec.yaml
+app-spec.yaml# Trigger deployment to apply topics column migration
