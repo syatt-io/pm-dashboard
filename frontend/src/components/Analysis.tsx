@@ -977,18 +977,20 @@ export const AnalysisShow = () => {
                                 <ListItem
                                   key={itemIndex}
                                   sx={{
-                                    pl: isSubBullet ? 6 : 2,
-                                    py: 0.5,
+                                    pl: isSubBullet ? 8 : 2,
+                                    py: 0.25,
                                     display: 'list-item',
                                     listStyleType: isSubBullet ? 'circle' : 'disc',
-                                    listStylePosition: 'outside'
+                                    listStylePosition: 'outside',
+                                    lineHeight: 1.4
                                   }}
                                 >
                                   <ListItemText
                                     primary={content}
                                     primaryTypographyProps={{
                                       variant: isSubBullet ? 'body2' : 'body1',
-                                      component: 'span'
+                                      component: 'span',
+                                      sx: { lineHeight: 1.4 }
                                     }}
                                   />
                                 </ListItem>
