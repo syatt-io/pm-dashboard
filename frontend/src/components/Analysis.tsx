@@ -883,19 +883,17 @@ export const AnalysisShow = () => {
                                   key={itemIndex}
                                   sx={{
                                     pl: isSubBullet ? 6 : 2,
-                                    py: 0.5
+                                    py: 0.5,
+                                    display: 'list-item',
+                                    listStyleType: isSubBullet ? 'circle' : 'disc',
+                                    listStylePosition: 'inside'
                                   }}
                                 >
-                                  <ListItemIcon sx={{ minWidth: 24 }}>
-                                    <CheckCircle
-                                      color="primary"
-                                      sx={{ fontSize: isSubBullet ? 16 : 20 }}
-                                    />
-                                  </ListItemIcon>
                                   <ListItemText
                                     primary={content}
                                     primaryTypographyProps={{
-                                      variant: isSubBullet ? 'body2' : 'body1'
+                                      variant: isSubBullet ? 'body2' : 'body1',
+                                      component: 'span'
                                     }}
                                   />
                                 </ListItem>

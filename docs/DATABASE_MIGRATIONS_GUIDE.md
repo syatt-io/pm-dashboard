@@ -202,7 +202,35 @@ CREATE INDEX IF NOT EXISTS index_name ON table_name (columns);
 - Use direct psql connection for immediate changes
 - OR add SQL file to `migrations/` directory and redeploy
 
-### Issue 4: How to Check Current Database Schema
+### Issue 4: PRE_DEPLOY Job Fails After Manual Migration
+
+**Problem**: After manually applying a migration via psql, the next deployment fails with "column already exists" or similar error.
+
+**Error Example**:
+```
+psycopg2.errors.DuplicateColumn: column "topics" of relation "processed_meetings" already exists
+```
+
+**Root Cause**: The `alembic_version` table was not updated after the manual migration, so Alembic tries to re-apply it during the PRE_DEPLOY job.
+
+**Solution**: Always update the `alembic_version` table after manually applying migrations:
+```bash
+# Get the revision ID from your migration file (e.g., alembic/versions/9f21026006cc_*.py)
+PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" -c "UPDATE alembic_version SET version_num = '9f21026006cc';"
+
+# Verify the update
+PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" -c "SELECT * FROM alembic_version;"
+```
+
+**Why This Is Critical**:
+- The `alembic_version` table tracks which migrations have been applied
+- When you run `alembic upgrade head` (via PRE_DEPLOY job), Alembic checks this table
+- If the version doesn't match, Alembic will attempt to apply the migration again
+- This causes deployment failures due to duplicate columns/indexes
+
+**Prevention**: Always follow the complete workflow in the example above, including step 7.5 (updating alembic_version)
+
+### Issue 5: How to Check Current Database Schema
 
 ```bash
 # List all tables
@@ -321,6 +349,14 @@ git push
 doctl databases list
 doctl databases connection <db-id> --format Host,Port,User,Password,Database
 PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" < migrations/add_send_meeting_emails_column.sql
+
+# 7.5. CRITICAL: Update alembic_version table to match the migration
+# This step is REQUIRED to prevent deployment failures!
+# Find the revision ID from your Alembic migration file (e.g., alembic/versions/9f21026006cc_*.py)
+PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" -c "UPDATE alembic_version SET version_num = '9f21026006cc';"
+
+# Verify alembic version was updated
+PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" -c "SELECT * FROM alembic_version;"
 
 # 8. Verify
 PGPASSWORD='xxx' psql -h ... -p 25060 -U doadmin -d "agentpm-db" -c "\d users"
