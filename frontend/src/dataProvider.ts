@@ -6,16 +6,55 @@ const API_URL = process.env.REACT_APP_API_URL
     ? 'http://localhost:4000/api'
     : 'https://agent-pm-tsbbb.ondigitalocean.app/api');
 
-const httpClient = (url: string, options: fetchUtils.Options = {}) => {
+// CSRF token storage (in-memory for security)
+let csrfToken: string | null = null;
+
+// Fetch CSRF token from backend
+const fetchCsrfToken = async (): Promise<string> => {
+    if (csrfToken) {
+        return csrfToken;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/csrf-token`, {
+            credentials: 'include', // Include cookies for session
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            csrfToken = data.csrf_token;
+            return csrfToken as string;
+        }
+    } catch (error) {
+        console.error('Failed to fetch CSRF token:', error);
+    }
+
+    return '';
+};
+
+// Export for use in other components
+export { fetchCsrfToken };
+
+const httpClient = async (url: string, options: fetchUtils.Options = {}) => {
     // Add auth token if available
     const token = localStorage.getItem('auth_token');
+    if (!options.headers) {
+        options.headers = new Headers();
+    } else if (!(options.headers instanceof Headers)) {
+        options.headers = new Headers(options.headers);
+    }
+
     if (token) {
-        if (!options.headers) {
-            options.headers = new Headers();
-        } else if (!(options.headers instanceof Headers)) {
-            options.headers = new Headers(options.headers);
-        }
         options.headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    // Add CSRF token for state-changing operations
+    const method = options.method || 'GET';
+    if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase())) {
+        const csrf = await fetchCsrfToken();
+        if (csrf) {
+            options.headers.set('X-CSRF-Token', csrf);
+        }
     }
 
     // Don't add a catch here - let the individual methods handle errors

@@ -13,6 +13,7 @@ import {
   useNotify,
   useListContext,
 } from 'react-admin';
+import { fetchCsrfToken } from '../dataProvider';
 import {
   Card,
   CardContent,
@@ -671,11 +672,14 @@ const AnalysisStatusBanner = () => {
     setIsAnalyzing(true);
     try {
       const token = localStorage.getItem('auth_token');
+      const csrfToken = await fetchCsrfToken();
+
       const response = await fetch(`${API_BASE_URL}/api/meetings/${record.id}/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'X-CSRF-Token': csrfToken,
         },
       });
 
