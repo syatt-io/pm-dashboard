@@ -284,6 +284,11 @@ logger.info("✅ Health check endpoint exempted from CSRF protection")
 csrf.exempt(scheduler_bp)
 logger.info("✅ Scheduler endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Slack endpoints from CSRF protection
+# Slack uses request signing for authentication, not CSRF tokens
+csrf.exempt(slack_bp)
+logger.info("✅ Slack endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
