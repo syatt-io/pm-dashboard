@@ -344,6 +344,29 @@ def process_fireflies_meeting(self, meeting_id: str):
                         if isinstance(attendee, dict) and attendee.get("email")
                     ]
 
+                    # ⚠️ SAFETY: Default to test mode unless explicitly set to production
+                    test_mode = os.getenv("MEETING_EMAIL_TEST_MODE", "true").lower() == "true"
+                    test_recipient = os.getenv("MEETING_EMAIL_TEST_RECIPIENT")
+
+                    if test_mode:
+                        if test_recipient:
+                            logger.warning(
+                                f"🧪 TEST MODE: Overriding {len(recipient_emails)} recipients "
+                                f"with test recipient: {test_recipient}"
+                            )
+                            recipient_emails = [test_recipient]
+                        else:
+                            logger.error(
+                                "TEST MODE enabled but MEETING_EMAIL_TEST_RECIPIENT not set, "
+                                "skipping email send"
+                            )
+                            recipient_emails = []
+                    else:
+                        logger.info(
+                            f"📧 PRODUCTION MODE: Sending emails to {len(recipient_emails)} "
+                            f"real meeting participants"
+                        )
+
                     if recipient_emails:
                         logger.info(
                             f"Sending meeting analysis email to {len(recipient_emails)} participants "
