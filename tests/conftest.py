@@ -114,6 +114,15 @@ def auth_headers(mock_user):
     }
 
 
+def get_csrf_token(client):
+    """Helper function to get CSRF token from the test client."""
+    response = client.get('/api/csrf-token')
+    if response.status_code == 200:
+        data = response.get_json()
+        return data.get('csrf_token', '')
+    return ''
+
+
 @pytest.fixture
 def sample_learning(db_session):
     """Create a sample learning entry."""

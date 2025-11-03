@@ -96,7 +96,7 @@ class TestCSRFProtection:
     def test_health_check_exempt_from_csrf(self, client):
         """Test that health check endpoint is exempt from CSRF protection."""
         # Health check should work without CSRF token
-        response = client.get('/health')
+        response = client.get('/api/health')
 
         # Should succeed
         assert response.status_code == 200

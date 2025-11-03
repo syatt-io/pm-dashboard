@@ -189,6 +189,8 @@ def test_get_metadata(client, mocker):
 
 def test_update_project(client, mocker):
     """Test updating project data."""
+    from tests.conftest import get_csrf_token
+
     mock_engine = mocker.patch('src.routes.jira.get_engine')
     mock_conn = Mock()
     mock_engine.return_value.connect.return_value.__enter__.return_value = mock_conn
@@ -198,13 +200,19 @@ def test_update_project(client, mocker):
     mock_result.fetchone.return_value = ['TEST', 'Test Project']
     mock_conn.execute.return_value = mock_result
 
-    response = client.put('/api/jira/projects/TEST', json={
-        'name': 'Updated Project',
-        'is_active': True,
-        'forecasted_hours_month': 40,
-        'project_work_type': 'ongoing',
-        'slack_channel': '#test'
-    })
+    # Get CSRF token
+    csrf_token = get_csrf_token(client)
+
+    response = client.put('/api/jira/projects/TEST',
+        json={
+            'name': 'Updated Project',
+            'is_active': True,
+            'forecasted_hours_month': 40,
+            'project_work_type': 'ongoing',
+            'slack_channel': '#test'
+        },
+        headers={'X-CSRF-Token': csrf_token}
+    )
 
     assert response.status_code == 200
     data = response.get_json()
@@ -213,6 +221,8 @@ def test_update_project(client, mocker):
 
 def test_update_project_creates_new(client, mocker):
     """Test updating creates new project if not exists."""
+    from tests.conftest import get_csrf_token
+
     mock_engine = mocker.patch('src.routes.jira.get_engine')
     mock_conn = Mock()
     mock_engine.return_value.connect.return_value.__enter__.return_value = mock_conn
@@ -222,10 +232,16 @@ def test_update_project_creates_new(client, mocker):
     mock_result.fetchone.return_value = None
     mock_conn.execute.return_value = mock_result
 
-    response = client.put('/api/jira/projects/NEW', json={
-        'name': 'New Project',
-        'is_active': True
-    })
+    # Get CSRF token
+    csrf_token = get_csrf_token(client)
+
+    response = client.put('/api/jira/projects/NEW',
+        json={
+            'name': 'New Project',
+            'is_active': True
+        },
+        headers={'X-CSRF-Token': csrf_token}
+    )
 
     assert response.status_code == 200
 
@@ -233,6 +249,7 @@ def test_update_project_creates_new(client, mocker):
 def test_get_project_forecasts_batch_success(client, mocker):
     """Test successfully getting batch forecasts for multiple projects."""
     from datetime import datetime
+    from tests.conftest import get_csrf_token
 
     mock_engine = mocker.patch('src.routes.jira.get_engine')
     mock_conn = Mock()
@@ -245,9 +262,15 @@ def test_get_project_forecasts_batch_success(client, mocker):
         ('PROJ2', current_month, 60.0, 50.0),
     ]
 
-    response = client.post('/api/jira/project-forecasts/batch', json={
-        'project_keys': ['PROJ1', 'PROJ2']
-    })
+    # Get CSRF token
+    csrf_token = get_csrf_token(client)
+
+    response = client.post('/api/jira/project-forecasts/batch',
+        json={
+            'project_keys': ['PROJ1', 'PROJ2']
+        },
+        headers={'X-CSRF-Token': csrf_token}
+    )
 
     assert response.status_code == 200
     data = response.get_json()
@@ -262,7 +285,15 @@ def test_get_project_forecasts_batch_success(client, mocker):
 
 def test_get_project_forecasts_batch_missing_keys(client, mocker):
     """Test batch forecast endpoint requires project_keys."""
-    response = client.post('/api/jira/project-forecasts/batch', json={})
+    from tests.conftest import get_csrf_token
+
+    # Get CSRF token
+    csrf_token = get_csrf_token(client)
+
+    response = client.post('/api/jira/project-forecasts/batch',
+        json={},
+        headers={'X-CSRF-Token': csrf_token}
+    )
 
     assert response.status_code == 400
     data = response.get_json()
@@ -272,9 +303,17 @@ def test_get_project_forecasts_batch_missing_keys(client, mocker):
 
 def test_get_project_forecasts_batch_empty_keys(client, mocker):
     """Test batch forecast endpoint with empty project_keys."""
-    response = client.post('/api/jira/project-forecasts/batch', json={
-        'project_keys': []
-    })
+    from tests.conftest import get_csrf_token
+
+    # Get CSRF token
+    csrf_token = get_csrf_token(client)
+
+    response = client.post('/api/jira/project-forecasts/batch',
+        json={
+            'project_keys': []
+        },
+        headers={'X-CSRF-Token': csrf_token}
+    )
 
     assert response.status_code == 400
     data = response.get_json()
