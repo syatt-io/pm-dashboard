@@ -522,6 +522,192 @@ class NotificationManager:
             logger.error(f"Error sending meeting analysis email: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
+    async def send_meeting_analysis_slack_dms(
+        self,
+        meeting_title: str,
+        meeting_date: datetime,
+        project_key: str,
+        topics: List[Dict],
+        action_items: List[Dict],
+        meeting_url: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Send meeting analysis via Slack DM to project followers.
+
+        Args:
+            meeting_title: Title of the meeting
+            meeting_date: Date when meeting occurred
+            project_key: Project key to find followers for
+            topics: List of topic sections (each with title and content_items)
+            action_items: List of action items from analysis
+            meeting_url: Optional URL to full meeting analysis
+
+        Returns:
+            Dict with success status and details
+        """
+        if not self.slack_client:
+            logger.error("Slack not configured, cannot send meeting analysis DMs")
+            return {"success": False, "error": "Slack not configured"}
+
+        try:
+            # Get database connection
+            database_url = os.getenv("DATABASE_URL")
+            if not database_url:
+                logger.error("DATABASE_URL not configured")
+                return {"success": False, "error": "DATABASE_URL not configured"}
+
+            from sqlalchemy import create_engine, text
+            from sqlalchemy.orm import sessionmaker
+
+            engine = create_engine(database_url)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+
+            try:
+                # Query project followers with Slack user IDs
+                result = session.execute(
+                    text("""
+                        SELECT DISTINCT u.slack_user_id, u.name, u.email
+                        FROM user_watched_projects uwp
+                        JOIN users u ON uwp.user_id = u.id
+                        WHERE uwp.project_key = :project_key
+                        AND u.slack_user_id IS NOT NULL
+                        AND u.slack_user_id != ''
+                    """),
+                    {"project_key": project_key}
+                )
+                followers = [{"slack_user_id": row[0], "name": row[1], "email": row[2]} for row in result]
+
+                if not followers:
+                    logger.info(f"No followers with Slack IDs found for project {project_key}")
+                    return {"success": True, "recipients": [], "message": "No followers to notify"}
+
+                logger.info(f"Found {len(followers)} followers with Slack IDs for project {project_key}")
+
+                # Format parent message
+                parent_message = f"*{meeting_title} Notes* ({meeting_date.strftime('%B %d, %Y')})"
+
+                # Format thread message with full analysis
+                thread_message = self._format_slack_meeting_analysis(
+                    meeting_title=meeting_title,
+                    meeting_date=meeting_date,
+                    topics=topics,
+                    action_items=action_items,
+                    meeting_url=meeting_url
+                )
+
+                # Send DMs to each follower
+                sent_count = 0
+                failed_count = 0
+                errors = []
+
+                for follower in followers:
+                    try:
+                        # Send parent message
+                        parent_response = self.slack_client.chat_postMessage(
+                            channel=follower["slack_user_id"],
+                            text=parent_message
+                        )
+
+                        # Send thread reply with full analysis
+                        self.slack_client.chat_postMessage(
+                            channel=follower["slack_user_id"],
+                            thread_ts=parent_response["ts"],
+                            text=thread_message
+                        )
+
+                        sent_count += 1
+                        logger.info(f"✅ Sent meeting analysis DM to {follower['name']} ({follower['email']})")
+
+                    except SlackApiError as e:
+                        failed_count += 1
+                        error_msg = f"Failed to send DM to {follower['name']}: {str(e)}"
+                        logger.error(error_msg)
+                        errors.append(error_msg)
+
+                return {
+                    "success": sent_count > 0,
+                    "sent_count": sent_count,
+                    "failed_count": failed_count,
+                    "total_followers": len(followers),
+                    "errors": errors if errors else None
+                }
+
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.error(f"Error sending meeting analysis Slack DMs: {e}", exc_info=True)
+            return {"success": False, "error": str(e)}
+
+    def _format_slack_meeting_analysis(
+        self,
+        meeting_title: str,
+        meeting_date: datetime,
+        topics: List[Dict],
+        action_items: List[Dict],
+        meeting_url: Optional[str] = None
+    ) -> str:
+        """
+        Format meeting analysis for Slack message.
+
+        Args:
+            meeting_title: Title of the meeting
+            meeting_date: Date when meeting occurred
+            topics: List of topic sections (each with title and content_items)
+            action_items: List of action items from analysis
+            meeting_url: Optional URL to full meeting analysis
+
+        Returns:
+            Formatted Slack message string
+        """
+        # Build message with emoji and formatting
+        message = f"📋 *{meeting_title}*\n"
+        message += f"📅 {meeting_date.strftime('%B %d, %Y at %I:%M %p')}\n\n"
+
+        # Add topics
+        if topics:
+            message += "*Topics:*\n"
+            for topic in topics:
+                topic_title = topic.get("title", "Untitled Topic")
+                content_items = topic.get("content_items", [])
+
+                message += f"\n*{topic_title}*\n"
+                for item in content_items:
+                    # Check if this is a sub-item (starts with "  * ")
+                    if item.startswith("  * "):
+                        # Sub-bullet (indented)
+                        message += f"    • {item[4:]}\n"
+                    else:
+                        # Main bullet
+                        message += f"• {item}\n"
+        else:
+            message += "*Topics:* None\n"
+
+        # Add action items
+        message += f"\n*Action Items:* ({len(action_items)})\n"
+        if action_items:
+            for item in action_items:
+                title = item.get("title", "Untitled")
+                assignee = item.get("assignee", "Unassigned")
+                priority = item.get("priority", "Medium")
+                description = item.get("description", "")
+
+                message += f"\n✅ *{title}*\n"
+                if description:
+                    # Limit description to 200 chars for Slack
+                    desc_preview = description[:200] + "..." if len(description) > 200 else description
+                    message += f"   {desc_preview}\n"
+                message += f"   👤 {assignee} | 🔥 {priority}\n"
+        else:
+            message += "None\n"
+
+        # Add link to full analysis if provided
+        if meeting_url:
+            message += f"\n🔗 <{meeting_url}|View full analysis>\n"
+
+        return message
+
     async def test_channels(self) -> Dict[str, bool]:
         """Test all configured notification channels."""
         content = NotificationContent(
