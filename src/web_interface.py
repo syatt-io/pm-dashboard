@@ -25,6 +25,7 @@ from src.managers.notifications import NotificationManager, NotificationContent
 from src.managers.todo_manager import TodoManager
 from src.managers.slack_bot import SlackTodoBot
 from src.services.scheduler import get_scheduler, start_scheduler, stop_scheduler
+from src.webhooks import handle_fireflies_webhook
 
 # Authentication imports
 from src.services.auth import AuthService, auth_required, admin_required
@@ -165,19 +166,37 @@ try:
     limiter = Limiter(
         app=app,
         key_func=get_remote_address,
-        default_limits=["1000 per day", "200 per hour"],  # Global limits
+        # ✅ SECURITY: Stricter global limits to prevent API abuse
+        default_limits=["500 per day", "100 per hour", "20 per minute"],
         storage_uri=storage_uri,
         storage_options=storage_options,
-        strategy="fixed-window",
-        # Gracefully handle Redis failures without blocking requests
-        swallow_errors=True
+        # ✅ SECURITY: Use moving-window strategy to prevent burst attacks
+        strategy="moving-window",
+        # ✅ SECURITY: Fail open on Redis errors (allow requests) but log warnings
+        swallow_errors=True,
+        # Add headers to responses showing rate limit status
+        headers_enabled=True
     )
-    logger.info("✅ Rate limiter initialized successfully")
+    logger.info("✅ Rate limiter initialized successfully with moving-window strategy")
 except Exception as e:
     logger.error(f"❌ Failed to initialize rate limiter: {e}")
-    # Create a no-op limiter that allows all requests (degraded mode)
-    limiter = None
-    logger.warning("⚠️  Running in degraded mode without rate limiting")
+    # ✅ SECURITY: Create a minimal rate limiter with in-memory storage as fallback
+    try:
+        limiter = Limiter(
+            app=app,
+            key_func=get_remote_address,
+            default_limits=["500 per day", "100 per hour", "20 per minute"],
+            storage_uri="memory://",
+            strategy="moving-window",
+            swallow_errors=True,
+            headers_enabled=True
+        )
+        logger.warning("⚠️  Running with in-memory rate limiter (fallback mode)")
+    except Exception as fallback_error:
+        logger.error(f"❌ Failed to create fallback rate limiter: {fallback_error}")
+        # Last resort: create no-op limiter (degraded mode)
+        limiter = None
+        logger.critical("🚨 CRITICAL: Running in degraded mode without rate limiting!")
 
 # Set up database and auth
 # Initialize database once at startup
@@ -290,6 +309,20 @@ def get_csrf_token():
     return jsonify({'csrf_token': token}), 200
 
 logger.info("✅ CSRF token endpoint registered at /api/csrf-token")
+
+# ✅ Fireflies Webhook Endpoint
+@app.route('/api/webhooks/fireflies', methods=['POST'])
+def fireflies_webhook():
+    """
+    Webhook endpoint for Fireflies.ai transcript completion notifications.
+
+    Receives webhook notifications when meeting transcripts are ready.
+    Validates HMAC signature, checks idempotency, and enqueues Celery task.
+    Returns 200 OK immediately to avoid webhook timeouts.
+    """
+    return handle_fireflies_webhook()
+
+logger.info("✅ Fireflies webhook endpoint registered at /api/webhooks/fireflies")
 
 # ✅ FIXED: Apply rate limiting to critical backfill endpoints (expensive operations)
 if limiter:
