@@ -317,6 +317,37 @@ class MeetingAnalysisSyncJob:
                     logger.error(f"Error sending meeting analysis email: {email_error}", exc_info=True)
                     # Don't fail the whole meeting analysis if email fails
 
+                # Send Slack DM notifications to project followers
+                try:
+                    if self.notification_manager:
+                        logger.info(f"Sending Slack DM notifications to project followers for {project['key']}")
+
+                        # Get Fireflies recording URL
+                        fireflies_url = transcript_data.get("recording_url") or f"https://app.fireflies.ai/view/{meeting_id}"
+
+                        slack_dm_result = asyncio.run(
+                            self.notification_manager.send_meeting_analysis_slack_dms(
+                                meeting_title=meeting_title,
+                                meeting_date=meeting_date,
+                                project_key=project["key"],
+                                topics=topics_data,
+                                action_items=action_items_data,
+                                meeting_url=fireflies_url
+                            )
+                        )
+
+                        if slack_dm_result.get("success"):
+                            sent_count = slack_dm_result.get("sent_count", 0)
+                            logger.info(f"✅ Meeting analysis Slack DMs sent to {sent_count} followers")
+                        else:
+                            logger.error(f"Failed to send meeting analysis Slack DMs: {slack_dm_result.get('error')}")
+                    else:
+                        logger.warning("Notification manager not available for Slack DMs")
+
+                except Exception as slack_error:
+                    logger.error(f"Error sending meeting analysis Slack DMs: {slack_error}", exc_info=True)
+                    # Don't fail the whole task if Slack DMs fail
+
                 return True
 
             except Exception as e:
