@@ -2,7 +2,7 @@
 Meeting Analysis Sync Job
 
 Scheduled job to automatically analyze meetings from active projects.
-Runs nightly at 7 AM UTC (3 AM EST) with 3-day lookback window.
+Runs nightly at 7 AM UTC (3 AM EST) with 14-day lookback window.
 """
 
 import logging
@@ -77,12 +77,12 @@ class MeetingAnalysisSyncJob:
         finally:
             session.close()
 
-    def get_unanalyzed_meetings(self, days_back: int = 3) -> List[Dict]:
+    def get_unanalyzed_meetings(self, days_back: int = 14) -> List[Dict]:
         """
         Fetch meetings from Fireflies that haven't been analyzed yet.
 
         Args:
-            days_back: Number of days to look back (default 3)
+            days_back: Number of days to look back (default 14)
 
         Returns:
             List of unanalyzed meeting dictionaries
@@ -469,7 +469,7 @@ class MeetingAnalysisSyncJob:
                 return stats
 
             # Get unanalyzed meetings
-            unanalyzed_meetings = self.get_unanalyzed_meetings(days_back=3)
+            unanalyzed_meetings = self.get_unanalyzed_meetings(days_back=14)
             stats["meetings_total"] = len(unanalyzed_meetings)
 
             if not unanalyzed_meetings:
