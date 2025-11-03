@@ -279,6 +279,11 @@ if limiter:
 csrf.exempt(health_bp)
 logger.info("✅ Health check endpoint exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt scheduler endpoints from CSRF protection
+# Scheduler endpoints use API key authentication, not session-based auth
+csrf.exempt(scheduler_bp)
+logger.info("✅ Scheduler endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
