@@ -15,6 +15,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from src.utils.prompt_manager import get_prompt_manager
+from src.utils.retry_logic import retry_with_backoff
 from config.settings import settings
 
 
@@ -110,6 +111,27 @@ class TranscriptAnalyzer:
         else:
             raise ValueError(f"Unsupported AI provider: {ai_config.provider}. Supported providers: openai, anthropic, google")
 
+    def _invoke_llm_with_retry(self, messages: List, max_retries: int = 3):
+        """Invoke LLM with retry logic for handling transient failures.
+
+        Wraps LLM invocations with exponential backoff retry logic to handle:
+        - Rate limiting (429 errors)
+        - Temporary service unavailability (503 errors)
+        - Network timeouts and connection issues
+
+        Args:
+            messages: List of messages to send to LLM
+            max_retries: Maximum number of retry attempts (default 3)
+
+        Returns:
+            LLM response object
+        """
+        @retry_with_backoff(max_retries=max_retries, base_delay=1.0)
+        def invoke():
+            return self.llm.invoke(messages)
+
+        return invoke()
+
     def analyze_transcript(self, transcript: str, meeting_title: str = None,
                           meeting_date: datetime = None) -> MeetingAnalysis:
         """Analyze a meeting transcript to extract structured information.
@@ -160,7 +182,7 @@ class TranscriptAnalyzer:
         ]
 
         try:
-            response = self.llm.invoke(messages)
+            response = self._invoke_llm_with_retry(messages)
             analysis = self.parser.parse(response.content)
 
             # Post-process dates to ensure proper format
@@ -198,7 +220,7 @@ class TranscriptAnalyzer:
         ]
 
         try:
-            response = self.llm.invoke(messages)
+            response = self._invoke_llm_with_retry(messages)
             # Parse the response as JSON
             items_data = json.loads(response.content)
             return [ActionItem(**item) for item in items_data]
@@ -243,7 +265,7 @@ class TranscriptAnalyzer:
         ]
 
         try:
-            response = self.llm.invoke(messages)
+            response = self._invoke_llm_with_retry(messages)
             return json.loads(response.content)
         except Exception as e:
             logger.error(f"Error identifying blockers: {e}")
@@ -268,7 +290,7 @@ class TranscriptAnalyzer:
         ]
 
         try:
-            response = self.llm.invoke(messages)
+            response = self._invoke_llm_with_retry(messages)
             return response.content[:max_length]
         except Exception as e:
             logger.error(f"Error generating summary: {e}")

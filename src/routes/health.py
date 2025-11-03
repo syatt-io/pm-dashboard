@@ -46,6 +46,69 @@ def health_check():
         }), 500
 
 
+@health_bp.route('/health/database', methods=['GET'])
+def database_health_check():
+    """Database connection pool health check endpoint.
+
+    Returns connection pool statistics and health metrics.
+    """
+    try:
+        from src.utils.database import get_engine
+        from sqlalchemy import text
+
+        engine = get_engine()
+        pool = engine.pool
+
+        # Get pool statistics
+        pool_stats = {
+            'pool_size': pool.size(),  # Total connections in pool
+            'checked_in': pool.checkedin(),  # Available connections
+            'checked_out': pool.checkedout(),  # Connections currently in use
+            'overflow': pool.overflow(),  # Overflow connections (beyond pool_size)
+            'max_overflow': pool._max_overflow,  # Max allowed overflow
+            'timeout': pool._timeout,  # Connection timeout
+            'pool_status': 'healthy'
+        }
+
+        # Calculate utilization percentage
+        total_capacity = pool.size() + pool._max_overflow
+        total_in_use = pool.checkedout() + pool.overflow()
+        pool_stats['utilization_percent'] = round((total_in_use / total_capacity) * 100, 2)
+
+        # Warn if pool is >80% utilized
+        if pool_stats['utilization_percent'] > 80:
+            pool_stats['pool_status'] = 'warning'
+            pool_stats['warning'] = 'Pool utilization is high (>80%)'
+
+        # Test database connectivity with a simple query
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text("SELECT 1"))
+                result.fetchone()
+                pool_stats['connectivity'] = 'healthy'
+        except Exception as db_error:
+            pool_stats['connectivity'] = 'unhealthy'
+            pool_stats['connectivity_error'] = str(db_error)
+            pool_stats['pool_status'] = 'unhealthy'
+
+        # Determine HTTP status code based on pool health
+        status_code = 200 if pool_stats['pool_status'] in ['healthy', 'warning'] else 503
+
+        return jsonify({
+            'status': pool_stats['pool_status'],
+            'timestamp': datetime.now().isoformat(),
+            'database': pool_stats
+        }), status_code
+
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 503
+
+
 @health_bp.route('/health/jira', methods=['GET'])
 def jira_health_check():
     """Diagnostic endpoint for Jira connection."""

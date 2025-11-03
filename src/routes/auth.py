@@ -110,6 +110,7 @@ def create_auth_blueprint(db_session_factory, limiter=None):
         return response
 
     @auth_bp.route('/api/auth/refresh', methods=['POST'])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent token refresh abuse
     def refresh_token():
         """Refresh JWT token."""
         try:
@@ -184,6 +185,7 @@ def create_auth_blueprint(db_session_factory, limiter=None):
             return jsonify({'error': 'Token refresh failed'}), 500
 
     @auth_bp.route('/api/auth/users', methods=['GET'])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
     @admin_required
     def get_all_users(current_user):
         """Get all users (admin only)."""
@@ -201,6 +203,7 @@ def create_auth_blueprint(db_session_factory, limiter=None):
             db_session.close()
 
     @auth_bp.route('/api/auth/users/<int:user_id>/role', methods=['PUT'])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
     @admin_required
     def update_user_role(current_user, user_id):
         """Update user role (admin only)."""
@@ -243,6 +246,7 @@ def create_auth_blueprint(db_session_factory, limiter=None):
             db_session.close()
 
     @auth_bp.route('/api/auth/users/<int:user_id>/status', methods=['PUT'])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
     @admin_required
     def update_user_status(current_user, user_id):
         """Update user active status (admin only)."""
@@ -342,6 +346,7 @@ def create_auth_blueprint(db_session_factory, limiter=None):
             return jsonify({'error': 'Failed to start authorization'}), 500
 
     @auth_bp.route('/api/auth/google/workspace/callback', methods=['GET'])
+    @rate_limit("10 per minute")  # ✅ SECURITY: Prevent OAuth callback flooding
     def google_workspace_callback():
         """Handle Google Workspace OAuth callback."""
         try:
@@ -490,6 +495,7 @@ def create_auth_blueprint(db_session_factory, limiter=None):
             return jsonify({'error': 'Failed to start authorization'}), 500
 
     @auth_bp.route('/api/auth/slack/callback', methods=['GET'])
+    @rate_limit("10 per minute")  # ✅ SECURITY: Prevent OAuth callback flooding
     def slack_callback():
         """Handle Slack OAuth callback."""
         try:

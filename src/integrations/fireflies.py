@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import requests
 from dataclasses import dataclass
 
+from src.utils.retry_logic import retry_with_backoff
+from src.utils.meeting_deduplicator import MeetingDeduplicator
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +91,22 @@ class FirefliesClient:
                             filtered.append(t)
                     except:
                         filtered.append(t)  # Include if we can't parse date
-            return filtered
+            transcripts = filtered
 
-        return transcripts
+        # Apply deduplication
+        deduplicator = MeetingDeduplicator()
+        deduplicated = deduplicator.deduplicate(transcripts)
+
+        # Log deduplication stats
+        stats = deduplicator.get_stats()
+        if stats['exact_duplicates_removed'] > 0 or stats['fuzzy_duplicates_removed'] > 0:
+            logger.info(
+                f"Fireflies meetings deduplicated: {stats['total']} → {stats['final_count']} "
+                f"(removed {stats['exact_duplicates_removed']} exact + "
+                f"{stats['fuzzy_duplicates_removed']} fuzzy duplicates)"
+            )
+
+        return deduplicated
 
     def get_meeting_transcript(self, meeting_id: str) -> Optional[Dict[str, Any]]:
         """Fetch detailed transcript for a specific meeting with sharing settings.
@@ -217,8 +232,9 @@ class FirefliesClient:
         response = self._make_request(graphql_query, variables)
         return response.get("data", {}).get("transcripts", [])
 
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
     def _make_request(self, query: str, variables: Dict[str, Any]) -> Dict[str, Any]:
-        """Make GraphQL request to Fireflies API."""
+        """Make GraphQL request to Fireflies API with automatic retries."""
         payload = {
             "query": query,
             "variables": variables

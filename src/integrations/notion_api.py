@@ -4,6 +4,7 @@ import logging
 import requests
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
+from src.utils.retry_logic import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +29,9 @@ class NotionAPIClient:
             "Notion-Version": "2022-06-28"
         }
 
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
     def _make_request(self, method: str, endpoint: str, data: Dict = None) -> Dict[str, Any]:
-        """Make HTTP request to Notion API."""
+        """Make HTTP request to Notion API with automatic retries."""
         url = f"{self.base_url}/{endpoint}"
 
         try:

@@ -17,6 +17,8 @@ from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 import requests
 
+from src.utils.retry_logic import retry_with_backoff
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,6 +71,7 @@ class TempoAPIClient:
 
         self.last_jira_request_time = time.time()
 
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
     def get_issue_key_from_jira(self, issue_id: str) -> Optional[str]:
         """
         Resolve Jira issue ID to issue key via Jira API with rate limiting.
@@ -101,6 +104,7 @@ class TempoAPIClient:
             self.issue_cache[issue_id] = None
             return None
 
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
     def get_user_name(self, account_id: str) -> Optional[str]:
         """
         Resolve Jira account ID to user display name via Jira API with rate limiting.
@@ -134,6 +138,7 @@ class TempoAPIClient:
             self.account_cache[account_id] = None
             return None
 
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
     def get_worklogs(
         self,
         from_date: str,

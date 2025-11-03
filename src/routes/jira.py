@@ -79,36 +79,52 @@ def get_jira_projects():
                 now = datetime.now()
                 current_month = datetime(now.year, now.month, 1).date()
 
-                for project in jira_projects:
-                    enhanced_project = project.copy()
-                    try:
-                        # Get local project data joined with current month forecast
-                        result = conn.execute(text("""
-                            SELECT
-                                p.is_active,
-                                p.project_work_type,
-                                p.total_hours,
-                                p.cumulative_hours,
-                                p.weekly_meeting_day,
-                                p.retainer_hours,
-                                pmf.forecasted_hours,
-                                pmf.actual_monthly_hours
-                            FROM projects p
-                            LEFT JOIN project_monthly_forecast pmf
-                                ON p.key = pmf.project_key
-                                AND pmf.month_year = :current_month
-                            WHERE p.key = :key
-                        """), {"key": project["key"], "current_month": current_month}).fetchone()
+                # ✅ PERFORMANCE FIX: Use single batch query instead of N+1 queries
+                # Extract all project keys for batch query
+                project_keys = [project["key"] for project in jira_projects]
 
-                        if result:
-                            enhanced_project["is_active"] = bool(result[0]) if result[0] is not None else True
-                            enhanced_project["project_work_type"] = result[1] if result[1] else 'project-based'
-                            enhanced_project["total_hours"] = float(result[2]) if result[2] else 0
-                            enhanced_project["cumulative_hours"] = float(result[3]) if result[3] else 0
-                            enhanced_project["weekly_meeting_day"] = result[4] if result[4] else None
-                            enhanced_project["retainer_hours"] = float(result[5]) if result[5] else 0
-                            enhanced_project["forecasted_hours_month"] = float(result[6]) if result[6] else 0
-                            enhanced_project["current_month_hours"] = float(result[7]) if result[7] else 0
+                # Fetch all project data in a single query
+                if project_keys:
+                    results = conn.execute(text("""
+                        SELECT
+                            p.key,
+                            p.is_active,
+                            p.project_work_type,
+                            p.total_hours,
+                            p.cumulative_hours,
+                            p.weekly_meeting_day,
+                            p.retainer_hours,
+                            pmf.forecasted_hours,
+                            pmf.actual_monthly_hours
+                        FROM projects p
+                        LEFT JOIN project_monthly_forecast pmf
+                            ON p.key = pmf.project_key
+                            AND pmf.month_year = :current_month
+                        WHERE p.key = ANY(:project_keys)
+                    """), {"project_keys": project_keys, "current_month": current_month}).fetchall()
+
+                    # Build lookup dictionary for O(1) access: project_key -> database_data
+                    project_data_map = {}
+                    for row in results:
+                        project_data_map[row[0]] = {
+                            "is_active": bool(row[1]) if row[1] is not None else True,
+                            "project_work_type": row[2] if row[2] else 'project-based',
+                            "total_hours": float(row[3]) if row[3] else 0,
+                            "cumulative_hours": float(row[4]) if row[4] else 0,
+                            "weekly_meeting_day": row[5] if row[5] else None,
+                            "retainer_hours": float(row[6]) if row[6] else 0,
+                            "forecasted_hours_month": float(row[7]) if row[7] else 0,
+                            "current_month_hours": float(row[8]) if row[8] else 0,
+                        }
+
+                    # Merge Jira data with database data
+                    for project in jira_projects:
+                        enhanced_project = project.copy()
+                        project_key = project["key"]
+
+                        if project_key in project_data_map:
+                            # Merge database data
+                            enhanced_project.update(project_data_map[project_key])
                         else:
                             # No database record - use defaults
                             enhanced_project["is_active"] = True
@@ -119,17 +135,11 @@ def get_jira_projects():
                             enhanced_project["retainer_hours"] = 0
                             enhanced_project["forecasted_hours_month"] = 0
                             enhanced_project["current_month_hours"] = 0
-                    except Exception:
-                        # Projects table doesn't exist or query failed - use defaults
-                        enhanced_project["forecasted_hours_month"] = 0
-                        enhanced_project["is_active"] = True
-                        enhanced_project["project_work_type"] = 'project-based'
-                        enhanced_project["total_hours"] = 0
-                        enhanced_project["current_month_hours"] = 0
-                        enhanced_project["cumulative_hours"] = 0
-                        enhanced_project["weekly_meeting_day"] = None
 
-                    enhanced_projects.append(enhanced_project)
+                        enhanced_projects.append(enhanced_project)
+                else:
+                    # No projects to enhance
+                    enhanced_projects = jira_projects
         except Exception as e:
             # If database operations fail entirely, return projects without enhancements
             logger.warning(f"Could not enhance projects with database data: {e}")
