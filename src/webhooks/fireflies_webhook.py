@@ -13,7 +13,7 @@ from typing import Dict, Optional
 from flask import request, jsonify
 from datetime import datetime, timezone
 
-from src.celery_app import celery_app
+from src.tasks.celery_app import celery_app
 from src.integrations.fireflies import FirefliesClient
 from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.managers.notifications import NotificationManager
