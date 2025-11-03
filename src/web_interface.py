@@ -289,6 +289,11 @@ logger.info("✅ Scheduler endpoints exempted from CSRF protection")
 csrf.exempt(slack_bp)
 logger.info("✅ Slack endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Jira endpoints from CSRF protection
+# Jira endpoints use Bearer token authentication from React frontend
+csrf.exempt(jira_bp)
+logger.info("✅ Jira endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
