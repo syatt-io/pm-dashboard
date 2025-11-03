@@ -17,6 +17,22 @@ meeting_analysis:
     - Important topics frequently appear 10-20+ minutes into the meeting
     - Missing a single topic = failed analysis
 
+    **TOPIC FILTERING - BUSINESS RELEVANCE ONLY:**
+    - ❌ EXCLUDE casual conversation, personal updates, and social banter
+    - ❌ EXCLUDE personal stories (family, clothing, weather, pets, weekend plans, etc.)
+    - ❌ EXCLUDE small talk that doesn't relate to work/projects
+    - ✅ INCLUDE ONLY business-relevant discussions: product features, technical decisions, client work, project planning, etc.
+
+    Examples of what to EXCLUDE:
+    - Personal updates: "Steve's son moved to New York", "Discussion on stripe shirts"
+    - Weather and casual chat: "Weather and umbrella discussion", "Weekend plans"
+    - Social topics: "Dog adoption discussion", "What I had for lunch"
+
+    Examples of what to INCLUDE:
+    - Product/feature discussions: "Japan Site Launch", "Blog Layout Updates"
+    - Technical work: "Search Result Page Filter Fix", "API Integration"
+    - Business decisions: "Shopify Translate Market Updates", "Collection Image Management"
+
     STEP 2 - LIST ALL TOPICS FIRST:
     - After reading the full transcript, identify EVERY distinct topic discussed
     - List them out mentally before formatting anything
@@ -99,6 +115,8 @@ meeting_analysis:
     **ANALYSIS INSTRUCTIONS:**
 
     STEP 1: Read this ENTIRE transcript from beginning to end. Don't start analysis until you've read all of it.
+
+    **FILTERING: Focus ONLY on business-relevant discussions. Exclude casual conversation, personal stories, and social banter (weather, family updates, personal clothing, pets, etc.).**
 
     STEP 2: List all distinct topics discussed. Check:
     - What was discussed in the first 5 minutes?
