@@ -212,13 +212,14 @@ def get_cache_manager(redis_url: Optional[str] = None) -> CacheManager:
     return _cache_manager
 
 
-def cached_endpoint(prefix: str, ttl: int, user_specific: bool = True):
+def cached_endpoint(prefix: str, ttl: int, user_specific: bool = True, exclude_params: list = None):
     """Decorator for caching endpoint responses.
 
     Args:
         prefix: Cache key prefix (e.g., 'projects', 'meetings')
         ttl: Cache time-to-live in seconds
         user_specific: Whether to cache per-user (default: True)
+        exclude_params: List of query params to exclude from cache key (e.g., ['page', 'perPage'])
 
     Usage:
         @cached_endpoint('projects', ttl=3600, user_specific=True)
@@ -226,6 +227,12 @@ def cached_endpoint(prefix: str, ttl: int, user_specific: bool = True):
         def get_projects(user):
             # ... fetch projects logic
             return jsonify({'data': projects})
+
+        # For paginated endpoints, exclude pagination params from cache key:
+        @cached_endpoint('meetings', ttl=3600, user_specific=True, exclude_params=['page', 'perPage'])
+        @auth_required
+        def get_meetings(user):
+            # This caches the full dataset, pagination happens in-memory
     """
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
@@ -240,10 +247,11 @@ def cached_endpoint(prefix: str, ttl: int, user_specific: bool = True):
                 if user and hasattr(user, 'id'):
                     user_id = user.id
 
-            # Build cache key parameters from request
+            # Build cache key parameters from request, excluding specified params
             cache_params = {}
             if request.args:
-                cache_params = dict(request.args)
+                excluded = set(exclude_params or [])
+                cache_params = {k: v for k, v in request.args.items() if k not in excluded}
 
             # Try to get from cache
             cached_data = cache.get(prefix, user_id=user_id, **cache_params)

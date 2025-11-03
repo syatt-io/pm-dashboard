@@ -72,7 +72,7 @@ def get_project_keywords_from_db():
 
 @meetings_bp.route("/api/meetings", methods=["GET"])
 @auth_required
-@cached_endpoint('meetings', ttl=3600, user_specific=True)
+@cached_endpoint('meetings', ttl=3600, user_specific=True, exclude_params=['page', 'perPage', 'sort_field', 'sort', 'sort_order', 'order'])
 def get_meetings(user):
     """Get meetings using live Fireflies data with cached analysis overlay.
 
