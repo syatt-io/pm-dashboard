@@ -90,6 +90,7 @@ interface Project {
   projectTypeKey?: string;
   is_active?: boolean;
   forecasted_hours_month?: number;
+  retainer_hours?: number;
   project_work_type?: 'project-based' | 'growth-support' | 'n-a';
   total_hours?: number;
   description?: string;
@@ -98,6 +99,7 @@ interface Project {
   slack_channel?: string;
   weekly_meeting_day?: string;
   send_meeting_emails?: boolean;
+  is_watched?: boolean;
 }
 
 interface TabPanelProps {
@@ -1268,7 +1270,7 @@ export const ProjectList = () => {
   const loadWatchedProjects = useCallback(async (activeProjects: Project[]) => {
     try {
       const token = localStorage.getItem('auth_token');
-      if (!token) return;
+      if (!token) return activeProjects;
 
       const response = await fetch(`${API_BASE_URL}/api/watched-projects`, {
         headers: {
@@ -1280,15 +1282,27 @@ export const ProjectList = () => {
       if (response.ok) {
         const data = await response.json();
         const watchedProjectKeys = data.watched_projects;
-        const watched = activeProjects.filter((p: Project) => watchedProjectKeys.includes(p.key));
+
+        // Mark each project with is_watched status
+        const projectsWithWatchedStatus = activeProjects.map((p: Project) => ({
+          ...p,
+          is_watched: watchedProjectKeys.includes(p.key)
+        }));
+
+        const watched = projectsWithWatchedStatus.filter((p: Project) => p.is_watched);
         setWatchedProjects(watched);
+
+        return projectsWithWatchedStatus;
       } else if (response.status === 401) {
         // Silently handle auth errors - user may not be logged in yet
+        return activeProjects;
       } else {
         // Silently handle other errors to prevent retry loops
+        return activeProjects;
       }
     } catch (error) {
       // Silently handle errors to prevent infinite retry loop
+      return activeProjects;
     }
   }, []);
 
@@ -1304,10 +1318,10 @@ export const ProjectList = () => {
 
       // Filter active projects from local DB
       const active = data.filter((p: Project) => p.is_active === true);
-      setActiveProjects(active);
 
-      // Load watched projects from API
-      await loadWatchedProjects(active);
+      // Load watched projects from API and merge is_watched status
+      const projectsWithWatchedStatus = await loadWatchedProjects(active);
+      setActiveProjects(projectsWithWatchedStatus);
 
       // Load resource mappings, todo counts, and monthly hours
       await loadResourceMappings();
@@ -1676,15 +1690,15 @@ export const ProjectList = () => {
                             {project.weekly_meeting_day || '-'}
                           </TableCell>
                           <TableCell>
-                            {project.forecasted_hours_month
-                              ? `${project.forecasted_hours_month.toFixed(1)}h`
+                            {project.retainer_hours
+                              ? `${project.retainer_hours.toFixed(1)}h`
                               : '-'}
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={project.send_meeting_emails ? 'On' : 'Off'}
+                              label={project.is_watched ? 'On' : 'Off'}
                               size="small"
-                              color={project.send_meeting_emails ? 'success' : 'default'}
+                              color={project.is_watched ? 'success' : 'default'}
                             />
                           </TableCell>
                         </TableRow>
@@ -2828,6 +2842,10 @@ export const ProjectEdit = () => (
 
         <Grid item xs={12} md={6}>
           <NumberInput source="forecasted_hours_month" label="Forecasted Hours/Month" fullWidth />
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <NumberInput source="retainer_hours" label="Monthly Retainer Hours" fullWidth />
         </Grid>
 
         <Grid item xs={12} md={6}>
