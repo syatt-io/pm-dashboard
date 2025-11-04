@@ -38,6 +38,8 @@ database/*.db
 *.sqlite
 *.sqlite3
 *.db
+celerybeat-schedule.db
+celerybeat-schedule
 
 # Logs
 *.log
@@ -78,7 +80,10 @@ temp/
 # Testing
 .coverage
 .pytest_cache/
+.mypy_cache/
 htmlcov/
+coverage.xml
+test_outputs/
 
 # Backup files
 *.bak
