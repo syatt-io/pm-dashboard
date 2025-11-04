@@ -3009,6 +3009,29 @@ const ProjectShowContent = () => {
         </Grid>
       </Box>
 
+      {/* Recent Activity Section - Meetings and TODOs */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <TimeIcon sx={{ color: 'primary.main' }} />
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Recent Activity
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 3 }} />
+
+        <Grid container spacing={2}>
+          {/* Recent Meetings - Left Card (50%) */}
+          <Grid item xs={12} lg={6}>
+            <ProjectMeetingsCard projectKey={record.key} projectName={record.name} />
+          </Grid>
+
+          {/* Active TODOs - Right Card (50%) */}
+          <Grid item xs={12} lg={6}>
+            <ProjectTodosCard projectKey={record.key} />
+          </Grid>
+        </Grid>
+      </Box>
+
       {/* Keywords Section */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -3140,29 +3163,6 @@ const ProjectShowContent = () => {
                 )}
               </CardContent>
             </Card>
-          </Grid>
-        </Grid>
-      </Box>
-
-      {/* Recent Activity Section - Meetings and TODOs */}
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <TimeIcon sx={{ color: 'primary.main' }} />
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            Recent Activity
-          </Typography>
-        </Box>
-        <Divider sx={{ mb: 3 }} />
-
-        <Grid container spacing={2}>
-          {/* Recent Meetings - Left Card (50%) */}
-          <Grid item xs={12} lg={6}>
-            <ProjectMeetingsCard projectKey={record.key} projectName={record.name} />
-          </Grid>
-
-          {/* Active TODOs - Right Card (50%) */}
-          <Grid item xs={12} lg={6}>
-            <ProjectTodosCard projectKey={record.key} />
           </Grid>
         </Grid>
       </Box>
