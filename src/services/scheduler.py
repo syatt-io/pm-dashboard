@@ -137,9 +137,10 @@ class TodoScheduler:
         try:
             logger.info("Sending daily TODO digest")
 
-            summary = self.todo_manager.get_todo_summary()
+            # Get all active todos
+            active_todos = self.todo_manager.get_active_todos(limit=100)
 
-            if summary.total == 0:
+            if not active_todos:
                 # Send "no todos" message
                 content = NotificationContent(
                     title="Daily TODO Digest",
@@ -149,24 +150,35 @@ class TodoScheduler:
                 await self.notifier.send_notification(content, channels=["slack"])
                 return
 
-            # Create digest content
-            body = f"📋 *Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}*\n\n"
-            body += f"📊 *Summary:*\n"
-            body += f"• Total Active: {summary.total}\n"
-            body += f"• Overdue: {summary.overdue}\n"
-            body += f"• Due Today: {summary.due_today}\n"
-            body += f"• Completed Today: {summary.completed_today}\n\n"
+            # Group TODOs by project
+            todos_by_project = {}
+            for todo in active_todos:
+                project = todo.project_key or "No Project"
+                if project not in todos_by_project:
+                    todos_by_project[project] = []
+                todos_by_project[project].append(todo)
 
-            # Add assignee breakdown
-            if summary.by_assignee:
-                body += "*By Team Member:*\n"
-                for assignee, count in sorted(summary.by_assignee.items()):
-                    body += f"• {assignee}: {count} items\n"
+            # Create minimal digest content
+            body = f"📋 *Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}*\n\n"
+
+            # Show TODOs grouped by project
+            for project in sorted(todos_by_project.keys()):
+                todos = todos_by_project[project]
+                body += f"*{project}*\n"
+                for todo in todos:
+                    assignee = todo.assignee or "Unassigned"
+                    body += f"• {todo.title}"
+                    if todo.description:
+                        # Truncate description to 50 chars
+                        desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+                        body += f" - {desc}"
+                    body += f" ({assignee})\n"
+                body += "\n"
 
             content = NotificationContent(
                 title="Daily TODO Digest",
                 body=body,
-                priority="high" if summary.overdue > 0 else "normal"
+                priority="normal"
             )
 
             # Send to all channels
@@ -176,7 +188,7 @@ class TodoScheduler:
             if self.slack_bot:
                 await self.slack_bot.send_daily_digest()
 
-            logger.info(f"Daily digest sent: {summary.total} active TODOs")
+            logger.info(f"Daily digest sent: {len(active_todos)} active TODOs")
 
         except Exception as e:
             logger.error(f"Error sending daily digest: {e}")
@@ -286,8 +298,8 @@ class TodoScheduler:
         try:
             logger.info("Sending weekly TODO summary")
 
-            # Get summary data
-            summary = self.todo_manager.get_todo_summary()
+            # Get all active todos
+            active_todos = self.todo_manager.get_active_todos(limit=100)
             now = datetime.now()
             week_start = now - timedelta(days=7)
 
@@ -300,31 +312,48 @@ class TodoScheduler:
 
             body = f"📊 *Weekly TODO Summary - Week of {week_start.strftime('%B %d, %Y')}*\n\n"
 
-            body += f"*Current Status:*\n"
-            body += f"• Active TODOs: {summary.total}\n"
-            body += f"• Overdue: {summary.overdue}\n"
-            body += f"• Due This Week: {summary.due_this_week}\n\n"
+            # Show completed items grouped by project
+            if completed_last_week:
+                body += f"*✅ Completed Last Week ({len(completed_last_week)} items):*\n\n"
+                completed_by_project = {}
+                for todo in completed_last_week:
+                    project = todo.project_key or "No Project"
+                    if project not in completed_by_project:
+                        completed_by_project[project] = []
+                    completed_by_project[project].append(todo)
 
-            body += f"*Last Week's Progress:*\n"
-            body += f"• Completed: {len(completed_last_week)} items\n\n"
+                for project in sorted(completed_by_project.keys()):
+                    todos = completed_by_project[project]
+                    body += f"*{project}*\n"
+                    for todo in todos:
+                        assignee = todo.assignee or "Unassigned"
+                        body += f"• {todo.title} ({assignee})\n"
+                    body += "\n"
 
-            # Top performers
-            completion_by_user = {}
-            for todo in completed_last_week:
-                assignee = todo.assignee or 'Unknown'
-                completion_by_user[assignee] = completion_by_user.get(assignee, 0) + 1
+            # Show active TODOs grouped by project
+            if active_todos:
+                body += f"*📋 Active TODOs ({len(active_todos)} items):*\n\n"
+                todos_by_project = {}
+                for todo in active_todos:
+                    project = todo.project_key or "No Project"
+                    if project not in todos_by_project:
+                        todos_by_project[project] = []
+                    todos_by_project[project].append(todo)
 
-            if completion_by_user:
-                body += "*Top Performers Last Week:*\n"
-                sorted_performers = sorted(completion_by_user.items(), key=lambda x: x[1], reverse=True)
-                for assignee, count in sorted_performers[:5]:
-                    body += f"• {assignee}: {count} completed\n"
+                for project in sorted(todos_by_project.keys()):
+                    todos = todos_by_project[project]
+                    body += f"*{project}*\n"
+                    for todo in todos:
+                        assignee = todo.assignee or "Unassigned"
+                        body += f"• {todo.title}"
+                        if todo.description:
+                            desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+                            body += f" - {desc}"
+                        body += f" ({assignee})\n"
+                    body += "\n"
 
-            # Areas needing attention
-            if summary.overdue > 0:
-                body += f"\n⚠️ *Attention Needed:* {summary.overdue} overdue items\n"
-
-            body += f"\n📈 Keep up the great work!"
+            if not completed_last_week and not active_todos:
+                body += "🎉 No TODOs to report! Great job team!\n"
 
             content = NotificationContent(
                 title="Weekly TODO Summary",
