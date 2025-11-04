@@ -328,18 +328,23 @@ const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; me
       const projectsData = await projectsResponse.json();
       const projects = projectsData.data?.projects || [];
 
-      // Step 2: Match meeting title against project keywords to find the project
+      // Step 2: Match meeting title against project keywords to find the best matching project
       const titleLower = meetingTitle.toLowerCase();
       let matchedProjectKey = null;
+      let bestMatchLength = 0;
 
+      // Find all matching projects and choose the one with the longest/most specific keyword match
       for (const project of projects) {
         if (project.keywords && Array.isArray(project.keywords)) {
-          const keywords = project.keywords.map((k: string) => k.toLowerCase());
-          const match = keywords.some((keyword: string) => titleLower.includes(keyword));
-
-          if (match) {
-            matchedProjectKey = project.key;
-            break;
+          for (const keyword of project.keywords) {
+            const keywordLower = keyword.toLowerCase();
+            if (titleLower.includes(keywordLower)) {
+              // Prefer longer, more specific keyword matches
+              if (keywordLower.length > bestMatchLength) {
+                bestMatchLength = keywordLower.length;
+                matchedProjectKey = project.key;
+              }
+            }
           }
         }
       }
