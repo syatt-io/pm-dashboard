@@ -299,6 +299,11 @@ logger.info("✅ Jira endpoints exempted from CSRF protection")
 csrf.exempt(tempo_bp)
 logger.info("✅ Tempo endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Projects endpoints from CSRF protection
+# Projects endpoints are called from React frontend (keywords, resource mappings)
+csrf.exempt(projects_bp)
+logger.info("✅ Projects endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
