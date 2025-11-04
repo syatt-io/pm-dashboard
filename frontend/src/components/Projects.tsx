@@ -1253,6 +1253,7 @@ const MonthlyForecastsPanel = ({ activeProjects }: { activeProjects: Project[] }
 export const ProjectList = () => {
   const notify = useNotify();
   const dataProvider = useDataProvider();
+  const [update] = useUpdate();
   const [tabValue, setTabValue] = useState(0);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [activeProjects, setActiveProjects] = useState<Project[]>([]);
@@ -1323,6 +1324,40 @@ export const ProjectList = () => {
       return activeProjects;
     }
   }, []);
+
+  // Handler for toggling email notifications
+  const handleEmailNotificationToggle = async (projectKey: string, currentValue: boolean) => {
+    try {
+      await update(
+        'projects',
+        {
+          id: projectKey,
+          data: { send_meeting_emails: !currentValue },
+          previousData: { send_meeting_emails: currentValue }
+        },
+        {
+          onSuccess: () => {
+            notify('Email notification setting updated', { type: 'success' });
+            // Update local state
+            setWatchedProjects(prevProjects =>
+              prevProjects.map(p =>
+                p.key === projectKey
+                  ? { ...p, send_meeting_emails: !currentValue }
+                  : p
+              )
+            );
+          },
+          onError: (error) => {
+            console.error('[Projects] Update error:', error);
+            notify('Error updating email notification setting', { type: 'error' });
+          }
+        }
+      );
+    } catch (error) {
+      console.error('[Projects] Toggle error:', error);
+      notify('Error updating email notification setting', { type: 'error' });
+    }
+  };
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -1714,11 +1749,15 @@ export const ProjectList = () => {
                               ? `${project.retainer_hours.toFixed(1)}h`
                               : '-'}
                           </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={project.send_meeting_emails ? 'On' : 'Off'}
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Switch
+                              checked={project.send_meeting_emails || false}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                handleEmailNotificationToggle(project.key, project.send_meeting_emails || false);
+                              }}
                               size="small"
-                              color={project.send_meeting_emails ? 'success' : 'default'}
+                              color="primary"
                             />
                           </TableCell>
                         </TableRow>
