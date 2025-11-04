@@ -334,7 +334,11 @@ const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; me
       let bestMatchLength = 0;
 
       // Find all matching projects and choose the one with the longest/most specific keyword match
+      // Only consider ACTIVE projects
       for (const project of projects) {
+        // Skip inactive projects
+        if (project.is_active === false) continue;
+
         if (project.keywords && Array.isArray(project.keywords)) {
           for (const keyword of project.keywords) {
             const keywordLower = keyword.toLowerCase();
