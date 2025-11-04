@@ -2045,8 +2045,6 @@ const ProjectShowContent = () => {
   };
 
   const handleFieldUpdate = async (field: string, value: any) => {
-    console.log('[Projects] handleFieldUpdate called:', { field, value, recordKey: record.key });
-    console.log('[Projects] Full record:', record);
     try {
       await update(
         'projects',
@@ -2057,7 +2055,6 @@ const ProjectShowContent = () => {
         },
         {
           onSuccess: (data) => {
-            console.log('[Projects] Update success:', data);
             notify('Project updated successfully', { type: 'success' });
             refresh();
           },

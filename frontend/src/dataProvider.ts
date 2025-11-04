@@ -372,7 +372,6 @@ export const dataProvider: DataProvider = {
     },
 
     update: (resource: string, params: UpdateParams) => {
-        console.log('[dataProvider] update called:', { resource, params });
         let url = '';
 
         switch (resource) {
@@ -393,12 +392,10 @@ export const dataProvider: DataProvider = {
                 return Promise.reject(new Error(`Update not supported for resource: ${resource}`));
         }
 
-        console.log('[dataProvider] Sending PUT to:', url, 'with data:', params.data);
         return httpClient(url, {
             method: 'PUT',
             body: JSON.stringify(params.data),
         }).then(({ json }) => {
-            console.log('[dataProvider] Response from server:', json);
             // Use server response if available, otherwise fallback to params.data
             const responseData = json.data || params.data;
             return {
