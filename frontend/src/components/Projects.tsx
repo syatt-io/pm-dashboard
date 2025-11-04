@@ -2359,17 +2359,17 @@ const ProjectShowContent = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <Box>
                   <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
-                    Total Hours (YTD)
+                    Cumulative Hours (YTD)
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      {record.total_hours || 0}h
+                      {record.cumulative_hours || 0}h
                     </Typography>
                     <TrendingUpIcon sx={{ fontSize: 20, opacity: 0.8 }} />
                   </Box>
-                  {record.retainer_hours && (
+                  {record.total_hours && (
                     <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                      Retainer: {record.retainer_hours}h
+                      Total: {record.total_hours}h
                     </Typography>
                   )}
                 </Box>
@@ -2426,7 +2426,7 @@ const ProjectShowContent = () => {
 
         <Grid container spacing={2}>
           {/* Project Information */}
-          <Grid item xs={12} sm={6} lg={4} xl={3}>
+          <Grid item xs={12} sm={6} lg={3}>
             <Card sx={{
               height: '100%',
               transition: 'all 0.3s ease',
@@ -2517,7 +2517,7 @@ const ProjectShowContent = () => {
                     value={record.send_meeting_emails || false}
                     label="Send Meeting Emails"
                     onSave={(newValue) => handleFieldUpdate('send_meeting_emails', newValue)}
-                    helperText="Automatically send email notifications for meetings"
+                    helperText="Automatically send email notes to recipients after meetings"
                   />
                 </Box>
               </CardContent>
@@ -2525,7 +2525,7 @@ const ProjectShowContent = () => {
           </Grid>
 
           {/* Hours & Forecasting */}
-          <Grid item xs={12} sm={6} lg={4} xl={3}>
+          <Grid item xs={12} sm={6} lg={3}>
             <Card sx={{
               height: '100%',
               transition: 'all 0.3s ease',
@@ -2628,8 +2628,8 @@ const ProjectShowContent = () => {
             </Card>
           </Grid>
 
-          {/* Jira Projects */}
-          <Grid item xs={12} sm={6} lg={4} xl={3}>
+          {/* Resource Integrations */}
+          <Grid item xs={12} lg={6}>
             <Card sx={{
               height: '100%',
               transition: 'all 0.3s ease',
@@ -2640,7 +2640,7 @@ const ProjectShowContent = () => {
             }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Jira Projects
+                  🔗 Resource Integrations
                 </Typography>
                 <Divider sx={{ mb: 2 }} />
                 {loadingMappings ? (
@@ -2648,110 +2648,70 @@ const ProjectShowContent = () => {
                     <CircularProgress size={24} />
                   </Box>
                 ) : (
-                  <ResourceMappingCell
-                    projectKey={record.key}
-                    resourceType="jira"
-                    values={resourceMappings.jira_project_keys}
-                    onChange={(newValues) => handleResourceMappingChange('jira', newValues)}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+                  <Grid container spacing={3}>
+                    {/* Jira Projects */}
+                    <Grid item xs={12} sm={6}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'primary.main' }}>
+                          Jira Projects
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="jira"
+                          values={resourceMappings.jira_project_keys}
+                          onChange={(newValues) => handleResourceMappingChange('jira', newValues)}
+                        />
+                      </Box>
+                    </Grid>
 
-          {/* Slack Channels */}
-          <Grid item xs={12} sm={6} lg={4} xl={3}>
-            <Card sx={{
-              height: '100%',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 4
-              }
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Slack Channels
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                {loadingMappings ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                    <CircularProgress size={24} />
-                  </Box>
-                ) : (
-                  <ResourceMappingCell
-                    projectKey={record.key}
-                    resourceType="slack"
-                    values={resourceMappings.slack_channel_ids}
-                    onChange={(newValues) => handleResourceMappingChange('slack', newValues)}
-                  />
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+                    {/* Slack Channels */}
+                    <Grid item xs={12} sm={6}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'primary.main' }}>
+                          Slack Channels
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="slack"
+                          values={resourceMappings.slack_channel_ids}
+                          onChange={(newValues) => handleResourceMappingChange('slack', newValues)}
+                        />
+                      </Box>
+                    </Grid>
 
-          {/* Notion Pages */}
-          <Grid item xs={12} sm={6} lg={4} xl={3}>
-            <Card sx={{
-              height: '100%',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 4
-              }
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  Notion Pages
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                {loadingMappings ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                    <CircularProgress size={24} />
-                  </Box>
-                ) : (
-                  <>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}>
-                      💡 Parent pages/databases auto-include children
-                    </Typography>
-                    <ResourceMappingCell
-                      projectKey={record.key}
-                      resourceType="notion"
-                      values={resourceMappings.notion_page_ids}
-                      onChange={(newValues) => handleResourceMappingChange('notion', newValues)}
-                    />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </Grid>
+                    {/* Notion Pages */}
+                    <Grid item xs={12} sm={6}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'primary.main' }}>
+                          Notion Pages
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}>
+                          💡 Parent pages/databases auto-include children
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="notion"
+                          values={resourceMappings.notion_page_ids}
+                          onChange={(newValues) => handleResourceMappingChange('notion', newValues)}
+                        />
+                      </Box>
+                    </Grid>
 
-          {/* GitHub Repos */}
-          <Grid item xs={12} sm={6} lg={4} xl={3}>
-            <Card sx={{
-              height: '100%',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: 4
-              }
-            }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                  GitHub Repos
-                </Typography>
-                <Divider sx={{ mb: 2 }} />
-                {loadingMappings ? (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                    <CircularProgress size={24} />
-                  </Box>
-                ) : (
-                  <ResourceMappingCell
-                    projectKey={record.key}
-                    resourceType="github"
-                    values={resourceMappings.github_repos}
-                    onChange={(newValues) => handleResourceMappingChange('github', newValues)}
-                  />
+                    {/* GitHub Repos */}
+                    <Grid item xs={12} sm={6}>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: 'primary.main' }}>
+                          GitHub Repos
+                        </Typography>
+                        <ResourceMappingCell
+                          projectKey={record.key}
+                          resourceType="github"
+                          values={resourceMappings.github_repos}
+                          onChange={(newValues) => handleResourceMappingChange('github', newValues)}
+                        />
+                      </Box>
+                    </Grid>
+                  </Grid>
                 )}
               </CardContent>
             </Card>
