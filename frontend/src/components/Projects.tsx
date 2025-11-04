@@ -1270,7 +1270,10 @@ export const ProjectList = () => {
   const loadWatchedProjects = useCallback(async (activeProjects: Project[]) => {
     try {
       const token = localStorage.getItem('auth_token');
-      if (!token) return activeProjects;
+      if (!token) {
+        console.log('[DEBUG] No auth token found');
+        return activeProjects;
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/watched-projects`, {
         headers: {
@@ -1282,26 +1285,37 @@ export const ProjectList = () => {
       if (response.ok) {
         const data = await response.json();
         const watchedProjectKeys = data.watched_projects;
+        console.log('[DEBUG] Watched project keys from API:', watchedProjectKeys);
+        console.log('[DEBUG] Total watched project keys:', watchedProjectKeys?.length || 0);
 
         // Mark each project with is_watched status
-        const projectsWithWatchedStatus = activeProjects.map((p: Project) => ({
-          ...p,
-          is_watched: watchedProjectKeys.includes(p.key)
-        }));
+        const projectsWithWatchedStatus = activeProjects.map((p: Project) => {
+          const isWatched = watchedProjectKeys.includes(p.key);
+          console.log(`[DEBUG] Project ${p.key}: is_watched=${isWatched}`);
+          return {
+            ...p,
+            is_watched: isWatched
+          };
+        });
 
         const watched = projectsWithWatchedStatus.filter((p: Project) => p.is_watched);
         setWatchedProjects(watched);
+        console.log('[DEBUG] Total projects with watched status:', projectsWithWatchedStatus.length);
+        console.log('[DEBUG] Total watched projects:', watched.length);
 
         return projectsWithWatchedStatus;
       } else if (response.status === 401) {
         // Silently handle auth errors - user may not be logged in yet
+        console.log('[DEBUG] Auth error (401)');
         return activeProjects;
       } else {
         // Silently handle other errors to prevent retry loops
+        console.log('[DEBUG] API error:', response.status);
         return activeProjects;
       }
     } catch (error) {
       // Silently handle errors to prevent infinite retry loop
+      console.log('[DEBUG] Exception:', error);
       return activeProjects;
     }
   }, []);
@@ -2378,6 +2392,19 @@ const ProjectShowContent = () => {
                     label="Forecasted Hours/Month"
                     onSave={(newValue) => handleFieldUpdate('forecasted_hours_month', newValue)}
                     placeholder="Enter forecasted hours"
+                    min={0}
+                  />
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Monthly Retainer Hours
+                  </Typography>
+                  <InlineNumberField
+                    value={record.retainer_hours}
+                    label="Monthly Retainer Hours"
+                    onSave={(newValue) => handleFieldUpdate('retainer_hours', newValue)}
+                    placeholder="Enter retainer hours"
                     min={0}
                   />
                 </Box>
