@@ -1974,7 +1974,7 @@ const ProjectMeetingsCard = ({ projectKey, projectName }: { projectKey: string; 
   const { data: meetings, isLoading, refetch } = useGetList('meetings', {
     sort: { field: 'date', order: 'DESC' },
     pagination: { page: 1, perPage: 5 },
-    filter: { dateRange, projects: projectKey }
+    filter: { dateRange, projects: projectKey, resource_context: 'analysis' }
   });
 
   const handleDateRangeChange = (newRange: string) => {
