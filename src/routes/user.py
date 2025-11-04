@@ -362,3 +362,82 @@ def delete_slack_user_token(user):
             'success': False,
             'error': str(e)
         }), 500
+
+
+# Notification preference endpoints
+@user_bp.route("/notification-preferences", methods=["GET"])
+@auth_required
+def get_notification_preferences(user):
+    """Get user's notification preferences."""
+    try:
+        # Refresh user from database to get latest data
+        from sqlalchemy.orm import Session
+
+        # Get the session that the user object is attached to
+        session = Session.object_session(user)
+        if session:
+            session.expire(user)  # Mark user as expired to force refresh
+            session.refresh(user)  # Refresh from database
+
+        preferences = user.get_notification_preferences()
+
+        return jsonify({
+            'success': True,
+            'data': preferences
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting notification preferences for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@user_bp.route("/notification-preferences", methods=["PUT"])
+@auth_required
+def update_notification_preferences(user):
+    """Update user's notification preferences."""
+    try:
+        data = request.get_json()
+
+        if not data or not isinstance(data, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Preferences data is required'
+            }), 400
+
+        # Validate preference values
+        if 'notify_daily_todo_digest' in data and not isinstance(data['notify_daily_todo_digest'], bool):
+            return jsonify({
+                'success': False,
+                'error': 'notify_daily_todo_digest must be a boolean'
+            }), 400
+
+        if 'notify_project_hours_forecast' in data and not isinstance(data['notify_project_hours_forecast'], bool):
+            return jsonify({
+                'success': False,
+                'error': 'notify_project_hours_forecast must be a boolean'
+            }), 400
+
+        # Update preferences
+        try:
+            with session_scope() as db_session:
+                db_user = db_session.merge(user)
+                db_user.update_notification_preferences(data)
+
+            logger.info(f"Notification preferences updated for user {user.id}")
+            return jsonify({
+                'success': True,
+                'message': 'Notification preferences updated successfully'
+            })
+
+        except Exception as e:
+            raise e
+
+    except Exception as e:
+        logger.error(f"Error updating notification preferences for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

@@ -49,6 +49,7 @@ import {
   SmartToy,
   Work as WorkIcon,
   People as PeopleIcon,
+  Notifications as NotificationsIcon,
 } from '@mui/icons-material';
 import { Loading, Title, useDataProvider, useNotify } from 'react-admin';
 import { getApiUrl } from '../config';
@@ -172,6 +173,15 @@ export const Settings = () => {
   const [deletingSlack, setDeletingSlack] = useState(false);
   const [deleteSlackDialog, setDeleteSlackDialog] = useState(false);
 
+  // Notification preferences state
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    notify_daily_todo_digest: true,
+    notify_project_hours_forecast: true,
+    slack_connected: false
+  });
+  const [loadingNotifPrefs, setLoadingNotifPrefs] = useState(false);
+  const [savingNotifPrefs, setSavingNotifPrefs] = useState(false);
+
   // AI Settings state (admin only)
   const [aiSettings, setAISettings] = useState<AISettings | null>(null);
   const [availableModels, setAvailableModels] = useState<AvailableModels | null>(null);
@@ -211,6 +221,14 @@ export const Settings = () => {
   useEffect(() => {
     if (tabValue === 1) { // Project Settings tab
       loadProjects();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabValue]);
+
+  // Load notification preferences when Notifications tab is accessed
+  useEffect(() => {
+    if (tabValue === 2) { // Notifications tab
+      loadNotificationPreferences();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabValue]);
@@ -297,6 +315,62 @@ export const Settings = () => {
       loadProjects();
     } catch (error) {
       showSnackbar('Error updating project status', 'error');
+    }
+  };
+
+  const loadNotificationPreferences = async () => {
+    try {
+      setLoadingNotifPrefs(true);
+      const response = await fetch(getApiUrl('/api/user/notification-preferences'), {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to load notification preferences');
+      }
+
+      const data: ApiResponse = await response.json();
+      if (data.success && data.data) {
+        setNotificationPrefs(data.data);
+      }
+    } catch (error) {
+      console.error('Error loading notification preferences:', error);
+      showSnackbar('Error loading notification preferences', 'error');
+    } finally {
+      setLoadingNotifPrefs(false);
+    }
+  };
+
+  const saveNotificationPreferences = async () => {
+    try {
+      setSavingNotifPrefs(true);
+      const response = await fetch(getApiUrl('/api/user/notification-preferences'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          notify_daily_todo_digest: notificationPrefs.notify_daily_todo_digest,
+          notify_project_hours_forecast: notificationPrefs.notify_project_hours_forecast,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to save notification preferences');
+      }
+
+      const data: ApiResponse = await response.json();
+      if (data.success) {
+        showSnackbar('Notification preferences saved successfully!', 'success');
+      } else {
+        throw new globalThis.Error(data.error || 'Failed to save preferences');
+      }
+    } catch (error) {
+      console.error('Error saving notification preferences:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Error saving notification preferences', 'error');
+    } finally {
+      setSavingNotifPrefs(false);
     }
   };
 
@@ -819,6 +893,7 @@ export const Settings = () => {
         <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
           <Tab icon={<SettingsIcon />} label="My Integrations" iconPosition="start" />
           <Tab icon={<WorkIcon />} label="Project Settings" iconPosition="start" />
+          <Tab icon={<NotificationsIcon />} label="Notifications" iconPosition="start" />
           {settings.user.role === 'admin' && <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />}
           {settings.user.role === 'admin' && <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />}
         </Tabs>
@@ -1290,9 +1365,101 @@ export const Settings = () => {
         )}
       </TabPanel>
 
-      {/* Tab 3: AI Configuration (Admin Only) */}
+      {/* Tab 3: Notifications */}
+      <TabPanel value={tabValue} index={2}>
+        {loadingNotifPrefs ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Notification Preferences
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Choose which notifications you'd like to receive via Slack DM
+              </Typography>
+
+              {!notificationPrefs.slack_connected && (
+                <Alert severity="warning" sx={{ mb: 3 }}>
+                  <Typography variant="body2">
+                    <strong>Slack Connection Required</strong>
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Connect your Slack account in the "My Integrations" tab to receive DM notifications.
+                  </Typography>
+                </Alert>
+              )}
+
+              <Box sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.notify_daily_todo_digest}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        notify_daily_todo_digest: e.target.checked
+                      })}
+                      disabled={!notificationPrefs.slack_connected}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" fontWeight={500}>
+                        Daily TODO Digest (9am EST)
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Receive a daily Slack DM with your assigned TODOs
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Box sx={{ mb: 3 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.notify_project_hours_forecast}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        notify_project_hours_forecast: e.target.checked
+                      })}
+                      disabled={!notificationPrefs.slack_connected}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" fontWeight={500}>
+                        Project Hours vs Forecast (4am EST)
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Receive a daily Slack DM with monthly hours tracking for all projects
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Button
+                variant="contained"
+                onClick={saveNotificationPreferences}
+                disabled={savingNotifPrefs || !notificationPrefs.slack_connected}
+                startIcon={savingNotifPrefs ? <CircularProgress size={16} /> : <Save />}
+              >
+                {savingNotifPrefs ? 'Saving...' : 'Save Preferences'}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </TabPanel>
+
+      {/* Tab 4: AI Configuration (Admin Only) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={2}>
+        <TabPanel value={tabValue} index={3}>
           {loadingAI ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <CircularProgress />
@@ -1485,9 +1652,9 @@ export const Settings = () => {
         </TabPanel>
       )}
 
-      {/* Tab 4: User Management (Admin Only) */}
+      {/* Tab 5: User Management (Admin Only) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={3}>
+        <TabPanel value={tabValue} index={4}>
           <UserManagement />
         </TabPanel>
       )}

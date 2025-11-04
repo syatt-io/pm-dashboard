@@ -196,6 +196,31 @@ class NotificationManager:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, _send_slack_sync)
 
+    async def _send_slack_dm(self, slack_user_id: str, message: str) -> Dict[str, Any]:
+        """Send a direct message to a Slack user."""
+        if not self.slack_client:
+            logger.error("Slack not configured, cannot send DM")
+            return {"success": False, "error": "Slack not configured"}
+
+        def _send_dm_sync():
+            """Synchronous Slack DM sending (runs in executor)."""
+            try:
+                response = self.slack_client.chat_postMessage(
+                    channel=slack_user_id,
+                    text=message
+                )
+                return {"success": True, "channel": slack_user_id, "ts": response["ts"]}
+            except SlackApiError as e:
+                logger.error(f"Slack API error sending DM to {slack_user_id}: {e}")
+                return {"success": False, "channel": slack_user_id, "error": str(e)}
+            except Exception as e:
+                logger.error(f"Error sending Slack DM to {slack_user_id}: {e}")
+                return {"success": False, "channel": slack_user_id, "error": str(e)}
+
+        # Run synchronous Slack API call in executor to avoid blocking
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, _send_dm_sync)
+
     async def _send_email(self, content: NotificationContent) -> Dict[str, Any]:
         """Send notification via email."""
         try:

@@ -133,13 +133,77 @@ class TodoScheduler:
                 time.sleep(60)
 
     async def send_daily_digest(self):
-        """Send daily TODO digest to all configured channels."""
+        """Send daily TODO digest to all configured channels and individual DMs."""
         try:
             logger.info("Sending daily TODO digest")
 
             # Get all active todos
             active_todos = self.todo_manager.get_active_todos(limit=100)
 
+            # Get users who have opted in for daily TODO digest
+            from src.utils.database import session_scope
+            from src.models.user import User
+
+            opted_in_users = []
+            with session_scope() as db_session:
+                opted_in_users = db_session.query(User).filter(
+                    User.notify_daily_todo_digest == True,
+                    User.slack_user_id.isnot(None)
+                ).all()
+
+                # Detach users from session to use them outside the context
+                for user in opted_in_users:
+                    db_session.expunge(user)
+
+            logger.info(f"Found {len(opted_in_users)} users opted in for daily TODO digest")
+
+            # Send individual DMs to opted-in users
+            for user in opted_in_users:
+                try:
+                    # Filter TODOs for this specific user
+                    user_todos = [todo for todo in active_todos if todo.assignee == user.email or todo.assignee == user.name]
+
+                    if not user_todos:
+                        # Send "no todos" message to user
+                        user_body = f"📋 *Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}*\n\n"
+                        user_body += "🎉 No active TODOs assigned to you today! Great job!"
+                    else:
+                        # Group user's TODOs by project
+                        todos_by_project = {}
+                        for todo in user_todos:
+                            project = todo.project_key or "No Project"
+                            if project not in todos_by_project:
+                                todos_by_project[project] = []
+                            todos_by_project[project].append(todo)
+
+                        # Create digest content for user
+                        user_body = f"📋 *Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}*\n\n"
+                        user_body += f"You have {len(user_todos)} active TODO(s):\n\n"
+
+                        # Show TODOs grouped by project
+                        for project in sorted(todos_by_project.keys()):
+                            todos = todos_by_project[project]
+                            user_body += f"*{project}*\n"
+                            for todo in todos:
+                                user_body += f"• {todo.title}"
+                                if todo.description:
+                                    # Truncate description to 50 chars
+                                    desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+                                    user_body += f" - {desc}"
+                                user_body += "\n"
+                            user_body += "\n"
+
+                    # Send DM to user
+                    await self.notifier._send_slack_dm(
+                        slack_user_id=user.slack_user_id,
+                        message=user_body
+                    )
+                    logger.info(f"Sent daily digest DM to user {user.email} ({len(user_todos)} TODOs)")
+
+                except Exception as user_error:
+                    logger.error(f"Error sending daily digest to user {user.email}: {user_error}")
+
+            # Also send system-wide digest to channel (for admins/monitoring)
             if not active_todos:
                 # Send "no todos" message
                 content = NotificationContent(
@@ -150,7 +214,7 @@ class TodoScheduler:
                 await self.notifier.send_notification(content, channels=["slack"])
                 return
 
-            # Group TODOs by project
+            # Group TODOs by project for system-wide message
             todos_by_project = {}
             for todo in active_todos:
                 project = todo.project_key or "No Project"
@@ -181,14 +245,10 @@ class TodoScheduler:
                 priority="normal"
             )
 
-            # Send to all channels
-            await self.notifier.send_notification(content, channels=["slack", "email"])
+            # Send to all channels (system-wide)
+            await self.notifier.send_notification(content, channels=["slack"])
 
-            # Send Slack digest with interactive elements
-            if self.slack_bot:
-                await self.slack_bot.send_daily_digest()
-
-            logger.info(f"Daily digest sent: {len(active_todos)} active TODOs")
+            logger.info(f"Daily digest sent: {len(active_todos)} active TODOs, {len(opted_in_users)} users notified")
 
         except Exception as e:
             logger.error(f"Error sending daily digest: {e}")
@@ -546,8 +606,42 @@ class TodoScheduler:
                         priority="normal"
                     )
                     try:
+                        # Send system-wide notification to channel
                         asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
-                        logger.info("✅ Tempo sync notification sent successfully")
+                        logger.info("✅ Tempo sync notification sent to channel successfully")
+
+                        # Send individual DMs to opted-in users
+                        from src.utils.database import session_scope
+                        from src.models.user import User
+
+                        opted_in_users = []
+                        with session_scope() as db_session:
+                            opted_in_users = db_session.query(User).filter(
+                                User.notify_project_hours_forecast == True,
+                                User.slack_user_id.isnot(None)
+                            ).all()
+
+                            # Detach users from session to use them outside the context
+                            for user in opted_in_users:
+                                db_session.expunge(user)
+
+                        logger.info(f"Found {len(opted_in_users)} users opted in for project hours forecast")
+
+                        # Send DMs to opted-in users
+                        async def send_dms():
+                            for user in opted_in_users:
+                                try:
+                                    await self.notifier._send_slack_dm(
+                                        slack_user_id=user.slack_user_id,
+                                        message=summary_body
+                                    )
+                                    logger.info(f"Sent project hours forecast DM to user {user.email}")
+                                except Exception as user_error:
+                                    logger.error(f"Error sending project hours forecast to user {user.email}: {user_error}")
+
+                        asyncio.run(send_dms())
+                        logger.info(f"✅ Sent project hours forecast to {len(opted_in_users)} users")
+
                     except Exception as notif_error:
                         logger.error(f"❌ Failed to send Tempo sync notification: {notif_error}", exc_info=True)
                         # Re-raise to ensure Celery task is marked as failed

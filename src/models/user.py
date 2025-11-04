@@ -40,6 +40,10 @@ class User(Base):
     notion_credentials_updated_at = Column(DateTime, nullable=True)
     slack_credentials_updated_at = Column(DateTime, nullable=True)
 
+    # Notification preferences
+    notify_daily_todo_digest = Column(Boolean, default=True, nullable=False)
+    notify_project_hours_forecast = Column(Boolean, default=True, nullable=False)
+
     # Relationships
     # todos = relationship("TodoItem", back_populates="user", cascade="all, delete-orphan")
     # meetings = relationship("ProcessedMeeting", back_populates="user", cascade="all, delete-orphan")
@@ -334,6 +338,25 @@ class User(Base):
         self.slack_user_token_encrypted = None
         self.slack_credentials_updated_at = None
         logger.info(f"Slack user token cleared for user {self.id}")
+
+    # Notification preference methods
+    def get_notification_preferences(self) -> dict:
+        """Get user's notification preferences."""
+        return {
+            'notify_daily_todo_digest': self.notify_daily_todo_digest,
+            'notify_project_hours_forecast': self.notify_project_hours_forecast,
+            'slack_connected': bool(self.slack_user_id)
+        }
+
+    def update_notification_preferences(self, preferences: dict):
+        """Update user's notification preferences."""
+        if 'notify_daily_todo_digest' in preferences:
+            self.notify_daily_todo_digest = bool(preferences['notify_daily_todo_digest'])
+            logger.info(f"Daily TODO digest preference set to {self.notify_daily_todo_digest} for user {self.id}")
+
+        if 'notify_project_hours_forecast' in preferences:
+            self.notify_project_hours_forecast = bool(preferences['notify_project_hours_forecast'])
+            logger.info(f"Project hours forecast preference set to {self.notify_project_hours_forecast} for user {self.id}")
 
 
 class UserWatchedProject(Base):
