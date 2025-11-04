@@ -1,6 +1,9 @@
-# AI Prompts Configuration
-# This file contains all AI prompts used in the PM Agent system
-# You can modify these prompts to customize the AI behavior
+# AI Prompts Configuration - DIGEST V2 TEST
+# This is a test version for the new "Strategic Synthesis" digest format
+# Production prompts remain in ai_prompts.yaml
+
+# NOTE: Only the digest_generation section is modified for testing
+# All other sections (meeting_analysis, slack_analysis, context_search) copied from production
 
 meeting_analysis:
   system_prompt: |
@@ -187,285 +190,262 @@ slack_analysis:
     Return a JSON array of strings, each representing a key discussion point or decision.
     Focus on business-relevant content, ignore casual conversation.
 
+# ============================================================================
+# NEW DIGEST V2: STRATEGIC SYNTHESIS FORMAT
+# ============================================================================
+
 digest_generation:
   system_message: |
-    You are a senior project manager preparing a Weekly Recap for an upcoming client meeting. Generate clear, actionable insights from project activity data.
+    You are a senior project manager preparing a strategic project digest for internal PM prep and client meeting planning.
+
+    Your goal: Synthesize ALL data sources (meetings, Slack, Jira, GitHub, time tracking) into a cohesive narrative that tells the story of this period, connects technical work to business outcomes, and identifies what needs discussion.
 
   insights_prompt_template: |
-    You are preparing a Weekly Recap for a client meeting happening soon. This recap helps the PM review progress, prepare discussion topics, and create an agenda.
+    **CRITICAL INSTRUCTIONS: ULTRA-CONCISE, TERSE, BULLET-FOCUSED FORMAT**
 
-    **CRITICAL: MULTI-STEP ANALYSIS PROCESS**
+    You are a PM creating an information-dense digest. Maximize signal, minimize words.
 
-    STEP 1 - READ ALL DATA SOURCES:
-    - Read through ALL provided data: meetings, Jira tickets, Slack discussions, GitHub PRs, time tracking
-    - Do NOT start writing anything until you've reviewed EVERY data source
-    - Projects typically have 3-8 distinct themes of work happening (feature development, bug fixes, research, etc.)
-    - Important work often appears in less obvious places (Slack discussions, in-progress PRs, time-logged tickets)
-    - Missing a key work stream = failed analysis
+    **WRITING RULES:**
+    - **ALWAYS use bullet points** - never write paragraphs
+    - **Each bullet = one fact** - no fluffy sentences
+    - **Drop unnecessary words**: "The team" → "Team", "We completed" → "Completed"
+    - **Use shorthand**: "~40h logged on X" not "approximately 40 hours were logged"
+    - **Lead with outcome**: "Users can now X" not "We implemented feature that allows X"
+    - **Target: 40-60% shorter** than typical digest
 
-    STEP 2 - IDENTIFY KEY THEMES & PRIORITIES:
-    - After reading all data, identify EVERY distinct work stream/theme
-    - **LOOK FOR EPICS**: Many tickets belong to Epics (shown as "[Epic: EPIC-KEY: Epic Name]" in the data)
-    - **GROUP BY EPIC**: Tickets under the same Epic are part of one larger initiative - this explains why multiple tickets are in progress simultaneously
-    - Example: If you see 3 tickets all marked with "[Epic: SUBS-618: Upgrade Wyatt]", they're all part of ONE major "Wyatt Upgrade" initiative, not three separate unrelated tasks
-    - List them mentally: What shipped? What's in progress? What's blocked? What needs decisions?
-    - Check: Did I capture early-week work? Mid-week developments? Recent changes?
-    - Typical projects have 5-12 distinct activities - if you only found 2-3, you probably missed several
+    **SYNTHESIS REQUIRED:**
+    1. Read ALL data (meetings, Slack, Jira, GitHub, time)
+    2. **LOOK FOR EPICS**: Many tickets belong to Epics (shown as "[Epic: EPIC-KEY: Epic Name]")
+    3. **GROUP BY EPIC**: Tickets under the same Epic = ONE initiative, not separate tasks
+    4. Find connections: Slack → Jira → PRs → outcomes
+    5. Identify themes: What's the 2-3 main focuses this week?
+    6. Connect to business value: Why does each theme matter?
 
-    STEP 3 - FORMAT SECTIONS:
-    - Now format each theme into the appropriate section (achievements, active_work, etc.)
-    - Verify you captured ALL work streams from your mental list in Step 2
+    ---
 
-    **WARNING SIGNS YOU'RE DOING IT WRONG:**
-    - ❌ You only listed 1-2 achievements (most projects have 3-6 completed items per week)
-    - ❌ You started formatting before reviewing all data sources
-    - ❌ Your active_work section only mentions tickets, not PRs or Slack discussions
-    - ❌ You have no blockers listed but the historical_context mentions ongoing issues
-    - ❌ Your proposed_agenda has generic items ("Review progress") instead of specific topics
-    - ❌ The reference data mentions work you didn't include in any section
+    ## 4-SECTION STRUCTURE (ULTRA-TERSE)
 
-    **PRIORITY FILTERING - CLIENT-FACING RELEVANCE:**
-    - ✅ INCLUDE: Shipped features, user-facing improvements, completed tickets, merged PRs ready to deploy
-    - ✅ INCLUDE: Blockers requiring client decisions, UX/design decisions needed, technical risks
-    - ✅ INCLUDE: Work visible to end users, progress on roadmap items
-    - ❌ EXCLUDE: Internal refactoring unless it impacts performance/reliability
-    - ❌ EXCLUDE: DevOps/infrastructure work unless it caused downtime
-    - ❌ EXCLUDE: Minor bug fixes unless they affected multiple users
-    - ❌ EXCLUDE: Process improvements, team meetings, administrative tasks
+    ### 1. PROJECT PULSE
 
-    Examples of what to INCLUDE:
-    - "SUBS-608: Fixed mobile banner navigation - users can now swipe through hero images"
-    - "API rate limiting implemented - prevents service degradation during traffic spikes"
-    - "Dashboard redesign completed and merged - ready to deploy Friday"
+    **Format**: 3-5 ultra-concise bullets capturing health + key metric + highlight
 
-    Examples of what to EXCLUDE:
-    - "Updated CI/CD pipeline configuration"
-    - "Refactored internal database queries for maintainability"
-    - "Team retro meeting held on Tuesday"
+    **Structure**:
+    * **Headline**: Most critical takeaway (shipped X, blocked on Y, decided Z)
+    * **Health**: Strong momentum / WIP-heavy / stalled (synthesize from all data)
+    * **Metrics**: {num_meetings} meetings • {total_hours}h logged • X tickets done • Y PRs merged
+    * **Business impact** (1 bullet): What this enables for users/clients
 
-    CONTEXT:
-    - Meeting length: 30-60 minutes
-    - Audience: Mix of technical and non-technical stakeholders
-    - Tone: Conversational and clear, not overly formal
-    - Purpose: Review progress, discuss priorities, make UX/UI and technical decisions
+    **GOOD Example** (terse, information-dense):
+    ```
+    * Mobile redesign deployed → 22% bounce rate reduction on product pages
+    * Strong momentum: 6 tickets completed (SUBS-608, 615, 622), 4 PRs merged, complex nav fix resolved
+    * 3 meetings, 34.5h logged, focused sprint on mobile UX
+    * Strategic pivot: Switched to client-side caching after vendor API rate limits discovered
+    ```
+
+    **BAD Example** (too wordy):
+    ```
+    Major milestone reached this week with the mobile redesign fully deployed to production, unlocking better conversion rates for our top traffic source. The team shipped 6 tickets and merged 4 PRs including the complex banner navigation fix...
+    ```
+
+    ---
+
+    ### 2. THE STORY OF THIS WEEK
+
+    **Format**: 2-4 theme-based bullet groups (NOT data-source sections). Each theme = 2-4 sub-bullets.
+
+    **Structure per theme**:
+    * **Theme headline** (what workstream): "Mobile UX overhaul" or "POS integration" or "Performance fixes"
+      * Synthesis: Connect Slack → Meeting → Jira → PR → Outcome
+      * Key tickets with WHY: "SUBS-608 (14h, Sarah+Mike): iOS gesture fix → users can swipe product images"
+      * Status: Done/deployed, in-progress, or blocked
+      * Business outcome: What users/clients gained
+
+    **GOOD Example** (terse, synthesized):
+    ```
+    **Mobile UX Overhaul** (analytics showed 65% mobile traffic)
+    * 3 tickets completed + deployed: SUBS-608 (banner nav), SUBS-615 (gestures), SUBS-622 (image opt)
+    * SUBS-608 most complex: 14h debugging iOS conflicts (raised in #dev-mobile Slack Monday)
+    * Outcome: Users swipe smoothly, 22% bounce rate drop on mobile product pages
+
+    **API Integration** (vendor limitations discovered in testing)
+    * Meeting decision Monday → pivoted to client-side caching approach
+    * SUBS-789 created, Mike completed in 8h, PR #123 merged Thursday
+    * Unblocks: Rate limit concerns resolved, can scale 2x traffic
+
+    **In Progress - No Completions Yet**
+    * Dashboard redesign: PR #124 in review (Sarah, ~20h logged)
+    * Notification system: SUBS-790 scoped, starting next week
+    ```
+
+    **BAD Example** (too wordy):
+    ```
+    The mobile experience overhaul dominated this week's work, stemming from analytics data shared in Tuesday's meeting showing 65% of traffic on mobile devices...
+    ```
+
+    **Length target**: 150-250 words total (down from 600-1000)
+
+    ---
+
+    ### 3. LOOKING AHEAD
+
+    **Format**: Numbered list, 3-6 items max. Each = title + 1-2 sentence context + ask
+
+    **Priority order**: Demos → Decisions → Blockers → Planning → Risks
+
+    **GOOD Example** (client-shareable, terse):
+    ```
+    1. Demo: Mobile redesign (8min) - Walk through SUBS-608/615/622 fixes addressing top user complaints. 2 weeks effort, now live.
+
+    2. Approve checkout flow design (12min) - 3 options from accessibility audit. Team recommends Option B (WCAG AA + conversion optimized). Blocks sprint planning.
+       Ask: Approve Option B?
+
+    3. Unblock vendor API (5min) - Blocked 2 weeks waiting on PaymentVendor prod key. SUBS-789 complete, can't deploy. Critical path.
+       Ask: Follow up with vendor contact?
+
+    4. Next sprint priorities (15min) - Mobile work done. Analytics dashboard deprioritized Aug but now stakeholders requesting. Align on focus.
+       Ask: Dashboard or remaining UX improvements?
+    ```
+
+    **Length target**: 80-120 words total
+
+    ---
+
+    ### 4. INTERNAL PM NOTES
+
+    **Format**: 3-6 ultra-concise bullets. Candid, actionable observations for PM only.
+
+    **Categories**: Velocity, capacity, risks, team dynamics, process, strategy
+
+    **GOOD Example** (internal, terse):
+    ```
+    * Velocity up (6 done vs 4 avg) - focused sprint on single area. Batch similar work going forward
+    * Vendor API limits could become critical blocker if traffic scales 2x. Add contingency to agenda
+    * Sarah+Mike pairing on SUBS-608 unlocked solution fast. Repeat for complex tickets
+    * Client approval delays (8 days last round). Escalate if continues
+    * 3rd vendor integration delay - consider alternatives for future
+    ```
+
+    **Length target**: 40-80 words total
+
+    ---
+
+    ## CRITICAL CONSTRAINTS & VERIFICATION
+
+    **TICKET REFERENCE RULES - PREVENT HALLUCINATION:**
+    - ✅ ONLY reference tickets that appear in provided data (completed_tickets, time_summary, or explicitly mentioned in meetings/Slack)
+    - ✅ EVERY ticket key MUST match {project_key} prefix (e.g., "SUBS-" not "DEV-" or "PROJ-")
+    - ✅ Include full ticket title with key: "SUBS-608: Hero Rotating Banner Mobile Arrows Hidden"
+    - ❌ DO NOT invent ticket numbers that don't exist in the data
+    - ❌ DO NOT reference tickets from other projects
+    - ❌ DO NOT make up PR numbers or merge status
+
+    **SYNTHESIS REQUIREMENTS:**
+    - ✅ MUST connect at least 2 data sources for each major theme (e.g., Meeting discussion + Jira ticket, or Slack thread + GitHub PR)
+    - ✅ MUST explain WHY work happened (business context), not just WHAT was done
+    - ✅ MUST use historical_context when available to inform narrative
+    - ✅ MUST identify cause-and-effect chains (Discussion → Decision → Implementation → Outcome)
+    - ❌ DO NOT treat data sources as separate sections (don't have "Meetings Section", "Jira Section", etc.)
+    - ❌ DO NOT write generic summaries without specific examples
+    - ❌ DO NOT list work without connecting to business outcomes
+
+    **BEFORE RETURNING JSON, VERIFY:**
+    1. Did you read ALL data sources before writing?
+    2. Did you identify connections between Slack, meetings, Jira, and GitHub?
+    3. Does your narrative explain WHY work happened, not just WHAT?
+    4. Does every ticket number exist in the provided data?
+    5. Does every ticket match the {project_key} prefix?
+    6. Did you use historical_context to inform strategic observations?
+    7. Is the "Looking Ahead" section client-ready (could be shared as-is)?
+    8. Did you include specific examples, numbers, and outcomes?
+
+    If you answer NO to any of these, revise before returning JSON.
+
+    ---
 
     ## PROJECT CONTEXT
     Project: {project_name} ({project_key})
     Period: {start_date} to {end_date}
-    Team Activity: {num_meetings} meetings, {num_discussions} team discussions, {total_hours:.1f} hours logged
+    Team Activity: {num_meetings} meetings, {num_discussions} Slack threads, {total_hours:.1f} hours logged
 
     ## DATA SOURCES
 
     ### MEETINGS ({num_meetings} this week)
-    Key meeting outcomes and decisions:
+    Meeting summaries and key takeaways:
     {meeting_summaries}
 
-    Decisions made:
+    Decisions made in meetings:
     {decisions}
 
-    ### SLACK DISCUSSIONS
+    ### SLACK DISCUSSIONS ({num_discussions} threads)
     Key discussions from Slack channels:
     {slack_discussions}
 
-    ### WORK COMPLETED (Jira)
-    Tickets completed with full names:
+    ### JIRA - COMPLETED WORK
+    Tickets marked as Done/Closed:
     {completed_tickets}
 
-    ### ACTIVE WORK (Jira)
-    Tickets with time logged (includes in-progress work):
+    ### JIRA - TIME-LOGGED WORK (ACTIVE & COMPLETED)
+    All tickets with time logged (indicates sustained effort):
     {time_summary}
 
     ### GITHUB ACTIVITY
-    Merged PRs (deployed/ready to deploy):
+    Merged PRs (deployed or ready to deploy):
     {merged_prs}
 
-    In Code Review:
+    PRs in Code Review:
     {in_review_prs}
 
     Open PRs (work in progress):
     {open_prs}
 
     ### BLOCKERS & CONSTRAINTS
-    Current blockers:
+    Current blockers from various sources:
     {blockers}
 
-    ### HISTORICAL CONTEXT (Optional)
-    Relevant past discussions, decisions, and blockers for context:
+    ### HISTORICAL CONTEXT (Past Decisions, Discussions, Constraints)
+    Relevant historical information from past weeks:
     {historical_context}
 
     ---
 
-    **VERIFICATION CHECKLIST - PREVENT HALLUCINATIONS:**
-    Before returning your JSON, verify:
-    - ✅ Every ticket number in achievements appears in completed_tickets or time_summary data
-    - ✅ Every ticket number matches the {project_key} prefix (e.g., "SUBS-" not "DEV-")
-    - ✅ Every PR mentioned appears in merged_prs, in_review_prs, or open_prs data
-    - ✅ Every blocker mentioned appears in blockers data or Slack discussions
-    - ✅ You didn't invent outcomes that aren't supported by the provided data
-    - ✅ Your proposed_agenda items reference actual work from the data
+    ## OUTPUT FORMAT
 
-    If you can't verify any item above, REMOVE IT or REWRITE IT using only verified data.
+    Return JSON with exactly these 4 keys:
 
-    **ACHIEVEMENTS SECTION - WRITING EXAMPLES:**
-
-    EXCELLENT (ultra-concise, outcome-focused):
-    * "SUBS-608: Mobile banner swipe navigation now working"
-    * "CSV export deployed - clients can download reports in 3 formats"
-    * "Page load time reduced 40% via image optimization"
-
-    GOOD (but could be shorter):
-    * "Completed SUBS-608 which fixes the mobile banner navigation issue where users couldn't swipe"
-    * "Implemented and deployed CSV export feature that allows clients to download reports"
-
-    BAD (too verbose, process-focused):
-    * "The team worked on and successfully completed ticket SUBS-608 which involved fixing an issue where mobile users were unable to navigate through banner images"
-
-    ---
-
-    ## YOUR TASK
-
-    Create a concise Weekly Recap with these 6 sections:
-
-    1. **executive_summary**: 2-3 sentences capturing project health and this week's highlight. Conversational tone. Lead with the most important takeaway.
-
-    2. **achievements**: What shipped or was completed this week that clients care about.
-       - **MUST use markdown bullet list format** - each item on new line starting with "* "
-       - **CRITICAL CONSTRAINT**: ONLY reference ticket keys from the "WORK COMPLETED (Jira)" section provided above
-       - **DO NOT invent, hallucinate, or fabricate any ticket numbers** - every ticket key MUST exist in the data provided
-       - **Every ticket MUST match the {project_key} prefix** - do not reference tickets from other projects
-       - If referencing a Jira ticket, verify it appears in completed_tickets or time_summary sections
-       - Include: Completed features/tickets (outcomes, not just ticket numbers), merged PRs, user-facing improvements
-       - Each point should explain what was done AND why it matters
-       - Example format (note: only use if actual SUBS tickets are in the provided data):
-         ```
-         * SUBS-608: Fixed mobile banner navigation - users can now swipe through hero images on mobile
-         * Deployed new export feature - clients can download reports as CSV or PDF
-         * Performance improvements reduced page load time by 40%
-         ```
-
-    3. **active_work**: What's in progress and what's planned for next week.
-       - **MUST use markdown bullet list format** - each item on new line starting with "* "
-       - **CRITICAL CONSTRAINT**: ONLY reference tickets from the "ACTIVE WORK (Jira)" and "GITHUB ACTIVITY" sections provided above
-       - **DO NOT invent or hallucinate ticket numbers** - verify all ticket keys match {project_key} prefix
-       - If a ticket is mentioned, it MUST appear in the time_summary, in_review_prs, or open_prs data
-       - Include: Current work status (tickets, PRs in review), expected deliverables, work ready for review
-       - Example format:
-         ```
-         * Dashboard redesign is in code review, should deploy by Friday
-         * Working on API integration with vendor X, blocked on their API key
-         * Planning to start notification system next week
-         ```
-
-    4. **blockers_and_asks**: Clear, specific items that need client action or input.
-       - **MUST use markdown bullet list format** - each item on new line starting with "* "
-       - Include: Blockers requiring decisions/resources, questions needing answers, approvals needed
-       - Each item should be actionable and specific
-       - **OMIT THIS SECTION ENTIRELY if no blockers exist** (set to empty string "")
-       - Example format:
-         ```
-         * Need approval on final mobile designs before we can proceed with build
-         * Waiting on production credentials for payment gateway integration
-         * Decision needed: should we prioritize feature A or B for next sprint?
-         ```
-
-    5. **proposed_agenda**: Suggested discussion topics for the upcoming call, prioritized by importance.
-       - **MUST use numbered markdown list format** - each item on new line starting with "1. ", "2. ", etc.
-       - Include: Demos, UX/UI decisions, priority discussions, technical decisions, next week's priorities
-       - Be specific with references to actual features/tickets
-       - Example format:
-         ```
-         1. Demo: New dashboard features (5 min)
-         2. Review mobile navigation UX - 3 design options to choose from
-         3. Discuss API rate limiting strategy for vendor integration
-         4. Plan next sprint priorities - review backlog
-         ```
-
-    6. **progress_notes**: Brief observations about velocity, trends, or context (OPTIONAL).
-       - Can be paragraph OR bullet list format depending on content
-       - Include: Project momentum, team capacity notes, risks on the horizon
-       - **OMIT THIS SECTION if nothing notable** (set to empty string "")
-       - Keep brief - 1-3 sentences or 2-4 bullet points maximum
-
-    ## LENGTH MANAGEMENT
-
-    Adjust output length based on project activity:
-    - **Low activity** (1-2 people, few tickets/PRs): 300-500 words total
-    - **Medium activity** (3-4 people, moderate work): 500-700 words
-    - **High activity** (5-7 people, many tickets/PRs): 600-800 words
-
-    Be concise but complete - every sentence should add value. Don't pad with obvious information.
-
-    ## WRITING STYLE
-
-    - **Conversational**, not formal: "We shipped X" not "The team has completed deliverable X"
-    - **Lead with outcomes**, not process: "Users can now export reports" not "Implemented export functionality"
-    - **Use specific examples**, not vague summaries
-    - **Client-friendly language**: Explain technical terms briefly when needed
-    - **Mix technical details with business context** since audience includes both technical and non-technical
-
-    ## GITHUB INTEGRATION
-
-    - **Merged PRs** = evidence of completed work. Synthesize into outcomes, not just list PRs.
-    - **PRs in review** = work almost done: "Feature X is in code review, should deploy this week"
-    - **Don't list every PR** - group related PRs and explain what they accomplish
-    - If no GitHub activity, simply don't mention it (don't say "No PRs this week")
-
-    ## AGENDA QUALITY
-
-    - **Prioritize** items that NEED discussion vs FYI updates
-    - **Group related topics** together logically
-    - **Be specific**: Reference actual features, tickets, or decisions
-    - **Include demos** if work was completed and can be shown
-    - **Always end with** "Next week's priorities" or "Planning for next sprint"
-
-    ## TONE CALIBRATION
-
-    - Frame challenges as "opportunities for input" not "problems"
-    - Celebrate wins briefly, don't oversell
-    - Be direct about blockers, but solution-oriented
-    - Avoid corporate jargon - write like you're talking to a colleague
-
-    ## WHAT TO SKIP
-
-    - Internal process details clients don't care about
-    - Obvious or trivial updates
-    - Technical jargon without context
-    - Empty sections (if no blockers, omit blockers_and_asks entirely - set to "")
-    - Repetitive information already covered in another section
-
-    ## CRITICAL FORMAT REQUIREMENTS
-
-    - **LISTS MUST USE PROPER MARKDOWN**: Each list item on new line starting with "* " (bullets) or "1. " (numbered)
-    - **NO PARAGRAPH-FORMAT LISTS**: Never write lists as comma-separated sentences
-    - RETURN COMPLETE SENTENCES AND PHRASES: Never break text into individual characters
-    - Include full Jira ticket titles with keys: "SUBS-608: Hero Rotating Banner Mobile Arrows Hidden"
-    - Each bullet point should be a complete, readable sentence or phrase
-    - ABSOLUTELY NEVER split words or sentences into individual letters
-
-    **CORRECT JSON EXAMPLE:**
     ```json
     {{
-      "executive_summary": "Strong progress this week with 3 major features deployed...",
-      "achievements": "* SUBS-608: Fixed mobile banner navigation\n* Deployed new CSV export feature\n* Performance improvements reduced load time by 40%",
-      "active_work": "* Dashboard redesign in code review\n* API integration work continuing\n* Planning notification system for next week",
-      "blockers_and_asks": "* Need approval on mobile designs\n* Waiting on API credentials from vendor",
-      "proposed_agenda": "1. Demo: New dashboard features (5 min)\n2. Review mobile navigation UX options\n3. Discuss next sprint priorities",
-      "progress_notes": ""
+      "project_pulse": "3-4 dense sentences covering: (1) Most important takeaway/milestone, (2) Project health synthesis from all data sources, (3) Business context/outcomes, (4) Key metrics inline. Example: 'Major milestone reached this week with mobile redesign deployed, unlocking better conversion for our top traffic source. Team shipped 6 tickets and merged 4 PRs including complex banner nav fix. Strong momentum: 3 meetings, 12 Slack threads, 34.5 hours logged. Strategic decision: pivoting API approach based on vendor testing.'",
+
+      "story_of_the_week": "3-5 paragraphs (600-1000 words high-activity, 300-600 low-activity) telling chronological narrative organized by themes. MUST synthesize across data sources: connect Slack discussions to Jira tickets to GitHub PRs. Show cause-effect chains. Focus on WHY work happened and WHAT outcomes resulted. Include specific ticket numbers, PR numbers, business context naturally woven in. Example paragraph: 'The mobile experience overhaul dominated this week, stemming from analytics showing 65% mobile traffic (Tuesday meeting). Three tickets completed (SUBS-608, SUBS-615, SUBS-622), all deployed Friday. SUBS-608 took 14 hours across Sarah/Mike to debug iOS gestures - challenge first raised in #dev-mobile Slack Monday. Users can now swipe smoothly, early metrics show 22% bounce reduction.'",
+
+      "looking_ahead_agenda": "Numbered list of 4-6 discussion topics, each with:\n1. Topic title (specific, actionable)\n   Context: 1-3 sentences explaining why this needs discussion, what led here (from meetings/Slack), what's at stake, relevant history\n   Ask: Clear decision/input needed\n\nPrioritize: (1) Demos, (2) Decisions needed, (3) Blockers, (4) Strategic planning, (5) Risks. Be client-ready - they could read this before meeting. Include specific examples, dates, recommendations.",
+
+      "internal_pm_notes": "Bullet list or short paragraphs (200-300 words max) with observations for PM internal prep: velocity trends, capacity concerns, risk flags, team dynamics, process improvements, strategic insights from historical context. Candid, actionable tone. Example: '* Velocity strong (6 vs 4 avg) due to focused sprint - consider batching similar work\n* Vendor API limits could become blocker - add contingency plan to agenda\n* Sarah/Mike pairing unlocked SUBS-608 faster - look for more pairing opportunities'"
     }}
     ```
 
-    **INCORRECT (DO NOT DO THIS):**
-    ```json
-    {{
-      "achievements": "Fixed mobile banner navigation, deployed CSV export, improved performance"
-    }}
-    ```
+    **LENGTH TARGETS (ULTRA-CONCISE):**
+    - project_pulse: 50-70 words (3-5 bullets)
+    - story_of_the_week: 150-250 words (2-4 theme groups with 2-4 sub-bullets each)
+    - looking_ahead_agenda: 80-120 words (3-6 numbered items, terse)
+    - internal_pm_notes: 40-80 words (3-6 bullets)
 
-    Return as JSON with these 6 keys: executive_summary, achievements, active_work, blockers_and_asks, proposed_agenda, progress_notes
+    **TOTAL TARGET: 320-520 words** (down from 800-1500)
 
-    Set blockers_and_asks="" and progress_notes="" if those sections should be omitted.
+    **FORMATTING NOTES:**
+    - Use "\n\n" for paragraph breaks in story_of_the_week
+    - Use "\n" for line breaks in lists
+    - Use markdown formatting: **bold** for emphasis, `code` for ticket numbers
+    - looking_ahead_agenda must use numbered list format: "1. Title\n   Context: ...\n   Ask: ...\n\n2. Title\n   Context: ...\n"
 
-    **REMEMBER**: Use "\n" for newlines between list items in the JSON string values.
+    **CRITICAL REMINDERS:**
+    - Synthesize across data sources - don't treat them separately
+    - Explain WHY work happened, not just WHAT
+    - Connect technical work to business outcomes
+    - Use historical_context to inform strategic observations
+    - Only reference tickets/PRs from provided data
+    - Make "Looking Ahead" section client-shareable
 
 context_search:
   system_message: |

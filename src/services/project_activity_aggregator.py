@@ -74,6 +74,12 @@ class ProjectActivity:
     proposed_agenda: Optional[str] = None
     progress_notes: Optional[str] = None
 
+    # V2 Strategic Synthesis format (4 sections)
+    project_pulse: Optional[str] = None
+    story_of_the_week: Optional[str] = None
+    looking_ahead_agenda: Optional[str] = None
+    internal_pm_notes: Optional[str] = None
+
     # Historical context from Pinecone (optional)
     historical_context: Optional[List[Dict[str, Any]]] = None
 
@@ -85,8 +91,14 @@ class ProjectActivity:
 class ProjectActivityAggregator:
     """Aggregates project activity from multiple sources for agenda generation."""
 
-    def __init__(self):
-        """Initialize the aggregator with required clients."""
+    def __init__(self, custom_prompt_config: dict = None):
+        """
+        Initialize the aggregator with required clients.
+
+        Args:
+            custom_prompt_config: Optional dict with custom prompt configuration.
+                                 If provided, will be used instead of default ai_prompts.yaml
+        """
         from sqlalchemy import create_engine, text
         from sqlalchemy.orm import sessionmaker
 
@@ -157,8 +169,22 @@ class ProjectActivityAggregator:
         Session = sessionmaker(bind=engine)
         self.session = Session()
 
-        # Initialize prompt manager
-        self.prompt_manager = get_prompt_manager()
+        # Initialize prompt manager with custom config if provided
+        if custom_prompt_config:
+            # Create temporary PromptManager with custom config
+            import tempfile
+            import yaml
+
+            # Write custom config to temp file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+                yaml.dump(custom_prompt_config, f)
+                temp_config_path = f.name
+
+            from src.utils.prompt_manager import PromptManager
+            self.prompt_manager = PromptManager(config_path=temp_config_path)
+            logger.info(f"Initialized PromptManager with custom config from temp file: {temp_config_path}")
+        else:
+            self.prompt_manager = get_prompt_manager()
 
     async def aggregate_project_activity(
         self,
@@ -426,6 +452,15 @@ class ProjectActivityAggregator:
                                         }
                                         recent_changes.append(change_info)
 
+                    # Extract Epic/parent information
+                    epic_info = None
+                    parent = fields.get('parent')
+                    if parent:
+                        epic_info = {
+                            'key': parent.get('key', ''),
+                            'summary': parent.get('fields', {}).get('summary', '') if parent.get('fields') else ''
+                        }
+
                     ticket_data = {
                         'key': ticket.get('key', ''),
                         'summary': fields.get('summary', ''),
@@ -434,7 +469,8 @@ class ProjectActivityAggregator:
                         'priority': fields.get('priority', {}).get('name', 'Medium') if fields.get('priority') else 'Medium',
                         'created': created_date.isoformat(),
                         'updated': updated_date.isoformat(),
-                        'recent_changes': recent_changes
+                        'recent_changes': recent_changes,
+                        'epic': epic_info
                     }
 
                     activity.ticket_activity.append(ticket_data)
@@ -464,18 +500,30 @@ class ProjectActivityAggregator:
                 logger.info(f"Slack bot not available, skipping Slack collection for {activity.project_key}")
                 return
 
-            # Query the database for the project's slack_channel
+            # Query project_resource_mappings for Slack channels
+            # Rollback any previous failed transaction
+            self.session.rollback()
+
             result = self.session.execute(
-                self.text("SELECT slack_channel FROM projects WHERE key = :key"),
+                self.text("SELECT slack_channel_ids FROM project_resource_mappings WHERE project_key = :key"),
                 {"key": activity.project_key}
-            ).fetchone()
+            ).first()
 
             if not result or not result[0]:
-                logger.info(f"No Slack channel configured for project {activity.project_key}")
+                logger.info(f"No Slack channels configured for project {activity.project_key}")
                 return
 
-            slack_channel = result[0]
-            logger.info(f"Found Slack channel '{slack_channel}' for project {activity.project_key}")
+            # Parse JSON array of channel IDs
+            import json
+            slack_channel_ids = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+
+            if not slack_channel_ids or len(slack_channel_ids) == 0:
+                logger.info(f"Empty Slack channel list for project {activity.project_key}")
+                return
+
+            # For now, use the first channel (we can enhance to support multiple channels later)
+            slack_channel = slack_channel_ids[0]
+            logger.info(f"Found Slack channel '{slack_channel}' for project {activity.project_key} (from {len(slack_channel_ids)} configured channels)")
 
             # Calculate how many messages to fetch based on the time period
             days_back = (end_date - start_date).days
@@ -724,15 +772,25 @@ class ProjectActivityAggregator:
                             "Accept": "application/json"
                         }
 
-                        url = f"{settings.jira.url}/rest/api/3/issue/{issue_key}?fields=summary"
+                        url = f"{settings.jira.url}/rest/api/3/issue/{issue_key}?fields=summary,parent"
                         response = requests.get(url, headers=headers)
                         response.raise_for_status()
                         issue_data = response.json()
-                        summary = issue_data.get("fields", {}).get("summary", "")
+                        fields = issue_data.get("fields", {})
+                        summary = fields.get("summary", "")
+
+                        # Extract Epic/parent information
+                        epic_info = None
+                        parent = fields.get("parent")
+                        if parent:
+                            epic_key = parent.get("key", "")
+                            epic_summary = parent.get("fields", {}).get("summary", "") if parent.get("fields") else ""
+                            epic_info = f"{epic_key}: {epic_summary}" if epic_key else None
 
                         # Update all entries with this issue key
                         for entry in entries:
                             entry['issue_summary'] = summary
+                            entry['epic'] = epic_info
                     except Exception as e:
                         logger.debug(f"Error fetching summary for {issue_key}: {e}")
 
@@ -778,20 +836,74 @@ class ProjectActivityAggregator:
                 installation_id=settings.github.installation_id
             )
 
-            # Generate project keywords from project name (split into words)
-            project_keywords = [word.lower() for word in activity.project_name.split() if len(word) > 2]
-            # Add project key as keyword
-            project_keywords.append(activity.project_key.lower())
+            # Try to get GitHub repos from project_resource_mappings table first
+            github_repos = None
+            try:
+                from sqlalchemy import text
+                # Rollback any previous failed transaction
+                self.session.rollback()
 
-            logger.info(f"Fetching GitHub PRs for {activity.project_key} with keywords: {project_keywords}")
+                logger.info(f"Querying project_resource_mappings for project_key={activity.project_key}")
+                result = self.session.execute(
+                    text("SELECT github_repos FROM project_resource_mappings WHERE project_key = :key"),
+                    {"key": activity.project_key}
+                ).first()
+
+                logger.info(f"Query result: {result}")
+                if result and result[0]:
+                    import json
+                    logger.info(f"Raw github_repos value: {result[0]}, type: {type(result[0])}")
+                    github_repos = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+                    logger.info(f"Found {len(github_repos)} GitHub repos from database for {activity.project_key}: {github_repos}")
+                else:
+                    logger.info(f"No result or empty github_repos for {activity.project_key}")
+            except Exception as e:
+                logger.warning(f"Could not query project_resource_mappings: {e}", exc_info=True)
+                # Ensure we rollback so future queries can work
+                self.session.rollback()
+
+            # Fallback: Generate project keywords from project name (split into words)
+            if not github_repos:
+                project_keywords = [word.lower() for word in activity.project_name.split() if len(word) > 2]
+                # Add project key as keyword
+                project_keywords.append(activity.project_key.lower())
+                logger.info(f"No repos in database, using keyword matching for {activity.project_key}: {project_keywords}")
+            else:
+                project_keywords = []  # Not needed when we have explicit repos
 
             # Get PRs organized by state
-            pr_data = await github_client.get_prs_by_date_and_state(
-                project_key=activity.project_key,
-                project_keywords=project_keywords,
-                repo_name=None,  # Auto-detect
-                days_back=days_back
-            )
+            # If we have explicit repos, fetch from each one
+            if github_repos:
+                # Fetch PRs from all mapped repos
+                all_merged = []
+                all_in_review = []
+                all_open = []
+
+                for repo_name in github_repos:
+                    logger.info(f"Fetching PRs from repo: {repo_name}")
+                    pr_data = await github_client.get_prs_by_date_and_state(
+                        project_key=activity.project_key,
+                        project_keywords=[],  # Not needed with explicit repo
+                        repo_name=repo_name,
+                        days_back=days_back
+                    )
+                    all_merged.extend(pr_data.get("merged", []))
+                    all_in_review.extend(pr_data.get("in_review", []))
+                    all_open.extend(pr_data.get("open", []))
+
+                pr_data = {
+                    "merged": all_merged,
+                    "in_review": all_in_review,
+                    "open": all_open
+                }
+            else:
+                # Fallback to keyword-based auto-detection
+                pr_data = await github_client.get_prs_by_date_and_state(
+                    project_key=activity.project_key,
+                    project_keywords=project_keywords,
+                    repo_name=None,  # Auto-detect
+                    days_back=days_back
+                )
 
             # Store PR data in activity
             activity.github_prs_merged = pr_data.get("merged", [])
@@ -1064,19 +1176,25 @@ class ProjectActivityAggregator:
                     if change_details:
                         ticket_changes_summary.append(f"• {ticket['key']}: {', '.join(change_details)}")
 
-            # Create time tracking summary
+            # Create time tracking summary (with Epic grouping)
             time_summary = []
             if activity.time_entries:
-                # Group by issue for summary
+                # Group by issue for summary, tracking Epic info
                 issue_hours = {}
                 for entry in activity.time_entries:
                     key = entry.get('issue_key', 'Unknown')
                     if key not in issue_hours:
-                        issue_hours[key] = {'hours': 0, 'summary': entry.get('issue_summary', 'No summary')}
+                        issue_hours[key] = {
+                            'hours': 0,
+                            'summary': entry.get('issue_summary', 'No summary'),
+                            'epic': entry.get('epic')  # Include Epic info
+                        }
                     issue_hours[key]['hours'] += entry.get('hours', 0)
 
                 for key, data in list(issue_hours.items())[:5]:  # Top 5 issues by time
-                    time_summary.append(f"• {key} ({data['hours']}h): {data['summary'][:50]}...")
+                    # Include Epic context if available
+                    epic_context = f" [Epic: {data['epic']}]" if data.get('epic') else ""
+                    time_summary.append(f"• {key} ({data['hours']}h): {data['summary'][:50]}...{epic_context}")
 
             # Format GitHub PR summaries
             merged_prs_summary = []
@@ -1145,7 +1263,11 @@ class ProjectActivityAggregator:
                 meeting_summaries=meeting_details_text,  # Use detailed meeting topics instead of brief summaries
                 decisions=chr(10).join(f'- {decision}' for decision in all_decisions[:3]) or '- No major decisions recorded',
                 slack_discussions=chr(10).join(f'- {discussion}' for discussion in activity.key_discussions[:5]) if activity.key_discussions else '- No significant Slack discussions',
-                completed_tickets=chr(10).join(f'- {ticket.get("key", "Unknown")}: {ticket.get("summary", "No summary")}' for ticket in activity.completed_tickets[:5]) or '- No tickets completed',
+                completed_tickets=chr(10).join(
+                    f'- {ticket.get("key", "Unknown")}: {ticket.get("summary", "No summary")}'
+                    f'{" [Epic: " + ticket.get("epic", {}).get("key", "") + ": " + ticket.get("epic", {}).get("summary", "") + "]" if ticket.get("epic") else ""}'
+                    for ticket in activity.completed_tickets[:5]
+                ) or '- No tickets completed',
                 time_summary=chr(10).join(time_summary) or '- No time tracking data available',
                 blockers=chr(10).join(f'- {blocker}' for blocker in all_blockers[:3]) or '- No blockers identified',
                 merged_prs=chr(10).join(merged_prs_summary) or '- No PRs merged this week',
@@ -1229,25 +1351,48 @@ class ProjectActivityAggregator:
 
                         return text
 
-                    # Store new 6-section Weekly Recap format with validation
-                    activity.executive_summary = validate_tickets_for_project(
-                        parsed_insights.get('executive_summary', ''), activity.project_key
-                    )
-                    activity.achievements = validate_tickets_for_project(
-                        parsed_insights.get('achievements', ''), activity.project_key
-                    )
-                    activity.active_work = validate_tickets_for_project(
-                        parsed_insights.get('active_work', ''), activity.project_key
-                    )
-                    activity.blockers_and_asks = validate_tickets_for_project(
-                        parsed_insights.get('blockers_and_asks', ''), activity.project_key
-                    )
-                    activity.proposed_agenda = validate_tickets_for_project(
-                        parsed_insights.get('proposed_agenda', ''), activity.project_key
-                    )
-                    activity.progress_notes = validate_tickets_for_project(
-                        parsed_insights.get('progress_notes', ''), activity.project_key
-                    )
+                    # Check if this is V2 format or original format
+                    is_v2_response = 'project_pulse' in parsed_insights
+
+                    if is_v2_response:
+                        # Store V2 Strategic Synthesis format with validation
+                        activity.project_pulse = validate_tickets_for_project(
+                            parsed_insights.get('project_pulse', ''), activity.project_key
+                        )
+                        activity.story_of_the_week = validate_tickets_for_project(
+                            parsed_insights.get('story_of_the_week', ''), activity.project_key
+                        )
+                        activity.looking_ahead_agenda = validate_tickets_for_project(
+                            parsed_insights.get('looking_ahead_agenda', ''), activity.project_key
+                        )
+                        activity.internal_pm_notes = validate_tickets_for_project(
+                            parsed_insights.get('internal_pm_notes', ''), activity.project_key
+                        )
+
+                        logger.info("Parsed V2 Strategic Synthesis format response")
+
+                    else:
+                        # Store new 6-section Weekly Recap format with validation
+                        activity.executive_summary = validate_tickets_for_project(
+                            parsed_insights.get('executive_summary', ''), activity.project_key
+                        )
+                        activity.achievements = validate_tickets_for_project(
+                            parsed_insights.get('achievements', ''), activity.project_key
+                        )
+                        activity.active_work = validate_tickets_for_project(
+                            parsed_insights.get('active_work', ''), activity.project_key
+                        )
+                        activity.blockers_and_asks = validate_tickets_for_project(
+                            parsed_insights.get('blockers_and_asks', ''), activity.project_key
+                        )
+                        activity.proposed_agenda = validate_tickets_for_project(
+                            parsed_insights.get('proposed_agenda', ''), activity.project_key
+                        )
+                        activity.progress_notes = validate_tickets_for_project(
+                            parsed_insights.get('progress_notes', ''), activity.project_key
+                        )
+
+                        logger.info("Parsed original Weekly Recap format response")
 
                     # Also populate legacy format for backward compatibility
                     activity.noteworthy_discussions = activity.executive_summary
@@ -1419,11 +1564,24 @@ class ProjectActivityAggregator:
             logger.warning(f"Failed to fetch summary for {issue_key}: {e}")
         return "Unknown"
 
-    def format_client_agenda(self, activity: ProjectActivity) -> str:
-        """Format the aggregated activity into a client-ready agenda."""
+    def format_client_agenda(self, activity: ProjectActivity, project_name: str = None) -> str:
+        """
+        Format the aggregated activity into a client-ready agenda.
+
+        Supports both old (6-section) and new (v2 strategic synthesis) formats.
+        Detects format based on presence of v2-specific fields.
+        """
         days = (datetime.fromisoformat(activity.end_date) -
                datetime.fromisoformat(activity.start_date)).days
 
+        # Detect if this is v2 format (has project_pulse instead of executive_summary)
+        is_v2_format = hasattr(activity, 'project_pulse') and activity.project_pulse
+
+        if is_v2_format:
+            # V2 FORMAT: Strategic Synthesis (4 sections)
+            return self._format_v2_digest(activity, project_name or activity.project_name, days)
+
+        # ORIGINAL FORMAT: Weekly Recap (6 sections)
         # Format attention section with highlighted background
         attention_section = ""
         if activity.attention_required:
@@ -1602,3 +1760,109 @@ class ProjectActivityAggregator:
 *Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}*
 """
         return agenda.strip()
+
+    def _format_v2_digest(self, activity: ProjectActivity, project_name: str, days: int) -> str:
+        """Format the V2 Strategic Synthesis digest (4 sections)."""
+
+        # Build GitHub PR section for appendix
+        github_section = ""
+        total_prs = len(activity.github_prs_merged) + len(activity.github_prs_in_review) + len(activity.github_prs_open)
+        if total_prs > 0:
+            github_section = "\n## 🔀 GitHub Activity\n"
+            if activity.github_prs_merged:
+                github_section += f"\n**Merged PRs ({len(activity.github_prs_merged)}):**\n"
+                for pr in activity.github_prs_merged[:5]:
+                    github_section += f"* #{pr.get('number')} - {pr.get('title')} (by {pr.get('author', 'Unknown')})\n"
+            if activity.github_prs_in_review:
+                github_section += f"\n**In Code Review ({len(activity.github_prs_in_review)}):**\n"
+                for pr in activity.github_prs_in_review[:5]:
+                    github_section += f"* #{pr.get('number')} - {pr.get('title')} (by {pr.get('author', 'Unknown')})\n"
+
+        # Build time tracking section for appendix
+        time_section = ""
+        if activity.total_hours > 0:
+            time_section = f"\n## ⏱️ Time Tracking\n* **Total Time Logged:** {activity.total_hours:.1f} hours\n"
+
+            # Group time entries by ticket
+            if activity.time_entries:
+                ticket_hours = {}
+                ticket_summaries = {}
+
+                # Collect hours
+                for entry in activity.time_entries:
+                    ticket_key = entry.get('issue_key', 'Unknown')
+                    hours = entry.get('hours', 0)
+                    if ticket_key not in ticket_hours:
+                        ticket_hours[ticket_key] = 0
+                    ticket_hours[ticket_key] += hours
+
+                # Get summaries from various sources
+                if activity.jira_ticket_changes:
+                    for change in activity.jira_ticket_changes:
+                        change_ticket_key = change.get('ticket_key')
+                        if change_ticket_key in ticket_hours and change_ticket_key not in ticket_summaries:
+                            summary = (change.get('ticket_summary') or
+                                     change.get('summary') or
+                                     change.get('title') or
+                                     change.get('subject'))
+                            if summary and summary != 'Unknown':
+                                ticket_summaries[change_ticket_key] = summary
+
+                if activity.completed_tickets:
+                    for ticket in activity.completed_tickets:
+                        ticket_key = ticket.get('key', '')
+                        if ticket_key in ticket_hours and ticket_key not in ticket_summaries:
+                            summary = (ticket.get('summary') or
+                                     ticket.get('title') or
+                                     ticket.get('subject') or
+                                     ticket.get('fields', {}).get('summary'))
+                            if summary and summary != 'Unknown':
+                                ticket_summaries[ticket_key] = summary
+
+                for entry in activity.time_entries:
+                    ticket_key = entry.get('issue_key', 'Unknown')
+                    if ticket_key in ticket_hours and ticket_key not in ticket_summaries:
+                        summary = (entry.get('issue_summary') or
+                                 entry.get('summary') or
+                                 entry.get('description'))
+                        if summary and summary != 'Unknown':
+                            ticket_summaries[ticket_key] = summary
+
+                # Show top tickets by time logged
+                sorted_tickets = sorted(ticket_hours.items(), key=lambda x: x[1], reverse=True)
+                time_section += "\n**Time by Ticket:**\n"
+                for ticket_key, hours in sorted_tickets[:8]:
+                    summary = ticket_summaries.get(ticket_key, '')
+                    if summary and summary != 'Unknown':
+                        time_section += f"* **{ticket_key}** - {summary}: {hours:.1f}h\n"
+                    else:
+                        time_section += f"* **{ticket_key}:** {hours:.1f}h\n"
+
+        # Build V2 digest
+        digest = f"""
+# Weekly Digest: {project_name}
+**Period:** {activity.start_date[:10]} to {activity.end_date[:10]} ({days} days)
+
+## 🎯 Project Pulse
+{activity.project_pulse or "No project pulse available"}
+
+## 📖 The Story of This Week
+{activity.story_of_the_week or "No story available"}
+
+## 🔮 Looking Ahead: Decisions & Discussion Topics
+{activity.looking_ahead_agenda or "No agenda items identified"}
+
+## 🗒️ Internal PM Notes
+{activity.internal_pm_notes or "No internal notes"}
+
+---
+
+## Appendix: Detailed Metrics
+{github_section}{time_section}
+---
+
+**Team Activity:** {len(activity.meetings)} meetings • {activity.total_hours:.1f}h logged • {len(activity.completed_tickets)} tickets completed
+
+*Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}*
+"""
+        return digest.strip()

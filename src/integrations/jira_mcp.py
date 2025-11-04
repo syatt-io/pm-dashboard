@@ -191,7 +191,7 @@ class JiraMCPClient:
                         issue_response = await self.client.get(
                             f"{self.jira_url}/rest/api/3/issue/{issue_id}",
                             params={
-                                "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project,key"
+                                "fields": "summary,description,status,priority,assignee,reporter,created,updated,issuetype,project,key,parent"
                             },
                             headers={
                                 "Authorization": f"Basic {auth_string}",
