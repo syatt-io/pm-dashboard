@@ -8,6 +8,9 @@ from .user import User, UserRole, UserWatchedProject
 from .learning import Learning
 from .backfill_progress import BackfillProgress
 from .system_settings import SystemSettings
+from .proactive_insight import ProactiveInsight
+from .notification_preferences import UserNotificationPreferences
+from .meeting_metadata import MeetingMetadata
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -116,6 +119,9 @@ __all__ = [
     'ProjectDigestCache',
     'BackfillProgress',
     'SystemSettings',
+    'ProactiveInsight',
+    'UserNotificationPreferences',
+    'MeetingMetadata',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',
