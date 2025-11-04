@@ -104,10 +104,24 @@ def get_jira_projects():
                         WHERE p.key = ANY(:project_keys)
                     """), {"project_keys": project_keys, "current_month": current_month}).fetchall()
 
+                    # Fetch keywords for all projects
+                    keywords_results = conn.execute(text("""
+                        SELECT project_key, array_agg(keyword) as keywords
+                        FROM project_keywords
+                        WHERE project_key = ANY(:project_keys)
+                        GROUP BY project_key
+                    """), {"project_keys": project_keys}).fetchall()
+
+                    # Build keywords lookup dictionary
+                    keywords_map = {}
+                    for row in keywords_results:
+                        keywords_map[row[0]] = row[1] if row[1] else []
+
                     # Build lookup dictionary for O(1) access: project_key -> database_data
                     project_data_map = {}
                     for row in results:
-                        project_data_map[row[0]] = {
+                        project_key = row[0]
+                        project_data_map[project_key] = {
                             "is_active": bool(row[1]) if row[1] is not None else True,
                             "project_work_type": row[2] if row[2] else 'project-based',
                             "total_hours": float(row[3]) if row[3] else 0,
@@ -117,6 +131,7 @@ def get_jira_projects():
                             "send_meeting_emails": bool(row[7]) if row[7] is not None else False,
                             "forecasted_hours_month": float(row[8]) if row[8] else 0,
                             "current_month_hours": float(row[9]) if row[9] else 0,
+                            "keywords": keywords_map.get(project_key, [])
                         }
 
                     # Merge Jira data with database data
@@ -138,6 +153,7 @@ def get_jira_projects():
                             enhanced_project["send_meeting_emails"] = False
                             enhanced_project["forecasted_hours_month"] = 0
                             enhanced_project["current_month_hours"] = 0
+                            enhanced_project["keywords"] = keywords_map.get(project_key, [])
 
                         enhanced_projects.append(enhanced_project)
                 else:
