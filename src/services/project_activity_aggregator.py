@@ -66,8 +66,9 @@ class ProjectActivity:
     topics_for_discussion: Optional[str] = None
     attention_required: Optional[str] = None
 
-    # New Weekly Recap format (6 sections)
+    # New Weekly Recap format (7 sections)
     executive_summary: Optional[str] = None
+    followup_on_meeting: Optional[str] = None
     achievements: Optional[str] = None
     active_work: Optional[str] = None
     blockers_and_asks: Optional[str] = None
@@ -86,6 +87,9 @@ class ProjectActivity:
     # Raw meeting insights
     meeting_action_items: Optional[List[Dict[str, Any]]] = None
     meeting_blockers: Optional[List[str]] = None
+
+    # Follow-up on last meeting topics
+    last_meeting_followup: Optional[Dict[str, Any]] = None
 
 
 class ProjectActivityAggregator:
@@ -239,6 +243,9 @@ class ProjectActivityAggregator:
             await self._collect_slack_messages(activity, start_date, end_date)
             await self._collect_time_tracking_data(activity, start_date, end_date)
             await self._collect_github_activity(activity, days_back)
+
+            # Match meeting topics to activity for follow-up section
+            await self._match_topics_to_activity(activity)
 
             # Collect historical context from Pinecone if requested
             if include_context:
@@ -971,6 +978,166 @@ class ProjectActivityAggregator:
             logger.warning(f"Error collecting historical context: {e}")
             activity.historical_context = []
 
+    async def _match_topics_to_activity(self, activity: ProjectActivity):
+        """Match topics from the most recent meeting to project activity."""
+
+        # Get most recent meeting with topics
+        if not activity.meetings:
+            activity.last_meeting_followup = None
+            return
+
+        # Sort meetings by date (most recent first)
+        sorted_meetings = sorted(
+            activity.meetings,
+            key=lambda m: m.get('date', ''),
+            reverse=True
+        )
+
+        # Find first meeting with action items (topics)
+        most_recent_meeting = None
+        for meeting in sorted_meetings:
+            action_items = meeting.get('action_items', [])
+            if action_items and len(action_items) > 0:
+                most_recent_meeting = meeting
+                break
+
+        if not most_recent_meeting:
+            activity.last_meeting_followup = None
+            return
+
+        # Use action items as "topics" to follow up on
+        action_items = most_recent_meeting.get('action_items', [])
+
+        # Initialize result structure
+        matched_topics = []
+
+        for action_item in action_items:
+            topic_title = action_item.get('title', 'Untitled')
+
+            # Initialize containers for matched activity
+            matched_tickets = []
+            matched_prs = []
+            matched_slack = []
+            total_time = 0.0
+
+            # Extract keywords from topic title (lowercase, remove common words)
+            keywords = self._extract_keywords(topic_title)
+
+            # Check if topic references an Epic (e.g., "SUBS-618: Feature Name")
+            epic_key = self._extract_epic_key(topic_title)
+
+            # Match Jira tickets
+            for ticket in activity.ticket_activity:
+                is_match = False
+
+                # Epic-based matching
+                if epic_key and ticket.get('epic', {}).get('key') == epic_key:
+                    is_match = True
+
+                # Keyword-based matching
+                if not is_match and keywords:
+                    ticket_text = f"{ticket.get('summary', '')} {ticket.get('key', '')}".lower()
+                    if any(kw in ticket_text for kw in keywords):
+                        is_match = True
+
+                if is_match:
+                    matched_tickets.append({
+                        'key': ticket.get('key', ''),
+                        'summary': ticket.get('summary', ''),
+                        'status': ticket.get('status', 'Unknown')
+                    })
+
+            # Match GitHub PRs
+            all_prs = (activity.github_prs_merged +
+                       activity.github_prs_in_review +
+                       activity.github_prs_open)
+
+            for pr in all_prs:
+                pr_text = f"{pr.get('title', '')} {pr.get('body', '')}".lower()
+
+                # Check for Epic key or keywords
+                if (epic_key and epic_key.lower() in pr_text) or \
+                   (keywords and any(kw in pr_text for kw in keywords)):
+                    matched_prs.append({
+                        'number': pr.get('number'),
+                        'title': pr.get('title', ''),
+                        'state': pr.get('state', 'unknown')
+                    })
+
+            # Match Slack messages
+            for msg in activity.slack_messages:
+                msg_text = msg.get('text', '').lower()
+
+                if keywords and any(kw in msg_text for kw in keywords):
+                    matched_slack.append({
+                        'text': msg.get('text', '')[:100],  # Truncate for brevity
+                        'user': msg.get('user', 'Unknown')
+                    })
+
+            # Sum time logged on related tickets
+            for entry in activity.time_entries:
+                entry_key = entry.get('issue_key', '')
+                entry_epic = entry.get('epic', '')
+                entry_desc = entry.get('description', '').lower()
+
+                # Match by Epic or by ticket key appearing in matched tickets
+                if (epic_key and epic_key in entry_epic) or \
+                   any(t['key'] == entry_key for t in matched_tickets) or \
+                   (keywords and any(kw in entry_desc for kw in keywords)):
+                    total_time += entry.get('hours', 0)
+
+            # Deduplicate matched_tickets by key
+            seen_keys = set()
+            unique_tickets = []
+            for ticket in matched_tickets:
+                if ticket['key'] not in seen_keys:
+                    seen_keys.add(ticket['key'])
+                    unique_tickets.append(ticket)
+
+            # Add to results
+            has_activity = (len(unique_tickets) > 0 or
+                           len(matched_prs) > 0 or
+                           len(matched_slack) > 0 or
+                           total_time > 0)
+
+            matched_topics.append({
+                'title': topic_title,
+                'has_activity': has_activity,
+                'tickets': unique_tickets[:5],  # Limit to top 5
+                'prs': matched_prs[:5],
+                'slack_messages': matched_slack[:3],
+                'time_logged': round(total_time, 1)
+            })
+
+        # Store in activity
+        activity.last_meeting_followup = {
+            'meeting_title': most_recent_meeting.get('title', 'Recent Meeting'),
+            'meeting_date': most_recent_meeting.get('date', '')[:10] if most_recent_meeting.get('date') else 'N/A',
+            'topics': matched_topics
+        }
+
+        logger.info(f"Matched {len(matched_topics)} topics from last meeting to project activity")
+
+    def _extract_keywords(self, text: str) -> list:
+        """Extract meaningful keywords from topic title."""
+        # Remove common stopwords
+        stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'is', 'are', 'be', 'this', 'that'}
+
+        # Split on spaces and punctuation, lowercase
+        import re
+        words = re.findall(r'\b\w+\b', text.lower())
+
+        # Filter out stopwords and short words
+        keywords = [w for w in words if w not in stopwords and len(w) > 2]
+
+        return keywords
+
+    def _extract_epic_key(self, text: str) -> str:
+        """Extract Epic key if mentioned in topic title (e.g., 'SUBS-618: Feature')."""
+        import re
+        match = re.search(r'\b([A-Z]+-\d+)\b', text)
+        return match.group(1) if match else None
+
     async def _fetch_tempo_direct(self, project_key: str, start_date: str, end_date: str) -> tuple[float, list]:
         """Direct Tempo API call as fallback when MCP fails."""
         try:
@@ -1250,6 +1417,39 @@ class ProjectActivityAggregator:
             meeting_details_text = chr(10).join(detailed_meeting_summaries) if detailed_meeting_summaries else '- No recent meetings with detailed analysis'
             logger.info(f"Formatted {len(detailed_meeting_summaries)} meetings with detailed topics for AI prompt")
 
+            # Format last meeting follow-up
+            last_meeting_text = "- No recent meetings with action items"
+            last_meeting_title = "N/A"
+            last_meeting_date = "N/A"
+
+            if activity.last_meeting_followup:
+                followup = activity.last_meeting_followup
+                last_meeting_title = followup.get('meeting_title', 'Recent Meeting')
+                last_meeting_date = followup.get('meeting_date', 'N/A')
+
+                topic_sections = []
+                for topic in followup['topics']:
+                    topic_lines = [f"**{topic['title']}**"]
+
+                    if not topic['has_activity']:
+                        topic_lines.append("  - No activity this week")
+                    else:
+                        if topic['tickets']:
+                            tickets_str = ', '.join([f"{t['key']} ({t['status']})" for t in topic['tickets']])
+                            topic_lines.append(f"  - Tickets: {tickets_str}")
+                        if topic['prs']:
+                            prs_str = ', '.join([f"#{p['number']} ({p['state']})" for p in topic['prs']])
+                            topic_lines.append(f"  - PRs: {prs_str}")
+                        if topic['slack_messages']:
+                            topic_lines.append(f"  - Slack: {len(topic['slack_messages'])} messages")
+                        if topic['time_logged'] > 0:
+                            topic_lines.append(f"  - Time logged: {topic['time_logged']}h")
+
+                    topic_sections.append(chr(10).join(topic_lines))
+
+                last_meeting_text = chr(10).join(topic_sections)
+                logger.info(f"Formatted follow-up for {len(followup['topics'])} topics from last meeting")
+
             # Format the insights prompt from configuration
             insights_prompt = self.prompt_manager.format_prompt(
                 'digest_generation', 'insights_prompt_template',
@@ -1273,7 +1473,10 @@ class ProjectActivityAggregator:
                 merged_prs=chr(10).join(merged_prs_summary) or '- No PRs merged this week',
                 in_review_prs=chr(10).join(in_review_prs_summary) or '- No PRs currently in review',
                 open_prs=chr(10).join(open_prs_summary) or '- No open PRs',
-                historical_context=historical_context_summary or '- No historical context available'
+                historical_context=historical_context_summary or '- No historical context available',
+                last_meeting_title=last_meeting_title,
+                last_meeting_date=last_meeting_date,
+                last_meeting_followup=last_meeting_text
             )
 
             # Use the LLM directly instead of the non-existent generate_insights method
@@ -1372,9 +1575,12 @@ class ProjectActivityAggregator:
                         logger.info("Parsed V2 Strategic Synthesis format response")
 
                     else:
-                        # Store new 6-section Weekly Recap format with validation
+                        # Store new 7-section Weekly Recap format with validation
                         activity.executive_summary = validate_tickets_for_project(
                             parsed_insights.get('executive_summary', ''), activity.project_key
+                        )
+                        activity.followup_on_meeting = validate_tickets_for_project(
+                            parsed_insights.get('followup_on_meeting', ''), activity.project_key
                         )
                         activity.achievements = validate_tickets_for_project(
                             parsed_insights.get('achievements', ''), activity.project_key
@@ -1736,14 +1942,24 @@ class ProjectActivityAggregator:
 {self._format_section_content(activity.progress_notes, "")}
 """
 
-        # New 6-section Weekly Recap format
+        # Format follow-up section (conditional)
+        followup_section = ""
+        if activity.followup_on_meeting:
+            followup_content = activity.followup_on_meeting
+            if isinstance(followup_content, str) and followup_content.strip():
+                followup_section = f"""
+## 📋 Follow-up on Last Meeting
+{self._format_section_content(activity.followup_on_meeting, "")}
+"""
+
+        # New 7-section Weekly Recap format
         agenda = f"""
 # Weekly Recap: {activity.project_name}
 **Period:** {activity.start_date[:10]} to {activity.end_date[:10]} ({days} days)
 
 ## 📊 Executive Summary
 {self._format_section_content(activity.executive_summary, "No summary available")}
-
+{followup_section}
 ## ✅ This Week's Achievements
 {self._format_section_content(activity.achievements, "No achievements recorded this period")}
 

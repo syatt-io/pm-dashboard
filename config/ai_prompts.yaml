@@ -293,6 +293,12 @@ digest_generation:
     Relevant past discussions, decisions, and blockers for context:
     {historical_context}
 
+    ### FOLLOW-UP ON LAST MEETING
+    Meeting: {last_meeting_title} ({last_meeting_date})
+
+    Topics discussed and related activity this week:
+    {last_meeting_followup}
+
     ---
 
     **VERIFICATION CHECKLIST - PREVENT HALLUCINATIONS:**
@@ -324,11 +330,30 @@ digest_generation:
 
     ## YOUR TASK
 
-    Create a concise Weekly Recap with these 6 sections:
+    Create a concise Weekly Recap with these sections:
+
+    **IMPORTANT**: If the "FOLLOW-UP ON LAST MEETING" section contains topics (not "No recent meetings"), you MUST reference those topics throughout your analysis:
+    - In **achievements**: Highlight completed work related to meeting topics
+    - In **active_work**: Note which topics have ongoing work
+    - In **blockers_and_asks**: Flag topics with no activity if they seem important
+    - In **proposed_agenda**: Include topics that need discussion
 
     1. **executive_summary**: 2-3 sentences capturing project health and this week's highlight. Conversational tone. Lead with the most important takeaway.
 
-    2. **achievements**: What shipped or was completed this week that clients care about.
+    2. **followup_on_meeting**: Follow-up on topics from last meeting (ONLY if "FOLLOW-UP ON LAST MEETING" contains actual topics).
+       - **MUST use markdown bullet list format** - each topic on new line starting with "* "
+       - List ALL topics from the last meeting
+       - For each topic, briefly state what happened this week OR "No activity this week" if nothing happened
+       - Example format:
+         ```
+         * Close Oakville location ticket: ✅ Resolved and tested, ready to close
+         * Document inventory sync findings: 🔄 Investigation ongoing, 3h logged on SUBS-654
+         * Review SEO schema: 📧 Discussed in Slack, no action taken yet
+         * Plan site performance audit: ❌ No activity this week
+         ```
+       - **OMIT THIS ENTIRE SECTION if no follow-up data** (set to empty string "")
+
+    3. **achievements**: What shipped or was completed this week that clients care about.
        - **MUST use markdown bullet list format** - each item on new line starting with "* "
        - **CRITICAL CONSTRAINT**: ONLY reference ticket keys from the "WORK COMPLETED (Jira)" section provided above
        - **DO NOT invent, hallucinate, or fabricate any ticket numbers** - every ticket key MUST exist in the data provided
@@ -343,7 +368,7 @@ digest_generation:
          * Performance improvements reduced page load time by 40%
          ```
 
-    3. **active_work**: What's in progress and what's planned for next week.
+    4. **active_work**: What's in progress and what's planned for next week.
        - **MUST use markdown bullet list format** - each item on new line starting with "* "
        - **CRITICAL CONSTRAINT**: ONLY reference tickets from the "ACTIVE WORK (Jira)" and "GITHUB ACTIVITY" sections provided above
        - **DO NOT invent or hallucinate ticket numbers** - verify all ticket keys match {project_key} prefix
@@ -356,7 +381,7 @@ digest_generation:
          * Planning to start notification system next week
          ```
 
-    4. **blockers_and_asks**: Clear, specific items that need client action or input.
+    5. **blockers_and_asks**: Clear, specific items that need client action or input.
        - **MUST use markdown bullet list format** - each item on new line starting with "* "
        - Include: Blockers requiring decisions/resources, questions needing answers, approvals needed
        - Each item should be actionable and specific
@@ -368,7 +393,7 @@ digest_generation:
          * Decision needed: should we prioritize feature A or B for next sprint?
          ```
 
-    5. **proposed_agenda**: Suggested discussion topics for the upcoming call, prioritized by importance.
+    6. **proposed_agenda**: Suggested discussion topics for the upcoming call, prioritized by importance.
        - **MUST use numbered markdown list format** - each item on new line starting with "1. ", "2. ", etc.
        - Include: Demos, UX/UI decisions, priority discussions, technical decisions, next week's priorities
        - Be specific with references to actual features/tickets
@@ -380,7 +405,7 @@ digest_generation:
          4. Plan next sprint priorities - review backlog
          ```
 
-    6. **progress_notes**: Brief observations about velocity, trends, or context (OPTIONAL).
+    7. **progress_notes**: Brief observations about velocity, trends, or context (OPTIONAL).
        - Can be paragraph OR bullet list format depending on content
        - Include: Project momentum, team capacity notes, risks on the horizon
        - **OMIT THIS SECTION if nothing notable** (set to empty string "")
