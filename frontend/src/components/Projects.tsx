@@ -1604,17 +1604,17 @@ export const ProjectList = () => {
                       <Table>
                         <TableHead>
                           <TableRow>
-                            <TableCell>Name</TableCell>
+                            <TableCell>Project Name</TableCell>
                             <TableCell>Type</TableCell>
                             <TableCell>{currentMonth} Hours</TableCell>
                             <TableCell>Meeting Day</TableCell>
-                            <TableCell># of TODOs</TableCell>
+                            <TableCell>Monthly Retainer</TableCell>
+                            <TableCell>Email Notification</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
                           {watchedProjects.map((project) => {
                             const projectType = project.project_work_type || 'project-based';
-                            const todoCount = todoCounts[project.key] || 0;
 
                             // Use current month hours and forecasted hours for all project types
                             const currentHours = project.current_month_hours || 0;
@@ -1676,10 +1676,15 @@ export const ProjectList = () => {
                             {project.weekly_meeting_day || '-'}
                           </TableCell>
                           <TableCell>
+                            {project.forecasted_hours_month
+                              ? `${project.forecasted_hours_month.toFixed(1)}h`
+                              : '-'}
+                          </TableCell>
+                          <TableCell>
                             <Chip
-                              label={todoCount}
+                              label={project.send_meeting_emails ? 'On' : 'Off'}
                               size="small"
-                              color={todoCount > 0 ? 'primary' : 'default'}
+                              color={project.send_meeting_emails ? 'success' : 'default'}
                             />
                           </TableCell>
                         </TableRow>
