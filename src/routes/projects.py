@@ -357,7 +357,7 @@ def update_project_resource_mapping(project_key):
         import json
 
         engine = get_engine()
-        with engine.connect() as conn:
+        with engine.begin() as conn:  # Use begin() for automatic transaction management
             # Check if mapping exists
             result = conn.execute(
                 text("SELECT project_key FROM project_resource_mappings WHERE project_key = :key"),
@@ -399,8 +399,6 @@ def update_project_resource_mapping(project_key):
                     'created_at': datetime.now(),
                     'updated_at': datetime.now()
                 })
-
-            conn.commit()
 
         return jsonify({'success': True, 'message': 'Resource mapping updated successfully'})
 
@@ -701,7 +699,7 @@ def update_project_keywords(project_key):
         from sqlalchemy import text
 
         engine = get_engine()
-        with engine.connect() as conn:
+        with engine.begin() as conn:  # Use begin() for automatic transaction management
             # Delete existing keywords
             conn.execute(
                 text("DELETE FROM project_keywords WHERE project_key = :key"),
@@ -715,8 +713,6 @@ def update_project_keywords(project_key):
                         text("INSERT INTO project_keywords (project_key, keyword) VALUES (:key, :keyword)"),
                         {"key": project_key.upper(), "keyword": keyword.strip().lower()}
                     )
-
-            conn.commit()
 
         return jsonify({'success': True, 'message': 'Keywords updated successfully'})
 
