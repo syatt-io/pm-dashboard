@@ -305,6 +305,9 @@ const ActionItemsList = ({ actionItems }: { actionItems: any[] }) => {
 
   const handleAddTodo = async (item: any, index: number) => {
     try {
+      const token = localStorage.getItem('auth_token');
+      const csrfToken = await fetchCsrfToken();
+
       const todoData = {
         title: item.title,
         description: item.description,
@@ -316,6 +319,8 @@ const ActionItemsList = ({ actionItems }: { actionItems: any[] }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-CSRF-Token': csrfToken,
         },
         body: JSON.stringify(todoData),
       });
@@ -323,7 +328,8 @@ const ActionItemsList = ({ actionItems }: { actionItems: any[] }) => {
       if (response.ok) {
         notify(`Added "${item.title}" to TODO list`, { type: 'success' });
       } else {
-        throw new Error('Failed to create TODO');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to create TODO');
       }
     } catch (error) {
       notify(`Error creating TODO: ${error}`, { type: 'error' });
