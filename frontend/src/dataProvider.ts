@@ -116,22 +116,38 @@ export const dataProvider: DataProvider = {
                     queryParams.append('projects', watchedProjects.join(','));
                 }
             }
+            // Pass through explicit projects filter (for project-specific views)
+            if (filter.projects) {
+                queryParams.append('projects', filter.projects);
+            }
+            // Pass through explicit resource_context if provided
+            if (filter.resource_context) {
+                queryParams.append('resource_context', filter.resource_context);
+            }
         }
 
         switch (resource) {
             case 'meetings':
                 url = `${API_URL}/meetings`;
-                // Pass context to indicate this is for the Meetings tab (show ALL meetings)
-                queryParams.append('resource_context', 'meetings');
+                // Only set default context if not already specified in filter
+                if (!filter?.resource_context) {
+                    // Pass context to indicate this is for the Meetings tab (show ALL meetings)
+                    queryParams.append('resource_context', 'meetings');
+                }
                 break;
             case 'analysis':
                 url = `${API_URL}/meetings`;
-                // Pass context to indicate this is for the Analysis tab (filter by projects)
-                queryParams.append('resource_context', 'analysis');
-                // For analysis, always filter by watched projects
-                const watchedProjectsForAnalysis = await getWatchedProjects();
-                if (watchedProjectsForAnalysis.length > 0) {
-                    queryParams.set('projects', watchedProjectsForAnalysis.join(','));
+                // Only set default context if not already specified in filter
+                if (!filter?.resource_context) {
+                    // Pass context to indicate this is for the Analysis tab (filter by projects)
+                    queryParams.append('resource_context', 'analysis');
+                }
+                // For analysis, always filter by watched projects unless explicit projects provided
+                if (!filter?.projects) {
+                    const watchedProjectsForAnalysis = await getWatchedProjects();
+                    if (watchedProjectsForAnalysis.length > 0) {
+                        queryParams.set('projects', watchedProjectsForAnalysis.join(','));
+                    }
                 }
                 // No fallback - if user has no watched projects, show nothing
                 break;
