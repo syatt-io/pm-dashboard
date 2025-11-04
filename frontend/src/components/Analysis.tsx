@@ -309,13 +309,13 @@ const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; me
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
 
-  // Function to determine project from meeting title
+  // Function to determine Jira project from meeting title using resource mappings
   const determineProjectFromMeeting = async (meetingTitle: string): Promise<string | null> => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) return null;
 
-      // Get all projects with keywords
+      // Step 1: Get all projects with keywords
       const projectsResponse = await fetch(`${API_BASE_URL}/api/jira/projects`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -328,8 +328,9 @@ const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; me
       const projectsData = await projectsResponse.json();
       const projects = projectsData.data?.projects || [];
 
-      // Check each project's keywords against the meeting title
+      // Step 2: Match meeting title against project keywords to find the project
       const titleLower = meetingTitle.toLowerCase();
+      let matchedProjectKey = null;
 
       for (const project of projects) {
         if (project.keywords && Array.isArray(project.keywords)) {
@@ -337,12 +338,37 @@ const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; me
           const match = keywords.some((keyword: string) => titleLower.includes(keyword));
 
           if (match) {
-            return project.key;
+            matchedProjectKey = project.key;
+            break;
           }
         }
       }
 
-      return null;
+      if (!matchedProjectKey) return null;
+
+      // Step 3: Get resource mappings to find the correct Jira project key
+      const mappingsResponse = await fetch(`${API_BASE_URL}/api/project-resource-mappings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!mappingsResponse.ok) return matchedProjectKey; // Fallback to matched project key
+
+      const mappingsData = await mappingsResponse.json();
+      const mappings = mappingsData.mappings || [];
+
+      // Find the mapping for the matched project
+      const mapping = mappings.find((m: any) => m.project_key === matchedProjectKey);
+
+      if (mapping && mapping.jira_project_keys && mapping.jira_project_keys.length > 0) {
+        // Return the first Jira project key from the mapping
+        return mapping.jira_project_keys[0];
+      }
+
+      // Fallback to the matched project key if no mapping exists
+      return matchedProjectKey;
     } catch (error) {
       console.error('Error determining project from meeting:', error);
       return null;
