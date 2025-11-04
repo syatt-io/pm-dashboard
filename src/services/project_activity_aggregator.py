@@ -280,20 +280,35 @@ class ProjectActivityAggregator:
 
                 # Check if any keyword matches title or summary
                 if any(keyword in title_lower or keyword in summary_lower for keyword in keywords):
+                    # Parse topics from JSON if available
+                    topics_data = []
+                    if db_meeting.topics:
+                        try:
+                            import json
+                            topics_data = json.loads(db_meeting.topics)
+                        except (json.JSONDecodeError, TypeError) as e:
+                            logger.warning(f"Failed to parse topics for meeting {db_meeting.id}: {e}")
+
+                    # Parse action items from JSON if available
+                    action_items_data = []
+                    if db_meeting.action_items:
+                        try:
+                            import json
+                            action_items_data = json.loads(db_meeting.action_items)
+                        except (json.JSONDecodeError, TypeError) as e:
+                            logger.warning(f"Failed to parse action items for meeting {db_meeting.id}: {e}")
+
                     meeting_data = {
                         'id': db_meeting.fireflies_id or db_meeting.id,
                         'title': db_meeting.title,
                         'date': db_meeting.date.isoformat() if db_meeting.date else '',
-                        'summary': db_meeting.summary,
+                        'topics': topics_data,  # Primary data source (new structure)
+                        'action_items': action_items_data,  # Primary data source (new structure)
                         'processed_at': db_meeting.processed_at.isoformat() if db_meeting.processed_at else '',
                         'analyzed_at': db_meeting.analyzed_at.isoformat() if db_meeting.analyzed_at else ''
                     }
                     relevant_meetings.append(meeting_data)
-                    logger.info(f"Matched meeting: {db_meeting.title}")
-
-                    # Add the summary to meeting summaries
-                    if db_meeting.summary:
-                        activity.meeting_summaries.append(db_meeting.summary)
+                    logger.info(f"Matched meeting: {db_meeting.title} with {len(topics_data)} topics and {len(action_items_data)} action items")
 
             logger.info(f"Keyword matching found {len(relevant_meetings)} relevant meetings for {activity.project_key}")
 
@@ -337,10 +352,6 @@ class ProjectActivityAggregator:
                                         'analyzed_at': None  # Live meeting not yet analyzed
                                     }
                                     relevant_meetings.append(meeting_data)
-
-                                    # Add summary if available
-                                    if getattr(meeting, 'summary', ''):
-                                        activity.meeting_summaries.append(meeting.summary)
 
                 logger.info(f"Added {len([m for m in relevant_meetings if not m['analyzed_at']])} live Fireflies meetings to digest")
 
@@ -1099,6 +1110,28 @@ class ProjectActivityAggregator:
                 historical_context_summary = chr(10).join(context_items)
                 logger.info(f"Formatted {len(context_items)} historical context items for AI prompt")
 
+            # Format detailed meeting topics for AI analysis
+            detailed_meeting_summaries = []
+            for meeting in activity.meetings[:5]:  # Include top 5 most recent meetings
+                meeting_title = meeting.get('title', 'Untitled Meeting')
+                meeting_date = meeting.get('date', '')[:10]  # Just the date part
+                topics = meeting.get('topics', [])
+
+                if topics:
+                    meeting_details = [f"**{meeting_title}** ({meeting_date})"]
+                    for topic in topics[:3]:  # Top 3 topics per meeting
+                        topic_title = topic.get('title', 'No title')
+                        content_items = topic.get('content_items', [])
+                        if content_items:
+                            # Join content items as bullet points
+                            content_str = chr(10).join(f"  - {item}" for item in content_items[:5])
+                            meeting_details.append(f"  • {topic_title}:")
+                            meeting_details.append(content_str)
+                    detailed_meeting_summaries.append(chr(10).join(meeting_details))
+
+            meeting_details_text = chr(10).join(detailed_meeting_summaries) if detailed_meeting_summaries else '- No recent meetings with detailed analysis'
+            logger.info(f"Formatted {len(detailed_meeting_summaries)} meetings with detailed topics for AI prompt")
+
             # Format the insights prompt from configuration
             insights_prompt = self.prompt_manager.format_prompt(
                 'digest_generation', 'insights_prompt_template',
@@ -1109,7 +1142,7 @@ class ProjectActivityAggregator:
                 num_meetings=len(activity.meetings),
                 num_discussions=len(activity.slack_messages),
                 total_hours=activity.total_hours,
-                meeting_summaries=chr(10).join(f'- {summary}' for summary in activity.meeting_summaries[:3]) or '- No recent meetings',
+                meeting_summaries=meeting_details_text,  # Use detailed meeting topics instead of brief summaries
                 decisions=chr(10).join(f'- {decision}' for decision in all_decisions[:3]) or '- No major decisions recorded',
                 slack_discussions=chr(10).join(f'- {discussion}' for discussion in activity.key_discussions[:5]) if activity.key_discussions else '- No significant Slack discussions',
                 completed_tickets=chr(10).join(f'- {ticket.get("key", "Unknown")}: {ticket.get("summary", "No summary")}' for ticket in activity.completed_tickets[:5]) or '- No tickets completed',
