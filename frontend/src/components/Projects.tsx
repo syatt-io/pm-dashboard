@@ -1710,9 +1710,9 @@ export const ProjectList = () => {
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={project.is_watched ? 'On' : 'Off'}
+                              label={project.send_meeting_emails ? 'On' : 'Off'}
                               size="small"
-                              color={project.is_watched ? 'success' : 'default'}
+                              color={project.send_meeting_emails ? 'success' : 'default'}
                             />
                           </TableCell>
                         </TableRow>
