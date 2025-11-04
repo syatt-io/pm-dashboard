@@ -174,6 +174,9 @@ const CreateJiraTicketDialog = ({
 
     setLoading(true);
     try {
+      const token = localStorage.getItem('auth_token');
+      const csrfToken = await fetchCsrfToken();
+
       const ticketData = {
         title: title,
         description: description,
@@ -187,6 +190,8 @@ const CreateJiraTicketDialog = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'X-CSRF-Token': csrfToken,
         },
         body: JSON.stringify(ticketData),
       });
@@ -196,7 +201,8 @@ const CreateJiraTicketDialog = ({
         onSuccess();
         onClose();
       } else {
-        throw new Error('Failed to create Jira ticket');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to create Jira ticket');
       }
     } catch (error) {
       notify(`Error creating Jira ticket: ${error}`, { type: 'error' });
