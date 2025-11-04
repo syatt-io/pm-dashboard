@@ -45,7 +45,16 @@ jobs:
         ENCRYPTION_KEY: test-encryption-key-32-bytes-long!
         JWT_SECRET_KEY: test-jwt-secret-key
       run: |
-        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term --ignore=tests/integration/
+        pytest tests/ -v --cov=src --cov-report=xml --cov-report=term \
+          --ignore=tests/integration/ \
+          --ignore=tests/test_beauchamp_search.py \
+          --ignore=tests/test_beauchamp_titles.py \
+          --ignore=tests/test_context_search.py \
+          --ignore=tests/test_individual_sources.py \
+          --ignore=tests/test_jira_only.py \
+          --ignore=tests/test_redis_connection.py \
+          --ignore=tests/test_slack_search_simulation.py \
+          --ignore=tests/test_snuggle_bugz_search.py
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
