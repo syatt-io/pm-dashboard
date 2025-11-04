@@ -3,7 +3,7 @@ import { Admin, Resource } from 'react-admin';
 import { dataProvider } from './dataProvider';
 import { authProvider } from './authProvider';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { customLightTheme, customDarkTheme } from './theme';
+import { customLightTheme } from './theme';
 
 // NOTE: React Admin provides its own router - do NOT wrap in BrowserRouter!
 
@@ -41,7 +41,6 @@ const AdminApp = () => {
       title="PM Command Center"
       layout={CustomLayout}
       theme={customLightTheme}
-      darkTheme={customDarkTheme}
       loginPage={Login}
       requireAuth
       disableTelemetry
