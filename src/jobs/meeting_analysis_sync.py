@@ -197,6 +197,14 @@ class MeetingAnalysisSyncJob:
                 meeting_date=meeting_date
             )
 
+            # Generate meeting summary for digest consumption
+            # Use first 3 topics as a concise summary
+            summary_parts = []
+            for topic in analysis.topics[:3]:
+                # Add topic title and first 2 content items
+                summary_parts.append(f"{topic.title}: {', '.join(topic.content_items[:2])}")
+            meeting_summary = "; ".join(summary_parts) if summary_parts else "No summary available"
+
             # Prepare action items for storage
             action_items_data = []
             for item in analysis.action_items:
@@ -229,11 +237,11 @@ class MeetingAnalysisSyncJob:
                     text("""
                         INSERT INTO processed_meetings (
                             id, fireflies_id, title, date, duration,
-                            topics, action_items,
+                            summary, topics, action_items,
                             analyzed_at, created_at, updated_at
                         ) VALUES (
                             :id, :fireflies_id, :title, :date, :duration,
-                            :topics, :action_items,
+                            :summary, :topics, :action_items,
                             :analyzed_at, :created_at, :updated_at
                         )
                     """),
@@ -243,6 +251,7 @@ class MeetingAnalysisSyncJob:
                         "title": meeting_title,
                         "date": meeting_date,
                         "duration": meeting.get("duration", 0),
+                        "summary": meeting_summary,
                         "topics": json.dumps(topics_data),
                         "action_items": json.dumps(action_items_data),
                         "analyzed_at": now,
