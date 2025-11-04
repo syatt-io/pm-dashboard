@@ -1,6 +1,7 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useNavigate } from 'react-router-dom';
 import {
   TextField,
   useNotify,
@@ -20,6 +21,7 @@ import {
   EditButton,
   TopToolbar,
   useUpdate,
+  ListButton,
 } from 'react-admin';
 import {
   Card,
@@ -59,6 +61,7 @@ import {
   Button as MuiButton,
   TextField as MuiTextField,
   CircularProgress,
+  LinearProgress,
 } from '@mui/material';
 import {
   Star,
@@ -73,6 +76,9 @@ import {
   Refresh as RefreshIcon,
   Assessment as DigestIcon,
   GetApp as DownloadIcon,
+  Close as CloseIcon,
+  ArrowBack as ArrowBackIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import { ResourceMappingCell } from './ResourceMappingCell';
 import WeeklyRecapComparison from './WeeklyRecapComparison';
@@ -1951,11 +1957,40 @@ export const ProjectList = () => {
   );
 };
 
-const ProjectShowActions = () => (
-  <TopToolbar>
-    {/* EditButton hidden - using inline editing instead */}
-  </TopToolbar>
-);
+const ProjectShowActions = () => {
+  const navigate = useNavigate();
+
+  return (
+    <TopToolbar sx={{ justifyContent: 'space-between', width: '100%' }}>
+      {/* Left side: Back button */}
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <ListButton
+          label="Back to Projects"
+          icon={<ArrowBackIcon />}
+          sx={{
+            textTransform: 'none',
+            '& .MuiButton-startIcon': { mr: 1 }
+          }}
+        />
+      </Box>
+
+      {/* Right side: Close button */}
+      <IconButton
+        onClick={() => navigate('/projects')}
+        sx={{
+          color: 'text.secondary',
+          '&:hover': {
+            color: 'primary.main',
+            backgroundColor: 'action.hover',
+          }
+        }}
+        title="Close and return to projects list"
+      >
+        <CloseIcon />
+      </IconButton>
+    </TopToolbar>
+  );
+};
 
 const ProjectShowContent = () => {
   const record = useRecordContext();
@@ -2241,6 +2276,107 @@ const ProjectShowContent = () => {
         {record.name}
       </Typography>
 
+      {/* Key Metrics Summary Card */}
+      <Card sx={{
+        mb: 3,
+        background: 'linear-gradient(135deg, #554DFF 0%, #7D00FF 100%)',
+        color: 'white',
+        boxShadow: '0 4px 20px rgba(85, 77, 255, 0.3)'
+      }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
+                  Status
+                </Typography>
+                <Chip
+                  label={record.is_active ? 'Active' : 'Inactive'}
+                  size="small"
+                  sx={{
+                    backgroundColor: record.is_active ? '#00FFCE' : 'rgba(255,255,255,0.2)',
+                    color: record.is_active ? '#000' : '#fff',
+                    fontWeight: 600
+                  }}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
+                  Work Type
+                </Typography>
+                <Chip
+                  label={
+                    record.project_work_type === 'project-based' ? 'Project-Based' :
+                    record.project_work_type === 'growth-support' ? 'Growth & Support' : 'N/A'
+                  }
+                  size="small"
+                  icon={<WorkIcon />}
+                  sx={{
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    color: '#fff',
+                    '& .MuiChip-icon': { color: '#fff' }
+                  }}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
+                  Current Month Progress
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {record.current_month_hours || 0}h
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                    / {record.forecasted_hours_month || 0}h
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(
+                    ((record.current_month_hours || 0) / (record.forecasted_hours_month || 1)) * 100,
+                    100
+                  )}
+                  sx={{
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor: '#00FFCE',
+                      borderRadius: 4
+                    }
+                  }}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} sm={6} md={3}>
+              <Box>
+                <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
+                  Total Hours (YTD)
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {record.total_hours || 0}h
+                  </Typography>
+                  <TrendingUpIcon sx={{ fontSize: 20, opacity: 0.8 }} />
+                </Box>
+                {record.retainer_hours && (
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    Retainer: {record.retainer_hours}h
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
       {/* Digest Generator Button */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
         <FormControlLabel
@@ -2276,10 +2412,27 @@ const ProjectShowContent = () => {
         </MuiButton>
       </Box>
 
-        <Grid container spacing={3}>
+      {/* Configuration Section */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <WorkIcon sx={{ color: 'primary.main' }} />
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Configuration
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 3 }} />
+
+        <Grid container spacing={2}>
           {/* Project Information */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%' }}>
+          <Grid item xs={12} sm={6} lg={4} xl={3}>
+            <Card sx={{
+              height: '100%',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 4
+              }
+            }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                   Project Information
@@ -2370,8 +2523,15 @@ const ProjectShowContent = () => {
           </Grid>
 
           {/* Hours & Forecasting */}
-          <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%' }}>
+          <Grid item xs={12} sm={6} lg={4} xl={3}>
+            <Card sx={{
+              height: '100%',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 4
+              }
+            }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                   Hours & Forecasting
@@ -2418,29 +2578,76 @@ const ProjectShowContent = () => {
                 </Box>
 
                 <Box sx={{ mb: 2 }}>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
                     Current Month Hours
                   </Typography>
-                  <Typography variant="body1">
-                    {record.current_month_hours || 0} hours
-                  </Typography>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {record.current_month_hours || 0}h
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      of {record.forecasted_hours_month || 0}h forecasted
+                    </Typography>
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(
+                      ((record.current_month_hours || 0) / (record.forecasted_hours_month || 1)) * 100,
+                      100
+                    )}
+                    sx={{
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: 'action.hover',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: ((record.current_month_hours || 0) / (record.forecasted_hours_month || 1)) > 0.9
+                          ? 'error.main'
+                          : ((record.current_month_hours || 0) / (record.forecasted_hours_month || 1)) > 0.7
+                          ? 'warning.main'
+                          : 'success.main',
+                        borderRadius: 3
+                      }
+                    }}
+                  />
                 </Box>
 
                 <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    Cumulative Hours
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                    Cumulative Hours (YTD)
                   </Typography>
-                  <Typography variant="body1">
-                    {record.cumulative_hours || 0} hours
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                      {record.cumulative_hours || 0}h
+                    </Typography>
+                    <TrendingUpIcon sx={{ fontSize: 18, color: 'success.main' }} />
+                  </Box>
                 </Box>
               </CardContent>
             </Card>
           </Grid>
+        </Grid>
+      </Box>
 
-          {/* Resource Mappings */}
+      {/* Integrations Section */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <ForumIcon sx={{ color: 'primary.main' }} />
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Integrations
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Resource Mappings */}
+        <Grid container spacing={2}>
           <Grid item xs={12}>
-            <Card>
+            <Card sx={{
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 4
+              }
+            }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                   🔗 Resource Mappings
@@ -2455,8 +2662,8 @@ const ProjectShowContent = () => {
                     <CircularProgress />
                   </Box>
                 ) : (
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
                       <Box sx={{ mb: 3 }}>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                           Jira Projects
@@ -2482,7 +2689,7 @@ const ProjectShowContent = () => {
                       </Box>
                     </Grid>
 
-                    <Grid item xs={12} md={6}>
+                    <Grid item xs={12} sm={6}>
                       <Box sx={{ mb: 3 }}>
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                           Notion Parent Pages/Databases
@@ -2515,10 +2722,31 @@ const ProjectShowContent = () => {
               </CardContent>
             </Card>
           </Grid>
+        </Grid>
+      </Box>
 
-          {/* Project Keywords */}
+      {/* Keywords Section */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <TaskIcon sx={{ color: 'warning.main' }} />
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Keywords & Filters
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Project Keywords */}
+        <Grid container spacing={2}>
           <Grid item xs={12}>
-            <Card sx={{ borderLeft: '4px solid', borderLeftColor: 'warning.main' }}>
+            <Card sx={{
+              borderLeft: '4px solid',
+              borderLeftColor: 'warning.main',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: 4
+              }
+            }}>
               <CardContent>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Box>
@@ -2630,8 +2858,9 @@ const ProjectShowContent = () => {
             </Card>
           </Grid>
         </Grid>
+      </Box>
 
-        {/* Weekly Recap Modal */}
+      {/* Weekly Recap Modal */}
         <Dialog
           open={digestModalOpen}
           onClose={() => setDigestModalOpen(false)}
