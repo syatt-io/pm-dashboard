@@ -1271,7 +1271,6 @@ export const ProjectList = () => {
     try {
       const token = localStorage.getItem('auth_token');
       if (!token) {
-        console.log('[DEBUG] No auth token found');
         return activeProjects;
       }
 
@@ -1285,13 +1284,10 @@ export const ProjectList = () => {
       if (response.ok) {
         const data = await response.json();
         const watchedProjectKeys = data.watched_projects;
-        console.log('[DEBUG] Watched project keys from API:', watchedProjectKeys);
-        console.log('[DEBUG] Total watched project keys:', watchedProjectKeys?.length || 0);
 
         // Mark each project with is_watched status
         const projectsWithWatchedStatus = activeProjects.map((p: Project) => {
           const isWatched = watchedProjectKeys.includes(p.key);
-          console.log(`[DEBUG] Project ${p.key}: is_watched=${isWatched}`);
           return {
             ...p,
             is_watched: isWatched
@@ -1300,22 +1296,17 @@ export const ProjectList = () => {
 
         const watched = projectsWithWatchedStatus.filter((p: Project) => p.is_watched);
         setWatchedProjects(watched);
-        console.log('[DEBUG] Total projects with watched status:', projectsWithWatchedStatus.length);
-        console.log('[DEBUG] Total watched projects:', watched.length);
 
         return projectsWithWatchedStatus;
       } else if (response.status === 401) {
         // Silently handle auth errors - user may not be logged in yet
-        console.log('[DEBUG] Auth error (401)');
         return activeProjects;
       } else {
         // Silently handle other errors to prevent retry loops
-        console.log('[DEBUG] API error:', response.status);
         return activeProjects;
       }
     } catch (error) {
       // Silently handle errors to prevent infinite retry loop
-      console.log('[DEBUG] Exception:', error);
       return activeProjects;
     }
   }, []);
