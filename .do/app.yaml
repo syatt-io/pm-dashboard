@@ -64,6 +64,14 @@ services:
       - key: FIREFLIES_API_KEY
         type: SECRET
 
+      # Fireflies System API Key (org-wide access for webhook processing)
+      - key: FIREFLIES_SYSTEM_API_KEY
+        type: SECRET
+
+      # Fireflies Webhook Secret (for signature verification)
+      - key: FIREFLIES_WEBHOOK_SECRET
+        type: SECRET
+
       # OpenAI
       - key: OPENAI_API_KEY
         type: SECRET
@@ -204,6 +212,14 @@ workers:
 
       # Fireflies
       - key: FIREFLIES_API_KEY
+        type: SECRET
+
+      # Fireflies System API Key (org-wide access for webhook processing)
+      - key: FIREFLIES_SYSTEM_API_KEY
+        type: SECRET
+
+      # Fireflies Webhook Secret (for signature verification)
+      - key: FIREFLIES_WEBHOOK_SECRET
         type: SECRET
 
       # Pinecone
