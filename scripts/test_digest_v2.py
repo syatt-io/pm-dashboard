@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""
+Test script for comparing OLD vs NEW digest formats
+Generates side-by-side comparison using real project data
+"""
+
+import sys
+import os
+import argparse
+from datetime import datetime, timedelta
+from pathlib import Path
+import yaml
+
+# Add parent directory to path to import from src
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.services.project_activity_aggregator import ProjectActivityAggregator
+from src.utils.database import get_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
+
+
+def load_prompt_config(config_path: str) -> dict:
+    """Load prompt configuration from YAML file"""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+
+def generate_digest(project_key: str, days: int, prompt_config_path: str, include_context: bool = True) -> dict:
+    """
+    Generate digest using specified prompt configuration
+
+    Returns:
+        dict with keys: project_name, activity_data, formatted_markdown
+    """
+    # Get database session
+    engine = get_engine()
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    try:
+        # Get project name from database
+        result = session.execute(
+            text("SELECT name FROM projects WHERE key = :key"),
+            {"key": project_key}
+        ).first()
+
+        if not result:
+            raise ValueError(f"Project {project_key} not found in database")
+
+        project_name = result[0]
+
+        # Load prompt config
+        prompt_config = load_prompt_config(prompt_config_path)
+
+        # Create aggregator with custom prompt config
+        aggregator = ProjectActivityAggregator(custom_prompt_config=prompt_config)
+
+        # Aggregate activity
+        print(f"  → Aggregating project activity for last {days} days...")
+
+        import asyncio
+        activity = asyncio.run(aggregator.aggregate_project_activity(
+            project_key=project_key,
+            project_name=project_name,
+            days_back=days,
+            include_context=include_context
+        ))
+
+        # Format as markdown
+        print(f"  → Formatting digest markdown...")
+        markdown = aggregator.format_client_agenda(activity, project_name)
+
+        return {
+            'project_name': project_name,
+            'activity_data': activity,
+            'formatted_markdown': markdown
+        }
+    finally:
+        session.close()
+
+
+def create_comparison_markdown(old_result: dict, new_result: dict, project_key: str, days: int) -> str:
+    """Create side-by-side comparison markdown document"""
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    comparison = f"""# Weekly Digest Comparison: OLD vs NEW Format
+
+**Project:** {project_key} ({old_result['project_name']})
+**Period:** Last {days} days
+**Generated:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+
+---
+
+## 📊 Comparison Summary
+
+This document shows side-by-side comparison of:
+- **LEFT**: Current production format (ai_prompts.yaml)
+- **RIGHT**: New "Strategic Synthesis" format (ai_prompts_digest_v2.yaml)
+
+### Key Differences in NEW Format:
+1. **Project Pulse** - Replaces "Executive Summary" with richer context & metrics
+2. **Story of the Week** - Synthesizes all data sources into narrative vs separate sections
+3. **Looking Ahead** - Client-ready agenda with full context vs basic proposed agenda
+4. **Internal PM Notes** - NEW section for PM prep (not shared with client)
+
+---
+
+## 📄 CURRENT FORMAT (Production)
+
+{old_result['formatted_markdown']}
+
+---
+---
+
+## 🚀 NEW FORMAT (Strategic Synthesis)
+
+{new_result['formatted_markdown']}
+
+---
+
+## 🔍 Evaluation Criteria
+
+When reviewing, consider:
+
+### 1. Synthesis Quality
+- [ ] Does NEW format connect dots between Slack, meetings, Jira, GitHub?
+- [ ] Does it explain WHY work happened, not just WHAT?
+- [ ] Are there clear cause-and-effect chains?
+
+### 2. Business Context
+- [ ] Does NEW format connect technical work to business outcomes?
+- [ ] Is it clear what clients/users can NOW do that they couldn't before?
+- [ ] Does it reference strategic goals or project objectives?
+
+### 3. Usefulness for PM Prep
+- [ ] Would the "Looking Ahead" section be shareable with client as-is?
+- [ ] Does "Internal PM Notes" provide valuable observations?
+- [ ] Is there enough context to prepare for client conversations?
+
+### 4. Readability & Flow
+- [ ] Does NEW format tell a coherent story vs list of facts?
+- [ ] Is it easy to scan and find key information?
+- [ ] Is the tone appropriate for client-facing document?
+
+### 5. Accuracy
+- [ ] Are all ticket numbers valid (from real data)?
+- [ ] Are cross-references between data sources accurate?
+- [ ] No hallucinated information?
+
+---
+
+## 📝 Feedback Template
+
+**What works well in NEW format:**
+-
+
+**What needs improvement:**
+-
+
+**Suggested changes:**
+-
+
+**Overall preference:** [ ] OLD  [ ] NEW  [ ] Hybrid
+
+---
+
+Generated by: scripts/test_digest_v2.py
+"""
+
+    return comparison
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Test new digest format and compare with current production format'
+    )
+    parser.add_argument(
+        '--project',
+        type=str,
+        required=True,
+        help='Project key (e.g., SUBS, SATG)'
+    )
+    parser.add_argument(
+        '--days',
+        type=int,
+        default=7,
+        help='Number of days to look back (default: 7)'
+    )
+    parser.add_argument(
+        '--no-context',
+        action='store_true',
+        help='Disable historical context (Pinecone) - faster for testing'
+    )
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        default='test_outputs',
+        help='Output directory for comparison files (default: test_outputs/)'
+    )
+
+    args = parser.parse_args()
+
+    # Paths
+    project_root = Path(__file__).parent.parent
+    old_prompt_path = project_root / 'config' / 'ai_prompts.yaml'
+    new_prompt_path = project_root / 'config' / 'ai_prompts_digest_v2.yaml'
+    output_dir = project_root / args.output_dir
+
+    # Create output directory
+    output_dir.mkdir(exist_ok=True)
+
+    # Validate prompt files exist
+    if not old_prompt_path.exists():
+        print(f"❌ ERROR: Production prompt file not found: {old_prompt_path}")
+        sys.exit(1)
+
+    if not new_prompt_path.exists():
+        print(f"❌ ERROR: Test prompt file not found: {new_prompt_path}")
+        sys.exit(1)
+
+    print(f"\n{'='*80}")
+    print(f"🧪 DIGEST FORMAT COMPARISON TEST")
+    print(f"{'='*80}\n")
+    print(f"Project: {args.project}")
+    print(f"Period: Last {args.days} days")
+    print(f"Historical Context: {'Disabled' if args.no_context else 'Enabled'}")
+    print(f"Output Directory: {output_dir}")
+    print()
+
+    include_context = not args.no_context
+
+    try:
+        # Generate OLD format digest
+        print("=" * 80)
+        print("📄 Generating CURRENT format digest (production prompts)...")
+        print("=" * 80)
+        old_result = generate_digest(
+            project_key=args.project,
+            days=args.days,
+            prompt_config_path=str(old_prompt_path),
+            include_context=include_context
+        )
+        print("✅ Current format generated successfully\n")
+
+        # Generate NEW format digest
+        print("=" * 80)
+        print("🚀 Generating NEW format digest (v2 prompts)...")
+        print("=" * 80)
+        new_result = generate_digest(
+            project_key=args.project,
+            days=args.days,
+            prompt_config_path=str(new_prompt_path),
+            include_context=include_context
+        )
+        print("✅ New format generated successfully\n")
+
+        # Create comparison document
+        print("=" * 80)
+        print("📝 Creating comparison document...")
+        print("=" * 80)
+        comparison_md = create_comparison_markdown(
+            old_result=old_result,
+            new_result=new_result,
+            project_key=args.project,
+            days=args.days
+        )
+
+        # Save to file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_filename = f"digest_comparison_{args.project}_{timestamp}.md"
+        output_path = output_dir / output_filename
+
+        with open(output_path, 'w') as f:
+            f.write(comparison_md)
+
+        print(f"✅ Comparison saved to: {output_path}")
+        print()
+        print("=" * 80)
+        print("🎉 TEST COMPLETE!")
+        print("=" * 80)
+        print()
+        print(f"📄 Review the comparison file:")
+        print(f"   {output_path}")
+        print()
+        print("💡 Next steps:")
+        print("   1. Open the comparison file and review both formats")
+        print("   2. Evaluate using the criteria checklist in the document")
+        print("   3. Provide feedback on what works and what needs improvement")
+        print("   4. Re-run this script with adjustments to the v2 prompt as needed")
+        print()
+
+    except Exception as e:
+        print(f"\n❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

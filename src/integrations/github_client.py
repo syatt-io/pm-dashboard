@@ -547,18 +547,19 @@ class GitHubClient:
                         pr_data = {
                             "number": item.get("number"),
                             "title": item.get("title"),
-                            "body": item.get("body", "")[:200],  # Truncate body
+                            "body": item.get("body", "")[:200] if item.get("body") else "",  # Truncate body
                             "state": item.get("state"),
                             "url": item.get("html_url"),
                             "created_at": item.get("created_at"),
                             "updated_at": item.get("updated_at"),
-                            "author": item.get("user", {}).get("login"),
+                            "author": item.get("user", {}).get("login") if item.get("user") else None,
                             "repo": item.get("repository_url", "").split("/")[-1] if item.get("repository_url") else ""
                         }
 
-                        # Add merged_at if available
-                        if item.get("pull_request", {}).get("merged_at"):
-                            pr_data["merged_at"] = item["pull_request"]["merged_at"]
+                        # Add merged_at if available - check if pull_request exists and has merged_at
+                        pull_request = item.get("pull_request")
+                        if pull_request and pull_request.get("merged_at"):
+                            pr_data["merged_at"] = pull_request["merged_at"]
 
                         prs.append(pr_data)
 
@@ -568,5 +569,5 @@ class GitHubClient:
                     return []
 
             except Exception as e:
-                logger.error(f"Error querying GitHub PRs: {e}")
+                logger.error(f"Error querying GitHub PRs: {e}", exc_info=True)
                 return []

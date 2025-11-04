@@ -8,7 +8,7 @@ import os
 import json
 
 from config.settings import settings
-from src.services.auth import auth_required
+from src.services.auth import auth_required, admin_required
 from src.integrations.fireflies import FirefliesClient
 from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.utils.database import get_engine, session_scope
@@ -679,3 +679,63 @@ def process_decisions():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@meetings_bp.route("/api/meetings/<meeting_id>", methods=["DELETE"])
+@admin_required
+def delete_meeting(user, meeting_id):
+    """Delete a meeting analysis (admin only).
+
+    This endpoint permanently deletes a meeting analysis from the processed_meetings table.
+    Only users with admin role can delete meetings.
+
+    Args:
+        meeting_id: The UUID of the meeting to delete
+
+    Returns:
+        200: Meeting deleted successfully
+        403: User is not an admin
+        404: Meeting not found
+        500: Server error
+    """
+    try:
+        from sqlalchemy import text
+
+        logger.info(f"Admin user {user.email} (ID: {user.id}) is deleting meeting {meeting_id}")
+
+        with session_scope() as db_session:
+            # Check if meeting exists
+            result = db_session.execute(
+                text("SELECT id, title FROM processed_meetings WHERE id = :meeting_id"),
+                {"meeting_id": meeting_id}
+            )
+            meeting = result.fetchone()
+
+            if not meeting:
+                logger.warning(f"Meeting {meeting_id} not found")
+                return error_response("Meeting not found", status_code=404)
+
+            meeting_title = meeting[1]
+
+            # Delete the meeting
+            db_session.execute(
+                text("DELETE FROM processed_meetings WHERE id = :meeting_id"),
+                {"meeting_id": meeting_id}
+            )
+            db_session.commit()
+
+            logger.info(f"Successfully deleted meeting {meeting_id} ({meeting_title})")
+
+            # Invalidate cache for this user
+            invalidate_cache('meetings', user.id)
+
+            return success_response(
+                message=f"Meeting '{meeting_title}' deleted successfully",
+                data={"meeting_id": meeting_id}
+            )
+
+    except Exception as e:
+        logger.error(f"Error deleting meeting {meeting_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return error_response(f"Failed to delete meeting: {str(e)}", status_code=500)

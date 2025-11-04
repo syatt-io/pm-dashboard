@@ -49,8 +49,10 @@ import {
   TrendingUp,
   Create,
   Download,
+  Delete,
 } from '@mui/icons-material';
 import { MeetingList } from './Meetings';
+import { useAuth } from '../context/AuthContext';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -905,6 +907,11 @@ const AnalysisShowErrorFallback = ({ error }: { error: any }) => {
 
 export const AnalysisShow = () => {
   const [error, setError] = React.useState<any>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const { isAdmin } = useAuth();
+  const notify = useNotify();
+  const redirect = useRedirect();
 
   const downloadAnalysisAsMarkdown = (record: any) => {
     if (!record) return;
@@ -981,6 +988,38 @@ export const AnalysisShow = () => {
     URL.revokeObjectURL(url);
   };
 
+  const handleDeleteMeeting = async (record: any) => {
+    if (!record || !record.id) return;
+
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const csrfToken = await fetchCsrfToken();
+
+      const response = await fetch(`${API_BASE_URL}/api/meetings/${record.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-CSRF-Token': csrfToken,
+        },
+      });
+
+      if (response.ok) {
+        notify('Meeting analysis deleted successfully', { type: 'success' });
+        // Redirect back to analysis list
+        redirect('/analysis');
+      } else {
+        const error = await response.json();
+        notify(`Failed to delete meeting: ${error.error || 'Unknown error'}`, { type: 'error' });
+      }
+    } catch (error) {
+      notify(`Failed to delete meeting: ${error}`, { type: 'error' });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   return (
     <>
       {error ? (
@@ -1012,16 +1051,30 @@ export const AnalysisShow = () => {
                 </Typography>
                 <FunctionField
                   render={(record: any) => (
-                    <Button
-                      variant="outlined"
-                      color="primary"
-                      size="medium"
-                      startIcon={<Download />}
-                      onClick={() => downloadAnalysisAsMarkdown(record)}
-                      sx={{ textTransform: 'none' }}
-                    >
-                      Download as Markdown
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        size="medium"
+                        startIcon={<Download />}
+                        onClick={() => downloadAnalysisAsMarkdown(record)}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Download as Markdown
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          size="medium"
+                          startIcon={<Delete />}
+                          onClick={() => setDeleteDialogOpen(true)}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </Box>
                   )}
                 />
               </Box>
@@ -1235,6 +1288,34 @@ export const AnalysisShow = () => {
           </Card>
         </Box>
       </Box>
+
+          {/* Delete Confirmation Dialog */}
+          <FunctionField
+            render={(record: any) => (
+              <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+                <DialogTitle>Delete Meeting Analysis?</DialogTitle>
+                <DialogContent>
+                  <Typography>
+                    Are you sure you want to delete the analysis for "{record?.meeting_title || record?.title}"?
+                    This action cannot be undone.
+                  </Typography>
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteMeeting(record)}
+                    variant="contained"
+                    color="error"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? <CircularProgress size={20} /> : 'Delete'}
+                  </Button>
+                </DialogActions>
+              </Dialog>
+            )}
+          />
           </SimpleShowLayout>
         </Show>
       )}
