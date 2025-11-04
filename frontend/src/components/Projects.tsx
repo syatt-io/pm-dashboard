@@ -421,7 +421,7 @@ const ProjectCard = ({ project, onCardClick }: { project: Project, onCardClick: 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CalendarIcon fontSize="small" color="action" />
             <Typography variant="body2">
-              Weekly meeting: {project.weekly_meeting_day}
+              Weekly meeting: {project.weekly_meeting_day.charAt(0).toUpperCase() + project.weekly_meeting_day.slice(1)}
             </Typography>
           </Box>
         )}
@@ -1692,7 +1692,9 @@ export const ProjectList = () => {
                             )}
                           </TableCell>
                           <TableCell>
-                            {project.weekly_meeting_day || '-'}
+                            {project.weekly_meeting_day
+                              ? project.weekly_meeting_day.charAt(0).toUpperCase() + project.weekly_meeting_day.slice(1)
+                              : '-'}
                           </TableCell>
                           <TableCell>
                             {project.retainer_hours
@@ -2237,6 +2239,11 @@ const ProjectShowContent = () => {
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Project Title */}
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
+        {record.name}
+      </Typography>
+
       {/* Digest Generator Button */}
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
         <FormControlLabel
@@ -2326,7 +2333,7 @@ const ProjectShowContent = () => {
                     label="Work Type"
                     options={[
                       { value: 'project-based', label: 'Project-Based' },
-                      { value: 'growth-support', label: 'Growth Support' },
+                      { value: 'growth-support', label: 'Growth & Support' },
                       { value: 'n-a', label: 'N/A' }
                     ]}
                     onSave={(newValue) => handleFieldUpdate('project_work_type', newValue)}
