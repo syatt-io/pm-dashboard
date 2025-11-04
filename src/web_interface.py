@@ -139,7 +139,10 @@ CORS(app, origins=cors_origins, supports_credentials=True,
 # ✅ SECURITY: Initialize CSRF protection for state-changing operations
 # CSRF tokens provide defense in depth beyond SameSite cookies
 csrf = CSRFProtect(app)
-logger.info("✅ CSRF protection initialized")
+# Exempt API routes that use JWT authentication (JWT provides CSRF protection)
+# Webhooks are also exempt as they use signature verification
+app.config['WTF_CSRF_EXEMPT_LIST'] = ['/api/', '/slack/']
+logger.info("✅ CSRF protection initialized (API/Slack routes exempt)")
 
 # ✅ FIXED: Initialize rate limiter for API protection
 # Use Redis if available (production), otherwise in-memory (development)
