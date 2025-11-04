@@ -194,6 +194,52 @@ digest_generation:
   insights_prompt_template: |
     You are preparing a Weekly Recap for a client meeting happening soon. This recap helps the PM review progress, prepare discussion topics, and create an agenda.
 
+    **CRITICAL: MULTI-STEP ANALYSIS PROCESS**
+
+    STEP 1 - READ ALL DATA SOURCES:
+    - Read through ALL provided data: meetings, Jira tickets, Slack discussions, GitHub PRs, time tracking
+    - Do NOT start writing anything until you've reviewed EVERY data source
+    - Projects typically have 3-8 distinct themes of work happening (feature development, bug fixes, research, etc.)
+    - Important work often appears in less obvious places (Slack discussions, in-progress PRs, time-logged tickets)
+    - Missing a key work stream = failed analysis
+
+    STEP 2 - IDENTIFY KEY THEMES & PRIORITIES:
+    - After reading all data, identify EVERY distinct work stream/theme
+    - List them mentally: What shipped? What's in progress? What's blocked? What needs decisions?
+    - Check: Did I capture early-week work? Mid-week developments? Recent changes?
+    - Typical projects have 5-12 distinct activities - if you only found 2-3, you probably missed several
+
+    STEP 3 - FORMAT SECTIONS:
+    - Now format each theme into the appropriate section (achievements, active_work, etc.)
+    - Verify you captured ALL work streams from your mental list in Step 2
+
+    **WARNING SIGNS YOU'RE DOING IT WRONG:**
+    - ❌ You only listed 1-2 achievements (most projects have 3-6 completed items per week)
+    - ❌ You started formatting before reviewing all data sources
+    - ❌ Your active_work section only mentions tickets, not PRs or Slack discussions
+    - ❌ You have no blockers listed but the historical_context mentions ongoing issues
+    - ❌ Your proposed_agenda has generic items ("Review progress") instead of specific topics
+    - ❌ The reference data mentions work you didn't include in any section
+
+    **PRIORITY FILTERING - CLIENT-FACING RELEVANCE:**
+    - ✅ INCLUDE: Shipped features, user-facing improvements, completed tickets, merged PRs ready to deploy
+    - ✅ INCLUDE: Blockers requiring client decisions, UX/design decisions needed, technical risks
+    - ✅ INCLUDE: Work visible to end users, progress on roadmap items
+    - ❌ EXCLUDE: Internal refactoring unless it impacts performance/reliability
+    - ❌ EXCLUDE: DevOps/infrastructure work unless it caused downtime
+    - ❌ EXCLUDE: Minor bug fixes unless they affected multiple users
+    - ❌ EXCLUDE: Process improvements, team meetings, administrative tasks
+
+    Examples of what to INCLUDE:
+    - "SUBS-608: Fixed mobile banner navigation - users can now swipe through hero images"
+    - "API rate limiting implemented - prevents service degradation during traffic spikes"
+    - "Dashboard redesign completed and merged - ready to deploy Friday"
+
+    Examples of what to EXCLUDE:
+    - "Updated CI/CD pipeline configuration"
+    - "Refactored internal database queries for maintainability"
+    - "Team retro meeting held on Tuesday"
+
     CONTEXT:
     - Meeting length: 30-60 minutes
     - Audience: Mix of technical and non-technical stakeholders
@@ -243,6 +289,33 @@ digest_generation:
     ### HISTORICAL CONTEXT (Optional)
     Relevant past discussions, decisions, and blockers for context:
     {historical_context}
+
+    ---
+
+    **VERIFICATION CHECKLIST - PREVENT HALLUCINATIONS:**
+    Before returning your JSON, verify:
+    - ✅ Every ticket number in achievements appears in completed_tickets or time_summary data
+    - ✅ Every ticket number matches the {project_key} prefix (e.g., "SUBS-" not "DEV-")
+    - ✅ Every PR mentioned appears in merged_prs, in_review_prs, or open_prs data
+    - ✅ Every blocker mentioned appears in blockers data or Slack discussions
+    - ✅ You didn't invent outcomes that aren't supported by the provided data
+    - ✅ Your proposed_agenda items reference actual work from the data
+
+    If you can't verify any item above, REMOVE IT or REWRITE IT using only verified data.
+
+    **ACHIEVEMENTS SECTION - WRITING EXAMPLES:**
+
+    EXCELLENT (ultra-concise, outcome-focused):
+    * "SUBS-608: Mobile banner swipe navigation now working"
+    * "CSV export deployed - clients can download reports in 3 formats"
+    * "Page load time reduced 40% via image optimization"
+
+    GOOD (but could be shorter):
+    * "Completed SUBS-608 which fixes the mobile banner navigation issue where users couldn't swipe"
+    * "Implemented and deployed CSV export feature that allows clients to download reports"
+
+    BAD (too verbose, process-focused):
+    * "The team worked on and successfully completed ticket SUBS-608 which involved fixing an issue where mobile users were unable to navigate through banner images"
 
     ---
 
