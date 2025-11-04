@@ -22,6 +22,7 @@ import {
   TopToolbar,
   useUpdate,
   ListButton,
+  useGetList,
 } from 'react-admin';
 import {
   Card,
@@ -79,6 +80,12 @@ import {
   Close as CloseIcon,
   ArrowBack as ArrowBackIcon,
   TrendingUp as TrendingUpIcon,
+  CheckCircle,
+  Analytics,
+  Launch,
+  CheckBox,
+  CheckBoxOutlineBlank,
+  RadioButtonUnchecked,
 } from '@mui/icons-material';
 import { ResourceMappingCell } from './ResourceMappingCell';
 import WeeklyRecapComparison from './WeeklyRecapComparison';
@@ -1957,6 +1964,289 @@ export const ProjectList = () => {
   );
 };
 
+// Recent Meetings Card Component
+const ProjectMeetingsCard = ({ projectKey, projectName }: { projectKey: string; projectName: string }) => {
+  const redirect = useRedirect();
+  const notify = useNotify();
+  const [dateRange, setDateRange] = useState('7');
+
+  // Fetch meetings with project filter
+  const { data: meetings, isLoading, refetch } = useGetList('meetings', {
+    sort: { field: 'date', order: 'DESC' },
+    pagination: { page: 1, perPage: 5 },
+    filter: { dateRange, projects: projectKey }
+  });
+
+  const handleDateRangeChange = (newRange: string) => {
+    setDateRange(newRange);
+    setTimeout(() => refetch(), 100);
+  };
+
+  const handleAnalyze = (meetingId: string) => {
+    notify('Opening analysis view...', { type: 'info' });
+    redirect(`/analysis/${meetingId}/show`);
+  };
+
+  const handleOpenFireflies = (meetingId: string, url: string) => {
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      notify('Fireflies URL not available', { type: 'warning' });
+    }
+  };
+
+  return (
+    <Card sx={{
+      height: '100%',
+      transition: 'all 0.3s ease',
+      '&:hover': {
+        transform: 'translateY(-4px)',
+        boxShadow: 4
+      }
+    }}>
+      <CardContent>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            📅 Recent Meetings
+          </Typography>
+          <Select
+            value={dateRange}
+            onChange={(e) => handleDateRangeChange(e.target.value)}
+            size="small"
+            sx={{ minWidth: 120 }}
+          >
+            <MenuItem value="1">Last 1 day</MenuItem>
+            <MenuItem value="7">Last 7 days</MenuItem>
+            <MenuItem value="30">Last 30 days</MenuItem>
+            <MenuItem value="all">All time</MenuItem>
+          </Select>
+        </Box>
+        <Divider sx={{ mb: 2 }} />
+
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : !meetings || meetings.length === 0 ? (
+          <Alert severity="info">
+            No meetings found for this project in the selected time range.
+          </Alert>
+        ) : (
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Meeting</TableCell>
+                  <TableCell align="center">Date</TableCell>
+                  <TableCell align="center">Relevance</TableCell>
+                  <TableCell align="center">Action Items</TableCell>
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {meetings.map((meeting: any) => {
+                  const isAnalyzed = meeting.analyzed_at || meeting.action_items_count > 0;
+                  const relevanceScore = meeting.relevance_score || 0;
+                  const scoreColor = relevanceScore >= 80 ? 'success' : relevanceScore >= 60 ? 'warning' : 'error';
+
+                  return (
+                    <TableRow
+                      key={meeting.id}
+                      hover
+                      sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                    >
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {isAnalyzed && (
+                            <CheckCircle sx={{ color: 'success.main', fontSize: 16 }} />
+                          )}
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 180 }}>
+                            {meeting.title}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="caption">
+                          {new Date(meeting.date).toLocaleDateString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="center">
+                        <Chip
+                          label={`${relevanceScore}%`}
+                          color={scoreColor}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        <Typography variant="body2">
+                          {meeting.action_items_count || 0}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleAnalyze(meeting.meeting_id || meeting.id)}
+                            title="Analyze meeting"
+                            sx={{ color: 'primary.main' }}
+                          >
+                            <Analytics fontSize="small" />
+                          </IconButton>
+                          {meeting.fireflies_url && (
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenFireflies(meeting.meeting_id, meeting.fireflies_url)}
+                              title="Open in Fireflies"
+                              sx={{ color: 'secondary.main' }}
+                            >
+                              <Launch fontSize="small" />
+                            </IconButton>
+                          )}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Active TODOs Card Component
+const ProjectTodosCard = ({ projectKey }: { projectKey: string }) => {
+  const redirect = useRedirect();
+
+  // Fetch all TODOs and filter client-side
+  const { data: allTodos, isLoading } = useGetList('todos', {
+    sort: { field: 'created_at', order: 'DESC' },
+    pagination: { page: 1, perPage: 100 }
+  });
+
+  // Filter for active TODOs of this project
+  const activeTodos = allTodos?.filter(
+    (todo: any) => todo.project_key === projectKey && todo.status !== 'done'
+  ).slice(0, 10);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'in_progress':
+        return <RadioButtonUnchecked sx={{ fontSize: 18, color: 'warning.main' }} />;
+      case 'pending':
+        return <CheckBoxOutlineBlank sx={{ fontSize: 18, color: 'text.secondary' }} />;
+      case 'done':
+        return <CheckBox sx={{ fontSize: 18, color: 'success.main' }} />;
+      default:
+        return <CheckBoxOutlineBlank sx={{ fontSize: 18 }} />;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case 'high':
+        return 'error';
+      case 'medium':
+        return 'warning';
+      case 'low':
+        return 'success';
+      default:
+        return 'default';
+    }
+  };
+
+  return (
+    <Card sx={{
+      height: '100%',
+      transition: 'all 0.3s ease',
+      '&:hover': {
+        transform: 'translateY(-4px)',
+        boxShadow: 4
+      }
+    }}>
+      <CardContent>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            ✅ Active TODOs
+          </Typography>
+          <MuiButton
+            size="small"
+            variant="text"
+            onClick={() => redirect('/todos')}
+            sx={{ textTransform: 'none' }}
+          >
+            View All
+          </MuiButton>
+        </Box>
+        <Divider sx={{ mb: 2 }} />
+
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+            <CircularProgress size={24} />
+          </Box>
+        ) : !activeTodos || activeTodos.length === 0 ? (
+          <Alert severity="info">
+            No active TODOs for this project.
+          </Alert>
+        ) : (
+          <Box>
+            {activeTodos.map((todo: any) => (
+              <Box
+                key={todo.id}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  py: 1.5,
+                  px: 1,
+                  borderRadius: 1,
+                  mb: 1,
+                  '&:hover': {
+                    backgroundColor: 'action.hover',
+                    cursor: 'pointer'
+                  }
+                }}
+                onClick={() => redirect(`/todos/${todo.id}/show`)}
+              >
+                {getStatusIcon(todo.status)}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" noWrap>
+                    {todo.title}
+                  </Typography>
+                  {todo.assignee && (
+                    <Typography variant="caption" color="text.secondary">
+                      {todo.assignee}
+                    </Typography>
+                  )}
+                </Box>
+                <Chip
+                  label={todo.priority || 'Medium'}
+                  size="small"
+                  color={getPriorityColor(todo.priority)}
+                  sx={{ minWidth: 70 }}
+                />
+                {todo.due_date && (
+                  <Typography variant="caption" color="text.secondary" sx={{ minWidth: 80 }}>
+                    {new Date(todo.due_date).toLocaleDateString()}
+                  </Typography>
+                )}
+              </Box>
+            ))}
+            {allTodos && allTodos.filter((t: any) => t.project_key === projectKey && t.status !== 'done').length > 10 && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1 }}>
+                Showing 10 of {allTodos.filter((t: any) => t.project_key === projectKey && t.status !== 'done').length} active TODOs
+              </Typography>
+            )}
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 const ProjectShowActions = () => {
   const navigate = useNavigate();
 
@@ -2850,6 +3140,29 @@ const ProjectShowContent = () => {
                 )}
               </CardContent>
             </Card>
+          </Grid>
+        </Grid>
+      </Box>
+
+      {/* Recent Activity Section - Meetings and TODOs */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+          <TimeIcon sx={{ color: 'primary.main' }} />
+          <Typography variant="h5" sx={{ fontWeight: 600 }}>
+            Recent Activity
+          </Typography>
+        </Box>
+        <Divider sx={{ mb: 3 }} />
+
+        <Grid container spacing={2}>
+          {/* Recent Meetings - Left Card (50%) */}
+          <Grid item xs={12} lg={6}>
+            <ProjectMeetingsCard projectKey={record.key} projectName={record.name} />
+          </Grid>
+
+          {/* Active TODOs - Right Card (50%) */}
+          <Grid item xs={12} lg={6}>
+            <ProjectTodosCard projectKey={record.key} />
           </Grid>
         </Grid>
       </Box>
