@@ -61,14 +61,15 @@ def test_get_jira_projects_with_database_enhancement(client, mocker):
 
     # Mock database with project data
     # Query returns: key, is_active, project_work_type, total_hours, cumulative_hours,
-    # weekly_meeting_day, retainer_hours, forecasted_hours, actual_monthly_hours
+    # weekly_meeting_day, retainer_hours, send_meeting_emails, forecasted_hours, actual_monthly_hours
     mock_engine = mocker.patch('src.routes.jira.get_engine')
     mock_conn = Mock()
     mock_engine.return_value.connect.return_value.__enter__.return_value = mock_conn
 
     # Mock the fetchall result (batch query) - returns list of row tuples
+    # Order matches the SELECT in jira.py lines 88-99
     mock_result_row = Mock()
-    mock_result_row.__getitem__ = lambda self, idx: ['TEST', True, 'project-based', 120.0, 155.0, 'Monday', 0, 40.0, 35.0][idx]
+    mock_result_row.__getitem__ = lambda self, idx: ['TEST', True, 'project-based', 120.0, 155.0, 'Monday', 0, False, 40.0, 35.0][idx]
     mock_conn.execute.return_value.fetchall.return_value = [mock_result_row]
 
     response = client.get('/api/jira/projects')
