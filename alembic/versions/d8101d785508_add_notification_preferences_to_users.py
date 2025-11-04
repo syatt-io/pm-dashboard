@@ -28,16 +28,15 @@ def upgrade() -> None:
     # Get existing columns
     existing_columns = [col['name'] for col in inspector.get_columns('users')]
 
-    with op.batch_alter_table('users', schema=None) as batch_op:
-        if 'notify_daily_todo_digest' not in existing_columns:
-            batch_op.add_column(sa.Column('notify_daily_todo_digest', sa.Boolean(), nullable=False, server_default='1'))
-        if 'notify_project_hours_forecast' not in existing_columns:
-            batch_op.add_column(sa.Column('notify_project_hours_forecast', sa.Boolean(), nullable=False, server_default='1'))
+    # Add columns if they don't exist (PostgreSQL compatible)
+    if 'notify_daily_todo_digest' not in existing_columns:
+        op.add_column('users', sa.Column('notify_daily_todo_digest', sa.Boolean(), nullable=False, server_default='true'))
+    if 'notify_project_hours_forecast' not in existing_columns:
+        op.add_column('users', sa.Column('notify_project_hours_forecast', sa.Boolean(), nullable=False, server_default='true'))
 
 
 def downgrade() -> None:
     """Downgrade schema."""
     # Remove notification preference columns from users table
-    with op.batch_alter_table('users', schema=None) as batch_op:
-        batch_op.drop_column('notify_project_hours_forecast')
-        batch_op.drop_column('notify_daily_todo_digest')
+    op.drop_column('users', 'notify_project_hours_forecast')
+    op.drop_column('users', 'notify_daily_todo_digest')
