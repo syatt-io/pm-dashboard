@@ -14,6 +14,7 @@ import {
   useListContext,
 } from 'react-admin';
 import { fetchCsrfToken } from '../dataProvider';
+import { formatESTDateTime, formatESTDate, formatESTDateTimeShort } from '../utils/timezone';
 import {
   Card,
   CardContent,
@@ -831,7 +832,7 @@ const AnalysisStatusBanner = () => {
             variant="filled"
           />
           <Typography variant="body2" color="text.secondary">
-            Analyzed on {new Date(record.analyzed_at).toLocaleString()}
+            Analyzed on {formatESTDateTime(record.analyzed_at)}
             {!isRecent && " (using cached results)"}
           </Typography>
           <Box sx={{ ml: 'auto' }}>
@@ -917,8 +918,8 @@ export const AnalysisShow = () => {
     if (!record) return;
 
     let markdown = `# ${record.meeting_title || record.title || 'Meeting Analysis'}\n\n`;
-    markdown += `**Meeting Date:** ${record.date ? new Date(record.date).toLocaleString() : 'N/A'}\n`;
-    markdown += `**Analyzed At:** ${record.analyzed_at ? new Date(record.analyzed_at).toLocaleString() : 'N/A'}\n\n`;
+    markdown += `**Meeting Date:** ${record.date ? formatESTDateTime(record.date) : 'N/A'}\n`;
+    markdown += `**Analyzed At:** ${record.analyzed_at ? formatESTDateTime(record.analyzed_at) : 'N/A'}\n\n`;
     markdown += '---\n\n';
 
     // Add topics if available (new format)
@@ -1079,16 +1080,9 @@ export const AnalysisShow = () => {
                 />
               </Box>
               <TextField source="meeting_title" label="Title" />
-              <DateField
-                source="analyzed_at"
+              <FunctionField
                 label="Analyzed At"
-                options={{
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                }}
+                render={(record: any) => formatESTDateTime(record.analyzed_at)}
               />
             </CardContent>
           </Card>
