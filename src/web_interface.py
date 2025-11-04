@@ -294,6 +294,11 @@ logger.info("✅ Slack endpoints exempted from CSRF protection")
 csrf.exempt(jira_bp)
 logger.info("✅ Jira endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Tempo endpoints from CSRF protection
+# Tempo endpoints (project digests, hours sync) are called from React frontend with JWT auth
+csrf.exempt(tempo_bp)
+logger.info("✅ Tempo endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
