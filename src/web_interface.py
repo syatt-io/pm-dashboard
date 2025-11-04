@@ -337,6 +337,7 @@ logger.info("✅ CSRF token endpoint registered at /api/csrf-token")
 
 # ✅ Fireflies Webhook Endpoint
 @app.route('/api/webhooks/fireflies', methods=['POST'])
+@csrf.exempt  # Webhook uses HMAC signature verification, not CSRF tokens
 def fireflies_webhook():
     """
     Webhook endpoint for Fireflies.ai transcript completion notifications.
@@ -347,7 +348,7 @@ def fireflies_webhook():
     """
     return handle_fireflies_webhook()
 
-logger.info("✅ Fireflies webhook endpoint registered at /api/webhooks/fireflies")
+logger.info("✅ Fireflies webhook endpoint registered at /api/webhooks/fireflies (CSRF exempt)")
 
 # ✅ FIXED: Apply rate limiting to critical backfill endpoints (expensive operations)
 if limiter:
