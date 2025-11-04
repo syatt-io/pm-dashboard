@@ -304,21 +304,68 @@ const CreateJiraTicketDialog = ({
   );
 };
 
-const ActionItemsList = ({ actionItems }: { actionItems: any[] }) => {
+const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; meetingTitle?: string }) => {
   const notify = useNotify();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  // Function to determine project from meeting title
+  const determineProjectFromMeeting = async (meetingTitle: string): Promise<string | null> => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return null;
+
+      // Get all projects with keywords
+      const projectsResponse = await fetch(`${API_BASE_URL}/api/jira/projects`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!projectsResponse.ok) return null;
+
+      const projectsData = await projectsResponse.json();
+      const projects = projectsData.data?.projects || [];
+
+      // Check each project's keywords against the meeting title
+      const titleLower = meetingTitle.toLowerCase();
+
+      for (const project of projects) {
+        if (project.keywords && Array.isArray(project.keywords)) {
+          const keywords = project.keywords.map((k: string) => k.toLowerCase());
+          const match = keywords.some((keyword: string) => titleLower.includes(keyword));
+
+          if (match) {
+            return project.key;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error determining project from meeting:', error);
+      return null;
+    }
+  };
 
   const handleAddTodo = async (item: any, index: number) => {
     try {
       const token = localStorage.getItem('auth_token');
       const csrfToken = await fetchCsrfToken();
 
+      // Determine project from meeting title if available
+      let projectKey = null;
+      if (meetingTitle) {
+        projectKey = await determineProjectFromMeeting(meetingTitle);
+      }
+
       const todoData = {
         title: item.title,
         description: item.description,
         assignee: item.assignee || '',
-        priority: item.priority || 'Medium'
+        priority: item.priority || 'Medium',
+        ...(projectKey && { project_key: projectKey })
       };
 
       const response = await fetch(`${API_BASE_URL}/api/todos`, {
@@ -332,7 +379,10 @@ const ActionItemsList = ({ actionItems }: { actionItems: any[] }) => {
       });
 
       if (response.ok) {
-        notify(`Added "${item.title}" to TODO list`, { type: 'success' });
+        const successMsg = projectKey
+          ? `Added "${item.title}" to TODO list (Project: ${projectKey})`
+          : `Added "${item.title}" to TODO list`;
+        notify(successMsg, { type: 'success' });
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         throw new Error(errorData.error || 'Failed to create TODO');
@@ -1139,7 +1189,12 @@ export const AnalysisShow = () => {
                 Action Items
               </Typography>
               <FunctionField
-                render={(record: any) => <ActionItemsList actionItems={record.action_items} />}
+                render={(record: any) => (
+                  <ActionItemsList
+                    actionItems={record.action_items}
+                    meetingTitle={record.title || record.meeting_title}
+                  />
+                )}
               />
             </CardContent>
           </Card>
