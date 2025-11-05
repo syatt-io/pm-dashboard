@@ -13,7 +13,8 @@ class ProactiveInsight(Base):
     id = Column(String(36), primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     project_key = Column(String(50), nullable=True, index=True)
-    insight_type = Column(String(50), nullable=False, index=True)  # 'stale_pr', 'budget_alert', 'missing_ticket', 'anomaly', 'meeting_prep'
+    # 'stale_pr', 'budget_alert', 'missing_ticket', 'anomaly', 'meeting_prep'
+    insight_type = Column(String(50), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
     severity = Column(String(20), nullable=False)  # 'info', 'warning', 'critical'
@@ -25,8 +26,15 @@ class ProactiveInsight(Base):
     delivered_via_slack = Column(DateTime, nullable=True)  # Track when delivered via Slack
     delivered_via_email = Column(DateTime, nullable=True)  # Track when delivered via Email
 
-    # Relationship
+    # Escalation tracking fields
+    last_escalated_at = Column(DateTime, nullable=True, index=True)  # When last escalation occurred
+    escalation_count = Column(Integer, nullable=False, default=0)  # Total number of escalations
+    # Current escalation tier (0=none, 1=dm, 2=channel, 3=critical)
+    escalation_level = Column(Integer, nullable=False, default=0)
+
+    # Relationships
     user = relationship("User", backref="proactive_insights")
+    escalation_history = relationship("EscalationHistory", back_populates="insight", cascade="all, delete-orphan")
 
     def to_dict(self):
         """Convert insight to dictionary."""
@@ -45,6 +53,9 @@ class ProactiveInsight(Base):
             'action_taken': self.action_taken,
             'delivered_via_slack': self.delivered_via_slack.isoformat() if self.delivered_via_slack else None,
             'delivered_via_email': self.delivered_via_email.isoformat() if self.delivered_via_email else None,
+            'last_escalated_at': self.last_escalated_at.isoformat() if self.last_escalated_at else None,
+            'escalation_count': self.escalation_count,
+            'escalation_level': self.escalation_level,
         }
 
     def is_delivered(self):

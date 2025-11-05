@@ -11,6 +11,7 @@ from .system_settings import SystemSettings
 from .proactive_insight import ProactiveInsight
 from .notification_preferences import UserNotificationPreferences
 from .meeting_metadata import MeetingMetadata
+from .escalation import EscalationHistory, EscalationPreferences
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -122,6 +123,8 @@ __all__ = [
     'ProactiveInsight',
     'UserNotificationPreferences',
     'MeetingMetadata',
+    'EscalationHistory',
+    'EscalationPreferences',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',
