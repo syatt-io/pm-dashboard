@@ -268,6 +268,7 @@ from src.routes.dashboard import dashboard_bp
 from src.routes.feedback import feedback_bp
 from src.routes.backfill import backfill_bp
 from src.routes.admin_settings import admin_settings_bp
+from src.routes.insights import insights_bp
 
 app.register_blueprint(health_bp)
 
@@ -320,6 +321,7 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(feedback_bp)
 app.register_blueprint(backfill_bp)
 app.register_blueprint(admin_settings_bp)
+app.register_blueprint(insights_bp)
 
 # ✅ SECURITY: CSRF token endpoint for frontend to fetch tokens
 @app.route('/api/csrf-token', methods=['GET'])

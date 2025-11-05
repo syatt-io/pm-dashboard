@@ -15,6 +15,8 @@ from src.managers.slack_bot import SlackTodoBot
 from src.services.hours_report_agent import HoursReportAgent
 from src.integrations.jira_mcp import JiraMCPClient
 from src.jobs.tempo_sync import run_tempo_sync
+from src.services.insight_detector import detect_insights_for_all_users
+from src.services.daily_brief_generator import send_daily_briefs
 
 
 logger = logging.getLogger(__name__)
@@ -87,6 +89,15 @@ class TodoScheduler:
         # Tempo hours sync at 4 AM EST (9 AM UTC)
         # Note: This runs at 9 AM UTC which is 4 AM EST (during DST) or 10 AM UTC for standard time
         schedule.every().day.at("09:00").do(self._run_sync, self.sync_tempo_hours)
+
+        # Proactive insights detection every 4 hours during work hours (8am, 12pm, 4pm EST)
+        schedule.every().day.at("08:00").do(self._run_sync, self.detect_proactive_insights)
+        schedule.every().day.at("12:00").do(self._run_sync, self.detect_proactive_insights)
+        schedule.every().day.at("16:00").do(self._run_sync, self.detect_proactive_insights)
+
+        # Daily brief delivery - check hourly to handle different user timezones
+        # Primary delivery at 9 AM EST
+        schedule.every().day.at("09:00").do(self._run_sync, self.send_proactive_briefs)
 
         logger.info("Scheduled tasks configured")
 
@@ -753,6 +764,65 @@ class TodoScheduler:
         except Exception as e:
             logger.error(f"Error getting project hours summary: {e}")
             return []
+
+    def detect_proactive_insights(self):
+        """Run proactive insight detection for all users."""
+        try:
+            logger.info("Running proactive insight detection")
+            stats = detect_insights_for_all_users()
+            logger.info(f"Insight detection complete: {stats}")
+
+            # Send Slack notification if enabled
+            if stats['insights_detected'] > 0 and self.slack_bot:
+                message = (
+                    f"🔍 *Proactive Insight Detection Complete*\n\n"
+                    f"• Users processed: {stats['users_processed']}\n"
+                    f"• Insights detected: {stats['insights_detected']}\n"
+                    f"• Insights stored: {stats['insights_stored']}\n"
+                )
+                if stats['errors']:
+                    message += f"• Errors: {len(stats['errors'])}\n"
+
+                try:
+                    self.slack_bot.post_message(
+                        channel=settings.notifications.slack_channel,
+                        text=message
+                    )
+                except Exception as e:
+                    logger.error(f"Error sending Slack notification: {e}")
+
+        except Exception as e:
+            logger.error(f"Error in proactive insight detection: {e}", exc_info=True)
+
+    def send_proactive_briefs(self):
+        """Send daily briefs to all users."""
+        try:
+            logger.info("Running daily brief delivery")
+            stats = send_daily_briefs()
+            logger.info(f"Daily brief delivery complete: {stats}")
+
+            # Send Slack notification if enabled
+            if (stats['briefs_sent_slack'] > 0 or stats['briefs_sent_email'] > 0) and self.slack_bot:
+                message = (
+                    f"📬 *Daily Brief Delivery Complete*\n\n"
+                    f"• Users processed: {stats['users_processed']}\n"
+                    f"• Briefs sent via Slack: {stats['briefs_sent_slack']}\n"
+                    f"• Briefs sent via Email: {stats['briefs_sent_email']}\n"
+                    f"• Total insights delivered: {stats['total_insights_delivered']}\n"
+                )
+                if stats['errors']:
+                    message += f"• Errors: {len(stats['errors'])}\n"
+
+                try:
+                    self.slack_bot.post_message(
+                        channel=settings.notifications.slack_channel,
+                        text=message
+                    )
+                except Exception as e:
+                    logger.error(f"Error sending Slack notification: {e}")
+
+        except Exception as e:
+            logger.error(f"Error in daily brief delivery: {e}", exc_info=True)
 
 
 # Global scheduler instance

@@ -81,6 +81,24 @@ def get_session():
     factory = get_session_factory()
     return factory()
 
+def get_db():
+    """Generator that yields database sessions.
+
+    Properly closes the session after use.
+
+    Usage:
+        db = next(get_db())
+        try:
+            # use db here
+        finally:
+            db.close()
+    """
+    session = get_session()
+    try:
+        yield session
+    finally:
+        close_session(session)
+
 def close_session(session):
     """Close a database session properly."""
     try:
