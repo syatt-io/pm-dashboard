@@ -91,6 +91,9 @@ class ProjectActivity:
     # Follow-up on last meeting topics
     last_meeting_followup: Optional[Dict[str, Any]] = None
 
+    # Attendee context for meeting prep (optional, enabled via ENABLE_ATTENDEE_CONTEXT env var)
+    attendee_context: Optional[List[Dict[str, Any]]] = None
+
 
 class ProjectActivityAggregator:
     """Aggregates project activity from multiple sources for agenda generation."""
@@ -253,6 +256,11 @@ class ProjectActivityAggregator:
 
             # Generate AI insights
             await self._generate_insights(activity, include_context=include_context)
+
+            # Collect attendee context if enabled
+            import os
+            if os.getenv('ENABLE_ATTENDEE_CONTEXT', 'false').lower() == 'true':
+                await self._collect_attendee_context(activity, days_back)
 
             logger.info(f"Successfully aggregated activity for {project_key}")
             return activity
@@ -978,6 +986,85 @@ class ProjectActivityAggregator:
             logger.warning(f"Error collecting historical context: {e}")
             activity.historical_context = []
 
+    async def _collect_attendee_context(
+        self,
+        activity: ProjectActivity,
+        days_back: int
+    ):
+        """
+        Collect attendee context for meeting prep - what each team member has been working on.
+
+        Args:
+            activity: ProjectActivity object with aggregated data
+            days_back: Number of days to look back for activity
+        """
+        try:
+            logger.info(f"Collecting attendee context for {activity.project_key}")
+
+            # Get meeting attendees for this project
+            attendees = self._get_meeting_attendees(activity.project_key, days_back)
+
+            if not attendees:
+                logger.info(f"No meeting attendees found for {activity.project_key}")
+                activity.attendee_context = []
+                return
+
+            # Build attendee context list
+            attendee_contexts = []
+
+            for email in attendees:
+                try:
+                    logger.debug(f"Processing attendee: {email}")
+
+                    # Get user activity
+                    user_activity = self._get_user_activity(
+                        project_key=activity.project_key,
+                        email=email,
+                        start_date=activity.start_date,
+                        end_date=activity.end_date,
+                        activity=activity
+                    )
+
+                    # Generate talking points
+                    talking_points = await self._generate_talking_points(user_activity, email)
+
+                    # Try to get display name from Jira user cache or fall back to email
+                    display_name = email
+                    try:
+                        # Try to extract name from email (e.g., "john.doe@example.com" -> "John Doe")
+                        if '@' in email:
+                            username = email.split('@')[0]
+                            # Convert to title case and replace dots/underscores with spaces
+                            display_name = username.replace('.', ' ').replace('_', ' ').title()
+                    except Exception:
+                        pass
+
+                    # Build context dict
+                    context = {
+                        'email': email,
+                        'name': display_name,
+                        'tickets': user_activity.get('tickets', []),
+                        'time_hours': user_activity.get('time_hours', 0.0),
+                        'prs': user_activity.get('prs', []),
+                        'slack_activity_count': user_activity.get('slack_activity_count', 0),
+                        'talking_points': talking_points
+                    }
+
+                    attendee_contexts.append(context)
+                    logger.debug(f"Added context for {email}: {len(talking_points)} talking points")
+
+                except Exception as e:
+                    logger.warning(f"Error processing attendee {email}: {e}")
+                    # Continue with other attendees
+                    continue
+
+            activity.attendee_context = attendee_contexts
+            logger.info(f"Collected context for {len(attendee_contexts)} attendees")
+
+        except Exception as e:
+            logger.warning(f"Error collecting attendee context: {e}")
+            activity.attendee_context = []
+
     async def _match_topics_to_activity(self, activity: ProjectActivity):
         """Match topics from the most recent meeting to project activity."""
 
@@ -1137,6 +1224,208 @@ class ProjectActivityAggregator:
         import re
         match = re.search(r'\b([A-Z]+-\d+)\b', text)
         return match.group(1) if match else None
+
+    def _get_meeting_attendees(self, project_key: str, days: int) -> List[str]:
+        """
+        Get list of unique meeting attendees for the project within the specified days.
+
+        Args:
+            project_key: Jira project key
+            days: Number of days to look back
+
+        Returns:
+            List of unique email addresses of meeting participants
+        """
+        try:
+            from datetime import datetime, timedelta
+            from sqlalchemy import text
+
+            cutoff_date = datetime.now() - timedelta(days=days)
+
+            result = self.session.execute(
+                text("""
+                    SELECT DISTINCT jsonb_array_elements_text(participants) as email
+                    FROM meeting_metadata
+                    WHERE project_key = :project_key
+                    AND last_occurrence > :cutoff_date
+                """),
+                {"project_key": project_key, "cutoff_date": cutoff_date}
+            )
+
+            attendees = [row[0] for row in result if row[0]]
+            logger.info(f"Found {len(attendees)} unique attendees for {project_key} in last {days} days")
+            return attendees
+
+        except Exception as e:
+            logger.warning(f"Error getting meeting attendees: {e}")
+            return []
+
+    def _get_user_activity(
+        self,
+        project_key: str,
+        email: str,
+        start_date: str,
+        end_date: str,
+        activity: ProjectActivity
+    ) -> Dict[str, Any]:
+        """
+        Get activity summary for a specific user.
+
+        Args:
+            project_key: Jira project key
+            email: User's email address
+            start_date: Start date in ISO format
+            end_date: End date in ISO format
+            activity: ProjectActivity object with aggregated data
+
+        Returns:
+            Dict with user's tickets, time_hours, prs, and slack_activity_count
+        """
+        try:
+            user_data = {
+                'tickets': [],
+                'time_hours': 0.0,
+                'prs': [],
+                'slack_activity_count': 0
+            }
+
+            # Get user's tickets from already-collected ticket activity
+            for ticket in activity.ticket_activity:
+                assignee_email = ticket.get('assignee_email', '')
+                assignee_name = ticket.get('assignee', '')
+
+                # Match by email or name (since we might only have display name)
+                if email.lower() in assignee_email.lower() or email.lower() in assignee_name.lower():
+                    user_data['tickets'].append({
+                        'key': ticket.get('key', ''),
+                        'summary': ticket.get('summary', ''),
+                        'status': ticket.get('status', 'Unknown')
+                    })
+
+            # Get user's time hours from already-collected time entries
+            for entry in activity.time_entries:
+                author_name = entry.get('author', '')
+                # Match by email or name
+                if email.lower() in author_name.lower():
+                    user_data['time_hours'] += entry.get('hours', 0)
+
+            # Get user's PRs from already-collected GitHub data
+            all_prs = (activity.github_prs_merged +
+                      activity.github_prs_in_review +
+                      activity.github_prs_open)
+
+            for pr in all_prs:
+                pr_author = pr.get('author', '')
+                # Match by email or username (GitHub username might be in email)
+                if email.lower() in pr_author.lower():
+                    user_data['prs'].append({
+                        'number': pr.get('number'),
+                        'title': pr.get('title', ''),
+                        'state': pr.get('state', 'unknown')
+                    })
+
+            # Get user's Slack activity count from already-collected messages
+            # Try to match by email or display name
+            for msg in activity.slack_messages:
+                msg_user = msg.get('user', '')
+                msg_user_email = msg.get('user_email', '')
+
+                if email.lower() in msg_user.lower() or email.lower() in msg_user_email.lower():
+                    user_data['slack_activity_count'] += 1
+
+            # Round time hours
+            user_data['time_hours'] = round(user_data['time_hours'], 2)
+
+            logger.debug(f"User activity for {email}: {len(user_data['tickets'])} tickets, "
+                        f"{user_data['time_hours']}h, {len(user_data['prs'])} PRs, "
+                        f"{user_data['slack_activity_count']} Slack messages")
+
+            return user_data
+
+        except Exception as e:
+            logger.warning(f"Error getting user activity for {email}: {e}")
+            return {
+                'tickets': [],
+                'time_hours': 0.0,
+                'prs': [],
+                'slack_activity_count': 0
+            }
+
+    async def _generate_talking_points(self, user_activity: Dict[str, Any], user_email: str) -> List[str]:
+        """
+        Generate talking points for a user based on their activity.
+
+        Args:
+            user_activity: Dict with user's activity data
+            user_email: User's email address
+
+        Returns:
+            List of 2-4 talking point strings
+        """
+        try:
+            import json
+            from langchain_core.messages import HumanMessage, SystemMessage
+
+            # Build activity summary for prompt
+            activity_summary = {
+                'tickets_count': len(user_activity.get('tickets', [])),
+                'tickets': user_activity.get('tickets', [])[:5],  # Limit to 5 for context
+                'time_logged_hours': user_activity.get('time_hours', 0),
+                'prs_count': len(user_activity.get('prs', [])),
+                'prs': user_activity.get('prs', [])[:3],  # Limit to 3
+                'slack_messages_count': user_activity.get('slack_activity_count', 0)
+            }
+
+            # Skip if no activity
+            if (activity_summary['tickets_count'] == 0 and
+                activity_summary['time_logged_hours'] == 0 and
+                activity_summary['prs_count'] == 0 and
+                activity_summary['slack_messages_count'] == 0):
+                return ["No recent activity tracked"]
+
+            prompt = f"""Based on this team member's recent activity, generate 2-4 concise talking points for a team meeting.
+Focus on achievements, blockers, and collaboration opportunities.
+
+User: {user_email}
+Activity Summary:
+{json.dumps(activity_summary, indent=2)}
+
+Generate 2-4 bullet points (without bullet symbols, just plain text lines).
+Keep each point concise and actionable. Format as a JSON array of strings."""
+
+            messages = [
+                SystemMessage(content="You are a project manager creating meeting prep materials. Generate concise, actionable talking points."),
+                HumanMessage(content=prompt)
+            ]
+
+            # Use the LLM to generate talking points
+            try:
+                response = await self.analyzer.llm.ainvoke(messages)
+            except AttributeError:
+                response = self.analyzer.llm.invoke(messages)
+
+            # Parse the response
+            content = response.content.strip()
+            if content.startswith('['):
+                talking_points = json.loads(content)
+            else:
+                # Fallback: split by newlines
+                talking_points = [line.strip() for line in content.split('\n') if line.strip()]
+
+            # Limit to 4 points
+            talking_points = talking_points[:4]
+
+            logger.debug(f"Generated {len(talking_points)} talking points for {user_email}")
+            return talking_points
+
+        except Exception as e:
+            logger.warning(f"Error generating talking points for {user_email}: {e}")
+            # Fallback to basic summary
+            tickets = len(user_activity.get('tickets', []))
+            hours = user_activity.get('time_hours', 0)
+            if tickets > 0 or hours > 0:
+                return [f"Working on {tickets} ticket(s), logged {hours} hours"]
+            return ["No recent activity tracked"]
 
     async def _fetch_tempo_direct(self, project_key: str, start_date: str, end_date: str) -> tuple[float, list]:
         """Direct Tempo API call as fallback when MCP fails."""
