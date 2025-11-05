@@ -58,6 +58,7 @@ class InsightDetector:
             insights.extend(self._detect_stale_prs(user, project_keys))
             insights.extend(self._detect_budget_alerts(user, project_keys))
             insights.extend(self._detect_anomaly(user, project_keys))
+            insights.extend(self._detect_meeting_prep(user, project_keys))
 
             logger.info(f"Detected {len(insights)} insights for user {user.id}")
 
@@ -570,6 +571,83 @@ class InsightDetector:
 
         return None
 
+    def _detect_meeting_prep(self, user: User, project_keys: List[str]) -> List[ProactiveInsight]:
+        """Generate meeting prep for projects with meetings today.
+
+        Args:
+            user: User to detect insights for
+            project_keys: List of project keys to monitor
+
+        Returns:
+            List of meeting prep insights
+        """
+        insights = []
+
+        try:
+            from sqlalchemy import text
+
+            # Get current weekday name (lowercase: "monday", "tuesday", etc.)
+            today_weekday = datetime.now(timezone.utc).strftime('%A').lower()
+
+            for project_key in project_keys:
+                try:
+                    # Check if already generated today
+                    if self._recently_alerted(user.id, 'meeting_prep', project_key, days=1):
+                        continue
+
+                    # Query projects table for meeting day
+                    query = text("""
+                        SELECT weekly_meeting_day
+                        FROM projects
+                        WHERE key = :project_key
+                    """)
+                    result = self.db.execute(query, {'project_key': project_key}).fetchone()
+
+                    if not result or not result.weekly_meeting_day:
+                        continue
+
+                    # Check if today is meeting day
+                    if result.weekly_meeting_day.lower() != today_weekday:
+                        continue
+
+                    logger.info(f"Generating meeting prep insight for {project_key} (meeting day: {today_weekday})")
+
+                    # Create insight that prompts user to generate digest
+                    insight = ProactiveInsight(
+                        id=str(uuid.uuid4()),
+                        user_id=user.id,
+                        project_key=project_key,
+                        insight_type='meeting_prep',
+                        title=f"{project_key}: Meeting prep for today's sync",
+                        description=f"Your weekly {project_key} meeting is scheduled today. Click to view the weekly digest with latest activity, action items, and proposed agenda.",
+                        severity='info',
+                        metadata_json={
+                            'meeting_day': today_weekday,
+                            'project_key': project_key,
+                            'digest_url': f'/api/project-digest/{project_key}',
+                            'action': 'view_digest',
+                            'suggested_params': {
+                                'days': 7,
+                                'include_context': True
+                            }
+                        },
+                        created_at=datetime.now(timezone.utc)
+                    )
+
+                    insights.append(insight)
+                    logger.info(f"Created meeting prep insight for {project_key}")
+
+                except Exception as e:
+                    logger.error(f"Error generating meeting prep for {project_key}: {e}", exc_info=True)
+                    continue
+
+            logger.info(f"Generated {len(insights)} meeting prep insights for user {user.id}")
+
+        except Exception as e:
+            logger.error(f"Error in meeting prep detection: {e}", exc_info=True)
+
+        return insights
+
     def _recently_alerted(self, user_id: int, insight_type: str, identifier: Any, days: int = 1) -> bool:
         """Check if user was recently alerted about this insight.
 
@@ -603,6 +681,9 @@ class InsightDetector:
                         return True
                     # For anomalies, check project_key
                     if insight_type == 'anomaly' and insight.metadata_json.get('project_key') == identifier:
+                        return True
+                    # For meeting prep, check project_key
+                    if insight_type == 'meeting_prep' and insight.metadata_json.get('project_key') == identifier:
                         return True
 
             return False
