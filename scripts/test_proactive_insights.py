@@ -140,7 +140,7 @@ def test_brief_generation(user_id):
                 title="Test Insight",
                 description="This is a test insight for brief generation",
                 severity="info",
-                insight_metadata={"test": True},
+                metadata_json={"test": True},
                 created_at=datetime.now(timezone.utc)
             )
             db.add(test_insight)

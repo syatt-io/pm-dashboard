@@ -117,7 +117,7 @@ class InsightDetector:
                         title=f"PR #{pr['number']} needs review",
                         description=f"Pull request '{pr['title']}' has been open for {days_open} days without reviews.",
                         severity='warning',
-                        insight_metadata={
+                        metadata_json={
                             'pr_number': pr['number'],
                             'pr_url': pr['html_url'],
                             'pr_title': pr['title'],
@@ -208,7 +208,7 @@ class InsightDetector:
                             title=f"{project_key} approaching budget limit",
                             description=f"Project has used {usage_pct:.0f}% of budget with {100 - time_passed_pct:.0f}% of month remaining. Consider scope adjustment.",
                             severity=severity,
-                            insight_metadata={
+                            metadata_json={
                                 'project_key': project_key,
                                 'budget_used_pct': round(usage_pct, 1),
                                 'time_passed_pct': round(time_passed_pct, 1),
@@ -256,12 +256,12 @@ class InsightDetector:
 
             # Check if any match the identifier
             for insight in existing:
-                if insight.insight_metadata:
+                if insight.metadata_json:
                     # For PRs, check pr_number
-                    if insight_type == 'stale_pr' and insight.insight_metadata.get('pr_number') == identifier:
+                    if insight_type == 'stale_pr' and insight.metadata_json.get('pr_number') == identifier:
                         return True
                     # For budget alerts, check project_key
-                    if insight_type == 'budget_alert' and insight.insight_metadata.get('project_key') == identifier:
+                    if insight_type == 'budget_alert' and insight.metadata_json.get('project_key') == identifier:
                         return True
 
             return False

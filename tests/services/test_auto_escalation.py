@@ -132,7 +132,7 @@ def create_insight(
         title=f'Stale PR: Test PR #{days_old}',
         description=f'This PR has been open for {days_old} days',
         severity='warning',
-        insight_metadata={'pr_url': pr_url, 'project_key': project_key},
+        metadata_json={'pr_url': pr_url, 'project_key': project_key},
         created_at=created_at,
         escalation_level=escalation_level,
         escalation_count=0,
@@ -509,7 +509,7 @@ def test_github_escalation_no_pr_url(
     """Test GitHub escalation fails safely when no PR URL in metadata."""
     # 7 days old = level 3, but no PR URL
     insight = create_insight(db_session, sample_user.id, 7, pr_url=None)
-    insight.insight_metadata = {'project_key': 'SUBS'}  # No pr_url
+    insight.metadata_json = {'project_key': 'SUBS'}  # No pr_url
     db_session.commit()
 
     service = AutoEscalationService(
@@ -622,7 +622,7 @@ def test_run_escalation_check_statistics(
         title='Stale PR: Test 1',
         description='Test insight 1',
         severity='warning',
-        insight_metadata={'pr_url': 'https://github.com/org/repo/pull/1', 'project_key': 'SUBS'},
+        metadata_json={'pr_url': 'https://github.com/org/repo/pull/1', 'project_key': 'SUBS'},
         created_at=datetime.now(timezone.utc) - timedelta(days=3),
         escalation_level=0,
         escalation_count=0
@@ -635,7 +635,7 @@ def test_run_escalation_check_statistics(
         title='Stale PR: Test 2',
         description='Test insight 2',
         severity='warning',
-        insight_metadata={'pr_url': 'https://github.com/org/repo/pull/2', 'project_key': 'SUBS'},
+        metadata_json={'pr_url': 'https://github.com/org/repo/pull/2', 'project_key': 'SUBS'},
         created_at=datetime.now(timezone.utc) - timedelta(days=5),
         escalation_level=0,
         escalation_count=0
@@ -648,7 +648,7 @@ def test_run_escalation_check_statistics(
         title='Stale PR: Test 3',
         description='Test insight 3',
         severity='warning',
-        insight_metadata={'pr_url': 'https://github.com/org/repo/pull/3', 'project_key': 'SUBS'},
+        metadata_json={'pr_url': 'https://github.com/org/repo/pull/3', 'project_key': 'SUBS'},
         created_at=datetime.now(timezone.utc) - timedelta(days=2),
         escalation_level=0,
         escalation_count=0
@@ -661,7 +661,7 @@ def test_run_escalation_check_statistics(
         title='Stale PR: Test 4',
         description='Test insight 4',
         severity='warning',
-        insight_metadata={'pr_url': 'https://github.com/org/repo/pull/4', 'project_key': 'SUBS'},
+        metadata_json={'pr_url': 'https://github.com/org/repo/pull/4', 'project_key': 'SUBS'},
         created_at=datetime.now(timezone.utc) - timedelta(days=3),
         escalation_level=1,
         escalation_count=0

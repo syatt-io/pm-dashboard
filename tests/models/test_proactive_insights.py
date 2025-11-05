@@ -46,7 +46,7 @@ def test_proactive_insight_creation(db_session, test_user):
         title="Test Insight",
         description="This is a test insight",
         severity="warning",
-        insight_metadata={"pr_number": 123, "days_open": 5},
+        metadata_json={"pr_number": 123, "days_open": 5},
         created_at=datetime.now(timezone.utc)
     )
 
@@ -58,7 +58,7 @@ def test_proactive_insight_creation(db_session, test_user):
     assert retrieved is not None
     assert retrieved.title == "Test Insight"
     assert retrieved.severity == "warning"
-    assert retrieved.insight_metadata["pr_number"] == 123
+    assert retrieved.metadata_json["pr_number"] == 123
     assert retrieved.dismissed_at is None
 
 
@@ -72,7 +72,7 @@ def test_proactive_insight_to_dict(db_session, test_user):
         title="Budget Alert",
         description="Budget exceeded",
         severity="critical",
-        insight_metadata={"budget_used_pct": 95.5},
+        metadata_json={"budget_used_pct": 95.5},
         created_at=datetime.now(timezone.utc)
     )
 

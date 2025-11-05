@@ -31,6 +31,7 @@ ENV/
 .env.local
 .env.production
 .env.staging
+.env.bak*
 
 # Database
 pm_agent.db

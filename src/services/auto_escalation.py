@@ -473,7 +473,7 @@ class AutoEscalationService:
             True if successful, False otherwise
         """
         # Extract PR URL from insight metadata
-        metadata = insight.insight_metadata or {}
+        metadata = insight.metadata_json or {}
         pr_url = metadata.get('pr_url') or metadata.get('url')
 
         if not pr_url:
@@ -563,8 +563,8 @@ class AutoEscalationService:
         message += f"This item has been waiting for *{days_old} days*.\n\n"
         message += f"{insight.description}\n\n"
 
-        if insight.insight_metadata:
-            metadata = insight.insight_metadata
+        if insight.metadata_json:
+            metadata = insight.metadata_json
             if metadata.get('pr_url'):
                 message += f":link: PR: {metadata['pr_url']}\n"
             if metadata.get('project_key'):
@@ -607,8 +607,8 @@ class AutoEscalationService:
         message += f"*{days_old} days* and needs attention.\n\n"
         message += f"{insight.description}\n\n"
 
-        if insight.insight_metadata:
-            metadata = insight.insight_metadata
+        if insight.metadata_json:
+            metadata = insight.metadata_json
             if metadata.get('pr_url'):
                 message += f":link: PR: {metadata['pr_url']}\n"
             if metadata.get('project_key'):

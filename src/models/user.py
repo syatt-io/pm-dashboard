@@ -341,15 +341,59 @@ class User(Base):
 
     # Notification preference methods
     def get_notification_preferences(self) -> dict:
-        """Get user's notification preferences."""
-        return {
+        """Get user's notification preferences including proactive insights settings."""
+        from src.models.notification_preferences import UserNotificationPreferences
+        from sqlalchemy.orm import Session
+
+        # Get basic preferences from User model
+        prefs = {
             'notify_daily_todo_digest': self.notify_daily_todo_digest,
             'notify_project_hours_forecast': self.notify_project_hours_forecast,
             'slack_connected': bool(self.slack_user_id)
         }
 
+        # Get extended preferences from UserNotificationPreferences
+        session = Session.object_session(self)
+        if session:
+            extended_prefs = session.query(UserNotificationPreferences).filter(
+                UserNotificationPreferences.user_id == self.id
+            ).first()
+
+            if extended_prefs:
+                # Add proactive insights preferences
+                prefs.update({
+                    'daily_brief_slack': extended_prefs.daily_brief_slack,
+                    'daily_brief_email': extended_prefs.daily_brief_email,
+                    'enable_stale_pr_alerts': extended_prefs.enable_stale_pr_alerts,
+                    'enable_budget_alerts': extended_prefs.enable_budget_alerts,
+                    'enable_missing_ticket_alerts': extended_prefs.enable_missing_ticket_alerts,
+                    'enable_anomaly_alerts': extended_prefs.enable_anomaly_alerts,
+                    'enable_meeting_prep': extended_prefs.enable_meeting_prep,
+                    'daily_brief_time': extended_prefs.daily_brief_time,
+                    'timezone': extended_prefs.timezone
+                })
+            else:
+                # Return defaults if no extended preferences exist yet
+                prefs.update({
+                    'daily_brief_slack': True,
+                    'daily_brief_email': False,
+                    'enable_stale_pr_alerts': True,
+                    'enable_budget_alerts': True,
+                    'enable_missing_ticket_alerts': True,
+                    'enable_anomaly_alerts': True,
+                    'enable_meeting_prep': True,
+                    'daily_brief_time': "09:00",
+                    'timezone': "America/New_York"
+                })
+
+        return prefs
+
     def update_notification_preferences(self, preferences: dict):
-        """Update user's notification preferences."""
+        """Update user's notification preferences including proactive insights settings."""
+        from src.models.notification_preferences import UserNotificationPreferences
+        from sqlalchemy.orm import Session
+
+        # Update User model fields (legacy)
         if 'notify_daily_todo_digest' in preferences:
             self.notify_daily_todo_digest = bool(preferences['notify_daily_todo_digest'])
             logger.info(f"Daily TODO digest preference set to {self.notify_daily_todo_digest} for user {self.id}")
@@ -357,6 +401,50 @@ class User(Base):
         if 'notify_project_hours_forecast' in preferences:
             self.notify_project_hours_forecast = bool(preferences['notify_project_hours_forecast'])
             logger.info(f"Project hours forecast preference set to {self.notify_project_hours_forecast} for user {self.id}")
+
+        # Update UserNotificationPreferences (proactive insights)
+        session = Session.object_session(self)
+        if session:
+            extended_prefs = session.query(UserNotificationPreferences).filter(
+                UserNotificationPreferences.user_id == self.id
+            ).first()
+
+            # Create UserNotificationPreferences if it doesn't exist
+            if not extended_prefs:
+                extended_prefs = UserNotificationPreferences(user_id=self.id)
+                session.add(extended_prefs)
+                logger.info(f"Created UserNotificationPreferences for user {self.id}")
+
+            # Update proactive insights preferences
+            if 'daily_brief_slack' in preferences:
+                extended_prefs.daily_brief_slack = bool(preferences['daily_brief_slack'])
+
+            if 'daily_brief_email' in preferences:
+                extended_prefs.daily_brief_email = bool(preferences['daily_brief_email'])
+
+            if 'enable_stale_pr_alerts' in preferences:
+                extended_prefs.enable_stale_pr_alerts = bool(preferences['enable_stale_pr_alerts'])
+
+            if 'enable_budget_alerts' in preferences:
+                extended_prefs.enable_budget_alerts = bool(preferences['enable_budget_alerts'])
+
+            if 'enable_missing_ticket_alerts' in preferences:
+                extended_prefs.enable_missing_ticket_alerts = bool(preferences['enable_missing_ticket_alerts'])
+
+            if 'enable_anomaly_alerts' in preferences:
+                extended_prefs.enable_anomaly_alerts = bool(preferences['enable_anomaly_alerts'])
+
+            if 'enable_meeting_prep' in preferences:
+                extended_prefs.enable_meeting_prep = bool(preferences['enable_meeting_prep'])
+
+            if 'daily_brief_time' in preferences:
+                extended_prefs.daily_brief_time = str(preferences['daily_brief_time'])
+
+            if 'timezone' in preferences:
+                extended_prefs.timezone = str(preferences['timezone'])
+
+            session.flush()
+            logger.info(f"Updated proactive insights preferences for user {self.id}")
 
 
 class UserWatchedProject(Base):

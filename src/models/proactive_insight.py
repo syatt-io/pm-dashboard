@@ -18,7 +18,7 @@ class ProactiveInsight(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
     severity = Column(String(20), nullable=False)  # 'info', 'warning', 'critical'
-    insight_metadata = Column(JSON, nullable=True)  # Flexible storage for type-specific data
+    metadata_json = Column(JSON, nullable=True)  # Flexible storage for type-specific data
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     dismissed_at = Column(DateTime, nullable=True)
     acted_on_at = Column(DateTime, nullable=True)
@@ -46,7 +46,7 @@ class ProactiveInsight(Base):
             'title': self.title,
             'description': self.description,
             'severity': self.severity,
-            'metadata': self.insight_metadata,
+            'metadata': self.metadata_json,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'dismissed_at': self.dismissed_at.isoformat() if self.dismissed_at else None,
             'acted_on_at': self.acted_on_at.isoformat() if self.acted_on_at else None,

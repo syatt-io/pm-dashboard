@@ -407,17 +407,37 @@ def update_notification_preferences(user):
                 'error': 'Preferences data is required'
             }), 400
 
-        # Validate preference values
-        if 'notify_daily_todo_digest' in data and not isinstance(data['notify_daily_todo_digest'], bool):
+        # Validate boolean preference values
+        boolean_fields = [
+            'notify_daily_todo_digest',
+            'notify_project_hours_forecast',
+            'daily_brief_slack',
+            'daily_brief_email',
+            'enable_stale_pr_alerts',
+            'enable_budget_alerts',
+            'enable_missing_ticket_alerts',
+            'enable_anomaly_alerts',
+            'enable_meeting_prep'
+        ]
+
+        for field in boolean_fields:
+            if field in data and not isinstance(data[field], bool):
+                return jsonify({
+                    'success': False,
+                    'error': f'{field} must be a boolean'
+                }), 400
+
+        # Validate string fields
+        if 'daily_brief_time' in data and not isinstance(data['daily_brief_time'], str):
             return jsonify({
                 'success': False,
-                'error': 'notify_daily_todo_digest must be a boolean'
+                'error': 'daily_brief_time must be a string'
             }), 400
 
-        if 'notify_project_hours_forecast' in data and not isinstance(data['notify_project_hours_forecast'], bool):
+        if 'timezone' in data and not isinstance(data['timezone'], str):
             return jsonify({
                 'success': False,
-                'error': 'notify_project_hours_forecast must be a boolean'
+                'error': 'timezone must be a string'
             }), 400
 
         # Update preferences
