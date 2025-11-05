@@ -2167,6 +2167,7 @@ const ProjectShowContent = () => {
   const [digestModalOpen, setDigestModalOpen] = useState(false);
   const [digestData, setDigestData] = useState<any>(null);
   const [includeHistoricalContext, setIncludeHistoricalContext] = useState(false);
+  const [includeAttendeeContext, setIncludeAttendeeContext] = useState(false);
 
   // A/B comparison state
   const [comparisonModalOpen, setComparisonModalOpen] = useState(false);
