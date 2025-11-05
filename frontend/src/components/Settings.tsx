@@ -463,7 +463,10 @@ export const Settings = () => {
       });
 
       if (!response.ok) {
-        throw new globalThis.Error('Failed to save escalation preferences');
+        // Try to get the error message from the response
+        const errorData = await response.json().catch(() => null);
+        const errorMessage = errorData?.error || `Failed to save escalation preferences (${response.status})`;
+        throw new globalThis.Error(errorMessage);
       }
 
       const data: ApiResponse = await response.json();
