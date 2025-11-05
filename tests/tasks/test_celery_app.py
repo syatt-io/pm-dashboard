@@ -222,7 +222,7 @@ class TestCeleryConfiguration:
         """Test that Celery app includes expected task modules."""
         from src.tasks.celery_app import celery_app
 
-        expected_includes = ['src.tasks.vector_tasks', 'src.tasks.notification_tasks']
+        expected_includes = ['src.tasks.vector_tasks', 'src.tasks.notification_tasks', 'src.webhooks.fireflies_webhook']
         assert celery_app.conf.include == expected_includes
 
     def test_celery_task_time_limit_configured(self):
