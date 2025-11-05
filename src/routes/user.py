@@ -441,3 +441,134 @@ def update_notification_preferences(user):
             'success': False,
             'error': str(e)
         }), 500
+
+
+# Escalation preference endpoints
+@user_bp.route("/escalation-preferences", methods=["GET"])
+@auth_required
+def get_user_escalation_preferences(user):
+    """Get current user's auto-escalation preferences."""
+    try:
+        from src.models.escalation import EscalationPreferences
+
+        with session_scope() as db_session:
+            prefs = db_session.query(EscalationPreferences).filter_by(user_id=user.id).first()
+
+            if not prefs:
+                # Return defaults
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'user_id': user.id,
+                        'enable_auto_escalation': False,
+                        'enable_dm_escalation': True,
+                        'enable_channel_escalation': True,
+                        'enable_github_escalation': True,
+                        'dm_threshold_days': 3,
+                        'channel_threshold_days': 5,
+                        'critical_threshold_days': 7
+                    }
+                })
+
+            return jsonify({
+                'success': True,
+                'data': prefs.to_dict()
+            })
+
+    except Exception as e:
+        logger.error(f"Error getting escalation preferences for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@user_bp.route("/escalation-preferences", methods=["PUT"])
+@auth_required
+def update_user_escalation_preferences(user):
+    """Update current user's auto-escalation preferences."""
+    try:
+        from src.models.escalation import EscalationPreferences
+        from datetime import datetime, timezone
+
+        data = request.get_json()
+
+        if not data or not isinstance(data, dict):
+            return jsonify({
+                'success': False,
+                'error': 'Preferences data is required'
+            }), 400
+
+        # Validate thresholds
+        dm_threshold = data.get('dm_threshold_days')
+        channel_threshold = data.get('channel_threshold_days')
+        critical_threshold = data.get('critical_threshold_days')
+
+        if dm_threshold is not None and dm_threshold < 1:
+            return jsonify({
+                'success': False,
+                'error': 'dm_threshold_days must be at least 1'
+            }), 400
+
+        if channel_threshold is not None and channel_threshold < 1:
+            return jsonify({
+                'success': False,
+                'error': 'channel_threshold_days must be at least 1'
+            }), 400
+
+        if critical_threshold is not None and critical_threshold < 1:
+            return jsonify({
+                'success': False,
+                'error': 'critical_threshold_days must be at least 1'
+            }), 400
+
+        with session_scope() as db_session:
+            prefs = db_session.query(EscalationPreferences).filter_by(user_id=user.id).first()
+
+            if not prefs:
+                # Create new preferences
+                prefs = EscalationPreferences(
+                    user_id=user.id,
+                    enable_auto_escalation=data.get('enable_auto_escalation', False),
+                    enable_dm_escalation=data.get('enable_dm_escalation', True),
+                    enable_channel_escalation=data.get('enable_channel_escalation', True),
+                    enable_github_escalation=data.get('enable_github_escalation', True),
+                    dm_threshold_days=data.get('dm_threshold_days', 3),
+                    channel_threshold_days=data.get('channel_threshold_days', 5),
+                    critical_threshold_days=data.get('critical_threshold_days', 7),
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc)
+                )
+                db_session.add(prefs)
+            else:
+                # Update existing preferences
+                if 'enable_auto_escalation' in data:
+                    prefs.enable_auto_escalation = data['enable_auto_escalation']
+                if 'enable_dm_escalation' in data:
+                    prefs.enable_dm_escalation = data['enable_dm_escalation']
+                if 'enable_channel_escalation' in data:
+                    prefs.enable_channel_escalation = data['enable_channel_escalation']
+                if 'enable_github_escalation' in data:
+                    prefs.enable_github_escalation = data['enable_github_escalation']
+                if 'dm_threshold_days' in data:
+                    prefs.dm_threshold_days = data['dm_threshold_days']
+                if 'channel_threshold_days' in data:
+                    prefs.channel_threshold_days = data['channel_threshold_days']
+                if 'critical_threshold_days' in data:
+                    prefs.critical_threshold_days = data['critical_threshold_days']
+                prefs.updated_at = datetime.now(timezone.utc)
+
+            logger.info(f"Escalation preferences updated for user {user.id}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Escalation preferences updated successfully',
+                'data': prefs.to_dict()
+            })
+
+    except Exception as e:
+        logger.error(f"Error updating escalation preferences for user {user.id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

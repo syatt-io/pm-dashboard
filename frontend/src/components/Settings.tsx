@@ -50,6 +50,7 @@ import {
   Work as WorkIcon,
   People as PeopleIcon,
   Notifications as NotificationsIcon,
+  TrendingUp as EscalationIcon,
 } from '@mui/icons-material';
 import { Loading, Title, useDataProvider, useNotify } from 'react-admin';
 import { getApiUrl } from '../config';
@@ -105,6 +106,17 @@ interface AvailableModels {
   openai: Array<{ value: string; label: string }>;
   anthropic: Array<{ value: string; label: string }>;
   google: Array<{ value: string; label: string }>;
+}
+
+interface EscalationPreferences {
+  user_id: number;
+  enable_auto_escalation: boolean;
+  enable_dm_escalation: boolean;
+  enable_channel_escalation: boolean;
+  enable_github_escalation: boolean;
+  dm_threshold_days: number;
+  channel_threshold_days: number;
+  critical_threshold_days: number;
 }
 
 interface ApiResponse {
@@ -202,6 +214,11 @@ export const Settings = () => {
   const [deleteAIKeyDialog, setDeleteAIKeyDialog] = useState<string | null>(null);
   const [deletingAIKey, setDeletingAIKey] = useState(false);
 
+  // Escalation preferences state
+  const [escalationPrefs, setEscalationPrefs] = useState<EscalationPreferences | null>(null);
+  const [loadingEscalation, setLoadingEscalation] = useState(false);
+  const [savingEscalation, setSavingEscalation] = useState(false);
+
   // Load user settings on component mount
   useEffect(() => {
     loadSettings();
@@ -229,6 +246,14 @@ export const Settings = () => {
   useEffect(() => {
     if (tabValue === 2) { // Notifications tab
       loadNotificationPreferences();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabValue]);
+
+  // Load escalation preferences when Auto-Escalation tab is accessed
+  useEffect(() => {
+    if (tabValue === 3) { // Auto-Escalation tab (index 3)
+      loadEscalationPreferences();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabValue]);
@@ -371,6 +396,64 @@ export const Settings = () => {
       showSnackbar(error instanceof Error ? error.message : 'Error saving notification preferences', 'error');
     } finally {
       setSavingNotifPrefs(false);
+    }
+  };
+
+  const loadEscalationPreferences = async () => {
+    try {
+      setLoadingEscalation(true);
+      const response = await fetch(getApiUrl('/api/user/escalation-preferences'), {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to load escalation preferences');
+      }
+
+      const data: ApiResponse = await response.json();
+      if (data.success && data.data) {
+        setEscalationPrefs(data.data);
+      }
+    } catch (error) {
+      console.error('Error loading escalation preferences:', error);
+      showSnackbar('Error loading escalation preferences', 'error');
+    } finally {
+      setLoadingEscalation(false);
+    }
+  };
+
+  const saveEscalationPreferences = async () => {
+    if (!escalationPrefs) return;
+
+    try {
+      setSavingEscalation(true);
+      const response = await fetch(getApiUrl('/api/user/escalation-preferences'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(escalationPrefs),
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to save escalation preferences');
+      }
+
+      const data: ApiResponse = await response.json();
+      if (data.success) {
+        showSnackbar('Auto-escalation preferences saved successfully!', 'success');
+        if (data.data) {
+          setEscalationPrefs(data.data);
+        }
+      } else {
+        throw new globalThis.Error(data.error || 'Failed to save preferences');
+      }
+    } catch (error) {
+      console.error('Error saving escalation preferences:', error);
+      showSnackbar(error instanceof Error ? error.message : 'Error saving escalation preferences', 'error');
+    } finally {
+      setSavingEscalation(false);
     }
   };
 
@@ -894,6 +977,7 @@ export const Settings = () => {
           <Tab icon={<SettingsIcon />} label="My Integrations" iconPosition="start" />
           <Tab icon={<WorkIcon />} label="Project Settings" iconPosition="start" />
           <Tab icon={<NotificationsIcon />} label="Notifications" iconPosition="start" />
+          <Tab icon={<EscalationIcon />} label="Auto-Escalation" iconPosition="start" />
           {settings.user.role === 'admin' && <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />}
           {settings.user.role === 'admin' && <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />}
         </Tabs>
@@ -1457,9 +1541,201 @@ export const Settings = () => {
         )}
       </TabPanel>
 
-      {/* Tab 4: AI Configuration (Admin Only) */}
+      {/* Tab 4: Auto-Escalation */}
+      <TabPanel value={tabValue} index={3}>
+        {loadingEscalation ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+            <CircularProgress />
+          </Box>
+        ) : escalationPrefs ? (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Auto-Escalation Settings
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Configure automatic escalation of stale proactive insights
+              </Typography>
+
+              <Alert severity="info" sx={{ mb: 3 }}>
+                Auto-escalation automatically notifies you about PR insights that haven't been addressed within specified timeframes.
+                Escalations are tiered: DM → Slack Channel → GitHub Comment.
+              </Alert>
+
+              <Box sx={{ mb: 3 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={escalationPrefs.enable_auto_escalation}
+                      onChange={(e) => setEscalationPrefs({
+                        ...escalationPrefs,
+                        enable_auto_escalation: e.target.checked
+                      })}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" fontWeight={500}>
+                        Enable Auto-Escalation
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Automatically escalate stale insights through multiple notification tiers
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="subtitle1" fontWeight={500} sx={{ mb: 2 }}>
+                Escalation Types
+              </Typography>
+
+              <Box sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={escalationPrefs.enable_dm_escalation}
+                      onChange={(e) => setEscalationPrefs({
+                        ...escalationPrefs,
+                        enable_dm_escalation: e.target.checked
+                      })}
+                      disabled={!escalationPrefs.enable_auto_escalation}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" fontWeight={500}>
+                        Slack DM Notifications
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Receive direct messages for insights requiring attention
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={escalationPrefs.enable_channel_escalation}
+                      onChange={(e) => setEscalationPrefs({
+                        ...escalationPrefs,
+                        enable_channel_escalation: e.target.checked
+                      })}
+                      disabled={!escalationPrefs.enable_auto_escalation}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" fontWeight={500}>
+                        Slack Channel Posts
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Post to internal project channels for visibility (only internal-safe channels)
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={escalationPrefs.enable_github_escalation}
+                      onChange={(e) => setEscalationPrefs({
+                        ...escalationPrefs,
+                        enable_github_escalation: e.target.checked
+                      })}
+                      disabled={!escalationPrefs.enable_auto_escalation}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1" fontWeight={500}>
+                        GitHub PR Comments
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Post comments directly on the pull request for critical insights
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              <Typography variant="subtitle1" fontWeight={500} sx={{ mb: 2 }}>
+                Escalation Thresholds
+              </Typography>
+
+              <TextField
+                fullWidth
+                type="number"
+                label="DM After (days)"
+                value={escalationPrefs.dm_threshold_days}
+                onChange={(e) => setEscalationPrefs({
+                  ...escalationPrefs,
+                  dm_threshold_days: parseInt(e.target.value) || 3
+                })}
+                disabled={!escalationPrefs.enable_auto_escalation || !escalationPrefs.enable_dm_escalation}
+                helperText="Send Slack DM after this many days"
+                InputProps={{ inputProps: { min: 1 } }}
+                sx={{ mb: 2 }}
+              />
+
+              <TextField
+                fullWidth
+                type="number"
+                label="Channel Post After (days)"
+                value={escalationPrefs.channel_threshold_days}
+                onChange={(e) => setEscalationPrefs({
+                  ...escalationPrefs,
+                  channel_threshold_days: parseInt(e.target.value) || 5
+                })}
+                disabled={!escalationPrefs.enable_auto_escalation || !escalationPrefs.enable_channel_escalation}
+                helperText="Post to Slack channel after this many days (includes DM)"
+                InputProps={{ inputProps: { min: 1 } }}
+                sx={{ mb: 2 }}
+              />
+
+              <TextField
+                fullWidth
+                type="number"
+                label="GitHub Comment After (days)"
+                value={escalationPrefs.critical_threshold_days}
+                onChange={(e) => setEscalationPrefs({
+                  ...escalationPrefs,
+                  critical_threshold_days: parseInt(e.target.value) || 7
+                })}
+                disabled={!escalationPrefs.enable_auto_escalation || !escalationPrefs.enable_github_escalation}
+                helperText="Post GitHub comment after this many days (includes DM + Channel)"
+                InputProps={{ inputProps: { min: 1 } }}
+                sx={{ mb: 3 }}
+              />
+
+              <Button
+                variant="contained"
+                onClick={saveEscalationPreferences}
+                disabled={savingEscalation}
+                startIcon={savingEscalation ? <CircularProgress size={16} /> : <Save />}
+              >
+                {savingEscalation ? 'Saving...' : 'Save Preferences'}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Alert severity="info">No escalation preferences configured yet.</Alert>
+        )}
+      </TabPanel>
+
+      {/* Tab 5: AI Configuration (Admin Only) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={3}>
+        <TabPanel value={tabValue} index={4}>
           {loadingAI ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <CircularProgress />
@@ -1652,9 +1928,9 @@ export const Settings = () => {
         </TabPanel>
       )}
 
-      {/* Tab 5: User Management (Admin Only) */}
+      {/* Tab 6: User Management (Admin Only) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={4}>
+        <TabPanel value={tabValue} index={5}>
           <UserManagement />
         </TabPanel>
       )}
