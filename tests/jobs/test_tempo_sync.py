@@ -32,7 +32,7 @@ def mock_tempo_client():
     """Create a mock TempoAPIClient."""
     client = MagicMock()
     client.get_current_month_hours = MagicMock(return_value={"SUBS": 10.5, "BEVS": 5.25})
-    client.get_year_to_date_hours = MagicMock(return_value={"SUBS": 120.0, "BEVS": 60.0})
+    client.get_all_time_hours = MagicMock(return_value={"SUBS": 120.0, "BEVS": 60.0})
     return client
 
 
@@ -190,7 +190,7 @@ class TestTempoSyncJob:
         # Mock Tempo client
         mock_client = MagicMock()
         mock_client.get_current_month_hours.return_value = {"SUBS": 10.5}
-        mock_client.get_year_to_date_hours.return_value = {"SUBS": 120.0}
+        mock_client.get_all_time_hours.return_value = {"SUBS": 120.0}
         mock_client_class.return_value = mock_client
 
         job = TempoSyncJob()
@@ -259,7 +259,7 @@ class TestTempoSyncJob:
 
         mock_client = MagicMock()
         mock_client.get_current_month_hours.return_value = {"SUBS": 0.0}
-        mock_client.get_year_to_date_hours.return_value = {"SUBS": 0.0}
+        mock_client.get_all_time_hours.return_value = {"SUBS": 0.0}
         mock_client_class.return_value = mock_client
 
         job = TempoSyncJob()
@@ -296,7 +296,7 @@ class TestTempoSyncJob:
             "RNWL": 15.75,
             "ECSC": 20.0
         }
-        mock_client.get_year_to_date_hours.return_value = {
+        mock_client.get_all_time_hours.return_value = {
             "SUBS": 120.0,
             "BEVS": 60.0,
             "RNWL": 180.0,
