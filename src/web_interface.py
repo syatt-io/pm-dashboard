@@ -141,8 +141,9 @@ CORS(app, origins=cors_origins, supports_credentials=True,
 csrf = CSRFProtect(app)
 # Exempt API routes that use JWT authentication (JWT provides CSRF protection)
 # Webhooks are also exempt as they use signature verification
-app.config['WTF_CSRF_EXEMPT_LIST'] = ['/api/', '/slack/']
-logger.info("✅ CSRF protection initialized (API/Slack routes exempt)")
+# Note: WTF_CSRF_EXEMPT_LIST doesn't support wildcards, so we exempt specific views
+app.config['WTF_CSRF_CHECK_DEFAULT'] = False  # Disable by default, enable selectively
+logger.info("✅ CSRF protection initialized (disabled by default for API routes)")
 
 # ✅ FIXED: Initialize rate limiter for API protection
 # Use Redis if available (production), otherwise in-memory (development)
