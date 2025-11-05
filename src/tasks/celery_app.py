@@ -60,7 +60,11 @@ print(f"Celery result backend: {backend_display}")
 # The broker will be set in conf.update() below
 celery_app = Celery(
     'agent_pm',
-    include=['src.tasks.vector_tasks', 'src.tasks.notification_tasks']
+    include=[
+        'src.tasks.vector_tasks',
+        'src.tasks.notification_tasks',
+        'src.webhooks.fireflies_webhook'  # Include webhook task for Fireflies meeting processing
+    ]
 )
 
 # Configure Celery with GCP Pub/Sub broker and PostgreSQL result backend
