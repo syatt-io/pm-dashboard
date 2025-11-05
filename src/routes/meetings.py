@@ -45,16 +45,18 @@ def error_response(error, status_code=500, details=None):
 
 # Helper function for project keyword mapping
 def get_project_keywords_from_db():
-    """Get project keywords mapping from database."""
+    """Get project keywords mapping from database (ACTIVE projects only)."""
     from sqlalchemy import text
     try:
         engine = get_engine()
         with engine.connect() as conn:
-            # Aggregate keywords by project_key (note: column is 'keyword' not 'keywords')
+            # Aggregate keywords by project_key, filtering for ACTIVE projects only
             result = conn.execute(text("""
-                SELECT project_key, array_agg(LOWER(keyword)) as keywords
-                FROM project_keywords
-                GROUP BY project_key
+                SELECT pk.project_key, array_agg(LOWER(pk.keyword)) as keywords
+                FROM project_keywords pk
+                INNER JOIN projects p ON pk.project_key = p.key
+                WHERE p.is_active = true
+                GROUP BY pk.project_key
             """))
             return {row[0]: row[1] for row in result}
     except Exception as e:
