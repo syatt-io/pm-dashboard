@@ -2433,27 +2433,10 @@ const ProjectShowContent = () => {
       }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={4}>
               <Box>
                 <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
-                  Status
-                </Typography>
-                <Chip
-                  label={record.is_active ? 'Active' : 'Inactive'}
-                  size="small"
-                  sx={{
-                    backgroundColor: record.is_active ? '#00FFCE' : 'rgba(255,255,255,0.2)',
-                    color: record.is_active ? '#000' : '#fff',
-                    fontWeight: 600
-                  }}
-                />
-              </Box>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={3}>
-              <Box>
-                <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
-                  Work Type
+                  Project Type
                 </Typography>
                 <Chip
                   label={
@@ -2471,7 +2454,7 @@ const ProjectShowContent = () => {
               </Box>
             </Grid>
 
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={6} md={4}>
               <Box>
                 <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
                   Current Month Progress
@@ -2495,7 +2478,10 @@ const ProjectShowContent = () => {
                     borderRadius: 4,
                     backgroundColor: 'rgba(255,255,255,0.2)',
                     '& .MuiLinearProgress-bar': {
-                      backgroundColor: '#00FFCE',
+                      backgroundColor:
+                        ((record.current_month_hours || 0) / (record.forecasted_hours_month || 1)) < 0.7 ? '#4caf50' :
+                        ((record.current_month_hours || 0) / (record.forecasted_hours_month || 1)) < 0.9 ? '#ff9800' :
+                        '#f44336',
                       borderRadius: 4
                     }
                   }}
@@ -2504,22 +2490,38 @@ const ProjectShowContent = () => {
             </Grid>
 
             {record.project_work_type === 'project-based' && (
-              <Grid item xs={12} sm={6} md={3}>
+              <Grid item xs={12} sm={6} md={4}>
                 <Box>
                   <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
-                    Cumulative Hours (YTD)
+                    Cumulative Hours
                   </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
                       {record.cumulative_hours || 0}h
                     </Typography>
-                    <TrendingUpIcon sx={{ fontSize: 20, opacity: 0.8 }} />
-                  </Box>
-                  {record.total_hours && (
-                    <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                      Total: {record.total_hours}h
+                    <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                      / {record.total_hours || 0}h
                     </Typography>
-                  )}
+                  </Box>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(
+                      ((record.cumulative_hours || 0) / (record.total_hours || 1)) * 100,
+                      100
+                    )}
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor:
+                          ((record.cumulative_hours || 0) / (record.total_hours || 1)) < 0.7 ? '#4caf50' :
+                          ((record.cumulative_hours || 0) / (record.total_hours || 1)) < 0.9 ? '#ff9800' :
+                          '#f44336',
+                        borderRadius: 4
+                      }
+                    }}
+                  />
                 </Box>
               </Grid>
             )}

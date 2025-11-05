@@ -295,6 +295,31 @@ class TempoAPIClient:
 
         return project_hours
 
+    def get_all_time_hours(self) -> Dict[str, float]:
+        """
+        Get cumulative hours for all time (no date filter).
+        Fetches ALL worklogs from Tempo without date restrictions.
+
+        Returns:
+            Dictionary mapping project keys to hours
+        """
+        logger.info("Fetching all-time hours (no date filter)")
+
+        # Use Tempo API to get all worklogs without date filter
+        # Note: Tempo API requires date range, so we use a very old start date
+        # This assumes projects started no earlier than 2020
+        start_date = "2020-01-01"
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        worklogs = self.get_worklogs(start_date, today)
+        project_hours, processed, skipped = self.process_worklogs(worklogs)
+
+        logger.info(f"All-time summary:")
+        for project, hours in sorted(project_hours.items()):
+            logger.info(f"  {project}: {hours:.2f}h")
+
+        return project_hours
+
     def get_date_range_hours(self, from_date: str, to_date: str) -> Dict[str, float]:
         """
         Get hours for a specific date range.

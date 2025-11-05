@@ -55,7 +55,7 @@ class TempoSyncJob:
 
         Args:
             current_month_hours: Dict of project_key -> current month hours
-            cumulative_hours: Dict of project_key -> year-to-date hours
+            cumulative_hours: Dict of project_key -> all-time cumulative hours
 
         Returns:
             Dict with update statistics
@@ -145,9 +145,9 @@ class TempoSyncJob:
             logger.info("Fetching current month hours from Tempo...")
             current_month_hours = self.tempo_client.get_current_month_hours()
 
-            # Fetch year-to-date hours
-            logger.info("Fetching year-to-date hours from Tempo...")
-            cumulative_hours = self.tempo_client.get_year_to_date_hours()
+            # Fetch all-time hours (cumulative from project start)
+            logger.info("Fetching all-time hours from Tempo...")
+            cumulative_hours = self.tempo_client.get_all_time_hours()
 
             # Update database
             logger.info("Updating database...")
