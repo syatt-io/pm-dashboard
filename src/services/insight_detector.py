@@ -165,16 +165,17 @@ class InsightDetector:
                         continue
 
                     # Query to get current month's hours and budget
+                    # Uses pre-calculated hours from project_monthly_forecast (updated by nightly Tempo sync)
                     query = text("""
                         SELECT
                             p.project_key,
                             p.monthly_forecasted_hours as budget,
-                            COALESCE(SUM(th.hours), 0) as hours_used
+                            COALESCE(pmf.actual_monthly_hours, 0) as hours_used
                         FROM projects p
-                        LEFT JOIN tempo_hours_log th ON th.project_key = p.project_key
-                            AND DATE_TRUNC('month', th.date) = DATE_TRUNC('month', CURRENT_DATE)
+                        LEFT JOIN project_monthly_forecast pmf
+                            ON pmf.project_key = p.project_key
+                            AND pmf.month_year = DATE_TRUNC('month', CURRENT_DATE)
                         WHERE p.project_key = :project_key
-                        GROUP BY p.project_key, p.monthly_forecasted_hours
                     """)
 
                     result = self.db.execute(query, {'project_key': project_key}).fetchone()
