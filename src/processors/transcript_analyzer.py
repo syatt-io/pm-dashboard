@@ -28,7 +28,7 @@ class ActionItem(BaseModel):
     description: str = Field(description="Detailed description of what needs to be done")
     assignee: Optional[str] = Field(description="Person responsible for this item", default=None)
     due_date: Optional[str] = Field(description="Due date if mentioned (ISO format)", default=None)
-    priority: str = Field(description="Priority level: High, Medium, or Low", default="Medium")
+    priority: Optional[str] = Field(description="Priority level (optional, rarely accurate)", default=None)
     context: str = Field(description="Meeting context where this was discussed")
     dependencies: Optional[List[str]] = Field(description="Other tasks this depends on", default=None)
 
@@ -231,8 +231,8 @@ class TranscriptAnalyzer:
     def prioritize_action_items(self, items: List[ActionItem]) -> List[ActionItem]:
         """Prioritize action items based on urgency and importance."""
 
-        # Define priority weights
-        priority_weights = {"High": 3, "Medium": 2, "Low": 1}
+        # Define priority weights (handle None values)
+        priority_weights = {"High": 3, "Medium": 2, "Low": 1, None: 0}
 
         # Sort by priority and due date
         sorted_items = sorted(
