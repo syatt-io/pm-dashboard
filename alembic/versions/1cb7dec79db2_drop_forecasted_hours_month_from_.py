@@ -23,8 +23,8 @@ def upgrade() -> None:
 
     All forecasted hours data is now stored in project_monthly_forecast table only.
     """
-    # Drop the column if it exists
-    op.drop_column('projects', 'forecasted_hours_month')
+    # Drop the column if it exists (using raw SQL for IF EXISTS support)
+    op.execute('ALTER TABLE projects DROP COLUMN IF EXISTS forecasted_hours_month')
 
 
 def downgrade() -> None:
