@@ -257,9 +257,8 @@ class ProjectActivityAggregator:
             # Generate AI insights
             await self._generate_insights(activity, include_context=include_context)
 
-            # Collect attendee context if enabled
-            import os
-            if os.getenv('ENABLE_ATTENDEE_CONTEXT', 'false').lower() == 'true':
+            # Collect attendee context if requested by user (via checkbox)
+            if include_context:
                 await self._collect_attendee_context(activity, days_back)
 
             logger.info(f"Successfully aggregated activity for {project_key}")

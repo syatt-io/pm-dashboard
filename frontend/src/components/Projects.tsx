@@ -465,6 +465,7 @@ const ProjectDetailDialog = ({
   const [generatingDigest, setGeneratingDigest] = useState(false);
   const [digestData, setDigestData] = useState<any>(null);
   const [digestDays, setDigestDays] = useState<'7' | '30'>('7');
+  const [includeAttendeeContext, setIncludeAttendeeContext] = useState(false);
 
   // Function to fetch meetings for this project
   const fetchMeetings = async (projectKey: string, days: string) => {
@@ -534,6 +535,7 @@ const ProjectDetailDialog = ({
         body: JSON.stringify({
           days: parseInt(digestDays),
           project_name: project.name,
+          include_attendee_context: includeAttendeeContext,
         }),
       });
 
@@ -885,6 +887,17 @@ const ProjectDetailDialog = ({
                     <MenuItem value="30">Last 30 days</MenuItem>
                   </Select>
                 </FormControl>
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={includeAttendeeContext}
+                      onChange={(e) => setIncludeAttendeeContext(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label="Include Attendee Context (Experimental)"
+                />
 
                 <MuiButton
                   variant="contained"

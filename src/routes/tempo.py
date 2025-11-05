@@ -284,7 +284,8 @@ def generate_project_digest(project_key):
         days_back = int(data.get('days', 7))
         project_name = data.get('project_name', project_key)
         force_refresh = data.get('force_refresh', False)
-        include_context = data.get('include_context', False)
+        # Support both include_attendee_context (new param) and include_context (legacy) for backwards compatibility
+        include_context = data.get('include_attendee_context', data.get('include_context', False))
 
         # Check cache first unless force refresh
         if not force_refresh:
