@@ -34,6 +34,92 @@ doctl apps create-deployment a2255a3b-23cc-4fd0-baa8-91d622bb912a
 
 ---
 
+## 🛡️ CSRF Protection Requirements
+
+**CRITICAL**: Every new Flask Blueprint with API endpoints MUST be explicitly exempted from CSRF protection!
+
+### The Problem
+This application uses Flask-WTF's CSRFProtect, which by default applies CSRF validation to ALL POST/PUT/DELETE requests. Our React frontend makes API calls without CSRF tokens (using JWT authentication instead), so API endpoints will return **400 Bad Request** errors unless explicitly exempted.
+
+### The Solution Pattern (src/web_interface.py)
+
+When creating a new Blueprint with API endpoints:
+
+1. **Import the blueprint** (around line 100-150):
+```python
+from src.routes.your_new_feature import your_feature_bp
+```
+
+2. **Exempt it from CSRF protection** (around line 280-320, BEFORE registering):
+```python
+# ✅ SECURITY: Exempt YourFeature endpoints from CSRF protection
+# YourFeature endpoints are called from React frontend with JWT auth
+csrf.exempt(your_feature_bp)
+logger.info("✅ YourFeature endpoints exempted from CSRF protection")
+```
+
+3. **Register the blueprint** (around line 313-330):
+```python
+app.register_blueprint(your_feature_bp)
+```
+
+### Real Examples from Codebase
+
+**Correct Pattern** (lines 308-316):
+```python
+# ✅ SECURITY: Exempt Projects endpoints from CSRF protection
+csrf.exempt(projects_bp)
+logger.info("✅ Projects endpoints exempted from CSRF protection")
+
+# ✅ SECURITY: Exempt User endpoints from CSRF protection
+csrf.exempt(user_bp)
+logger.info("✅ User endpoints exempted from CSRF protection")
+
+app.register_blueprint(todos_bp)
+app.register_blueprint(meetings_bp)
+app.register_blueprint(user_bp)
+```
+
+### Blueprints That Need Exemption
+- All `/api/*` routes called from React frontend
+- Routes using JWT authentication (not session-based auth)
+- Routes that handle POST/PUT/DELETE requests
+
+### Blueprints That Don't Need Exemption
+- Routes rendering HTML templates (GET only)
+- Routes using session-based authentication with forms
+- Webhook endpoints (like `/slack/` - already exempted)
+
+### How to Debug CSRF Issues
+
+**Symptom**: 400 Bad Request on POST/PUT/DELETE from frontend
+
+**Quick Check**:
+```bash
+# Search for your blueprint in web_interface.py
+grep "your_feature_bp" src/web_interface.py
+
+# Look for these two lines:
+# 1. csrf.exempt(your_feature_bp)  ← Should exist
+# 2. app.register_blueprint(your_feature_bp)  ← Should exist
+```
+
+**If exemption is missing**: Add it following the pattern above, commit, and deploy.
+
+### Historical Issues
+- **Week 2 Auto-Escalation (Nov 2024)**: user_bp not exempted → 400 errors on `/api/user/escalation-preferences`
+- **Fix**: Added `csrf.exempt(user_bp)` at line 315 (commit 95538ac)
+
+### Checklist for New API Features
+- [ ] Create Blueprint in `src/routes/`
+- [ ] Import Blueprint in `src/web_interface.py`
+- [ ] **Add `csrf.exempt(your_bp)` BEFORE registering**
+- [ ] Register Blueprint with `app.register_blueprint(your_bp)`
+- [ ] Test POST/PUT/DELETE endpoints from frontend
+- [ ] Verify no 400 errors in browser console
+
+---
+
 ## Project Overview
 This is an Autonomous PM Agent that processes Fireflies.ai meeting transcripts, extracts action items using AI, and creates Jira tickets via Model Context Protocol (MCP). The system provides both automated and interactive modes for ticket creation.
 
