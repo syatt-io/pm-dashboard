@@ -441,19 +441,61 @@ def update_notification_preferences(user):
             }), 400
 
         # Update preferences
-        try:
-            with session_scope() as db_session:
-                db_user = db_session.merge(user)
-                db_user.update_notification_preferences(data)
+        from src.models.notification_preferences import UserNotificationPreferences
 
-            logger.info(f"Notification preferences updated for user {user.id}")
-            return jsonify({
-                'success': True,
-                'message': 'Notification preferences updated successfully'
-            })
+        with session_scope() as db_session:
+            # Get fresh user from session
+            db_user = db_session.merge(user)
 
-        except Exception as e:
-            raise e
+            # Update User model fields (legacy)
+            if 'notify_daily_todo_digest' in data:
+                db_user.notify_daily_todo_digest = bool(data['notify_daily_todo_digest'])
+
+            if 'notify_project_hours_forecast' in data:
+                db_user.notify_project_hours_forecast = bool(data['notify_project_hours_forecast'])
+
+            # Get or create UserNotificationPreferences
+            extended_prefs = db_session.query(UserNotificationPreferences).filter(
+                UserNotificationPreferences.user_id == db_user.id
+            ).first()
+
+            if not extended_prefs:
+                extended_prefs = UserNotificationPreferences(user_id=db_user.id)
+                db_session.add(extended_prefs)
+
+            # Update proactive insights preferences
+            if 'daily_brief_slack' in data:
+                extended_prefs.daily_brief_slack = bool(data['daily_brief_slack'])
+
+            if 'daily_brief_email' in data:
+                extended_prefs.daily_brief_email = bool(data['daily_brief_email'])
+
+            if 'enable_stale_pr_alerts' in data:
+                extended_prefs.enable_stale_pr_alerts = bool(data['enable_stale_pr_alerts'])
+
+            if 'enable_budget_alerts' in data:
+                extended_prefs.enable_budget_alerts = bool(data['enable_budget_alerts'])
+
+            if 'enable_missing_ticket_alerts' in data:
+                extended_prefs.enable_missing_ticket_alerts = bool(data['enable_missing_ticket_alerts'])
+
+            if 'enable_anomaly_alerts' in data:
+                extended_prefs.enable_anomaly_alerts = bool(data['enable_anomaly_alerts'])
+
+            if 'enable_meeting_prep' in data:
+                extended_prefs.enable_meeting_prep = bool(data['enable_meeting_prep'])
+
+            if 'daily_brief_time' in data:
+                extended_prefs.daily_brief_time = str(data['daily_brief_time'])
+
+            if 'timezone' in data:
+                extended_prefs.timezone = str(data['timezone'])
+
+        logger.info(f"Notification preferences updated for user {user.id}")
+        return jsonify({
+            'success': True,
+            'message': 'Notification preferences updated successfully'
+        })
 
     except Exception as e:
         logger.error(f"Error updating notification preferences for user {user.id}: {e}")

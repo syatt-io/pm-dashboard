@@ -406,6 +406,8 @@ export const Settings = () => {
       const data: ApiResponse = await response.json();
       if (data.success) {
         showSnackbar('Notification preferences saved successfully!', 'success');
+        // Reload preferences from database to confirm save
+        await loadNotificationPreferences();
       } else {
         throw new globalThis.Error(data.error || 'Failed to save preferences');
       }
