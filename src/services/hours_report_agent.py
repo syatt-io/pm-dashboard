@@ -42,9 +42,12 @@ class HoursReportAgent:
 
         with engine.connect() as conn:
             result = conn.execute(text("""
-                SELECT key, name, forecasted_hours_month, is_active
-                FROM projects
-                WHERE is_active = 1 AND forecasted_hours_month > 0
+                SELECT p.key, p.name, pmf.forecasted_hours, p.is_active
+                FROM projects p
+                INNER JOIN project_monthly_forecast pmf
+                    ON p.key = pmf.project_key
+                    AND pmf.month_year = DATE_TRUNC('month', CURRENT_DATE)
+                WHERE p.is_active = 1 AND pmf.forecasted_hours > 0
             """))
 
             for row in result:

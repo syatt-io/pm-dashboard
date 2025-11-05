@@ -172,6 +172,8 @@ def save_user_settings():
             # Handle project updates if provided
             project_updates = data.get('project_updates', [])
             if project_updates:
+                current_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
                 for update in project_updates:
                     project_key = update.get('key')
                     project_name = update.get('name')
@@ -179,22 +181,34 @@ def save_user_settings():
                     is_active = update.get('is_active', True)
 
                     if project_key:
-                        # Insert or update project in projects table
+                        # Insert or update project in projects table (without forecasted_hours_month)
                         db_session.execute(text("""
-                            INSERT INTO projects (key, name, forecasted_hours_month, is_active, created_at, updated_at)
-                            VALUES (:key, :name, :forecasted_hours, :is_active, :created_at, :updated_at)
+                            INSERT INTO projects (key, name, is_active, created_at, updated_at)
+                            VALUES (:key, :name, :is_active, :created_at, :updated_at)
                             ON CONFLICT(key) DO UPDATE SET
                                 name = EXCLUDED.name,
-                                forecasted_hours_month = EXCLUDED.forecasted_hours_month,
                                 is_active = EXCLUDED.is_active,
                                 updated_at = EXCLUDED.updated_at
                         """), {
                             'key': project_key,
                             'name': project_name or project_key,
-                            'forecasted_hours': forecasted_hours,
                             'is_active': is_active,
                             'created_at': datetime.now(),
                             'updated_at': datetime.now()
+                        })
+
+                        # Insert or update forecasted hours in project_monthly_forecast
+                        db_session.execute(text("""
+                            INSERT INTO project_monthly_forecast (project_key, month_year, forecasted_hours, updated_at)
+                            VALUES (:project_key, :month_year, :forecasted_hours, NOW())
+                            ON CONFLICT (project_key, month_year)
+                            DO UPDATE SET
+                                forecasted_hours = :forecasted_hours,
+                                updated_at = NOW()
+                        """), {
+                            'project_key': project_key,
+                            'month_year': current_month,
+                            'forecasted_hours': forecasted_hours
                         })
 
         # Store user email in session for future redirects
