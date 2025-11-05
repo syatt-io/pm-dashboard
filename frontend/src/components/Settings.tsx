@@ -52,7 +52,7 @@ import {
   Notifications as NotificationsIcon,
   TrendingUp as EscalationIcon,
 } from '@mui/icons-material';
-import { Loading, Title, useDataProvider, useNotify } from 'react-admin';
+import { Loading, Title, useDataProvider, useNotify, useRedirect } from 'react-admin';
 import { getApiUrl } from '../config';
 import UserManagement from './UserManagement';
 
@@ -151,6 +151,7 @@ function TabPanel(props: TabPanelProps) {
 export const Settings = () => {
   const notify = useNotify();
   const dataProvider = useDataProvider();
+  const redirect = useRedirect();
   const [tabValue, setTabValue] = useState(0);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1451,7 +1452,16 @@ export const Settings = () => {
                   </TableHead>
                   <TableBody>
                     {allProjects.map((project) => (
-                      <TableRow key={project.key}>
+                      <TableRow
+                        key={project.key}
+                        sx={{
+                          cursor: 'pointer',
+                          '&:hover': {
+                            backgroundColor: 'rgba(85, 77, 255, 0.08)'
+                          }
+                        }}
+                        onClick={() => redirect('show', 'projects', project.key)}
+                      >
                         <TableCell>{project.name}</TableCell>
                         <TableCell>
                           <Chip label={project.key} size="small" />
@@ -1462,7 +1472,10 @@ export const Settings = () => {
                             control={
                               <Switch
                                 checked={project.is_active || false}
-                                onChange={() => handleActiveToggle(project)}
+                                onChange={(e) => {
+                                  e.stopPropagation(); // Prevent row click when toggling switch
+                                  handleActiveToggle(project);
+                                }}
                                 color="primary"
                                 size="small"
                               />

@@ -1669,11 +1669,13 @@ export const ProjectList = () => {
                           <TableRow
                             key={project.key}
                             sx={{
+                              cursor: 'pointer',
                               backgroundColor: isWatched ? 'rgba(85, 77, 255, 0.08)' : 'inherit', // Light purple background for watched projects
                               '&:hover': {
                                 backgroundColor: isWatched ? 'rgba(85, 77, 255, 0.12)' : 'rgba(0, 0, 0, 0.04)'
                               }
                             }}
+                            onClick={() => redirect('show', 'projects', project.key)}
                           >
                             <TableCell>{project.name}</TableCell>
                             <TableCell>
