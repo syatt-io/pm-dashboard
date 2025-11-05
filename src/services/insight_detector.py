@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from config.settings import settings
 from src.models import ProactiveInsight, User, UserWatchedProject
 from src.integrations.github_client import GitHubClient
-from src.utils.database import session_scope
+from src.utils.database import session_scope, get_db
 
 logger = logging.getLogger(__name__)
 
