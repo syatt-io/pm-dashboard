@@ -189,7 +189,16 @@ export const Settings = () => {
   const [notificationPrefs, setNotificationPrefs] = useState({
     notify_daily_todo_digest: true,
     notify_project_hours_forecast: true,
-    slack_connected: false
+    slack_connected: false,
+    daily_brief_slack: true,
+    daily_brief_email: false,
+    enable_stale_pr_alerts: true,
+    enable_budget_alerts: true,
+    enable_missing_ticket_alerts: true,
+    enable_anomaly_alerts: true,
+    enable_meeting_prep: true,
+    daily_brief_time: "09:00",
+    timezone: "America/New_York"
   });
   const [loadingNotifPrefs, setLoadingNotifPrefs] = useState(false);
   const [savingNotifPrefs, setSavingNotifPrefs] = useState(false);
@@ -378,6 +387,15 @@ export const Settings = () => {
         body: JSON.stringify({
           notify_daily_todo_digest: notificationPrefs.notify_daily_todo_digest,
           notify_project_hours_forecast: notificationPrefs.notify_project_hours_forecast,
+          daily_brief_slack: notificationPrefs.daily_brief_slack,
+          daily_brief_email: notificationPrefs.daily_brief_email,
+          enable_stale_pr_alerts: notificationPrefs.enable_stale_pr_alerts,
+          enable_budget_alerts: notificationPrefs.enable_budget_alerts,
+          enable_missing_ticket_alerts: notificationPrefs.enable_missing_ticket_alerts,
+          enable_anomaly_alerts: notificationPrefs.enable_anomaly_alerts,
+          enable_meeting_prep: notificationPrefs.enable_meeting_prep,
+          daily_brief_time: notificationPrefs.daily_brief_time,
+          timezone: notificationPrefs.timezone
         }),
       });
 
@@ -424,6 +442,14 @@ export const Settings = () => {
 
   const saveEscalationPreferences = async () => {
     if (!escalationPrefs) return;
+
+    // Validate thresholds before sending
+    if (escalationPrefs.dm_threshold_days < 1 ||
+        escalationPrefs.channel_threshold_days < 1 ||
+        escalationPrefs.critical_threshold_days < 1) {
+      showSnackbar('All threshold values must be at least 1 day', 'error');
+      return;
+    }
 
     try {
       setSavingEscalation(true);
@@ -1462,7 +1488,7 @@ export const Settings = () => {
                 Notification Preferences
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Choose which notifications you'd like to receive via Slack DM
+                Choose which notifications you'd like to receive
               </Typography>
 
               {!notificationPrefs.slack_connected && (
@@ -1475,6 +1501,11 @@ export const Settings = () => {
                   </Typography>
                 </Alert>
               )}
+
+              {/* Daily Digests Section */}
+              <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+                📋 Daily Digests
+              </Typography>
 
               <Box sx={{ mb: 2 }}>
                 <FormControlLabel
@@ -1501,9 +1532,7 @@ export const Settings = () => {
                 />
               </Box>
 
-              <Divider sx={{ my: 2 }} />
-
-              <Box sx={{ mb: 3 }}>
+              <Box sx={{ mb: 2 }}>
                 <FormControlLabel
                   control={
                     <Switch
@@ -1522,6 +1551,196 @@ export const Settings = () => {
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Receive a daily Slack DM with monthly hours tracking for all projects
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Proactive Insights Section */}
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                🔍 Proactive Insights
+              </Typography>
+
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Configure how you receive daily proactive insights (stale PRs, budget alerts, etc.) Default time: 9am EST
+              </Typography>
+
+              {/* Delivery Channels */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                Delivery Channels
+              </Typography>
+
+              <Box sx={{ mb: 2, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.daily_brief_slack}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        daily_brief_slack: e.target.checked
+                      })}
+                      disabled={!notificationPrefs.slack_connected}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Slack Direct Messages
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Receive insights via Slack DM
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 3, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.daily_brief_email}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        daily_brief_email: e.target.checked
+                      })}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Email
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Receive insights via email
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              {/* Insight Types */}
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                Insight Types
+              </Typography>
+
+              <Box sx={{ mb: 1, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.enable_stale_pr_alerts}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        enable_stale_pr_alerts: e.target.checked
+                      })}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Stale PR Alerts
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Alert when PRs are &gt;3 days old without reviews
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 1, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.enable_budget_alerts}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        enable_budget_alerts: e.target.checked
+                      })}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Budget Alerts
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Alert when projects use &gt;75% budget with &gt;40% month remaining
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 1, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.enable_missing_ticket_alerts}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        enable_missing_ticket_alerts: e.target.checked
+                      })}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Missing Ticket Alerts
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Alert when work is done without associated tickets
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 1, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.enable_anomaly_alerts}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        enable_anomaly_alerts: e.target.checked
+                      })}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Anomaly Alerts
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Alert on unusual patterns in project activity
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
+              <Box sx={{ mb: 3, ml: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={notificationPrefs.enable_meeting_prep}
+                      onChange={(e) => setNotificationPrefs({
+                        ...notificationPrefs,
+                        enable_meeting_prep: e.target.checked
+                      })}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>
+                        Meeting Preparation
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Reminders and prep materials for upcoming meetings
                       </Typography>
                     </Box>
                   }
@@ -1678,10 +1897,13 @@ export const Settings = () => {
                 type="number"
                 label="DM After (days)"
                 value={escalationPrefs.dm_threshold_days}
-                onChange={(e) => setEscalationPrefs({
-                  ...escalationPrefs,
-                  dm_threshold_days: parseInt(e.target.value) || 3
-                })}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  setEscalationPrefs({
+                    ...escalationPrefs,
+                    dm_threshold_days: !isNaN(value) && value >= 1 ? value : escalationPrefs.dm_threshold_days
+                  });
+                }}
                 disabled={!escalationPrefs.enable_auto_escalation || !escalationPrefs.enable_dm_escalation}
                 helperText="Send Slack DM after this many days"
                 InputProps={{ inputProps: { min: 1 } }}
@@ -1693,10 +1915,13 @@ export const Settings = () => {
                 type="number"
                 label="Channel Post After (days)"
                 value={escalationPrefs.channel_threshold_days}
-                onChange={(e) => setEscalationPrefs({
-                  ...escalationPrefs,
-                  channel_threshold_days: parseInt(e.target.value) || 5
-                })}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  setEscalationPrefs({
+                    ...escalationPrefs,
+                    channel_threshold_days: !isNaN(value) && value >= 1 ? value : escalationPrefs.channel_threshold_days
+                  });
+                }}
                 disabled={!escalationPrefs.enable_auto_escalation || !escalationPrefs.enable_channel_escalation}
                 helperText="Post to Slack channel after this many days (includes DM)"
                 InputProps={{ inputProps: { min: 1 } }}
@@ -1708,10 +1933,13 @@ export const Settings = () => {
                 type="number"
                 label="GitHub Comment After (days)"
                 value={escalationPrefs.critical_threshold_days}
-                onChange={(e) => setEscalationPrefs({
-                  ...escalationPrefs,
-                  critical_threshold_days: parseInt(e.target.value) || 7
-                })}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  setEscalationPrefs({
+                    ...escalationPrefs,
+                    critical_threshold_days: !isNaN(value) && value >= 1 ? value : escalationPrefs.critical_threshold_days
+                  });
+                }}
                 disabled={!escalationPrefs.enable_auto_escalation || !escalationPrefs.enable_github_escalation}
                 helperText="Post GitHub comment after this many days (includes DM + Channel)"
                 InputProps={{ inputProps: { min: 1 } }}
