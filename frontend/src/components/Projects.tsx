@@ -856,202 +856,6 @@ const ProjectDetailDialog = ({
             </Box>
           </Grid>
 
-          {/* Project Digest Generator */}
-          <Grid item xs={12}>
-            <Box sx={{
-              border: '1px solid',
-              borderColor: 'primary.main',
-              borderRadius: 2,
-              p: 3,
-              backgroundColor: 'rgba(85, 77, 255, 0.08)',
-              boxShadow: 2
-            }}>
-              <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 'bold', mb: 2 }}>
-                📋 Client Meeting Digest Generator
-              </Typography>
-
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Generate a comprehensive project status report for client meetings, including progress summary,
-                key achievements, blockers, and next steps.
-              </Typography>
-
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 3 }}>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Time Period</InputLabel>
-                  <Select
-                    value={digestDays}
-                    onChange={(e) => setDigestDays(e.target.value as '7' | '30')}
-                    label="Time Period"
-                  >
-                    <MenuItem value="7">Last 7 days</MenuItem>
-                    <MenuItem value="30">Last 30 days</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={includeAttendeeContext}
-                      onChange={(e) => setIncludeAttendeeContext(e.target.checked)}
-                      color="primary"
-                    />
-                  }
-                  label="Include Attendee Context (Experimental)"
-                />
-
-                <MuiButton
-                  variant="contained"
-                  color="primary"
-                  size="medium"
-                  startIcon={<DigestIcon />}
-                  onClick={generateDigest}
-                  disabled={generatingDigest}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {generatingDigest ? 'Generating...' : 'Generate Digest'}
-                </MuiButton>
-
-                {digestData && (
-                  <MuiButton
-                    variant="outlined"
-                    color="primary"
-                    size="medium"
-                    startIcon={<DownloadIcon />}
-                    onClick={downloadDigest}
-                    sx={{ textTransform: 'none' }}
-                  >
-                    Download as Markdown
-                  </MuiButton>
-                )}
-              </Box>
-
-              {/* Digest Results */}
-              {digestData && (
-                <Box sx={{
-                  backgroundColor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 2,
-                  mt: 2
-                }}>
-                  <Typography variant="h6" gutterBottom>
-                    📊 Generated Digest Summary
-                  </Typography>
-
-                  <Grid container spacing={2}>
-                    <Grid item xs={6} sm={3}>
-                      <Box sx={{ textAlign: 'center', p: 1 }}>
-                        <Typography variant="h4" color="primary.main">
-                          {digestData.activity_data.meetings_count}
-                        </Typography>
-                        <Typography variant="caption">Meetings</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6} sm={3}>
-                      <Box sx={{ textAlign: 'center', p: 1 }}>
-                        <Typography variant="h4" color="success.main">
-                          {digestData.activity_data.tickets_completed}
-                        </Typography>
-                        <Typography variant="caption">Completed</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6} sm={3}>
-                      <Box sx={{ textAlign: 'center', p: 1 }}>
-                        <Typography variant="h4" color="info.main">
-                          {digestData.activity_data.tickets_created}
-                        </Typography>
-                        <Typography variant="caption">New Tickets</Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6} sm={3}>
-                      <Box sx={{ textAlign: 'center', p: 1 }}>
-                        <Typography variant="h4" color="warning.main">
-                          {digestData.activity_data.hours_logged.toFixed(1)}h
-                        </Typography>
-                        <Typography variant="caption">Hours Logged</Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
-
-                  {digestData.activity_data.progress_summary && (
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="body2" sx={{ fontStyle: 'italic' }}>
-                        "{digestData.activity_data.progress_summary}"
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              )}
-
-              {/* Full Digest Content Display */}
-              {digestData && digestData.formatted_agenda && (
-                <Box sx={{
-                  backgroundColor: 'background.paper',
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 2,
-                  mt: 3
-                }}>
-                  <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    📄 Complete Digest
-                    <MuiButton
-                      size="small"
-                      variant="outlined"
-                      startIcon={<DownloadIcon />}
-                      onClick={downloadDigest}
-                      sx={{ ml: 'auto', textTransform: 'none' }}
-                    >
-                      Download MD
-                    </MuiButton>
-                  </Typography>
-
-                  <Box sx={{
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #e9ecef',
-                    borderRadius: 1,
-                    p: 3,
-                    '& h1': { fontSize: '1.75rem', fontWeight: 600, mt: 2, mb: 2, color: '#2c3e50' },
-                    '& h2': { fontSize: '1.5rem', fontWeight: 600, mt: 2, mb: 1.5, color: '#34495e', borderBottom: '2px solid #e9ecef', pb: 1 },
-                    '& h3': { fontSize: '1.25rem', fontWeight: 600, mt: 2, mb: 1, color: '#34495e' },
-                    '& h4': { fontSize: '1.1rem', fontWeight: 600, mt: 1.5, mb: 1, color: '#34495e' },
-                    '& p': { mb: 1.5, lineHeight: 1.7, color: '#495057' },
-                    '& ul, & ol': { pl: 3, mb: 2 },
-                    '& li': { mb: 0.75, lineHeight: 1.6, color: '#495057' },
-                    '& strong': { fontWeight: 600, color: '#2c3e50' },
-                    '& em': { fontStyle: 'italic' },
-                    '& code': {
-                      backgroundColor: '#e9ecef',
-                      padding: '2px 6px',
-                      borderRadius: '3px',
-                      fontSize: '0.9em',
-                      fontFamily: 'monospace',
-                      color: '#c7254e'
-                    },
-                    '& pre': {
-                      backgroundColor: '#f5f5f5',
-                      p: 2,
-                      borderRadius: 1,
-                      overflow: 'auto',
-                      border: '1px solid #ddd'
-                    },
-                    '& blockquote': {
-                      borderLeft: '4px solid #554DFF',
-                      pl: 2,
-                      ml: 0,
-                      fontStyle: 'italic',
-                      color: '#6c757d'
-                    },
-                    '& a': { color: '#554DFF', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } },
-                    '& hr': { border: 'none', borderTop: '1px solid #dee2e6', my: 2 }
-                  }}>
-                    <ReactMarkdown>{digestData.formatted_agenda}</ReactMarkdown>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          </Grid>
         </Grid>
       </DialogContent>
 
@@ -2540,6 +2344,7 @@ const ProjectShowContent = () => {
           project_name: record.name,
           force_refresh: forceRefresh,
           include_context: includeHistoricalContext,
+          include_attendee_context: includeAttendeeContext,
         }),
       });
 
@@ -2732,6 +2537,18 @@ const ProjectShowContent = () => {
             />
           }
           label="Include historical context"
+          sx={{ mr: 2 }}
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={includeAttendeeContext}
+              onChange={(e) => setIncludeAttendeeContext(e.target.checked)}
+              disabled={generatingDigest}
+              color="primary"
+            />
+          }
+          label="Include Attendee Context"
           sx={{ mr: 2 }}
         />
         <MuiButton
