@@ -17,6 +17,7 @@ from src.integrations.jira_mcp import JiraMCPClient
 from src.jobs.tempo_sync import run_tempo_sync
 from src.services.insight_detector import detect_insights_for_all_users
 from src.services.daily_brief_generator import send_daily_briefs
+from src.services.auto_escalation import AutoEscalationService
 
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,12 @@ class TodoScheduler:
         # Daily brief delivery - check hourly to handle different user timezones
         # Primary delivery at 9 AM EST
         schedule.every().day.at("09:00").do(self._run_sync, self.send_proactive_briefs)
+
+        # Auto-escalation checks every 6 hours (6am, 12pm, 6pm, 12am EST)
+        schedule.every().day.at("06:00").do(self._run_sync, self.run_auto_escalation)
+        schedule.every().day.at("12:00").do(self._run_sync, self.run_auto_escalation)
+        schedule.every().day.at("18:00").do(self._run_sync, self.run_auto_escalation)
+        schedule.every().day.at("00:00").do(self._run_sync, self.run_auto_escalation)
 
         logger.info("Scheduled tasks configured")
 
@@ -823,6 +830,43 @@ class TodoScheduler:
 
         except Exception as e:
             logger.error(f"Error in daily brief delivery: {e}", exc_info=True)
+
+    def run_auto_escalation(self):
+        """Run auto-escalation check for stale insights."""
+        try:
+            logger.info("Running auto-escalation check")
+
+            from src.utils.database import session_scope
+
+            with session_scope() as db:
+                escalation_service = AutoEscalationService(db)
+                stats = escalation_service.run_escalation_check()
+
+            logger.info(f"Auto-escalation check complete: {stats}")
+
+            # Send Slack notification if escalations were performed
+            if stats['escalations_performed'] > 0 and self.slack_bot:
+                message = (
+                    f"🚨 *Auto-Escalation Summary*\n\n"
+                    f"• Insights checked: {stats['total_checked']}\n"
+                    f"• Escalations performed: {stats['escalations_performed']}\n"
+                    f"• DMs sent: {stats['dm_sent']}\n"
+                    f"• Channel posts: {stats['channel_posts']}\n"
+                    f"• GitHub comments: {stats['github_comments']}\n"
+                )
+                if stats['errors'] > 0:
+                    message += f"• Errors: {stats['errors']}\n"
+
+                try:
+                    self.slack_bot.post_message(
+                        channel=settings.notifications.slack_channel,
+                        text=message
+                    )
+                except Exception as e:
+                    logger.error(f"Error sending Slack notification: {e}")
+
+        except Exception as e:
+            logger.error(f"Error in auto-escalation check: {e}", exc_info=True)
 
 
 # Global scheduler instance
