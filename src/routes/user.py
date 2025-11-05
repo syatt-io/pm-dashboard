@@ -370,20 +370,54 @@ def delete_slack_user_token(user):
 def get_notification_preferences(user):
     """Get user's notification preferences."""
     try:
-        # Refresh user from database to get latest data
-        from sqlalchemy.orm import Session
+        from src.models.notification_preferences import UserNotificationPreferences
 
-        # Get the session that the user object is attached to
-        session = Session.object_session(user)
-        if session:
-            session.expire(user)  # Mark user as expired to force refresh
-            session.refresh(user)  # Refresh from database
+        with session_scope() as db_session:
+            # Get fresh user from this session
+            db_user = db_session.merge(user)
 
-        preferences = user.get_notification_preferences()
+            # Get basic preferences from User model
+            prefs = {
+                'notify_daily_todo_digest': db_user.notify_daily_todo_digest,
+                'notify_project_hours_forecast': db_user.notify_project_hours_forecast,
+                'slack_connected': bool(db_user.slack_user_id)
+            }
+
+            # Get extended preferences from UserNotificationPreferences
+            extended_prefs = db_session.query(UserNotificationPreferences).filter(
+                UserNotificationPreferences.user_id == db_user.id
+            ).first()
+
+            if extended_prefs:
+                # Add proactive insights preferences
+                prefs.update({
+                    'daily_brief_slack': extended_prefs.daily_brief_slack,
+                    'daily_brief_email': extended_prefs.daily_brief_email,
+                    'enable_stale_pr_alerts': extended_prefs.enable_stale_pr_alerts,
+                    'enable_budget_alerts': extended_prefs.enable_budget_alerts,
+                    'enable_missing_ticket_alerts': extended_prefs.enable_missing_ticket_alerts,
+                    'enable_anomaly_alerts': extended_prefs.enable_anomaly_alerts,
+                    'enable_meeting_prep': extended_prefs.enable_meeting_prep,
+                    'daily_brief_time': extended_prefs.daily_brief_time,
+                    'timezone': extended_prefs.timezone
+                })
+            else:
+                # Return defaults if no extended preferences exist yet
+                prefs.update({
+                    'daily_brief_slack': True,
+                    'daily_brief_email': False,
+                    'enable_stale_pr_alerts': True,
+                    'enable_budget_alerts': True,
+                    'enable_missing_ticket_alerts': True,
+                    'enable_anomaly_alerts': True,
+                    'enable_meeting_prep': True,
+                    'daily_brief_time': "09:00",
+                    'timezone': "America/New_York"
+                })
 
         return jsonify({
             'success': True,
-            'data': preferences
+            'data': prefs
         })
 
     except Exception as e:
