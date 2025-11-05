@@ -252,6 +252,13 @@ else:
 
 # Register auth blueprint with rate limiter
 auth_blueprint = create_auth_blueprint(db_session_factory, limiter)
+
+# ✅ SECURITY: Exempt auth endpoints from CSRF protection
+# Auth endpoints use JWT tokens for authentication, which provide CSRF protection
+# OAuth endpoints use state parameters for CSRF protection
+csrf.exempt(auth_blueprint)
+logger.info("✅ Auth endpoints exempted from CSRF protection")
+
 app.register_blueprint(auth_blueprint)
 
 # Register extracted route blueprints
