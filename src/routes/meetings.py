@@ -6,6 +6,7 @@ import logging
 import asyncio
 import os
 import json
+import re
 
 from config.settings import settings
 from src.services.auth import auth_required, admin_required
@@ -232,8 +233,17 @@ def get_meetings(user):
                             logger.info(f"Search keywords: {search_keywords}")
                             logger.info(f"Title: '{title_lower}', Summary: '{summary_lower[:100]}...'")
 
+                            # Use word boundary regex matching to prevent false positives
+                            # e.g., "project" won't match "projections"
+                            def matches_keyword(text, keyword):
+                                # Escape special regex characters in the keyword
+                                escaped_keyword = re.escape(keyword)
+                                # Match whole words only using word boundaries
+                                pattern = r'\b' + escaped_keyword + r'\b'
+                                return bool(re.search(pattern, text, re.IGNORECASE))
+
                             project_match = any(
-                                keyword in title_lower or keyword in summary_lower
+                                matches_keyword(title_lower, keyword) or matches_keyword(summary_lower, keyword)
                                 for keyword in search_keywords
                             )
 
