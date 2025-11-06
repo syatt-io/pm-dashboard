@@ -229,8 +229,8 @@ class TestCeleryConfiguration:
         """Test that task time limit is configured correctly."""
         from src.tasks.celery_app import celery_app
 
-        # Should be 60 minutes (3600 seconds)
-        assert celery_app.conf.task_time_limit == 60 * 60
+        # Should be 120 minutes (7200 seconds) for large backfills
+        assert celery_app.conf.task_time_limit == 120 * 60
 
     def test_celery_late_ack_enabled(self):
         """Test that late acknowledgment is enabled (resilience fix)."""
