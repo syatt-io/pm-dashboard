@@ -44,8 +44,13 @@ class GitHubClient:
         self.organization = organization
         self.base_url = "https://api.github.com"
 
-        # Determine auth mode
-        self.auth_mode = "app" if app_id and private_key and installation_id else "token"
+        # Determine auth mode - check for non-empty strings
+        has_app_creds = (app_id and app_id.strip() and
+                         private_key and private_key.strip() and
+                         installation_id and installation_id.strip())
+        has_token = api_token and api_token.strip()
+
+        self.auth_mode = "app" if has_app_creds else "token"
 
         if self.auth_mode == "app":
             logger.info("Using GitHub App authentication")
@@ -56,6 +61,12 @@ class GitHubClient:
             self.token_expires_at = 0
         else:
             logger.info("Using Personal Access Token authentication")
+            if not has_token:
+                raise ValueError(
+                    "GitHub authentication failed: No valid credentials provided. "
+                    "Either provide GitHub App credentials (app_id, private_key, installation_id) "
+                    "or a Personal Access Token (api_token)."
+                )
             self.api_token = api_token
 
         self.headers = {
