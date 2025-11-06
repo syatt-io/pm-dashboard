@@ -25,6 +25,10 @@ sys.path.insert(0, project_root)
 from src.integrations.github_client import GitHubClient
 from src.services.vector_ingest import VectorIngestService
 
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -63,7 +67,14 @@ async def backfill_github_prs(
     logger.info("=" * 80)
 
     # Initialize clients
-    github_client = GitHubClient()
+    # Read GitHub credentials from environment variables
+    github_client = GitHubClient(
+        api_token=os.getenv("GITHUB_API_TOKEN", ""),
+        organization=os.getenv("GITHUB_ORGANIZATION", ""),
+        app_id=os.getenv("GITHUB_APP_ID", ""),
+        private_key=os.getenv("GITHUB_APP_PRIVATE_KEY", ""),
+        installation_id=os.getenv("GITHUB_APP_INSTALLATION_ID", "")
+    )
     vector_service = VectorIngestService()
 
     # Calculate date range
