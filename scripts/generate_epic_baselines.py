@@ -26,8 +26,32 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_epic_name(epic_summary: str) -> str:
-    """Normalize epic names for grouping (case-insensitive, strip whitespace)."""
-    return epic_summary.strip().lower()
+    """
+    Normalize and consolidate epic names for grouping.
+
+    Combines similar epic names into canonical categories:
+    - Product details, PDP details, PDP image & summary -> product details
+    - Globals & style guide, Globals -> globals & style guide
+    """
+    normalized = epic_summary.strip().lower()
+
+    # Consolidation mappings (order matters - check specific patterns first)
+    consolidations = {
+        # Product detail page variants
+        'pdp details': 'product details',
+        'pdp image & summary': 'product details',
+        'product detail page': 'product details',
+
+        # Globals variants
+        'globals': 'globals & style guide',
+    }
+
+    # Apply consolidation mapping
+    for pattern, canonical in consolidations.items():
+        if normalized == pattern:
+            return canonical
+
+    return normalized
 
 
 def classify_variance(cv: float) -> str:

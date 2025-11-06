@@ -15,8 +15,32 @@ analytics_bp = Blueprint('analytics', __name__, url_prefix='/api/analytics')
 
 
 def normalize_epic_name(epic_summary: str) -> str:
-    """Normalize epic names for matching."""
-    return epic_summary.strip().lower()
+    """
+    Normalize and consolidate epic names for matching.
+
+    Combines similar epic names into canonical categories:
+    - Product details, PDP details, PDP image & summary -> product details
+    - Globals & style guide, Globals -> globals & style guide
+    """
+    normalized = epic_summary.strip().lower()
+
+    # Consolidation mappings (order matters - check specific patterns first)
+    consolidations = {
+        # Product detail page variants
+        'pdp details': 'product details',
+        'pdp image & summary': 'product details',
+        'product detail page': 'product details',
+
+        # Globals variants
+        'globals': 'globals & style guide',
+    }
+
+    # Apply consolidation mapping
+    for pattern, canonical in consolidations.items():
+        if normalized == pattern:
+            return canonical
+
+    return normalized
 
 
 @analytics_bp.route('/baselines', methods=['GET'])
@@ -362,7 +386,8 @@ def get_high_variance_epics(user):
             'high_risk_epics': [{
                 'epic_category': b.epic_category,
                 'median_hours': b.median_hours,
-                'range': f"{b.min_hours:.1f}h - {b.max_hours:.1f}h",
+                'min_hours': b.min_hours,
+                'max_hours': b.max_hours,
                 'coefficient_of_variation': b.coefficient_of_variation,
                 'project_count': b.project_count,
                 'recommended_estimate': b.p90_hours  # Use P90 for high variance

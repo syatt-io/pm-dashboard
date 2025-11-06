@@ -21,6 +21,7 @@ import {
   Tabs,
   Tab,
   Divider,
+  TableSortLabel,
 } from '@mui/material';
 import {
   Assessment as AnalyticsIcon,
@@ -114,6 +115,8 @@ export const AnalyticsList = () => {
   const [forecastResult, setForecastResult] = useState<ForecastResult | null>(null);
   const [epicInput, setEpicInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<'epic_category' | 'median_hours' | 'project_count'>('epic_category');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     // Only fetch data if user is admin
@@ -168,6 +171,34 @@ export const AnalyticsList = () => {
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
+
+  const handleSort = (field: 'epic_category' | 'median_hours' | 'project_count') => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to asc for epic_category, desc for numbers
+      setSortField(field);
+      setSortDirection(field === 'epic_category' ? 'asc' : 'desc');
+    }
+  };
+
+  // Sort baselines
+  const sortedBaselines = [...baselines].sort((a, b) => {
+    let aVal: string | number = a[sortField];
+    let bVal: string | number = b[sortField];
+
+    if (sortField === 'epic_category') {
+      aVal = (aVal as string).toLowerCase();
+      bVal = (bVal as string).toLowerCase();
+    }
+
+    if (sortDirection === 'asc') {
+      return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+    } else {
+      return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+    }
+  });
 
   // Show loading while checking permissions
   if (permissionsLoading) {
@@ -245,18 +276,42 @@ export const AnalyticsList = () => {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell><strong>Epic Category</strong></TableCell>
-                    <TableCell align="right"><strong>Median</strong></TableCell>
+                    <TableCell>
+                      <TableSortLabel
+                        active={sortField === 'epic_category'}
+                        direction={sortField === 'epic_category' ? sortDirection : 'asc'}
+                        onClick={() => handleSort('epic_category')}
+                      >
+                        <strong>Epic Category</strong>
+                      </TableSortLabel>
+                    </TableCell>
+                    <TableCell align="right">
+                      <TableSortLabel
+                        active={sortField === 'median_hours'}
+                        direction={sortField === 'median_hours' ? sortDirection : 'desc'}
+                        onClick={() => handleSort('median_hours')}
+                      >
+                        <strong>Median</strong>
+                      </TableSortLabel>
+                    </TableCell>
                     <TableCell align="right"><strong>P75</strong></TableCell>
                     <TableCell align="right"><strong>P90</strong></TableCell>
                     <TableCell align="right"><strong>Range</strong></TableCell>
-                    <TableCell align="center"><strong>Projects</strong></TableCell>
+                    <TableCell align="center">
+                      <TableSortLabel
+                        active={sortField === 'project_count'}
+                        direction={sortField === 'project_count' ? sortDirection : 'desc'}
+                        onClick={() => handleSort('project_count')}
+                      >
+                        <strong>Projects</strong>
+                      </TableSortLabel>
+                    </TableCell>
                     <TableCell align="center"><strong>Variance</strong></TableCell>
                     <TableCell align="right"><strong>Recommended</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {baselines.map((baseline) => (
+                  {sortedBaselines.map((baseline) => (
                     <TableRow key={baseline.epic_category}>
                       <TableCell>{baseline.epic_category}</TableCell>
                       <TableCell align="right">{baseline.median_hours.toFixed(1)}h</TableCell>
