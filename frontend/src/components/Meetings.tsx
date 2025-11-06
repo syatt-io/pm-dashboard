@@ -220,6 +220,7 @@ const DateRangeFilter = () => {
 export const MeetingList = () => (
   <Box>
     <List
+      resource="meetings"
       title="📞 Meeting Transcripts"
       sort={{ field: 'date', order: 'DESC' }}
       perPage={25}
