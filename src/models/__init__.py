@@ -13,6 +13,7 @@ from .notification_preferences import UserNotificationPreferences
 from .meeting_metadata import MeetingMetadata
 from .escalation import EscalationHistory, EscalationPreferences
 from .epic_hours import EpicHours
+from .epic_baselines import EpicBaseline
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -126,6 +127,8 @@ __all__ = [
     'MeetingMetadata',
     'EscalationHistory',
     'EscalationPreferences',
+    'EpicHours',
+    'EpicBaseline',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',
