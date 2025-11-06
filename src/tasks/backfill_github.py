@@ -87,7 +87,7 @@ async def backfill_github_prs(
         logger.info(f"Processing {len(repo_list)} specific repositories")
     else:
         logger.info("Fetching all accessible repositories...")
-        repo_list = github_client.list_accessible_repos()
+        repo_list = await github_client.list_accessible_repos()
         logger.info(f"Found {len(repo_list)} accessible repositories")
 
     # Statistics
@@ -113,7 +113,7 @@ async def backfill_github_prs(
 
             # Get PRs using GitHub client
             # States: 'open', 'closed', 'all'
-            prs = github_client.get_prs_by_date_and_state(
+            prs = await github_client.get_prs_by_date_range(
                 repo_name=repo_name,
                 start_date=start_date_str,
                 end_date=end_date_str,

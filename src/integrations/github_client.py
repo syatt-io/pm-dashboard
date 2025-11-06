@@ -571,3 +571,93 @@ class GitHubClient:
             except Exception as e:
                 logger.error(f"Error querying GitHub PRs: {e}", exc_info=True)
                 return []
+
+    async def get_prs_by_date_range(
+        self,
+        repo_name: str,
+        start_date: str,
+        end_date: str,
+        state: str = 'all'
+    ) -> List[Dict[str, Any]]:
+        """Get PRs for a specific repo within a date range.
+
+        Args:
+            repo_name: Repository name (without org prefix)
+            start_date: Start date in YYYY-MM-DD format
+            end_date: End date in YYYY-MM-DD format
+            state: PR state ('open', 'closed', 'all')
+
+        Returns:
+            List of PR dictionaries
+        """
+        # Build query
+        query_parts = []
+
+        # Add repo filter
+        if self.organization:
+            query_parts.append(f"repo:{self.organization}/{repo_name}")
+        else:
+            query_parts.append(f"repo:{repo_name}")
+
+        # Add date range filter
+        query_parts.append(f"created:{start_date}..{end_date}")
+
+        # Add PR type filter
+        query_parts.append("is:pr")
+
+        # Add state filter if not 'all'
+        if state != 'all':
+            query_parts.append(f"is:{state}")
+
+        search_query = " ".join(query_parts)
+
+        # Get auth headers
+        headers = await self._get_auth_headers()
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    f"{self.base_url}/search/issues",
+                    headers=headers,
+                    params={
+                        "q": search_query,
+                        "sort": "created",
+                        "order": "desc",
+                        "per_page": 100  # Max allowed
+                    },
+                    timeout=15.0
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    items = data.get("items", [])
+
+                    prs = []
+                    for item in items:
+                        pr_data = {
+                            "number": item.get("number"),
+                            "title": item.get("title"),
+                            "body": item.get("body", ""),
+                            "state": item.get("state"),
+                            "url": item.get("html_url"),
+                            "created_at": item.get("created_at"),
+                            "updated_at": item.get("updated_at"),
+                            "author": item.get("user", {}).get("login") if item.get("user") else None,
+                            "repo": repo_name
+                        }
+
+                        # Add merged_at if available
+                        pull_request = item.get("pull_request")
+                        if pull_request and pull_request.get("merged_at"):
+                            pr_data["merged_at"] = pull_request["merged_at"]
+
+                        prs.append(pr_data)
+
+                    return prs
+                else:
+                    logger.warning(f"GitHub PR search returned status {response.status_code}: {search_query}")
+                    return []
+
+            except Exception as e:
+                logger.error(f"Error searching GitHub PRs: {e}", exc_info=True)
+                return []
