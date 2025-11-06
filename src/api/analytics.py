@@ -1,12 +1,16 @@
 """Analytics API endpoints for epic hours insights and forecasting."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, make_response
 from src.models import EpicBaseline, EpicHours
 from src.utils.database import get_session
 from src.services.auth import admin_required
 from sqlalchemy import func
 from collections import defaultdict
 from typing import List, Dict
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+import csv
+import io
 import logging
 
 logger = logging.getLogger(__name__)
@@ -396,4 +400,129 @@ def get_high_variance_epics(user):
 
     except Exception as e:
         logger.error(f"Error fetching high variance epics: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@analytics_bp.route('/project-schedule', methods=['POST'])
+@admin_required
+def generate_project_schedule(user):
+    """
+    Generate month-by-month project schedule based on historical ratios.
+
+    Request body:
+        {
+            "total_hours": 1500,
+            "duration_months": 8,
+            "start_date": "2025-01-15"
+        }
+    """
+    try:
+        from src.api.analytics_schedule import generate_project_schedule as gen_schedule
+
+        data = request.get_json()
+
+        # Validate inputs
+        total_hours = data.get('total_hours')
+        duration_months = data.get('duration_months')
+        start_date = data.get('start_date')
+
+        if not total_hours or total_hours <= 0:
+            return jsonify({'success': False, 'error': 'total_hours must be > 0'}), 400
+
+        if not duration_months or duration_months < 1 or duration_months > 24:
+            return jsonify({'success': False, 'error': 'duration_months must be between 1 and 24'}), 400
+
+        if not start_date:
+            return jsonify({'success': False, 'error': 'start_date is required'}), 400
+
+        # Validate date format
+        try:
+            datetime.fromisoformat(start_date)
+        except ValueError:
+            return jsonify({'success': False, 'error': 'start_date must be in YYYY-MM-DD format'}), 400
+
+        # Generate schedule
+        schedule = gen_schedule(total_hours, duration_months, start_date)
+
+        return jsonify({
+            'success': True,
+            'schedule': schedule
+        })
+
+    except Exception as e:
+        logger.error(f"Error generating project schedule: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@analytics_bp.route('/project-schedule/export', methods=['POST'])
+@admin_required
+def export_project_schedule(user):
+    """
+    Export project schedule as CSV file.
+
+    Same request body as /project-schedule endpoint.
+    """
+    try:
+        from src.api.analytics_schedule import generate_project_schedule as gen_schedule
+
+        data = request.get_json()
+
+        # Validate inputs (same as above)
+        total_hours = data.get('total_hours')
+        duration_months = data.get('duration_months')
+        start_date = data.get('start_date')
+
+        if not total_hours or total_hours <= 0:
+            return jsonify({'success': False, 'error': 'total_hours must be > 0'}), 400
+
+        if not duration_months or duration_months < 1 or duration_months > 24:
+            return jsonify({'success': False, 'error': 'duration_months must be between 1 and 24'}), 400
+
+        if not start_date:
+            return jsonify({'success': False, 'error': 'start_date is required'}), 400
+
+        # Generate schedule
+        schedule = gen_schedule(total_hours, duration_months, start_date)
+
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Header row: Epic, Ratio %, Total Hours, Month1, Month2, ..., Total
+        header = ['Epic Category', 'Ratio %', 'Total Hours']
+        header.extend(schedule['months'])
+        header.append('Row Total')
+        writer.writerow(header)
+
+        # Data rows
+        for epic in schedule['epics']:
+            row = [
+                epic['epic_category'],
+                f"{epic['ratio'] * 100:.2f}%",
+                epic['allocated_hours']
+            ]
+            # Add monthly hours
+            for month_data in epic['monthly_breakdown']:
+                row.append(month_data['hours'])
+            # Add row total (same as allocated_hours)
+            row.append(epic['allocated_hours'])
+            writer.writerow(row)
+
+        # Totals row
+        totals_row = ['TOTAL', '', total_hours]
+        for month_total in schedule['monthly_totals']:
+            totals_row.append(month_total['total_hours'])
+        totals_row.append(total_hours)
+        writer.writerow(totals_row)
+
+        # Create response
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=project_schedule_{start_date}.csv'
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error exporting project schedule: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

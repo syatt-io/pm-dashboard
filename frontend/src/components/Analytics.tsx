@@ -28,9 +28,12 @@ import {
   TrendingUp as ForecastIcon,
   Warning as WarningIcon,
   Lock as LockIcon,
+  CalendarMonth as ScheduleIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material';
 import { usePermissions } from 'react-admin';
 import axios from 'axios';
+import { ProjectScheduleTab } from './ProjectSchedule';
 
 interface EpicBaseline {
   epic_category: string;
@@ -77,6 +80,26 @@ interface ForecastResult {
     custom_epics: string[];
     high_risk_epics: string[];
   };
+}
+
+interface ProjectSchedule {
+  total_hours: number;
+  duration_months: number;
+  start_date: string;
+  months: string[];
+  epics: Array<{
+    epic_category: string;
+    ratio: number;
+    allocated_hours: number;
+    monthly_breakdown: Array<{
+      month: string;
+      hours: number;
+    }>;
+  }>;
+  monthly_totals: Array<{
+    month: string;
+    total_hours: number;
+  }>;
 }
 
 const getVarianceColor = (level: string) => {
@@ -255,6 +278,7 @@ export const AnalyticsList = () => {
           <Tab icon={<AnalyticsIcon />} label="Epic Baselines" />
           <Tab icon={<ForecastIcon />} label="Project Forecasting" />
           <Tab icon={<WarningIcon />} label="High-Risk Epics" />
+          <Tab icon={<ScheduleIcon />} label="Project Schedule" />
         </Tabs>
       </Box>
 
@@ -539,6 +563,9 @@ export const AnalyticsList = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Tab 4: Project Schedule */}
+      {tabValue === 3 && <ProjectScheduleTab />}
     </Box>
   );
 };
