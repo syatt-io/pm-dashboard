@@ -51,6 +51,8 @@ import {
   Create,
   Download,
   Delete,
+  Analytics,
+  Launch,
 } from '@mui/icons-material';
 import { MeetingList } from './Meetings';
 import { useAuth } from '../context/AuthContext';
@@ -695,6 +697,56 @@ const MeetingTitle = ({ record }: { record: any }) => {
   );
 };
 
+const MeetingActions = ({ record }: { record: any }) => {
+  const redirect = useRedirect();
+  const notify = useNotify();
+  const hasAnalysis = !!record.analyzed_at;
+
+  const handleAnalyze = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (record?.meeting_id || record?.id) {
+      const meetingId = record.meeting_id || record.id;
+      notify('Opening analysis view...', { type: 'info' });
+      redirect(`/analysis/${meetingId}/show`);
+    }
+  };
+
+  const handleOpenFireflies = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (record?.meeting_id || record?.id) {
+      const meetingId = record.meeting_id || record.id;
+      const firefliesUrl = `https://app.fireflies.ai/view/${meetingId}`;
+      window.open(firefliesUrl, '_blank');
+      notify('Opening Fireflies meeting...', { type: 'info' });
+    } else {
+      notify('Meeting ID not available', { type: 'warning' });
+    }
+  };
+
+  return (
+    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+      <Button
+        onClick={handleAnalyze}
+        variant="contained"
+        color="primary"
+        size="small"
+        startIcon={<Analytics />}
+      >
+        {hasAnalysis ? 'Re-analyze' : 'Analyze'}
+      </Button>
+      <Button
+        onClick={handleOpenFireflies}
+        variant="outlined"
+        color="secondary"
+        size="small"
+        startIcon={<Launch />}
+      >
+        Fireflies
+      </Button>
+    </Box>
+  );
+};
+
 export const AnalysisList = () => {
   const [tabValue, setTabValue] = useState(0);
 
@@ -747,12 +799,9 @@ export const AnalysisList = () => {
               render={(record: any) => record.action_items?.length || 0}
             />
             <FunctionField
-              label="Outcomes"
-              render={(record: any) => record.outcomes?.length || 0}
-            />
-            <FunctionField
-              label="Constraints"
-              render={(record: any) => record.blockers_and_constraints?.length || 0}
+              label="Actions"
+              render={(record: any) => <MeetingActions record={record} />}
+              sortable={false}
             />
           </Datagrid>
         </List>
