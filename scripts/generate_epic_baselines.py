@@ -61,20 +61,28 @@ def generate_baselines(min_project_count: int = 3):
         logger.info(f"Found {len(all_records)} total epic hour records")
 
         # Group by normalized epic summary
-        epic_data = defaultdict(lambda: {
-            'hours': [],
-            'projects': set(),
-            'occurrences': 0
-        })
+        # First, aggregate hours by project+epic (sum across all months)
+        project_epic_hours = defaultdict(lambda: defaultdict(float))
 
         for record in all_records:
             if not record.epic_summary:
                 continue
 
             normalized_name = normalize_epic_name(record.epic_summary)
-            epic_data[normalized_name]['hours'].append(record.hours)
-            epic_data[normalized_name]['projects'].add(record.project_key)
-            epic_data[normalized_name]['occurrences'] += 1
+            project_epic_hours[normalized_name][record.project_key] += record.hours
+
+        # Now calculate statistics across project totals
+        epic_data = defaultdict(lambda: {
+            'hours': [],
+            'projects': set(),
+            'occurrences': 0
+        })
+
+        for epic_name, projects in project_epic_hours.items():
+            for project_key, total_hours in projects.items():
+                epic_data[epic_name]['hours'].append(total_hours)
+                epic_data[epic_name]['projects'].add(project_key)
+                epic_data[epic_name]['occurrences'] += 1
 
         # Filter to common epics (3+ projects) and calculate statistics
         baselines = []
