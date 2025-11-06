@@ -98,12 +98,21 @@ class VectorIngestService:
             logger.error(f"Error getting embedding: {e}")
             return None
 
-    def upsert_documents(self, documents: List[VectorDocument], batch_size: int = 100) -> int:
-        """Upsert documents into Pinecone in batches.
+    def upsert_documents(
+        self,
+        documents: List[VectorDocument],
+        batch_size: int = 100,
+        embedding_chunk_size: int = 500  # Process embeddings in chunks
+    ) -> int:
+        """Upsert documents into Pinecone in batches with chunked embedding generation.
+
+        For large datasets (>1000 documents), this method processes embeddings in chunks
+        to avoid timeouts and memory issues.
 
         Args:
             documents: List of documents to upsert
-            batch_size: Number of documents per batch
+            batch_size: Number of documents per Pinecone upsert batch
+            embedding_chunk_size: Number of documents to generate embeddings for at once
 
         Returns:
             Number of successfully upserted documents
@@ -112,30 +121,66 @@ class VectorIngestService:
             logger.error("Pinecone index not initialized")
             return 0
 
-        # Generate embeddings for documents that don't have them
-        logger.info(f"🔄 Generating embeddings for {len(documents)} documents...")
-        for idx, doc in enumerate(documents):
-            if (idx + 1) % 100 == 0:
-                logger.info(f"   Embedding progress: {idx + 1}/{len(documents)}")
+        if not documents:
+            logger.warning("No documents provided for upserting")
+            return 0
 
-            if not doc.embedding:
-                doc.embedding = self.get_embedding(doc.content)
-                if not doc.embedding:
-                    logger.warning(f"Skipping document {doc.id} - failed to generate embedding")
+        total_docs = len(documents)
+        logger.info(f"📝 Ingesting {total_docs} documents into Pinecone...")
 
-        # Filter out documents without embeddings
-        valid_docs = [doc for doc in documents if doc.embedding]
+        # Process documents in chunks to avoid timeouts
+        all_valid_docs = []
+        total_chunks = (total_docs + embedding_chunk_size - 1) // embedding_chunk_size
 
-        if not valid_docs:
+        logger.info(f"🔄 Processing {total_chunks} chunks of {embedding_chunk_size} documents each...")
+
+        for chunk_idx in range(0, total_docs, embedding_chunk_size):
+            chunk_end = min(chunk_idx + embedding_chunk_size, total_docs)
+            chunk = documents[chunk_idx:chunk_end]
+            chunk_num = (chunk_idx // embedding_chunk_size) + 1
+
+            logger.info(f"🔄 Chunk {chunk_num}/{total_chunks}: Generating embeddings for {len(chunk)} documents...")
+
+            # Generate embeddings for this chunk
+            valid_in_chunk = 0
+            failed_in_chunk = 0
+
+            for idx, doc in enumerate(chunk):
+                if (idx + 1) % 100 == 0:
+                    logger.info(f"   Chunk {chunk_num} embedding progress: {idx + 1}/{len(chunk)}")
+
+                try:
+                    if not doc.embedding:
+                        doc.embedding = self.get_embedding(doc.content)
+                        if not doc.embedding:
+                            logger.warning(f"Failed to generate embedding for document {doc.id}")
+                            failed_in_chunk += 1
+                            continue
+
+                    all_valid_docs.append(doc)
+                    valid_in_chunk += 1
+
+                except Exception as e:
+                    logger.error(f"Error generating embedding for document {doc.id}: {e}")
+                    failed_in_chunk += 1
+                    continue
+
+            logger.info(f"✅ Chunk {chunk_num}/{total_chunks} complete: {valid_in_chunk} valid, {failed_in_chunk} failed")
+
+        if not all_valid_docs:
             logger.warning("No valid documents to upsert (all failed embedding generation)")
             return 0
 
-        logger.info(f"✅ Generated {len(valid_docs)} embeddings successfully")
+        logger.info(f"✅ Generated {len(all_valid_docs)}/{total_docs} embeddings successfully")
 
-        # Upsert in batches
+        # Upsert valid documents to Pinecone in batches
+        logger.info(f"📤 Upserting {len(all_valid_docs)} documents to Pinecone in batches of {batch_size}...")
         upserted = 0
-        for i in range(0, len(valid_docs), batch_size):
-            batch = valid_docs[i:i + batch_size]
+        total_batches = (len(all_valid_docs) + batch_size - 1) // batch_size
+
+        for i in range(0, len(all_valid_docs), batch_size):
+            batch = all_valid_docs[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
 
             try:
                 # Format for Pinecone
@@ -154,15 +199,14 @@ class VectorIngestService:
 
                 # Upsert to Pinecone
                 response = self.pinecone_index.upsert(vectors=vectors)
-                logger.info(f"🔍 Pinecone upsert response: {response}")
                 upserted += len(vectors)
-                logger.info(f"✅ Upserted batch of {len(vectors)} vectors ({upserted}/{len(valid_docs)} total)")
+                logger.info(f"✅ Upserted batch {batch_num}/{total_batches}: {len(vectors)} vectors ({upserted}/{len(all_valid_docs)} total)")
 
             except Exception as e:
-                logger.error(f"❌ Error upserting batch: {e}", exc_info=True)
+                logger.error(f"❌ Error upserting batch {batch_num}/{total_batches}: {e}", exc_info=True)
                 continue
 
-        logger.info(f"✅ Successfully upserted {upserted}/{len(documents)} documents to Pinecone")
+        logger.info(f"✅ Successfully upserted {upserted}/{total_docs} documents to Pinecone")
         return upserted
 
     def ingest_slack_messages(
@@ -681,6 +725,124 @@ class VectorIngestService:
         logger.info(f"✅ Built {len(documents)} valid documents ({skipped_count} skipped)")
         logger.info(f"📝 Ingesting {len(documents)} Tempo worklogs into Pinecone...")
         return self.upsert_documents(documents, batch_size=50)
+
+    def ingest_github_prs(
+        self,
+        prs: List[Dict[str, Any]],
+        repo_name: Optional[str] = None
+    ) -> int:
+        """Ingest GitHub pull requests into vector database.
+
+        Args:
+            prs: List of PR dicts from GitHub API
+            repo_name: Optional repository name for context
+
+        Returns:
+            Number of successfully ingested PRs
+        """
+        documents = []
+        skipped_count = 0
+
+        for pr in prs:
+            try:
+                pr_number = pr.get('number')
+                pr_title = pr.get('title', '')
+                pr_body = pr.get('body', '') or ''
+                pr_state = pr.get('state', 'unknown')
+                pr_author = pr.get('author') or pr.get('user', 'unknown')
+                pr_url = pr.get('url', '')
+                pr_repo = pr.get('repo', repo_name or 'unknown')
+
+                created_at = pr.get('created_at', '')
+                updated_at = pr.get('updated_at', '')
+                merged_at = pr.get('merged_at')
+
+                # Skip PRs without essential data
+                if not pr_number or not pr_title:
+                    logger.warning(f"Skipping PR - missing number or title")
+                    skipped_count += 1
+                    continue
+
+                # Generate unique ID
+                doc_id = f"github-pr-{pr_repo}-{pr_number}"
+
+                # Parse dates
+                pr_date = None
+                timestamp_epoch = None
+                if created_at:
+                    try:
+                        from datetime import datetime
+                        pr_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        timestamp_epoch = int(pr_date.timestamp())
+                    except:
+                        pass
+
+                # Extract linked Jira tickets from title and body
+                import re
+                jira_pattern = r'\b([A-Z]{2,}-\d+)\b'
+                linked_tickets = []
+                for text in [pr_title, pr_body]:
+                    matches = re.findall(jira_pattern, text)
+                    linked_tickets.extend(matches)
+                linked_tickets = list(set(linked_tickets))  # Remove duplicates
+
+                # Build content for embedding
+                content = f"[PR #{pr_number}] {pr_title}"
+                if pr_body:
+                    # Truncate body to first 500 chars for embedding
+                    body_preview = pr_body[:500]
+                    content += f"\n\n{body_preview}"
+                if linked_tickets:
+                    content += f"\n\nLinked Jira tickets: {', '.join(linked_tickets)}"
+
+                # Build metadata
+                metadata = {
+                    'pr_number': pr_number,
+                    'title': pr_title,
+                    'state': pr_state,
+                    'author': pr_author,
+                    'repo': pr_repo,
+                    'url': pr_url,
+                    'created_at': created_at,
+                    'updated_at': updated_at,
+                    'access_type': 'all'  # GitHub PRs accessible to all users
+                }
+
+                # Add optional fields if they exist
+                if merged_at:
+                    metadata['merged_at'] = merged_at
+                if linked_tickets:
+                    metadata['linked_jira_tickets'] = ','.join(linked_tickets)
+                if pr_date:
+                    metadata['date'] = pr_date.strftime('%Y-%m-%d')
+                    metadata['timestamp'] = pr_date.isoformat()
+                if timestamp_epoch:
+                    metadata['timestamp_epoch'] = timestamp_epoch
+
+                # Extract labels if present
+                labels = pr.get('labels', [])
+                if labels:
+                    if isinstance(labels, list):
+                        label_names = [l.get('name', l) if isinstance(l, dict) else str(l) for l in labels]
+                        metadata['labels'] = ','.join(label_names)
+
+                doc = VectorDocument(
+                    id=doc_id,
+                    source='github',
+                    title=f"PR #{pr_number}: {pr_title}",
+                    content=content,
+                    metadata=metadata
+                )
+                documents.append(doc)
+
+            except Exception as e:
+                logger.error(f"Error processing GitHub PR {pr.get('number', 'unknown')}: {e}")
+                skipped_count += 1
+                continue
+
+        logger.info(f"✅ Built {len(documents)} valid documents ({skipped_count} skipped)")
+        logger.info(f"📝 Ingesting {len(documents)} GitHub PRs into Pinecone...")
+        return self.upsert_documents(documents, batch_size=100)
 
     def _match_project_keywords(self, title: str) -> List[str]:
         """Match meeting title against project keywords and return matching project keys.

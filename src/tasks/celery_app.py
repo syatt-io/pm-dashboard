@@ -79,7 +79,8 @@ celery_app.conf.update(
     timezone='UTC',
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=60 * 60,  # 60 minutes max per task (increased for Tempo YTD sync with 16k+ worklogs)
+    task_time_limit=120 * 60,  # 120 minutes (2 hours) max per task (for large backfills with 20k+ items)
+    task_soft_time_limit=110 * 60,  # 110 minutes soft limit (gives 10 min to cleanup before hard kill)
     worker_max_tasks_per_child=50,  # Restart worker after 50 tasks to prevent memory leaks
     # Broker connection retry settings
     broker_connection_retry_on_startup=True,

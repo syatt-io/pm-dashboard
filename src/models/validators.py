@@ -92,6 +92,21 @@ class BackfillFirefliesRequest(BaseModel):
     }
 
 
+class BackfillGitHubRequest(BaseModel):
+    """Validation for GitHub backfill request parameters."""
+    days: int = Field(default=730, ge=1, le=3650, description="Number of days to backfill (1-3650)")
+    repos: Optional[str] = Field(default=None, description="Comma-separated list of repos (owner/repo format)")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "days": 730,
+                "repos": "syatt-io/agent-pm,syatt-io/frontend"
+            }
+        }
+    }
+
+
 class JiraQueryTestRequest(BaseModel):
     """Validation for Jira query test request parameters."""
     days: int = Field(default=2555, ge=1, le=3650, description="Number of days to query (1-3650)")

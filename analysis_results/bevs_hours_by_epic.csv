@@ -1,0 +1,50 @@
+Project,Month,Epic,Epic_Summary,Hours
+BEVS,2025-05,BEVS-1,"Project Oversight / Support",23.25
+BEVS,2025-05,BEVS-113,"Fulfilment Integration",0.50
+BEVS,2025-05,BEVS-115,"Checkout",0.25
+BEVS,2025-05,BEVS-16,"Product Details",0.25
+BEVS,2025-05,BEVS-6,"Design",40.00
+BEVS,2025-06,BEVS-1,"Project Oversight / Support",23.00
+BEVS,2025-06,BEVS-10,"Footer",23.50
+BEVS,2025-06,BEVS-2,"Environment Setup",4.00
+BEVS,2025-06,BEVS-6,"Design",19.00
+BEVS,2025-06,BEVS-7,"Globals",38.00
+BEVS,2025-06,BEVS-8,"Header",8.75
+BEVS,2025-07,BEVS-1,"Project Oversight / Support",68.50
+BEVS,2025-07,BEVS-10,"Footer",8.25
+BEVS,2025-07,BEVS-11,"Content Sections",5.50
+BEVS,2025-07,BEVS-12,"Cart",20.00
+BEVS,2025-07,BEVS-13,"Product Listings",58.25
+BEVS,2025-07,BEVS-136,"Quick Order",1.75
+BEVS,2025-07,BEVS-15,"Search",36.75
+BEVS,2025-07,BEVS-16,"Product Details",38.50
+BEVS,2025-07,BEVS-17,"Product Recommendations",6.00
+BEVS,2025-07,BEVS-6,"Design",2.50
+BEVS,2025-07,BEVS-7,"Globals",51.00
+BEVS,2025-07,BEVS-8,"Header",23.25
+BEVS,2025-07,BEVS-9,"Navigation",25.00
+BEVS,2025-08,BEVS-1,"Project Oversight / Support",29.75
+BEVS,2025-08,BEVS-11,"Content Sections",19.50
+BEVS,2025-08,BEVS-115,"Checkout",12.00
+BEVS,2025-08,BEVS-116,"Product Migration",10.50
+BEVS,2025-08,BEVS-12,"Cart",0.50
+BEVS,2025-08,BEVS-13,"Product Listings",13.50
+BEVS,2025-08,BEVS-136,"Quick Order",57.00
+BEVS,2025-08,BEVS-16,"Product Details",12.75
+BEVS,2025-08,BEVS-7,"Globals",1.50
+BEVS,2025-08,BEVS-8,"Header",3.00
+BEVS,2025-09,BEVS-1,"Project Oversight / Support",27.50
+BEVS,2025-09,BEVS-11,"Content Sections",19.50
+BEVS,2025-09,BEVS-115,"Checkout",1.50
+BEVS,2025-09,BEVS-12,"Cart",7.00
+BEVS,2025-09,BEVS-13,"Product Listings",10.75
+BEVS,2025-09,BEVS-136,"Quick Order",6.25
+BEVS,2025-09,BEVS-16,"Product Details",10.25
+BEVS,2025-10,BEVS-1,"Project Oversight / Support",23.50
+BEVS,2025-10,BEVS-10,"Footer",1.25
+BEVS,2025-10,BEVS-11,"Content Sections",1.00
+BEVS,2025-10,BEVS-12,"Cart",1.25
+BEVS,2025-10,BEVS-3,"Launch Support",0.50
+BEVS,2025-10,BEVS-6,"Design",1.50
+BEVS,2025-10,BEVS-7,"Globals",10.50
+BEVS,2025-10,BEVS-9,"Navigation",2.75

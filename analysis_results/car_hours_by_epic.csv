@@ -1,0 +1,90 @@
+Project,Month,Epic,Epic_Summary,Hours
+CAR,2024-11,CAR-16,"Project oversight / support",7.17
+CAR,2024-11,CAR-21,"Eagle Integration - Customer Import",14.00
+CAR,2024-12,CAR-116,"UX",3.00
+CAR,2024-12,CAR-16,"Project oversight / support",22.33
+CAR,2024-12,CAR-17,"Eagle Integration - Order Export",13.25
+CAR,2024-12,CAR-21,"Eagle Integration - Customer Import",3.25
+CAR,2024-12,CAR-4,"Design",11.50
+CAR,2025-01,CAR-116,"UX",1.75
+CAR,2025-01,CAR-16,"Project oversight / support",48.25
+CAR,2025-01,CAR-17,"Eagle Integration - Order Export",2.00
+CAR,2025-01,CAR-186,"Send Cart To POS",16.50
+CAR,2025-01,CAR-4,"Design",24.25
+CAR,2025-01,CAR-40,"Globals & Style Guide",11.75
+CAR,2025-01,CAR-41,"Header",17.00
+CAR,2025-01,CAR-46,"PDP Image, Summary",29.75
+CAR,2025-01,CAR-47,"PDP Details, Image, & Summary",10.00
+CAR,2025-01,CAR-48,"PDP Upsells & Cross Sells",5.75
+CAR,2025-01,CAR-51,"Content Sections",18.25
+CAR,2025-01,CAR-58,"Components",12.00
+CAR,2025-02,CAR-105,"Search",11.75
+CAR,2025-02,CAR-116,"UX",8.75
+CAR,2025-02,CAR-158,"Vendor Product integration ",1.18
+CAR,2025-02,CAR-16,"Project oversight / support",52.50
+CAR,2025-02,CAR-186,"Send Cart To POS",26.65
+CAR,2025-02,CAR-4,"Design",4.25
+CAR,2025-02,CAR-40,"Globals & Style Guide",14.50
+CAR,2025-02,CAR-41,"Header",2.50
+CAR,2025-02,CAR-42,"Footer",0.25
+CAR,2025-02,CAR-44,"Mega Menu",13.50
+CAR,2025-02,CAR-45,"PLP",58.00
+CAR,2025-02,CAR-46,"PDP Image, Summary",1.50
+CAR,2025-02,CAR-47,"PDP Details, Image, & Summary",0.75
+CAR,2025-02,CAR-48,"PDP Upsells & Cross Sells",5.25
+CAR,2025-02,CAR-49,"Cart ",4.75
+CAR,2025-02,CAR-51,"Content Sections",57.00
+CAR,2025-02,CAR-58,"Components",3.50
+CAR,2025-03,CAR-116,"UX",6.25
+CAR,2025-03,CAR-158,"Vendor Product integration ",56.75
+CAR,2025-03,CAR-16,"Project oversight / support",54.00
+CAR,2025-03,CAR-186,"Send Cart To POS",8.00
+CAR,2025-03,CAR-24,"Shopify Configuration Support",0.50
+CAR,2025-03,CAR-28,"Setup Middleware Infrastructure",0.25
+CAR,2025-03,CAR-4,"Design",0.25
+CAR,2025-03,CAR-40,"Globals & Style Guide",28.00
+CAR,2025-03,CAR-41,"Header",16.75
+CAR,2025-03,CAR-42,"Footer",13.25
+CAR,2025-03,CAR-43,"Search",1.75
+CAR,2025-03,CAR-45,"PLP",18.25
+CAR,2025-03,CAR-46,"PDP Image, Summary",0.50
+CAR,2025-03,CAR-47,"PDP Details, Image, & Summary",83.50
+CAR,2025-03,CAR-49,"Cart ",6.00
+CAR,2025-03,CAR-51,"Content Sections",13.25
+CAR,2025-03,CAR-57,"Pages",8.00
+CAR,2025-03,CAR-58,"Components",2.00
+CAR,2025-04,CAR-116,"UX",7.50
+CAR,2025-04,CAR-158,"Vendor Product integration ",7.25
+CAR,2025-04,CAR-16,"Project oversight / support",15.25
+CAR,2025-04,CAR-186,"Send Cart To POS",4.50
+CAR,2025-04,CAR-203,"Import products from eagle to Shopify",20.33
+CAR,2025-04,CAR-41,"Header",1.25
+CAR,2025-04,CAR-42,"Footer",1.75
+CAR,2025-04,CAR-45,"PLP",1.50
+CAR,2025-04,CAR-47,"PDP Details, Image, & Summary",21.25
+CAR,2025-04,CAR-57,"Pages",1.00
+CAR,2025-04,CAR-60,"3rd Party Apps",0.25
+CAR,2025-05,CAR-116,"UX",7.00
+CAR,2025-05,CAR-16,"Project oversight / support",13.50
+CAR,2025-05,CAR-203,"Import products from eagle to Shopify",19.57
+CAR,2025-05,CAR-22,"Import Other Vendor Products",2.52
+CAR,2025-05,CAR-47,"PDP Details, Image, & Summary",9.78
+CAR,2025-06,CAR-105,"Search",0.75
+CAR,2025-06,CAR-16,"Project oversight / support",8.50
+CAR,2025-06,CAR-186,"Send Cart To POS",2.50
+CAR,2025-06,CAR-22,"Import Other Vendor Products",0.25
+CAR,2025-06,CAR-47,"PDP Details, Image, & Summary",3.75
+CAR,2025-06,CAR-49,"Cart ",0.50
+CAR,2025-06,CAR-51,"Content Sections",0.50
+CAR,2025-06,CAR-60,"3rd Party Apps",0.25
+CAR,2025-07,CAR-16,"Project oversight / support",12.15
+CAR,2025-07,CAR-186,"Send Cart To POS",1.25
+CAR,2025-07,CAR-22,"Import Other Vendor Products",2.08
+CAR,2025-07,CAR-47,"PDP Details, Image, & Summary",10.50
+CAR,2025-07,CAR-49,"Cart ",6.00
+CAR,2025-07,CAR-51,"Content Sections",1.25
+CAR,2025-08,CAR-47,"PDP Details, Image, & Summary",1.25
+CAR,2025-08,No Epic,"",3.75
+CAR,2025-09,CAR-49,"Cart ",0.75
+CAR,2025-09,No Epic,"",0.50
+CAR,2025-10,ECAT-7,"Order Sync",3.95

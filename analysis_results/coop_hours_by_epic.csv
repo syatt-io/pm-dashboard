@@ -1,0 +1,110 @@
+Project,Month,Epic,Epic_Summary,Hours
+COOP,2025-01,COOP-1,"Project Oversight / Support",53.75
+COOP,2025-01,COOP-14,"Globals & Style Guide",0.50
+COOP,2025-01,COOP-19,"Mega Menu",0.25
+COOP,2025-02,COOP-1,"Project Oversight / Support",79.83
+COOP,2025-02,COOP-14,"Globals & Style Guide",13.25
+COOP,2025-02,COOP-16,"Content Sections",8.00
+COOP,2025-02,COOP-21,"PLP / SRP",4.75
+COOP,2025-02,COOP-102,"Academic Purchasing Journey",4.50
+COOP,2025-02,COOP-22,"PDP Image & Summary",4.00
+COOP,2025-02,COOP-112,"POS Scholarship Extension",2.25
+COOP,2025-02,COOP-108,"Scholarships",1.25
+COOP,2025-02,COOP-38,"Scholarship Integration",1.00
+COOP,2025-02,COOP-105,"[Watchman] POS Extension",0.25
+COOP,2025-03,COOP-112,"POS Scholarship Extension",57.25
+COOP,2025-03,COOP-1,"Project Oversight / Support",41.25
+COOP,2025-03,COOP-14,"Globals & Style Guide",22.25
+COOP,2025-03,COOP-102,"Academic Purchasing Journey",20.25
+COOP,2025-03,COOP-20,"Search",9.75
+COOP,2025-03,COOP-18,"Footer",8.50
+COOP,2025-03,COOP-17,"Header",6.25
+COOP,2025-03,COOP-22,"PDP Image & Summary",4.25
+COOP,2025-03,COOP-16,"Content Sections",4.25
+COOP,2025-03,COOP-15,"Components",2.75
+COOP,2025-03,COOP-21,"PLP / SRP",2.25
+COOP,2025-04,COOP-16,"Content Sections",64.50
+COOP,2025-04,COOP-1,"Project Oversight / Support",59.75
+COOP,2025-04,COOP-26,"Cart",17.50
+COOP,2025-04,COOP-15,"Components",9.25
+COOP,2025-04,COOP-21,"PLP / SRP",8.50
+COOP,2025-04,COOP-143,"Donations",7.50
+COOP,2025-04,COOP-19,"Mega Menu",5.75
+COOP,2025-04,COOP-17,"Header",4.75
+COOP,2025-04,COOP-23,"PDP Details",3.75
+COOP,2025-04,COOP-20,"Search",2.75
+COOP,2025-04,COOP-108,"Scholarships",2.50
+COOP,2025-04,COOP-18,"Footer",0.50
+COOP,2025-04,COOP-105,"[Watchman] POS Extension",0.25
+COOP,2025-04,COOP-38,"Scholarship Integration",0.25
+COOP,2025-04,COOP-39,"Fulfillment Integration",0.25
+COOP,2025-04,COOP-139,"Quicklook",0.25
+COOP,2025-04,COOP-28,"Checkout",0.25
+COOP,2025-05,COOP-1,"Project Oversight / Support",68.50
+COOP,2025-05,COOP-108,"Scholarships",63.00
+COOP,2025-05,COOP-143,"Donations",27.45
+COOP,2025-05,COOP-26,"Cart",25.50
+COOP,2025-05,COOP-112,"POS Scholarship Extension",24.50
+COOP,2025-05,COOP-22,"PDP Image & Summary",15.38
+COOP,2025-05,COOP-21,"PLP / SRP",14.50
+COOP,2025-05,COOP-23,"PDP Details",14.25
+COOP,2025-05,COOP-25,"Brands",9.25
+COOP,2025-05,COOP-15,"Components",8.00
+COOP,2025-05,COOP-24,"PDP Upsells / Cross Sells",5.25
+COOP,2025-05,COOP-139,"Quicklook",4.50
+COOP,2025-05,COOP-20,"Search",3.50
+COOP,2025-05,COOP-104,"Customizable Product Form & Purchasing",3.25
+COOP,2025-05,COOP-16,"Content Sections",2.50
+COOP,2025-05,COOP-42,"Emails",1.00
+COOP,2025-06,COOP-112,"POS Scholarship Extension",52.25
+COOP,2025-06,COOP-1,"Project Oversight / Support",40.00
+COOP,2025-06,COOP-108,"Scholarships",18.00
+COOP,2025-06,COOP-22,"PDP Image & Summary",17.23
+COOP,2025-06,COOP-34,"Gift Card Integration",9.50
+COOP,2025-06,COOP-35,"Gift Card Migration",8.43
+COOP,2025-06,COOP-38,"Scholarship Integration",5.75
+COOP,2025-06,COOP-26,"Cart",5.50
+COOP,2025-06,COOP-21,"PLP / SRP",4.75
+COOP,2025-06,COOP-24,"PDP Upsells / Cross Sells",2.25
+COOP,2025-06,COOP-104,"Customizable Product Form & Purchasing",1.50
+COOP,2025-06,COOP-15,"Components",1.50
+COOP,2025-06,COOP-139,"Quicklook",1.25
+COOP,2025-06,COOP-25,"Brands",1.00
+COOP,2025-06,COOP-23,"PDP Details",1.00
+COOP,2025-06,COOP-143,"Donations",0.75
+COOP,2025-06,COOP-27,"Store Locator",0.50
+COOP,2025-06,COOP-16,"Content Sections",0.25
+COOP,2025-07,COOP-38,"Scholarship Integration",57.25
+COOP,2025-07,COOP-102,"Academic Purchasing Journey",55.75
+COOP,2025-07,COOP-1,"Project Oversight / Support",53.00
+COOP,2025-07,COOP-108,"Scholarships",18.25
+COOP,2025-07,COOP-42,"Emails",8.50
+COOP,2025-07,COOP-23,"PDP Details",2.00
+COOP,2025-07,COOP-22,"PDP Image & Summary",1.25
+COOP,2025-07,COOP-104,"Customizable Product Form & Purchasing",1.00
+COOP,2025-07,COOP-13,"Analytics",0.75
+COOP,2025-07,COOP-26,"Cart",0.50
+COOP,2025-07,COOP-143,"Donations",0.25
+COOP,2025-08,COOP-102,"Academic Purchasing Journey",152.50
+COOP,2025-08,COOP-108,"Scholarships",84.75
+COOP,2025-08,COOP-38,"Scholarship Integration",45.50
+COOP,2025-08,COOP-1,"Project Oversight / Support",44.00
+COOP,2025-08,COOP-143,"Donations",28.00
+COOP,2025-08,COOP-22,"PDP Image & Summary",2.25
+COOP,2025-08,COOP-42,"Emails",1.25
+COOP,2025-09,COOP-102,"Academic Purchasing Journey",100.75
+COOP,2025-09,COOP-108,"Scholarships",35.25
+COOP,2025-09,COOP-1,"Project Oversight / Support",26.50
+COOP,2025-09,COOP-103,"Textbook PDP",4.00
+COOP,2025-09,COOP-209,"Hat Customizer",2.00
+COOP,2025-09,COOP-22,"PDP Image & Summary",0.50
+COOP,2025-09,COOP-21,"PLP / SRP",0.50
+COOP,2025-09,COOP-143,"Donations",0.25
+COOP,2025-10,COOP-38,"Scholarship Integration",23.50
+COOP,2025-10,COOP-1,"Project Oversight / Support",19.50
+COOP,2025-10,COOP-102,"Academic Purchasing Journey",7.75
+COOP,2025-10,COOP-108,"Scholarships",5.50
+COOP,2025-10,COOP-209,"Hat Customizer",2.00
+COOP,2025-10,COOP-103,"Textbook PDP",0.25
+COOP,2025-11,COOP-38,"Scholarship Integration",1.00
+COOP,2025-11,COOP-1,"Project Oversight / Support",0.50

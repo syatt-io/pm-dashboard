@@ -11,6 +11,7 @@ from src.models.validators import (
     BackfillNotionRequest,
     BackfillTempoRequest,
     BackfillFirefliesRequest,
+    BackfillGitHubRequest,
     JiraQueryTestRequest
 )
 from pydantic import ValidationError
@@ -410,6 +411,67 @@ def trigger_fireflies_backfill():
 
     except Exception as e:
         logger.error(f"Error starting Fireflies backfill: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
+@backfill_bp.route('/github', methods=['POST'])
+@admin_or_api_key_required
+@validate_request(BackfillGitHubRequest)
+def trigger_github_backfill():
+    """
+    Trigger GitHub PR backfill to ingest historical pull requests into vector database.
+
+    Query params:
+        days: Number of days back to fetch (default: 730 = 2 years, max: 3650)
+        repos: Optional comma-separated list of repos in 'owner/repo' format
+               If not provided, fetches from all accessible repositories
+
+    Returns:
+        JSON response with task started status
+    """
+    try:
+        # Use validated parameters
+        params = request.validated_params
+        days_back = params.days
+        repos_param = params.repos
+
+        # Parse repos parameter
+        repos = None
+        if repos_param:
+            repos = [r.strip() for r in repos_param.split(',') if r.strip()]
+            logger.info(f"Starting GitHub backfill for {len(repos)} specific repos: {days_back} days")
+        else:
+            logger.info(f"Starting GitHub backfill for all accessible repos: {days_back} days")
+
+        # Import backfill function
+        from src.tasks.backfill_github import backfill_github_prs
+
+        # Run in background thread (fire-and-forget)
+        run_async_in_thread(backfill_github_prs, days_back, None, None, repos)
+
+        logger.info(f"✅ GitHub backfill started in background for {days_back} days")
+
+        response = {
+            "success": True,
+            "message": f"GitHub backfill started successfully in background",
+            "days_back": days_back,
+            "status": "RUNNING",
+            "note": "Task is running in background thread - check app logs for progress"
+        }
+
+        if repos:
+            response["repos"] = repos
+            response["repo_count"] = len(repos)
+        else:
+            response["repos"] = "all"
+
+        return jsonify(response), 202  # 202 Accepted - processing started
+
+    except Exception as e:
+        logger.error(f"Error starting GitHub backfill: {e}")
         return jsonify({
             "success": False,
             "error": str(e)

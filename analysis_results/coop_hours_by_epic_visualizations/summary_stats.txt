@@ -1,0 +1,91 @@
+================================================================================
+SUMMARY STATISTICS: COOP
+================================================================================
+
+Total Hours: 1789.07h
+Months Covered: 11
+Unique Epics: 31
+Average Monthly Hours: 162.64h
+
+--------------------------------------------------------------------------------
+TOP 5 MONTHS BY HOURS
+--------------------------------------------------------------------------------
+  2025-08: 358.25h
+  2025-05: 290.33h
+  2025-07: 198.50h
+  2025-04: 188.25h
+  2025-03: 179.00h
+
+--------------------------------------------------------------------------------
+TOP 10 EPICS BY HOURS
+--------------------------------------------------------------------------------
+  1. COOP-1 (486.58h): Project Oversight / Support
+  2. COOP-102 (341.50h): Academic Purchasing Journey
+  3. COOP-108 (228.50h): Scholarships
+  4. COOP-112 (136.25h): POS Scholarship Extension
+  5. COOP-38 (134.25h): Scholarship Integration
+  6. COOP-16 (79.50h): Content Sections
+  7. COOP-143 (64.20h): Donations
+  8. COOP-26 (49.00h): Cart
+  9. COOP-22 (44.86h): PDP Image & Summary
+  10. COOP-14 (36.00h): Globals & Style Guide
+
+--------------------------------------------------------------------------------
+MONTH-BY-MONTH BREAKDOWN
+--------------------------------------------------------------------------------
+
+2025-01: 54.50h across 3 epics
+    COOP-1: 53.75h (98.6%) - Project Oversight / Support
+    COOP-14: 0.50h (0.9%) - Globals & Style Guide
+    COOP-19: 0.25h (0.5%) - Mega Menu
+
+2025-02: 119.08h across 10 epics
+    COOP-1: 79.83h (67.0%) - Project Oversight / Support
+    COOP-14: 13.25h (11.1%) - Globals & Style Guide
+    COOP-16: 8.00h (6.7%) - Content Sections
+
+2025-03: 179.00h across 11 epics
+    COOP-112: 57.25h (32.0%) - POS Scholarship Extension
+    COOP-1: 41.25h (23.0%) - Project Oversight / Support
+    COOP-14: 22.25h (12.4%) - Globals & Style Guide
+
+2025-04: 188.25h across 17 epics
+    COOP-16: 64.50h (34.3%) - Content Sections
+    COOP-1: 59.75h (31.7%) - Project Oversight / Support
+    COOP-26: 17.50h (9.3%) - Cart
+
+2025-05: 290.33h across 16 epics
+    COOP-1: 68.50h (23.6%) - Project Oversight / Support
+    COOP-108: 63.00h (21.7%) - Scholarships
+    COOP-143: 27.45h (9.5%) - Donations
+
+2025-06: 171.41h across 18 epics
+    COOP-112: 52.25h (30.5%) - POS Scholarship Extension
+    COOP-1: 40.00h (23.3%) - Project Oversight / Support
+    COOP-108: 18.00h (10.5%) - Scholarships
+
+2025-07: 198.50h across 11 epics
+    COOP-38: 57.25h (28.8%) - Scholarship Integration
+    COOP-102: 55.75h (28.1%) - Academic Purchasing Journey
+    COOP-1: 53.00h (26.7%) - Project Oversight / Support
+
+2025-08: 358.25h across 7 epics
+    COOP-102: 152.50h (42.6%) - Academic Purchasing Journey
+    COOP-108: 84.75h (23.7%) - Scholarships
+    COOP-38: 45.50h (12.7%) - Scholarship Integration
+
+2025-09: 169.75h across 8 epics
+    COOP-102: 100.75h (59.4%) - Academic Purchasing Journey
+    COOP-108: 35.25h (20.8%) - Scholarships
+    COOP-1: 26.50h (15.6%) - Project Oversight / Support
+
+2025-10: 58.50h across 6 epics
+    COOP-38: 23.50h (40.2%) - Scholarship Integration
+    COOP-1: 19.50h (33.3%) - Project Oversight / Support
+    COOP-102: 7.75h (13.2%) - Academic Purchasing Journey
+
+2025-11: 1.50h across 2 epics
+    COOP-38: 1.00h (66.7%) - Scholarship Integration
+    COOP-1: 0.50h (33.3%) - Project Oversight / Support
+
+================================================================================

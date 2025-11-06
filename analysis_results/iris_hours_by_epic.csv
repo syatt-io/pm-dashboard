@@ -1,0 +1,95 @@
+Project,Month,Epic,Epic_Summary,Hours
+IRIS,2024-11,IRIS-11,"Project oversight / support",11.75
+IRIS,2024-11,IRIS-4,"Configurator",18.50
+IRIS,2024-12,IRIS-11,"Project oversight / support",32.83
+IRIS,2024-12,IRIS-4,"Configurator",27.50
+IRIS,2025-01,IRIS-11,"Project oversight / support",26.50
+IRIS,2025-01,IRIS-4,"Configurator",56.75
+IRIS,2025-01,IRIS-85,"Design",25.75
+IRIS,2025-01,IRIS-90,"Footer",0.25
+IRIS,2025-01,IRIS-99,"UX",2.50
+IRIS,2025-02,IRIS-101,"Integrations",1.75
+IRIS,2025-02,IRIS-11,"Project oversight / support",21.83
+IRIS,2025-02,IRIS-4,"Configurator",90.50
+IRIS,2025-02,IRIS-99,"UX",0.25
+IRIS,2025-03,IRIS-11,"Project oversight / support",26.75
+IRIS,2025-03,IRIS-4,"Configurator",57.50
+IRIS,2025-03,IRIS-85,"Design",18.00
+IRIS,2025-04,IRIS-11,"Project oversight / support",86.50
+IRIS,2025-04,IRIS-132,"Navigation",9.25
+IRIS,2025-04,IRIS-4,"Configurator",111.75
+IRIS,2025-04,IRIS-82,"Environment Setup",5.00
+IRIS,2025-04,IRIS-85,"Design",60.00
+IRIS,2025-04,IRIS-89,"Content Sections",10.00
+IRIS,2025-04,IRIS-90,"Footer",4.25
+IRIS,2025-04,IRIS-91,"Globals",23.25
+IRIS,2025-04,IRIS-92,"Header",24.00
+IRIS,2025-04,IRIS-95,"Product Details",5.75
+IRIS,2025-04,IRIS-96,"Product Listings",5.00
+IRIS,2025-04,IRIS-99,"UX",1.50
+IRIS,2025-05,IRIS-11,"Project oversight / support",43.75
+IRIS,2025-05,IRIS-132,"Navigation",28.25
+IRIS,2025-05,IRIS-148,"Collection Template",5.50
+IRIS,2025-05,IRIS-4,"Configurator",65.25
+IRIS,2025-05,IRIS-84,"3rd Party Apps",0.75
+IRIS,2025-05,IRIS-85,"Design",5.75
+IRIS,2025-05,IRIS-87,"Cart",6.25
+IRIS,2025-05,IRIS-89,"Content Sections",21.00
+IRIS,2025-05,IRIS-91,"Globals",6.00
+IRIS,2025-05,IRIS-94,"Product Recommendations",1.25
+IRIS,2025-05,IRIS-95,"Product Details",21.75
+IRIS,2025-05,IRIS-96,"Product Listings",11.75
+IRIS,2025-05,IRIS-99,"UX",2.25
+IRIS,2025-06,IRIS-101,"Integrations",1.00
+IRIS,2025-06,IRIS-11,"Project oversight / support",27.08
+IRIS,2025-06,IRIS-132,"Navigation",3.00
+IRIS,2025-06,IRIS-148,"Collection Template",1.00
+IRIS,2025-06,IRIS-163,"Collection Landing",17.75
+IRIS,2025-06,IRIS-177,"QA",4.00
+IRIS,2025-06,IRIS-4,"Configurator",167.75
+IRIS,2025-06,IRIS-87,"Cart",2.25
+IRIS,2025-06,IRIS-89,"Content Sections",13.17
+IRIS,2025-06,IRIS-90,"Footer",1.00
+IRIS,2025-06,IRIS-91,"Globals",3.33
+IRIS,2025-06,IRIS-92,"Header",2.75
+IRIS,2025-06,IRIS-95,"Product Details",12.00
+IRIS,2025-06,IRIS-96,"Product Listings",1.00
+IRIS,2025-06,IRIS-97,"Search Template",4.50
+IRIS,2025-07,IRIS-11,"Project oversight / support",24.75
+IRIS,2025-07,IRIS-132,"Navigation",0.25
+IRIS,2025-07,IRIS-148,"Collection Template",0.25
+IRIS,2025-07,IRIS-177,"QA",11.00
+IRIS,2025-07,IRIS-4,"Configurator",141.00
+IRIS,2025-07,IRIS-85,"Design",0.50
+IRIS,2025-07,IRIS-87,"Cart",0.75
+IRIS,2025-07,IRIS-89,"Content Sections",11.77
+IRIS,2025-07,IRIS-90,"Footer",0.25
+IRIS,2025-07,IRIS-91,"Globals",3.00
+IRIS,2025-07,IRIS-92,"Header",0.25
+IRIS,2025-07,IRIS-95,"Product Details",11.75
+IRIS,2025-07,IRIS-96,"Product Listings",5.75
+IRIS,2025-07,IRIS-99,"UX",0.25
+IRIS,2025-07,No Epic,"",6.33
+IRIS,2025-08,IRIS-11,"Project oversight / support",29.50
+IRIS,2025-08,IRIS-132,"Navigation",0.25
+IRIS,2025-08,IRIS-177,"QA",1.25
+IRIS,2025-08,IRIS-4,"Configurator",35.25
+IRIS,2025-08,IRIS-87,"Cart",0.75
+IRIS,2025-08,IRIS-89,"Content Sections",0.75
+IRIS,2025-08,IRIS-95,"Product Details",4.50
+IRIS,2025-08,IRIS-96,"Product Listings",2.00
+IRIS,2025-08,IRIS-97,"Search Template",0.50
+IRIS,2025-08,No Epic,"",5.50
+IRIS,2025-09,IRIS-11,"Project oversight / support",18.58
+IRIS,2025-09,IRIS-132,"Navigation",0.25
+IRIS,2025-09,IRIS-4,"Configurator",0.25
+IRIS,2025-09,IRIS-95,"Product Details",0.50
+IRIS,2025-09,IRIS-96,"Product Listings",0.25
+IRIS,2025-09,No Epic,"",10.75
+IRIS,2025-10,IRIS-11,"Project oversight / support",11.95
+IRIS,2025-10,IRIS-4,"Configurator",3.00
+IRIS,2025-10,IRIS-91,"Globals",0.75
+IRIS,2025-10,No Epic,"",11.75
+IRIS,2025-11,IRIS-11,"Project oversight / support",0.25
+IRIS,2025-11,IRIS-89,"Content Sections",0.25
+IRIS,2025-11,No Epic,"",10.75
