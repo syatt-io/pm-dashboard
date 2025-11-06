@@ -14,11 +14,13 @@ import BusinessIcon from '@mui/icons-material/Business';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import FeedbackIcon from '@mui/icons-material/Feedback';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
 
 // Components
 import { MeetingShow, MeetingEdit } from './components/Meetings';
 import { TodoList, TodoShow, TodoEdit, TodoCreate } from './components/Todos';
 import { AnalysisList, AnalysisShow } from './components/Analysis';
+import { AnalyticsList } from './components/Analytics';
 import { Dashboard } from './components/Dashboard';
 import { CustomLayout } from './components/Layout';
 import { ProjectList, ProjectShow, ProjectEdit } from './components/Projects';
@@ -85,6 +87,12 @@ const AdminApp = () => {
           edit={LearningEdit}
           icon={LightbulbIcon}
           options={{ label: 'Team Learnings' }}
+        />
+        <Resource
+          name="analytics"
+          list={AnalyticsList}
+          icon={AnalyticsIcon}
+          options={{ label: 'Analytics' }}
         />
         <Resource
           name="settings"

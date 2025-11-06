@@ -1,9 +1,10 @@
 import React from 'react';
-import { Layout, AppBar, Sidebar, Menu, Logout, MenuItemLink } from 'react-admin';
+import { Layout, AppBar, Sidebar, Logout, MenuItemLink } from 'react-admin';
 import { Typography, Box } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import SettingsIcon from '@mui/icons-material/Settings';
 import OnboardingAlert from './OnboardingAlert';
+import { CustomMenu } from './CustomMenu';
 
 // Custom AppBar with Syatt branding
 const CustomAppBar = styled(AppBar)(({ theme }) => ({
@@ -59,32 +60,6 @@ const CustomSidebar = styled(Sidebar)(({ theme }) => ({
     backgroundColor: '#FFFFFF',
     borderRight: '1px solid rgba(101, 96, 131, 0.1)',
     boxShadow: '4px 0 16px rgba(30, 29, 39, 0.06)',
-  },
-}));
-
-// Custom Menu with icons and enhanced styling
-const CustomMenu = styled(Menu)(({ theme }) => ({
-  '& .RaMenuItemLink-root': {
-    borderRadius: '8px',
-    margin: '4px 8px',
-    padding: '12px 16px',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      backgroundColor: 'rgba(85, 77, 255, 0.08)',
-      transform: 'translateX(4px)',
-    },
-    '&.RaMenuItemLink-active': {
-      backgroundColor: 'rgba(85, 77, 255, 0.12)',
-      borderLeft: '3px solid #554DFF',
-      fontWeight: 600,
-    },
-  },
-  '& .RaMenuItemLink-icon': {
-    color: '#656083',
-    transition: 'color 0.2s ease',
-  },
-  '& .RaMenuItemLink-active .RaMenuItemLink-icon': {
-    color: '#554DFF',
   },
 }));
 
