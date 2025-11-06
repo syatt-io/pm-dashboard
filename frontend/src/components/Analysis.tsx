@@ -336,16 +336,36 @@ const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; me
       let matchedProjectKey = null;
       let bestMatchLength = 0;
 
+      // Blacklist of common company terms that should be ignored for project matching
+      // These terms appear in too many meetings to be useful discriminators
+      const KEYWORD_BLACKLIST = ['syatt'];
+
+      // Helper function to check if keyword matches as whole word (word boundary matching)
+      const matchesKeyword = (text: string, keyword: string): boolean => {
+        // Escape special regex characters
+        const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match whole words only using word boundaries
+        const pattern = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+        return pattern.test(text);
+      };
+
       // Find all matching projects and choose the one with the longest/most specific keyword match
-      // Only consider ACTIVE projects
+      // Only consider ACTIVE projects (must be explicitly true)
       for (const project of projects) {
-        // Skip inactive projects
-        if (project.is_active === false) continue;
+        // Skip projects that are not explicitly marked as active
+        if (project.is_active !== true) continue;
 
         if (project.keywords && Array.isArray(project.keywords)) {
           for (const keyword of project.keywords) {
             const keywordLower = keyword.toLowerCase();
-            if (titleLower.includes(keywordLower)) {
+
+            // Skip blacklisted keywords (common company terms)
+            if (KEYWORD_BLACKLIST.includes(keywordLower)) {
+              continue;
+            }
+
+            // Use word boundary matching instead of simple substring matching
+            if (matchesKeyword(titleLower, keywordLower)) {
               // Prefer longer, more specific keyword matches
               if (keywordLower.length > bestMatchLength) {
                 bestMatchLength = keywordLower.length;

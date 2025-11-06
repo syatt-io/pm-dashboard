@@ -221,10 +221,17 @@ def get_meetings(user):
                             # Get keyword mapping for projects from database
                             project_keywords = get_project_keywords_from_db()
 
-                            # Get all keywords for the selected projects
+                            # Blacklist of common company terms that should be ignored for project matching
+                            # These terms appear in too many meetings to be useful discriminators
+                            KEYWORD_BLACKLIST = {'syatt'}
+
+                            # Get all keywords for the selected projects (excluding blacklisted terms)
                             search_keywords = []
                             for project in project_list:
-                                search_keywords.extend(project_keywords.get(project, [project.lower()]))
+                                project_kw = project_keywords.get(project, [project.lower()])
+                                # Filter out blacklisted keywords
+                                filtered_kw = [kw for kw in project_kw if kw.lower() not in KEYWORD_BLACKLIST]
+                                search_keywords.extend(filtered_kw)
 
                             # Check if any project keyword appears in title or summary
                             title_lower = meeting_data['title'].lower()
