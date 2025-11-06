@@ -21,7 +21,7 @@ def normalize_epic_name(epic_summary: str) -> str:
 
 @analytics_bp.route('/baselines', methods=['GET'])
 @admin_required
-def get_baselines():
+def get_baselines(user):
     """
     Get all epic baselines with statistics.
 
@@ -74,7 +74,7 @@ def get_baselines():
 
 @analytics_bp.route('/forecast', methods=['POST'])
 @admin_required
-def forecast_project():
+def forecast_project(user):
     """
     Forecast project hours based on epic list.
 
@@ -228,7 +228,7 @@ def forecast_project():
 
 @analytics_bp.route('/projects', methods=['GET'])
 @admin_required
-def get_projects():
+def get_projects(user):
     """Get list of all projects with basic stats."""
     try:
         session = get_session()
@@ -270,7 +270,7 @@ def get_projects():
 
 @analytics_bp.route('/projects/<project_key>/composition', methods=['GET'])
 @admin_required
-def get_project_composition(project_key: str):
+def get_project_composition(user, project_key: str):
     """Get epic category breakdown for a specific project."""
     try:
         session = get_session()
@@ -345,7 +345,7 @@ def get_project_composition(project_key: str):
 
 @analytics_bp.route('/variance', methods=['GET'])
 @admin_required
-def get_high_variance_epics():
+def get_high_variance_epics(user):
     """Get list of high-variance epics that need careful scoping."""
     try:
         session = get_session()
