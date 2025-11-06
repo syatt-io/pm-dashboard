@@ -28,9 +28,16 @@ class VectorIngestService:
         """Initialize the vector ingestion service."""
         from config.settings import settings
         from openai import OpenAI
+        import os
 
         self.settings = settings
-        self.openai_client = OpenAI(api_key=settings.ai.api_key)
+
+        # Always use OpenAI for embeddings, regardless of configured AI provider
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        if not openai_api_key:
+            logger.warning("OPENAI_API_KEY not set - embeddings will not be available")
+
+        self.openai_client = OpenAI(api_key=openai_api_key)
         self.pinecone_index = None
         self._init_pinecone()
 
