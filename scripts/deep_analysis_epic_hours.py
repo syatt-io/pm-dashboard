@@ -382,11 +382,12 @@ def generate_forecasting_guide():
 
     guide_data = []
 
-    # Get epic type patterns
+    # Get epic type patterns (sum per epic, not nested avg)
     epic_stats = session.query(
         EpicHours.project_key,
+        EpicHours.epic_key,
         func.count(distinct(EpicHours.team)).label('num_teams'),
-        func.avg(func.sum(EpicHours.hours)).label('avg_total_hours')
+        func.sum(EpicHours.hours).label('total_hours')
     ).group_by(
         EpicHours.project_key,
         EpicHours.epic_key
@@ -395,7 +396,7 @@ def generate_forecasting_guide():
     # Aggregate by team count
     team_count_stats = defaultdict(list)
     for stat in epic_stats:
-        team_count_stats[stat.num_teams].append(stat.avg_total_hours)
+        team_count_stats[stat.num_teams].append(stat.total_hours)
 
     # Write to CSV
     csv_path = output_dir / '7_forecasting_guide.csv'

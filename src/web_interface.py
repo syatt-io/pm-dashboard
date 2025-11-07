@@ -279,6 +279,7 @@ from src.routes.admin_settings import admin_settings_bp
 from src.routes.insights import insights_bp
 from src.routes.escalation import escalation_bp
 from src.api.analytics import analytics_bp
+from src.api.forecasts import forecasts_bp
 
 app.register_blueprint(health_bp)
 
@@ -328,6 +329,11 @@ logger.info("✅ User endpoints exempted from CSRF protection")
 csrf.exempt(analytics_bp)
 logger.info("✅ Analytics endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Forecasts endpoints from CSRF protection
+# Forecasts endpoints are called from React frontend with JWT auth
+csrf.exempt(forecasts_bp)
+logger.info("✅ Forecasts endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
@@ -344,6 +350,7 @@ app.register_blueprint(admin_settings_bp)
 app.register_blueprint(insights_bp)
 app.register_blueprint(escalation_bp)
 app.register_blueprint(analytics_bp)
+app.register_blueprint(forecasts_bp)
 
 # ✅ SECURITY: CSRF token endpoint for frontend to fetch tokens
 @app.route('/api/csrf-token', methods=['GET'])

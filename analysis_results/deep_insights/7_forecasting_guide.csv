@@ -1,0 +1,6 @@
+Num_Teams_Involved,Avg_Total_Hours,Min_Hours,Max_Hours,Sample_Count,Estimate_Range_Low,Estimate_Range_High
+1,6.02,0.25,48.00,26,0.50,8.50
+2,18.48,2.25,43.50,29,9.25,28.25
+3,55.08,5.25,372.60,20,21.75,66.50
+4,109.41,31.00,405.33,11,38.75,129.04
+5,497.70,347.42,706.01,3,347.42,706.01
