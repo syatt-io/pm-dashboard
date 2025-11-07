@@ -1,0 +1,11 @@
+Project_Type,Team,Avg_Hours_Per_Epic,Min_Hours,Max_Hours,Sample_Size,Confidence,Ramp_Up_Pct,Busy_Peak_Pct,Ramp_Down_Pct
+Integration Required,BE Devs,66.60,13.00,370.75,11,Medium,,,
+Integration Required,Design,9.75,0.50,24.00,8,Low,,,
+Integration Required,FE Devs,27.15,0.28,144.67,25,High,,,
+Integration Required,PMs,6.93,0.25,184.83,31,High,,,
+Integration Required,UX,6.70,0.50,14.50,5,Low,,,
+No Integration,BE Devs,10.04,0.25,36.37,8,Low,,,
+No Integration,Design,8.88,0.25,44.08,23,High,,,
+No Integration,FE Devs,39.82,0.75,323.75,43,High,,,
+No Integration,PMs,16.61,0.25,390.58,38,High,,,
+No Integration,UX,11.33,0.50,39.92,11,Medium,,,

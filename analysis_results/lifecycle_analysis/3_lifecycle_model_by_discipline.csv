@@ -1,0 +1,16 @@
+Team,Phase,Avg_Percent_Of_Total,Min_Percent,Max_Percent,Sample_Size,Use_For_Forecasting
+BE Devs,Ramp Up,45.1,0.0,100.0,12,45.1%
+BE Devs,Busy (Peak),40.5,0.0,96.2,12,40.5%
+BE Devs,Ramp Down,14.5,0.0,46.2,12,14.5%
+Design,Ramp Up,87.1,34.3,100.0,13,87.1%
+Design,Busy (Peak),7.6,0.0,38.1,13,7.6%
+Design,Ramp Down,5.3,0.0,65.7,13,5.3%
+FE Devs,Ramp Up,45.9,0.0,100.0,33,45.9%
+FE Devs,Busy (Peak),41.0,0.0,99.1,33,41.0%
+FE Devs,Ramp Down,13.1,0.0,72.7,33,13.1%
+PMs,Ramp Up,55.5,40.1,80.2,7,55.5% (use with caution)
+PMs,Busy (Peak),27.3,4.9,41.4,7,27.3% (use with caution)
+PMs,Ramp Down,17.1,1.0,28.3,7,17.1% (use with caution)
+UX,Ramp Up,82.8,64.7,100.0,8,82.8% (use with caution)
+UX,Busy (Peak),13.6,0.0,35.3,8,13.6% (use with caution)
+UX,Ramp Down,3.7,0.0,24.2,8,3.7% (use with caution)

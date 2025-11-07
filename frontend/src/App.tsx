@@ -15,6 +15,7 @@ import FavoriteIcon from '@mui/icons-material/Favorite';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 // Components
 import { MeetingShow, MeetingEdit } from './components/Meetings';

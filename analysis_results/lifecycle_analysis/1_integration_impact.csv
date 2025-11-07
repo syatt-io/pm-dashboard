@@ -1,0 +1,11 @@
+Project_Category,Team,Total_Hours,Num_Epics,Avg_Hours_Per_Epic,Percent_Of_Total
+Integration Required,BE Devs,732.61,11,66.60,42.2
+Integration Required,Design,78.00,8,9.75,4.5
+Integration Required,FE Devs,678.80,25,27.15,39.1
+Integration Required,PMs,214.83,31,6.93,12.4
+Integration Required,UX,33.50,5,6.70,1.9
+No Integration,BE Devs,80.32,8,10.04,2.9
+No Integration,Design,204.33,23,8.88,7.4
+No Integration,FE Devs,1712.35,43,39.82,62.2
+No Integration,PMs,631.12,38,16.61,22.9
+No Integration,UX,124.67,11,11.33,4.5

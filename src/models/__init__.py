@@ -15,6 +15,7 @@ from .escalation import EscalationHistory, EscalationPreferences
 from .epic_hours import EpicHours
 from .epic_baselines import EpicBaseline
 from .user_team import UserTeam
+from .forecast import EpicForecast
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -131,6 +132,7 @@ __all__ = [
     'EpicHours',
     'EpicBaseline',
     'UserTeam',
+    'EpicForecast',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',

@@ -30,10 +30,12 @@ import {
   Lock as LockIcon,
   CalendarMonth as ScheduleIcon,
   Download as DownloadIcon,
+  Group as TeamIcon,
 } from '@mui/icons-material';
 import { usePermissions } from 'react-admin';
 import axios from 'axios';
 import { ProjectScheduleTab } from './ProjectSchedule';
+import { TeamForecastingTab } from './TeamForecastingTab';
 
 interface EpicBaseline {
   epic_category: string;
@@ -279,6 +281,7 @@ export const AnalyticsList = () => {
           <Tab icon={<ForecastIcon />} label="Project Forecasting" />
           <Tab icon={<WarningIcon />} label="High-Risk Epics" />
           <Tab icon={<ScheduleIcon />} label="Project Schedule" />
+          <Tab icon={<TeamIcon />} label="Team Forecasting" />
         </Tabs>
       </Box>
 
@@ -566,6 +569,9 @@ export const AnalyticsList = () => {
 
       {/* Tab 4: Project Schedule */}
       {tabValue === 3 && <ProjectScheduleTab />}
+
+      {/* Tab 5: Team Forecasting */}
+      {tabValue === 4 && <TeamForecastingTab />}
     </Box>
   );
 };
