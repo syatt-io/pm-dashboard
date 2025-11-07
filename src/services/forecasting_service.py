@@ -56,28 +56,39 @@ class ForecastingService:
 
     def _load_lifecycle_percentages(self) -> Dict[str, Dict[str, float]]:
         """
-        Load lifecycle distribution percentages.
+        Load lifecycle distribution percentages based on ACTUAL historical data.
 
-        These represent the intensity curve for each discipline based on
-        their dependencies in the project workflow:
-        - Design/UX: Front-loaded (need to complete before dev starts)
-        - FE/BE Devs: Bell curve (ramp up after design, peak mid-project)
-        - PMs/Data: Sustained throughout
+        These values are calculated from real project data across BIGO, BMBY, and SRLK
+        projects, analyzing how hours were distributed across project timelines.
+
+        Analysis shows:
+        - FE Devs: 45% ramp up (front-loaded), 51% busy, 4% ramp down
+        - BE Devs: 31% ramp up, 61% busy, 7% ramp down
+        - Design: 52% ramp up, 42% busy, 6% ramp down
+        - UX: 57% ramp up, 34% busy, 9% ramp down
+        - PMs: 43% ramp up, 47% busy, 10% ramp down
+
+        Source: scripts/calculate_actual_lifecycle_distributions.py
         """
         return {
-            # Devs: Bell curve - low start (waiting for design), peak middle, taper end
-            'BE Devs': {'ramp_up': 20.0, 'busy': 60.0, 'ramp_down': 20.0},
-            'FE Devs': {'ramp_up': 15.0, 'busy': 65.0, 'ramp_down': 20.0},
+            # Based on 3 projects: avg 31.4% / 61.4% / 7.1%
+            'BE Devs': {'ramp_up': 31.0, 'busy': 61.0, 'ramp_down': 8.0},
 
-            # Design/UX: Front-loaded - most work early, minimal later
-            'Design': {'ramp_up': 85.0, 'busy': 10.0, 'ramp_down': 5.0},
-            'UX': {'ramp_up': 80.0, 'busy': 15.0, 'ramp_down': 5.0},
+            # Based on 3 projects: avg 45.1% / 50.6% / 4.3%
+            # Note: FE actually front-loads work in real projects
+            'FE Devs': {'ramp_up': 45.0, 'busy': 51.0, 'ramp_down': 4.0},
 
-            # PMs: Sustained with slight front-load for planning
-            'PMs': {'ramp_up': 40.0, 'busy': 40.0, 'ramp_down': 20.0},
+            # Based on 3 projects: avg 52.2% / 41.8% / 5.9%
+            'Design': {'ramp_up': 52.0, 'busy': 42.0, 'ramp_down': 6.0},
 
-            # Data: Balanced with back-end focus for analytics
-            'Data': {'ramp_up': 25.0, 'busy': 50.0, 'ramp_down': 25.0}
+            # Based on 3 projects: avg 57.1% / 33.5% / 9.3%
+            'UX': {'ramp_up': 57.0, 'busy': 34.0, 'ramp_down': 9.0},
+
+            # Based on 3 projects: avg 43.2% / 47.1% / 9.7%
+            'PMs': {'ramp_up': 43.0, 'busy': 47.0, 'ramp_down': 10.0},
+
+            # No historical data available - using balanced estimate
+            'Data': {'ramp_up': 33.0, 'busy': 50.0, 'ramp_down': 17.0}
         }
 
     def calculate_forecast(
@@ -401,35 +412,15 @@ class ForecastingService:
         estimated_months: int
     ) -> Dict[str, float]:
         """
-        Get lifecycle percentages with intelligent adjustments based on characteristics.
+        Get lifecycle percentages from historical data.
 
-        Historical patterns show:
-        - Design/UX: Heavy front-loading (85%+ in ramp up)
-        - BE Devs with integrations: Extended ramp-up (more discovery)
-        - UX Research: Sustained engagement vs. front-loaded
+        Returns base historical percentages without adjustments, since the
+        real data already reflects how teams actually work on projects.
         """
         base_lifecycle = self.lifecycle_percentages.get(team, {
-            'ramp_up': 50.0,
-            'busy': 35.0,
+            'ramp_up': 40.0,
+            'busy': 45.0,
             'ramp_down': 15.0
         }).copy()
-
-        # Design/UX with custom work: increase front-loading
-        if team in ['Design', 'UX'] and custom_designs:
-            base_lifecycle['ramp_up'] = min(90.0, base_lifecycle['ramp_up'] * 1.1)
-            base_lifecycle['busy'] = max(5.0, base_lifecycle['busy'] * 0.8)
-            base_lifecycle['ramp_down'] = 100 - base_lifecycle['ramp_up'] - base_lifecycle['busy']
-
-        # UX with research: more sustained engagement
-        if team == 'UX' and ux_research:
-            base_lifecycle['ramp_up'] = 60.0
-            base_lifecycle['busy'] = 30.0
-            base_lifecycle['ramp_down'] = 10.0
-
-        # BE with integrations: extended discovery/ramp-up
-        if team == 'BE Devs' and be_integrations:
-            base_lifecycle['ramp_up'] = 50.0
-            base_lifecycle['busy'] = 35.0
-            base_lifecycle['ramp_down'] = 15.0
 
         return base_lifecycle
