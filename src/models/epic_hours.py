@@ -14,11 +14,11 @@ class EpicHours(Base):
     __tablename__ = 'epic_hours'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    project_key = Column(String(50), nullable=False, index=True)
-    epic_key = Column(String(50), nullable=False, index=True)
+    project_key = Column(String(50), nullable=False)
+    epic_key = Column(String(50), nullable=False)
     epic_summary = Column(String(500))
-    month = Column(Date, nullable=False, index=True)  # First day of month (e.g., 2025-01-01)
-    team = Column(String(50), nullable=False, index=True)  # Team name (e.g., "FE Devs", "BE Devs")
+    month = Column(Date, nullable=False)  # First day of month (e.g., 2025-01-01)
+    team = Column(String(50), nullable=False)  # Team name (e.g., "FE Devs", "BE Devs")
     hours = Column(Float, nullable=False, default=0.0)
 
     # Metadata
