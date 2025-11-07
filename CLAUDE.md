@@ -389,3 +389,51 @@ When working on this project:
 6. Test form functionality after Jira integration changes
 - never use mock data without approval
 - IMPORTANT: for getting tracked time in Tempo, use the APIs not the MCP tools. Don't use MCP tools as fallback either, the data will be wrong
+
+## Data Backfill Scripts
+
+### ⚠️ IMPORTANT: Always Use V2 Backfill Scripts
+
+When creating or running backfill scripts (Jira, Slack, GitHub, Tempo, etc.), **ALWAYS use the disk-caching pattern** from `scripts/backfill_jira_standalone_v2.py`.
+
+**Why V2 is Critical:**
+- **Data persistence**: Saves fetched data to disk incrementally (no data loss on crashes)
+- **Resume capability**: Can resume from where it left off if interrupted
+- **Memory efficiency**: Doesn't hold all data in RAM during fetch phase
+- **Debugging**: Can inspect cached data manually
+- **Reliability**: Survives crashes, OOM errors, network interruptions
+
+**Key Features of V2 Pattern:**
+```python
+# Save each project immediately after fetching
+CACHE_DIR = Path("/tmp/jira_backfill_cache")
+save_project_data(project_key, issues)  # Saves to {PROJECT_KEY}.json
+
+# Resume capability - skip already cached projects
+already_fetched = get_already_fetched_projects()
+if resume and project_key in already_fetched:
+    skip_project()
+
+# Load all cached data before ingestion
+all_cached_data = load_cached_projects()
+ingest_service.ingest(all_cached_data)
+```
+
+**Usage Examples:**
+```bash
+# Normal run with resume (recommended)
+python scripts/backfill_jira_standalone_v2.py --days 730
+
+# Start fresh (clear cache and re-fetch)
+python scripts/backfill_jira_standalone_v2.py --days 730 --clear-cache
+
+# Check cache status
+ls -lh /tmp/jira_backfill_cache/
+
+# Inspect specific project cache
+cat /tmp/jira_backfill_cache/SUBS.json | jq '.issue_count'
+```
+
+**DO NOT use V1 scripts** (in-memory only) for production backfills - they risk losing hours of work if the process crashes!
+- always refer to @docs/README_MIGRATIONS.md when doing DB migrations.
+- Locally use the Postgres DB, not SQLlite

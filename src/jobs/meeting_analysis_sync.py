@@ -235,7 +235,14 @@ class MeetingAnalysisSyncJob:
             else:
                 meeting_date = datetime.now()
 
+            # Get AI config to track which model is being used
+            from config.settings import Settings
+            ai_config = Settings.get_fresh_ai_config()
+            ai_provider = ai_config.provider if ai_config else "unknown"
+            ai_model = ai_config.model if ai_config else "unknown"
+
             # Run AI analysis
+            logger.info(f"Running AI analysis using {ai_provider}/{ai_model}")
             analysis = self.analyzer.analyze_transcript(
                 transcript=transcript_text,
                 meeting_title=meeting_title,
@@ -283,10 +290,12 @@ class MeetingAnalysisSyncJob:
                         INSERT INTO processed_meetings (
                             id, fireflies_id, title, date, duration,
                             summary, topics, action_items,
+                            ai_provider, ai_model,
                             analyzed_at, created_at, updated_at
                         ) VALUES (
                             :id, :fireflies_id, :title, :date, :duration,
                             :summary, :topics, :action_items,
+                            :ai_provider, :ai_model,
                             :analyzed_at, :created_at, :updated_at
                         )
                     """),
@@ -299,6 +308,8 @@ class MeetingAnalysisSyncJob:
                         "summary": meeting_summary,
                         "topics": json.dumps(topics_data),
                         "action_items": json.dumps(action_items_data),
+                        "ai_provider": ai_provider,
+                        "ai_model": ai_model,
                         "analyzed_at": now,
                         "created_at": now,
                         "updated_at": now
@@ -375,7 +386,9 @@ class MeetingAnalysisSyncJob:
                                     meeting_date=meeting_date,
                                     recipients=recipient_emails,
                                     topics=topics_data,
-                                    action_items=action_items_data
+                                    action_items=action_items_data,
+                                    ai_provider=ai_provider,
+                                    ai_model=ai_model
                                 )
                             )
 
@@ -409,7 +422,9 @@ class MeetingAnalysisSyncJob:
                                 project_key=project["key"],
                                 topics=topics_data,
                                 action_items=action_items_data,
-                                meeting_url=fireflies_url
+                                meeting_url=fireflies_url,
+                                ai_provider=ai_provider,
+                                ai_model=ai_model
                             )
                         )
 

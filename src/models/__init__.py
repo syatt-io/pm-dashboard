@@ -52,6 +52,9 @@ class ProcessedMeeting(Base):
     topics = Column(Text)  # JSON string - list of topic sections with titles and content
     # Action items (shared between old and new structure)
     action_items = Column(Text)  # JSON string - unchanged
+    # AI model tracking (for diagnostics and auditing)
+    ai_provider = Column(String(50))  # AI provider used: "openai", "anthropic", "google"
+    ai_model = Column(String(100))  # Specific model: "gpt-4", "claude-3-5-sonnet", etc.
     # Legacy structure fields (DEPRECATED - for backward compatibility)
     executive_summary = Column(Text)  # Renamed from summary
     outcomes = Column(Text)  # JSON string - replaces key_decisions

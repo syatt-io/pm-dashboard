@@ -282,8 +282,14 @@ def process_fireflies_meeting(self, meeting_id: str):
                 logger.info(f"Meeting '{meeting_title}' does not match any active project keywords, skipping")
                 return {"status": "skipped", "reason": "no project match", "meeting_id": meeting_id}
 
+            # Get AI config to track which model is being used
+            from config.settings import Settings
+            ai_config = Settings.get_fresh_ai_config()
+            ai_provider = ai_config.provider if ai_config else "unknown"
+            ai_model = ai_config.model if ai_config else "unknown"
+
             # Run AI analysis
-            logger.info(f"Running AI analysis for meeting {meeting_id}")
+            logger.info(f"Running AI analysis for meeting {meeting_id} using {ai_provider}/{ai_model}")
             analysis = analyzer.analyze_transcript(
                 transcript=transcript_text,
                 meeting_title=meeting_title,
@@ -320,10 +326,12 @@ def process_fireflies_meeting(self, meeting_id: str):
                     INSERT INTO processed_meetings (
                         id, fireflies_id, title, date, duration,
                         topics, action_items,
+                        ai_provider, ai_model,
                         analyzed_at, created_at, updated_at
                     ) VALUES (
                         :id, :fireflies_id, :title, :date, :duration,
                         :topics, :action_items,
+                        :ai_provider, :ai_model,
                         :analyzed_at, :created_at, :updated_at
                     )
                 """),
@@ -335,6 +343,8 @@ def process_fireflies_meeting(self, meeting_id: str):
                     "duration": transcript_data.get("duration", 0),
                     "topics": json.dumps(topics_data),
                     "action_items": json.dumps(action_items_data),
+                    "ai_provider": ai_provider,
+                    "ai_model": ai_model,
                     "analyzed_at": now,
                     "created_at": now,
                     "updated_at": now
@@ -402,7 +412,9 @@ def process_fireflies_meeting(self, meeting_id: str):
                                 meeting_date=meeting_date,
                                 recipients=recipient_emails,
                                 topics=topics_data,
-                                action_items=action_items_data
+                                action_items=action_items_data,
+                                ai_provider=ai_provider,
+                                ai_model=ai_model
                             )
                         )
 
@@ -436,7 +448,9 @@ def process_fireflies_meeting(self, meeting_id: str):
                             project_key=matched_project["key"],
                             topics=topics_data,
                             action_items=action_items_data,
-                            meeting_url=fireflies_url
+                            meeting_url=fireflies_url,
+                            ai_provider=ai_provider,
+                            ai_model=ai_model
                         )
                     )
 

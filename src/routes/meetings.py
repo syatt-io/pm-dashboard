@@ -445,6 +445,12 @@ def analyze_meeting_api(user, meeting_id):
         elif not isinstance(meeting_date, datetime):
             meeting_date = datetime.now()
 
+        # Get AI config to track which model is being used
+        from config.settings import Settings
+        ai_config = Settings.get_fresh_ai_config()
+        ai_provider = ai_config.provider if ai_config else "unknown"
+        ai_model = ai_config.model if ai_config else "unknown"
+
         # Analyze with AI using global analyzer
         analysis = analyzer.analyze_transcript(
             transcript['transcript'],
@@ -483,6 +489,9 @@ def analyze_meeting_api(user, meeting_id):
                 ] if analysis.topics else []
                 existing_meeting.topics = json.dumps(topics_data)
                 existing_meeting.action_items = json.dumps(action_items_data)  # Always serialize
+                # Track which AI model was used
+                existing_meeting.ai_provider = ai_provider
+                existing_meeting.ai_model = ai_model
                 # Legacy fields for backward compatibility (deprecated, will be removed in future)
                 existing_meeting.executive_summary = None  # No longer generated
                 existing_meeting.outcomes = json.dumps([])
@@ -516,6 +525,9 @@ def analyze_meeting_api(user, meeting_id):
                     # New topic-based structure
                     topics=json.dumps(topics_data),
                     action_items=json.dumps(action_items_data),  # Always serialize
+                    # Track which AI model was used
+                    ai_provider=ai_provider,
+                    ai_model=ai_model,
                     # Legacy fields for backward compatibility (deprecated, will be removed in future)
                     executive_summary=None,  # No longer generated
                     outcomes=json.dumps([]),
@@ -538,7 +550,9 @@ def analyze_meeting_api(user, meeting_id):
             'message': 'Meeting analyzed successfully',
             'meeting_id': meeting_id,
             'analyzed_at': analyzed_at.isoformat(),
-            'action_items_count': len(action_items_data)
+            'action_items_count': len(action_items_data),
+            'ai_provider': ai_provider,
+            'ai_model': ai_model
         })
 
     except Exception as e:

@@ -386,7 +386,9 @@ class NotificationManager:
         meeting_date: datetime,
         recipients: List[str],
         topics: List[Dict],  # New: List of topic sections with title and content_items
-        action_items: List[Dict]
+        action_items: List[Dict],
+        ai_provider: Optional[str] = None,
+        ai_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Send meeting analysis email to participants.
@@ -397,6 +399,8 @@ class NotificationManager:
             recipients: List of email addresses to send to
             topics: List of topic sections (each with title and content_items)
             action_items: List of action items from analysis
+            ai_provider: AI provider used for analysis (e.g., "openai", "anthropic")
+            ai_model: AI model used for analysis (e.g., "gpt-4", "claude-3-5-sonnet")
 
         Returns:
             Dict with success status and details
@@ -466,6 +470,9 @@ class NotificationManager:
 
                     <h1>📊 Meeting Analysis: {meeting_title}</h1>
                     <p><strong>Date:</strong> {format_est_datetime(meeting_date)}</p>
+                    <p style="color: #666; font-size: 0.9em; font-style: italic;">
+                        <strong>AI Model:</strong> {ai_provider or "unknown"}/{ai_model or "unknown"}
+                    </p>
 
                     <div class="section">
                         <h2>Discussion Topics</h2>
@@ -562,7 +569,9 @@ class NotificationManager:
         project_key: str,
         topics: List[Dict],
         action_items: List[Dict],
-        meeting_url: Optional[str] = None
+        meeting_url: Optional[str] = None,
+        ai_provider: Optional[str] = None,
+        ai_model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Send meeting analysis via Slack DM to project followers.
@@ -574,6 +583,8 @@ class NotificationManager:
             topics: List of topic sections (each with title and content_items)
             action_items: List of action items from analysis
             meeting_url: Optional URL to full meeting analysis
+            ai_provider: AI provider used for analysis (e.g., "openai", "anthropic")
+            ai_model: AI model used for analysis (e.g., "gpt-4", "claude-3-5-sonnet")
 
         Returns:
             Dict with success status and details
@@ -626,7 +637,9 @@ class NotificationManager:
                     meeting_date=meeting_date,
                     topics=topics,
                     action_items=action_items,
-                    meeting_url=meeting_url
+                    meeting_url=meeting_url,
+                    ai_provider=ai_provider,
+                    ai_model=ai_model
                 )
 
                 # Send DMs to each follower
@@ -679,7 +692,9 @@ class NotificationManager:
         meeting_date: datetime,
         topics: List[Dict],
         action_items: List[Dict],
-        meeting_url: Optional[str] = None
+        meeting_url: Optional[str] = None,
+        ai_provider: Optional[str] = None,
+        ai_model: Optional[str] = None
     ) -> str:
         """
         Format meeting analysis for Slack message.
@@ -690,13 +705,16 @@ class NotificationManager:
             topics: List of topic sections (each with title and content_items)
             action_items: List of action items from analysis
             meeting_url: Optional URL to full meeting analysis
+            ai_provider: AI provider used for analysis (e.g., "openai", "anthropic")
+            ai_model: AI model used for analysis (e.g., "gpt-4", "claude-3-5-sonnet")
 
         Returns:
             Formatted Slack message string
         """
         # Build message with emoji and formatting
         message = f"📋 *{meeting_title}*\n"
-        message += f"📅 {format_est_datetime(meeting_date)}\n\n"
+        message += f"📅 {format_est_datetime(meeting_date)}\n"
+        message += f"🤖 _AI Model: {ai_provider or 'unknown'}/{ai_model or 'unknown'}_\n\n"
 
         # Add topics
         if topics:

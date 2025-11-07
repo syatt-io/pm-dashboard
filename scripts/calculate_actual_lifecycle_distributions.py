@@ -3,6 +3,9 @@ Calculate actual lifecycle distributions from historical data.
 
 This script analyzes real project data to determine how hours are actually
 distributed across project phases for each team, rather than using assumptions.
+
+For Design/UX: Uses chronological front-loading (first months get most hours)
+For Dev/PM teams: Uses peak-based analysis (find highest-hours month)
 """
 
 import pandas as pd
@@ -35,24 +38,47 @@ for project in df['Project'].unique():
         if total_hours < 10:  # Skip teams with minimal involvement
             continue
 
-        # Determine lifecycle phases based on position in project
-        num_months = len(team_data)
-
-        # Calculate thirds for ramp up, busy, ramp down
-        ramp_up_months = max(1, int(num_months * 0.33))
-        ramp_down_months = max(1, int(num_months * 0.33))
-        busy_months = num_months - ramp_up_months - ramp_down_months
-
-        # Get hours for each phase
         team_data_reset = team_data.reset_index(drop=True)
+        num_months = len(team_data_reset)
 
-        ramp_up_hours = team_data_reset.iloc[:ramp_up_months]['Hours'].sum()
-        ramp_down_hours = team_data_reset.iloc[-ramp_down_months:]['Hours'].sum()
+        # Different strategies for different team types
+        if team in ['Design', 'UX']:
+            # Design/UX are FRONT-LOADED chronologically
+            # First 30% of timeline = ramp up
+            # Next 30% = busy
+            # Remaining 40% = ramp down
 
-        if busy_months > 0:
-            busy_hours = team_data_reset.iloc[ramp_up_months:-ramp_down_months]['Hours'].sum()
+            ramp_up_cutoff = int(num_months * 0.3) or 1
+            busy_cutoff = ramp_up_cutoff + (int(num_months * 0.3) or 1)
+
+            ramp_up_hours = team_data_reset.iloc[:ramp_up_cutoff]['Hours'].sum()
+            busy_hours = team_data_reset.iloc[ramp_up_cutoff:busy_cutoff]['Hours'].sum()
+            ramp_down_hours = team_data_reset.iloc[busy_cutoff:]['Hours'].sum()
+
         else:
+            # Dev/PM teams: Use peak-based analysis
+            # Find the PEAK month (highest hours) to identify lifecycle phases
+            peak_idx = team_data_reset['Hours'].idxmax()
+
+            # Classify months based on their relationship to the peak
+            # Ramp Up: months BEFORE peak
+            # Busy (Peak): peak month +/- 1 month (the high-intensity period)
+            # Ramp Down: months AFTER the busy period
+
+            ramp_up_hours = 0
             busy_hours = 0
+            ramp_down_hours = 0
+
+            for idx, row in team_data_reset.iterrows():
+                if idx < max(0, peak_idx - 1):
+                    # Before peak window
+                    ramp_up_hours += row['Hours']
+                elif idx <= min(num_months - 1, peak_idx + 1):
+                    # Peak window (peak +/- 1 month)
+                    busy_hours += row['Hours']
+                else:
+                    # After peak window
+                    ramp_down_hours += row['Hours']
 
         # Calculate percentages
         ramp_up_pct = (ramp_up_hours / total_hours) * 100
@@ -108,12 +134,12 @@ print("CURRENT CODED VALUES (for comparison):")
 print("=" * 80)
 
 current_values = {
-    'BE Devs': {'ramp_up': 20.0, 'busy': 60.0, 'ramp_down': 20.0},
-    'FE Devs': {'ramp_up': 15.0, 'busy': 65.0, 'ramp_down': 20.0},
-    'Design': {'ramp_up': 85.0, 'busy': 10.0, 'ramp_down': 5.0},
-    'UX': {'ramp_up': 80.0, 'busy': 15.0, 'ramp_down': 5.0},
-    'PMs': {'ramp_up': 40.0, 'busy': 40.0, 'ramp_down': 20.0},
-    'Data': {'ramp_up': 25.0, 'busy': 50.0, 'ramp_down': 25.0}
+    'BE Devs': {'ramp_up': 17.0, 'busy': 55.0, 'ramp_down': 28.0},
+    'FE Devs': {'ramp_up': 1.0, 'busy': 77.0, 'ramp_down': 22.0},
+    'Design': {'ramp_up': 0.0, 'busy': 91.0, 'ramp_down': 9.0},
+    'UX': {'ramp_up': 0.0, 'busy': 62.0, 'ramp_down': 38.0},
+    'PMs': {'ramp_up': 14.0, 'busy': 56.0, 'ramp_down': 30.0},
+    'Data': {'ramp_up': 20.0, 'busy': 60.0, 'ramp_down': 20.0}
 }
 
 for team, values in current_values.items():

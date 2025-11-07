@@ -1153,6 +1153,18 @@ export const AnalysisShow = () => {
                 label="Analyzed At"
                 render={(record: any) => formatESTDateTime(record.analyzed_at)}
               />
+              <FunctionField
+                label="AI Model"
+                render={(record: any) => {
+                  const provider = record.ai_provider || 'unknown';
+                  const model = record.ai_model || 'unknown';
+                  return (
+                    <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                      {provider}/{model}
+                    </Typography>
+                  );
+                }}
+              />
             </CardContent>
           </Card>
 
