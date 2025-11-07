@@ -232,6 +232,15 @@ class TestCeleryConfiguration:
         # Should be 120 minutes (7200 seconds) for large backfills
         assert celery_app.conf.task_time_limit == 120 * 60
 
+    def test_backfill_tasks_inherit_global_time_limit(self):
+        """Test that backfill tasks don't override global time limit."""
+        from src.tasks.vector_tasks import backfill_jira, backfill_tempo
+
+        # Neither backfill task should have time_limit override in decorator
+        # They should inherit the global 2-hour limit
+        assert not hasattr(backfill_jira, 'time_limit'), "backfill_jira should not override time_limit"
+        assert not hasattr(backfill_tempo, 'time_limit'), "backfill_tempo should not override time_limit"
+
     def test_celery_late_ack_enabled(self):
         """Test that late acknowledgment is enabled (resilience fix)."""
         from src.tasks.celery_app import celery_app

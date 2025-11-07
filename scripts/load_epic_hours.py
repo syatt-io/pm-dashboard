@@ -38,6 +38,7 @@ def load_epic_hours_from_csv(csv_path: str):
                 try:
                     project_key = row['Project']
                     epic_key = row['Epic']
+                    team = row['Team']
                     epic_summary = row['Epic_Summary']
                     month_str = row['Month']  # e.g., "2025-01"
                     hours = float(row['Hours'])
@@ -45,11 +46,12 @@ def load_epic_hours_from_csv(csv_path: str):
                     # Parse month as first day of month
                     month_date = datetime.strptime(f"{month_str}-01", "%Y-%m-%d").date()
 
-                    # Check if record exists
+                    # Check if record exists (now includes team in unique constraint)
                     existing = session.query(EpicHours).filter(
                         EpicHours.project_key == project_key,
                         EpicHours.epic_key == epic_key,
-                        EpicHours.month == month_date
+                        EpicHours.month == month_date,
+                        EpicHours.team == team
                     ).first()
 
                     if existing:
@@ -65,6 +67,7 @@ def load_epic_hours_from_csv(csv_path: str):
                             epic_key=epic_key,
                             epic_summary=epic_summary,
                             month=month_date,
+                            team=team,
                             hours=hours
                         )
                         session.add(epic_hours)

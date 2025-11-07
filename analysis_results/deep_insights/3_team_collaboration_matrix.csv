@@ -1,0 +1,11 @@
+Team_Pair,Num_Shared_Epics,Collaboration_Frequency
+FE Devs + PMs,52,High
+Design + FE Devs,28,Medium
+Design + PMs,27,Medium
+BE Devs + PMs,17,Low
+BE Devs + FE Devs,14,Low
+PMs + UX,13,Low
+FE Devs + UX,12,Low
+Design + UX,9,Low
+BE Devs + Design,8,Low
+BE Devs + UX,5,Low

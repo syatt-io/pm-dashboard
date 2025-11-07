@@ -56,6 +56,9 @@ class TempoAPIClient:
         # Cache for account ID to display name mappings
         self.account_cache: Dict[str, Optional[str]] = {}
 
+        # Cache for account ID to team mappings
+        self.team_cache: Dict[str, Optional[str]] = {}
+
         # Rate limiting: Track last request time to avoid hitting Jira API limits
         self.last_jira_request_time = 0.0
         self.min_request_interval = 0.1  # 100ms between Jira API calls (max 10 req/sec)
@@ -136,6 +139,55 @@ class TempoAPIClient:
         except Exception as e:
             logger.debug(f"Error getting user name for account ID {account_id}: {e}")
             self.account_cache[account_id] = None
+            return None
+
+    def get_user_team(self, account_id: str) -> Optional[str]:
+        """
+        Look up user's team from database via account ID.
+
+        Args:
+            account_id: Jira account ID (e.g., "abc123")
+
+        Returns:
+            Team name (e.g., "FE Devs", "BE Devs", "PMs", etc.) or None if not found
+        """
+        if account_id in self.team_cache:
+            return self.team_cache[account_id]
+
+        try:
+            from sqlalchemy import create_engine
+            from sqlalchemy.orm import sessionmaker
+            from src.models import UserTeam
+
+            # Get database URL
+            database_url = os.getenv('DATABASE_URL')
+            if not database_url:
+                logger.warning("DATABASE_URL not set, cannot look up user teams")
+                self.team_cache[account_id] = None
+                return None
+
+            # Query database for user team
+            engine = create_engine(database_url)
+            Session = sessionmaker(bind=engine)
+            session = Session()
+
+            try:
+                user_team = session.query(UserTeam).filter_by(account_id=account_id).first()
+                if user_team:
+                    team = user_team.team
+                    self.team_cache[account_id] = team
+                    return team
+                else:
+                    # User not found in team assignments
+                    logger.debug(f"No team assignment found for account ID {account_id}")
+                    self.team_cache[account_id] = "Unassigned"
+                    return "Unassigned"
+            finally:
+                session.close()
+
+        except Exception as e:
+            logger.debug(f"Error getting team for account ID {account_id}: {e}")
+            self.team_cache[account_id] = None
             return None
 
     @retry_with_backoff(max_retries=3, base_delay=1.0)

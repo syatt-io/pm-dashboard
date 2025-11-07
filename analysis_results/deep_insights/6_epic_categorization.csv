@@ -1,0 +1,90 @@
+Category,Epic,Teams_Involved,Total_Hours,Epic_Summary
+Backend-Only,SRLK-SRLK-32,BE Devs,48.00,Order Integration
+Cross-Functional (Complex),BIGO-BIGO-1,"BE Devs, Design, FE Devs, PMs, UX",706.01,Project oversight / support
+Cross-Functional (Complex),SRLK-SRLK-1,"BE Devs, Design, FE Devs, PMs, UX",439.67,Project Oversight / Support
+Cross-Functional (Complex),BIGO-No Epic,"Design, FE Devs, PMs, UX",405.33,
+Cross-Functional (Complex),BMBY-BMBY-1,"BE Devs, Design, FE Devs, PMs, UX",347.42,Project Oversight / Support
+Cross-Functional (Complex),SRLK-SRLK-27,"BE Devs, Design, FE Devs, PMs",159.72,BOPIS / Locations
+Cross-Functional (Complex),BIGO-BIGO-47,"BE Devs, Design, FE Devs, PMs",129.04,Content Sections
+Cross-Functional (Complex),BMBY-BMBY-27,"Design, FE Devs, PMs, UX",114.25,Content Sections
+Cross-Functional (Complex),BIGO-BIGO-46,"BE Devs, Design, FE Devs, PMs",89.75,PLP / Search
+Cross-Functional (Complex),BIGO-BIGO-43,"BE Devs, Design, FE Devs, PMs",86.37,Product Details
+Cross-Functional (Complex),SRLK-SRLK-13,"Design, FE Devs, PMs, UX",63.00,Globals & Style Guide
+Cross-Functional (Complex),BMBY-BMBY-20,"Design, FE Devs, PMs, UX",54.75,PDP Image & Summary
+Cross-Functional (Complex),BIGO-BIGO-144,"BE Devs, Design, FE Devs, PMs",38.75,Cart
+Cross-Functional (Complex),BMBY-BMBY-18,"Design, FE Devs, PMs, UX",31.50,PLP / SRP
+Cross-Functional (Complex),SRLK-SRLK-37,"BE Devs, FE Devs, PMs, UX",31.00,Launch Set Up
+Design-Only,BIGO-BIGO-113,"Design, UX",31.00,Design Prototyping and Refinement
+Design-Only,BMBY-BMBY-35,UX,18.50,Analytics
+Frontend-Only,BMBY-BMBY-22,FE Devs,14.00,PDP Upsells & Cross Sells
+Frontend-Only,BMBY-BMBY-25,FE Devs,13.75,Blog
+Frontend-Only,BMBY-BMBY-24,FE Devs,11.75,BOPIS / Locations
+Frontend-Only,BMBY-BMBY-28,FE Devs,9.25,Reviews
+Frontend-Only,BMBY-BMBY-19,FE Devs,8.50,Quick View
+Frontend-Only,BMBY-BMBY-16,FE Devs,7.75,Mega Menu
+Frontend-Only,BMBY-BMBY-29,FE Devs,5.75,Emails
+Frontend-Only,BIGO-BIGO-118,FE Devs,3.00,CI & Deployment
+Frontend-Only,BMBY-BMBY-90,FE Devs,1.75,Account
+Frontend-Only,BMBY-BMBY-91,FE Devs,1.75,3rd Party Apps
+Frontend-Only,SRLK-SRLK-212,FE Devs,1.50,Pages
+Frontend-Only,BMBY-No Epic,FE Devs,1.25,
+Frontend-Only,BMBY-BMBY-33,FE Devs,0.75,Buy Now Pay Later
+Mixed,SRLK-SRLK-39,"FE Devs, PMs",43.50,Components
+Mixed,SRLK-SRLK-16,"FE Devs, PMs",35.75,Footer
+Mixed,SRLK-SRLK-268,"BE Devs, PMs",34.00,Phase 2 Integration Features 
+Mixed,BIGO-BIGO-28,"Design, PMs",32.50,Design Ideation phase
+Mixed,BMBY-BMBY-14,"Design, FE Devs",32.25,Header
+Mixed,SRLK-SRLK-255,"BE Devs, PMs",28.25,Returns & Refunds
+Mixed,BMBY-BMBY-15,"Design, FE Devs",28.25,Footer
+Mixed,SRLK-SRLK-24,"FE Devs, PMs",23.00,Cart
+Mixed,BIGO-BIGO-38,"FE Devs, PMs",21.00,Globals
+Mixed,SRLK-SRLK-22,"FE Devs, PMs",20.50,PDP Upsells
+Mixed,BMBY-BMBY-86,"Design, FE Devs",20.00,Components
+Mixed,SRLK-SRLK-57,"BE Devs, PMs",19.22,Gift Card Integration
+Mixed,BIGO-BIGO-349,"PMs, UX",18.50,Strategy 
+Mixed,SRLK-No Epic,"BE Devs, UX",17.00,
+Mixed,SRLK-SRLK-21,"FE Devs, PMs",15.75,PDP Details
+Mixed,SRLK-SRLK-38,"FE Devs, PMs",15.75,Emails
+Mixed,BMBY-BMBY-21,"FE Devs, PMs",14.25,PDP Details
+Mixed,SRLK-SRLK-154,"FE Devs, PMs",14.00,Wishlist
+Mixed,BMBY-BMBY-32,"FE Devs, PMs",13.50,Registry
+Mixed,SRLK-SRLK-19,"FE Devs, PMs",11.75,Search
+Mixed,SRLK-SRLK-18,"FE Devs, PMs",9.25,Mega Menu
+Mixed,BMBY-BMBY-23,"FE Devs, PMs",8.25,Cart
+Mixed,BIGO-BIGO-317,"FE Devs, PMs",7.50,Product Bundles
+Mixed,SRLK-SRLK-132,"FE Devs, PMs",5.75,Reviews
+Mixed,SRLK-SRLK-136,"FE Devs, PMs",5.50,Instagram Section
+Mixed,BMBY-BMBY-147,"FE Devs, PMs",4.25,Store Attribution
+Mixed,BMBY-BMBY-37,"FE Devs, PMs",3.50,Brands
+Mixed,BIGO-BIGO-153,"Design, PMs",2.25,Design cart/mini cart
+Multi-Discipline,SRLK-SRLK-31,"BE Devs, FE Devs, PMs",372.60,Catalog Integration
+Multi-Discipline,SRLK-SRLK-36,"BE Devs, FE Devs, PMs",97.00,Bulk Image Uploader
+Multi-Discipline,BIGO-BIGO-45,"Design, FE Devs, PMs",95.00,Site Structure
+Multi-Discipline,SRLK-SRLK-17,"Design, FE Devs, PMs",73.25,Content Sections
+Multi-Discipline,BIGO-BIGO-42,"Design, FE Devs, PMs",66.50,Pages
+Multi-Discipline,BIGO-BIGO-23,"BE Devs, FE Devs, PMs",49.12,Migrations and Automation
+Multi-Discipline,SRLK-SRLK-20,"Design, FE Devs, PMs",44.75,PDP Image & Summary
+Multi-Discipline,SRLK-SRLK-23,"Design, FE Devs, PMs",42.25,PLP / SRP
+Multi-Discipline,BMBY-BMBY-17,"FE Devs, PMs, UX",38.00,Search
+Multi-Discipline,BIGO-BIGO-313,"Design, FE Devs, PMs",34.75,Shopify Markets Setup
+Multi-Discipline,BMBY-BMBY-13,"Design, FE Devs, PMs",33.25,Globals & Style Guide
+Multi-Discipline,SRLK-SRLK-15,"Design, FE Devs, PMs",29.00,Header
+Multi-Discipline,BIGO-BIGO-40,"Design, FE Devs, PMs",25.75,Blog
+Multi-Discipline,BIGO-BIGO-27,"FE Devs, PMs, UX",22.25,UX
+Multi-Discipline,BIGO-BIGO-44,"Design, FE Devs, PMs",21.75,Components
+Multi-Discipline,SRLK-SRLK-58,"BE Devs, FE Devs, PMs",20.53,Fulfillment Integration
+Multi-Discipline,BIGO-BIGO-41,"Design, FE Devs, PMs",14.50,Account
+Multi-Discipline,SRLK-SRLK-14,"FE Devs, PMs, UX",10.25,Analytics
+Multi-Discipline,BIGO-BIGO-25,"BE Devs, FE Devs, PMs",5.75,3rd Party apps
+Multi-Discipline,SRLK-SRLK-29,"Design, FE Devs, PMs",5.25,Brands
+PM-Coordination,BIGO-BIGO-173,PMs,2.75,UAT | PDP
+PM-Coordination,BMBY-BMBY-132,PMs,2.00,Launch Set Up
+PM-Coordination,BIGO-BIGO-165,PMs,1.50,UAT | PLP
+PM-Coordination,BIGO-BIGO-193,PMs,0.75,UAT | Global Site Functionality
+PM-Coordination,BIGO-BIGO-194,PMs,0.50,UAT | Homepage Sections
+PM-Coordination,BIGO-BIGO-253,PMs,0.50,UAT | Discounts/Promotions
+PM-Coordination,SRLK-SRLK-33,PMs,0.25,User Migration
+PM-Coordination,SRLK-SRLK-26,PMs,0.25,Shipping
+PM-Coordination,SRLK-SRLK-35,PMs,0.25,User Integration
+PM-Coordination,SRLK-SRLK-25,PMs,0.25,Checkout
+PM-Coordination,BIGO-BIGO-155,PMs,0.25,Analytics & SEO

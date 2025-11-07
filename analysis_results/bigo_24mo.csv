@@ -1,0 +1,221 @@
+Project,Month,Epic,Team,Epic_Summary,Hours
+BIGO,2024-06,BIGO-1,BE Devs,"Project oversight / support",0.33
+BIGO,2024-06,BIGO-1,FE Devs,"Project oversight / support",1.00
+BIGO,2024-06,BIGO-1,PMs,"Project oversight / support",1.50
+BIGO,2024-06,BIGO-1,UX,"Project oversight / support",2.00
+BIGO,2024-07,BIGO-1,BE Devs,"Project oversight / support",3.00
+BIGO,2024-07,BIGO-1,Design,"Project oversight / support",13.58
+BIGO,2024-07,BIGO-1,FE Devs,"Project oversight / support",45.65
+BIGO,2024-07,BIGO-1,PMs,"Project oversight / support",33.33
+BIGO,2024-07,BIGO-1,UX,"Project oversight / support",15.25
+BIGO,2024-07,BIGO-113,Design,"Design Prototyping and Refinement",4.00
+BIGO,2024-07,BIGO-23,BE Devs,"Migrations and Automation",20.70
+BIGO,2024-07,BIGO-23,FE Devs,"Migrations and Automation",10.00
+BIGO,2024-07,BIGO-23,PMs,"Migrations and Automation",1.50
+BIGO,2024-07,BIGO-25,PMs,"3rd Party apps",0.25
+BIGO,2024-07,BIGO-27,PMs,"UX",0.25
+BIGO,2024-07,BIGO-27,UX,"UX",12.00
+BIGO,2024-07,BIGO-28,Design,"Design Ideation phase",21.50
+BIGO,2024-07,BIGO-28,PMs,"Design Ideation phase",0.75
+BIGO,2024-07,BIGO-38,FE Devs,"Globals",5.00
+BIGO,2024-07,BIGO-40,FE Devs,"Blog",8.75
+BIGO,2024-08,BIGO-1,BE Devs,"Project oversight / support",1.75
+BIGO,2024-08,BIGO-1,Design,"Project oversight / support",8.50
+BIGO,2024-08,BIGO-1,FE Devs,"Project oversight / support",33.75
+BIGO,2024-08,BIGO-1,PMs,"Project oversight / support",43.83
+BIGO,2024-08,BIGO-1,UX,"Project oversight / support",7.17
+BIGO,2024-08,BIGO-113,Design,"Design Prototyping and Refinement",26.00
+BIGO,2024-08,BIGO-113,UX,"Design Prototyping and Refinement",1.00
+BIGO,2024-08,BIGO-144,PMs,"Cart",0.50
+BIGO,2024-08,BIGO-23,BE Devs,"Migrations and Automation",9.67
+BIGO,2024-08,BIGO-23,PMs,"Migrations and Automation",0.50
+BIGO,2024-08,BIGO-25,PMs,"3rd Party apps",0.25
+BIGO,2024-08,BIGO-27,UX,"UX",0.50
+BIGO,2024-08,BIGO-28,Design,"Design Ideation phase",10.25
+BIGO,2024-08,BIGO-38,FE Devs,"Globals",5.75
+BIGO,2024-08,BIGO-40,FE Devs,"Blog",4.25
+BIGO,2024-08,BIGO-42,FE Devs,"Pages",14.00
+BIGO,2024-08,BIGO-42,PMs,"Pages",0.75
+BIGO,2024-08,BIGO-43,Design,"Product Details",3.25
+BIGO,2024-08,BIGO-43,FE Devs,"Product Details",35.75
+BIGO,2024-08,BIGO-43,PMs,"Product Details",3.25
+BIGO,2024-08,BIGO-44,FE Devs,"Components",6.25
+BIGO,2024-08,BIGO-45,Design,"Site Structure",5.25
+BIGO,2024-08,BIGO-45,FE Devs,"Site Structure",65.00
+BIGO,2024-08,BIGO-45,PMs,"Site Structure",1.00
+BIGO,2024-08,BIGO-46,FE Devs,"PLP / Search",18.75
+BIGO,2024-08,BIGO-46,PMs,"PLP / Search",0.50
+BIGO,2024-08,BIGO-47,BE Devs,"Content Sections",5.00
+BIGO,2024-08,BIGO-47,Design,"Content Sections",3.00
+BIGO,2024-08,BIGO-47,FE Devs,"Content Sections",68.75
+BIGO,2024-08,BIGO-47,PMs,"Content Sections",2.02
+BIGO,2024-09,BIGO-1,BE Devs,"Project oversight / support",3.00
+BIGO,2024-09,BIGO-1,Design,"Project oversight / support",13.25
+BIGO,2024-09,BIGO-1,FE Devs,"Project oversight / support",34.25
+BIGO,2024-09,BIGO-1,PMs,"Project oversight / support",52.92
+BIGO,2024-09,BIGO-1,UX,"Project oversight / support",3.25
+BIGO,2024-09,BIGO-144,BE Devs,"Cart",4.50
+BIGO,2024-09,BIGO-144,Design,"Cart",0.50
+BIGO,2024-09,BIGO-144,FE Devs,"Cart",13.50
+BIGO,2024-09,BIGO-144,PMs,"Cart",1.25
+BIGO,2024-09,BIGO-153,Design,"Design cart/mini cart",2.00
+BIGO,2024-09,BIGO-153,PMs,"Design cart/mini cart",0.25
+BIGO,2024-09,BIGO-165,PMs,"UAT | PLP",1.00
+BIGO,2024-09,BIGO-173,PMs,"UAT | PDP",2.50
+BIGO,2024-09,BIGO-193,PMs,"UAT | Global Site Functionality",0.50
+BIGO,2024-09,BIGO-194,PMs,"UAT | Homepage Sections",0.25
+BIGO,2024-09,BIGO-23,BE Devs,"Migrations and Automation",2.50
+BIGO,2024-09,BIGO-23,FE Devs,"Migrations and Automation",0.75
+BIGO,2024-09,BIGO-25,BE Devs,"3rd Party apps",1.50
+BIGO,2024-09,BIGO-25,PMs,"3rd Party apps",1.00
+BIGO,2024-09,BIGO-27,FE Devs,"UX",1.50
+BIGO,2024-09,BIGO-38,FE Devs,"Globals",9.75
+BIGO,2024-09,BIGO-38,PMs,"Globals",0.25
+BIGO,2024-09,BIGO-40,Design,"Blog",0.25
+BIGO,2024-09,BIGO-40,FE Devs,"Blog",12.25
+BIGO,2024-09,BIGO-41,Design,"Account",0.50
+BIGO,2024-09,BIGO-41,FE Devs,"Account",8.50
+BIGO,2024-09,BIGO-41,PMs,"Account",0.50
+BIGO,2024-09,BIGO-42,Design,"Pages",0.50
+BIGO,2024-09,BIGO-42,FE Devs,"Pages",50.00
+BIGO,2024-09,BIGO-43,BE Devs,"Product Details",6.70
+BIGO,2024-09,BIGO-43,Design,"Product Details",2.00
+BIGO,2024-09,BIGO-43,FE Devs,"Product Details",10.50
+BIGO,2024-09,BIGO-43,PMs,"Product Details",2.25
+BIGO,2024-09,BIGO-44,Design,"Components",1.75
+BIGO,2024-09,BIGO-44,FE Devs,"Components",9.00
+BIGO,2024-09,BIGO-44,PMs,"Components",1.00
+BIGO,2024-09,BIGO-45,Design,"Site Structure",0.50
+BIGO,2024-09,BIGO-45,FE Devs,"Site Structure",8.50
+BIGO,2024-09,BIGO-46,BE Devs,"PLP / Search",0.25
+BIGO,2024-09,BIGO-46,Design,"PLP / Search",0.75
+BIGO,2024-09,BIGO-46,FE Devs,"PLP / Search",50.25
+BIGO,2024-09,BIGO-46,PMs,"PLP / Search",1.00
+BIGO,2024-09,BIGO-47,Design,"Content Sections",1.50
+BIGO,2024-09,BIGO-47,FE Devs,"Content Sections",33.00
+BIGO,2024-09,BIGO-47,PMs,"Content Sections",2.02
+BIGO,2024-10,BIGO-1,BE Devs,"Project oversight / support",2.00
+BIGO,2024-10,BIGO-1,Design,"Project oversight / support",8.25
+BIGO,2024-10,BIGO-1,FE Devs,"Project oversight / support",36.00
+BIGO,2024-10,BIGO-1,PMs,"Project oversight / support",56.00
+BIGO,2024-10,BIGO-1,UX,"Project oversight / support",5.25
+BIGO,2024-10,BIGO-144,FE Devs,"Cart",16.50
+BIGO,2024-10,BIGO-144,PMs,"Cart",2.00
+BIGO,2024-10,BIGO-155,PMs,"Analytics & SEO",0.25
+BIGO,2024-10,BIGO-165,PMs,"UAT | PLP",0.50
+BIGO,2024-10,BIGO-173,PMs,"UAT | PDP",0.25
+BIGO,2024-10,BIGO-193,PMs,"UAT | Global Site Functionality",0.25
+BIGO,2024-10,BIGO-194,PMs,"UAT | Homepage Sections",0.25
+BIGO,2024-10,BIGO-23,BE Devs,"Migrations and Automation",3.50
+BIGO,2024-10,BIGO-25,FE Devs,"3rd Party apps",0.75
+BIGO,2024-10,BIGO-25,PMs,"3rd Party apps",2.00
+BIGO,2024-10,BIGO-253,PMs,"UAT | Discounts/Promotions",0.50
+BIGO,2024-10,BIGO-27,UX,"UX",4.00
+BIGO,2024-10,BIGO-38,PMs,"Globals",0.25
+BIGO,2024-10,BIGO-40,PMs,"Blog",0.25
+BIGO,2024-10,BIGO-41,Design,"Account",0.25
+BIGO,2024-10,BIGO-41,FE Devs,"Account",4.75
+BIGO,2024-10,BIGO-42,FE Devs,"Pages",0.75
+BIGO,2024-10,BIGO-42,PMs,"Pages",0.50
+BIGO,2024-10,BIGO-43,BE Devs,"Product Details",2.92
+BIGO,2024-10,BIGO-43,FE Devs,"Product Details",18.25
+BIGO,2024-10,BIGO-43,PMs,"Product Details",1.50
+BIGO,2024-10,BIGO-44,Design,"Components",0.25
+BIGO,2024-10,BIGO-44,FE Devs,"Components",3.50
+BIGO,2024-10,BIGO-45,FE Devs,"Site Structure",8.00
+BIGO,2024-10,BIGO-45,PMs,"Site Structure",1.25
+BIGO,2024-10,BIGO-46,FE Devs,"PLP / Search",17.25
+BIGO,2024-10,BIGO-46,PMs,"PLP / Search",1.00
+BIGO,2024-10,BIGO-47,FE Devs,"Content Sections",12.75
+BIGO,2024-10,BIGO-47,PMs,"Content Sections",1.00
+BIGO,2024-10,No Epic,Design,"",1.25
+BIGO,2024-10,No Epic,FE Devs,"",42.25
+BIGO,2024-10,No Epic,PMs,"",7.25
+BIGO,2024-11,BIGO-1,FE Devs,"Project oversight / support",19.08
+BIGO,2024-11,BIGO-1,PMs,"Project oversight / support",11.50
+BIGO,2024-11,BIGO-118,FE Devs,"CI & Deployment",2.00
+BIGO,2024-11,BIGO-27,FE Devs,"UX",4.00
+BIGO,2024-11,BIGO-45,FE Devs,"Site Structure",5.50
+BIGO,2024-11,No Epic,FE Devs,"",46.50
+BIGO,2024-11,No Epic,PMs,"",5.75
+BIGO,2024-11,No Epic,UX,"",3.50
+BIGO,2024-12,BIGO-1,FE Devs,"Project oversight / support",3.50
+BIGO,2024-12,BIGO-1,PMs,"Project oversight / support",4.00
+BIGO,2024-12,BIGO-1,UX,"Project oversight / support",2.00
+BIGO,2024-12,BIGO-118,FE Devs,"CI & Deployment",0.50
+BIGO,2024-12,No Epic,Design,"",1.50
+BIGO,2024-12,No Epic,FE Devs,"",20.25
+BIGO,2024-12,No Epic,PMs,"",3.08
+BIGO,2025-01,BIGO-1,FE Devs,"Project oversight / support",9.50
+BIGO,2025-01,BIGO-1,PMs,"Project oversight / support",12.25
+BIGO,2025-01,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-01,BIGO-349,UX,"Strategy ",9.00
+BIGO,2025-01,No Epic,FE Devs,"",31.50
+BIGO,2025-01,No Epic,PMs,"",5.25
+BIGO,2025-01,No Epic,UX,"",1.00
+BIGO,2025-02,BIGO-1,FE Devs,"Project oversight / support",1.67
+BIGO,2025-02,BIGO-1,PMs,"Project oversight / support",20.50
+BIGO,2025-02,BIGO-349,UX,"Strategy ",7.00
+BIGO,2025-02,No Epic,Design,"",3.00
+BIGO,2025-02,No Epic,FE Devs,"",6.25
+BIGO,2025-02,No Epic,PMs,"",4.42
+BIGO,2025-03,BIGO-1,Design,"Project oversight / support",0.50
+BIGO,2025-03,BIGO-1,FE Devs,"Project oversight / support",4.50
+BIGO,2025-03,BIGO-1,PMs,"Project oversight / support",14.00
+BIGO,2025-03,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-03,BIGO-118,FE Devs,"CI & Deployment",0.50
+BIGO,2025-03,BIGO-313,FE Devs,"Shopify Markets Setup",0.50
+BIGO,2025-03,BIGO-313,PMs,"Shopify Markets Setup",2.75
+BIGO,2025-03,BIGO-317,FE Devs,"Product Bundles",5.00
+BIGO,2025-03,BIGO-317,PMs,"Product Bundles",2.50
+BIGO,2025-03,No Epic,FE Devs,"",21.25
+BIGO,2025-03,No Epic,PMs,"",5.75
+BIGO,2025-03,No Epic,UX,"",0.50
+BIGO,2025-04,BIGO-1,FE Devs,"Project oversight / support",2.50
+BIGO,2025-04,BIGO-1,PMs,"Project oversight / support",10.50
+BIGO,2025-04,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-04,BIGO-313,Design,"Shopify Markets Setup",2.25
+BIGO,2025-04,BIGO-313,FE Devs,"Shopify Markets Setup",14.25
+BIGO,2025-04,BIGO-313,PMs,"Shopify Markets Setup",5.25
+BIGO,2025-04,BIGO-349,UX,"Strategy ",1.00
+BIGO,2025-04,No Epic,FE Devs,"",7.00
+BIGO,2025-04,No Epic,PMs,"",1.75
+BIGO,2025-04,No Epic,UX,"",0.50
+BIGO,2025-05,BIGO-1,FE Devs,"Project oversight / support",0.75
+BIGO,2025-05,BIGO-1,PMs,"Project oversight / support",19.75
+BIGO,2025-05,BIGO-313,FE Devs,"Shopify Markets Setup",6.25
+BIGO,2025-05,BIGO-313,PMs,"Shopify Markets Setup",0.25
+BIGO,2025-05,BIGO-349,PMs,"Strategy ",1.00
+BIGO,2025-05,No Epic,FE Devs,"",30.00
+BIGO,2025-05,No Epic,PMs,"",1.25
+BIGO,2025-05,No Epic,UX,"",0.75
+BIGO,2025-06,BIGO-1,FE Devs,"Project oversight / support",1.50
+BIGO,2025-06,BIGO-1,PMs,"Project oversight / support",23.75
+BIGO,2025-06,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-06,BIGO-313,PMs,"Shopify Markets Setup",0.25
+BIGO,2025-06,BIGO-349,PMs,"Strategy ",0.50
+BIGO,2025-06,No Epic,FE Devs,"",22.75
+BIGO,2025-06,No Epic,PMs,"",10.75
+BIGO,2025-07,BIGO-1,FE Devs,"Project oversight / support",1.00
+BIGO,2025-07,BIGO-1,PMs,"Project oversight / support",29.50
+BIGO,2025-07,No Epic,FE Devs,"",4.75
+BIGO,2025-07,No Epic,PMs,"",3.75
+BIGO,2025-08,BIGO-1,FE Devs,"Project oversight / support",3.50
+BIGO,2025-08,BIGO-1,PMs,"Project oversight / support",13.75
+BIGO,2025-08,No Epic,Design,"",11.00
+BIGO,2025-08,No Epic,FE Devs,"",19.50
+BIGO,2025-08,No Epic,PMs,"",2.00
+BIGO,2025-09,BIGO-1,FE Devs,"Project oversight / support",7.50
+BIGO,2025-09,BIGO-1,PMs,"Project oversight / support",20.50
+BIGO,2025-09,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-09,BIGO-313,PMs,"Shopify Markets Setup",1.75
+BIGO,2025-09,No Epic,FE Devs,"",55.75
+BIGO,2025-09,No Epic,PMs,"",4.00
+BIGO,2025-10,BIGO-1,FE Devs,"Project oversight / support",15.45
+BIGO,2025-10,BIGO-1,PMs,"Project oversight / support",23.00
+BIGO,2025-10,BIGO-313,FE Devs,"Shopify Markets Setup",1.25
+BIGO,2025-10,No Epic,FE Devs,"",15.50
+BIGO,2025-10,No Epic,PMs,"",2.58
+BIGO,2025-11,BIGO-1,FE Devs,"Project oversight / support",0.25
+BIGO,2025-11,No Epic,FE Devs,"",0.50
+BIGO,2025-11,No Epic,PMs,"",1.00

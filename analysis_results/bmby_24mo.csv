@@ -1,0 +1,96 @@
+Project,Month,Epic,Team,Epic_Summary,Hours
+BMBY,2024-07,BMBY-1,BE Devs,"Project Oversight / Support",7.25
+BMBY,2024-07,BMBY-1,Design,"Project Oversight / Support",10.25
+BMBY,2024-07,BMBY-1,FE Devs,"Project Oversight / Support",49.50
+BMBY,2024-07,BMBY-1,PMs,"Project Oversight / Support",41.25
+BMBY,2024-07,BMBY-1,UX,"Project Oversight / Support",9.50
+BMBY,2024-07,BMBY-13,Design,"Globals & Style Guide",10.25
+BMBY,2024-07,BMBY-13,FE Devs,"Globals & Style Guide",21.50
+BMBY,2024-07,BMBY-13,PMs,"Globals & Style Guide",0.25
+BMBY,2024-07,BMBY-14,Design,"Header",1.00
+BMBY,2024-07,BMBY-14,FE Devs,"Header",2.75
+BMBY,2024-07,BMBY-15,Design,"Footer",1.00
+BMBY,2024-07,BMBY-20,Design,"PDP Image & Summary",8.50
+BMBY,2024-07,BMBY-27,Design,"Content Sections",7.50
+BMBY,2024-07,BMBY-35,UX,"Analytics",18.50
+BMBY,2024-08,BMBY-1,BE Devs,"Project Oversight / Support",1.00
+BMBY,2024-08,BMBY-1,Design,"Project Oversight / Support",10.25
+BMBY,2024-08,BMBY-1,FE Devs,"Project Oversight / Support",71.00
+BMBY,2024-08,BMBY-1,PMs,"Project Oversight / Support",56.92
+BMBY,2024-08,BMBY-1,UX,"Project Oversight / Support",10.00
+BMBY,2024-08,BMBY-14,Design,"Header",0.25
+BMBY,2024-08,BMBY-14,FE Devs,"Header",28.25
+BMBY,2024-08,BMBY-147,FE Devs,"Store Attribution",1.50
+BMBY,2024-08,BMBY-15,Design,"Footer",0.25
+BMBY,2024-08,BMBY-15,FE Devs,"Footer",26.75
+BMBY,2024-08,BMBY-16,FE Devs,"Mega Menu",7.50
+BMBY,2024-08,BMBY-17,FE Devs,"Search",37.25
+BMBY,2024-08,BMBY-18,FE Devs,"PLP / SRP",20.75
+BMBY,2024-08,BMBY-19,FE Devs,"Quick View",4.00
+BMBY,2024-08,BMBY-20,Design,"PDP Image & Summary",2.75
+BMBY,2024-08,BMBY-20,FE Devs,"PDP Image & Summary",24.00
+BMBY,2024-08,BMBY-21,FE Devs,"PDP Details",11.50
+BMBY,2024-08,BMBY-22,FE Devs,"PDP Upsells & Cross Sells",14.00
+BMBY,2024-08,BMBY-23,FE Devs,"Cart",7.00
+BMBY,2024-08,BMBY-24,FE Devs,"BOPIS / Locations",10.50
+BMBY,2024-08,BMBY-25,FE Devs,"Blog",11.75
+BMBY,2024-08,BMBY-27,FE Devs,"Content Sections",99.75
+BMBY,2024-08,BMBY-27,UX,"Content Sections",0.50
+BMBY,2024-08,BMBY-29,FE Devs,"Emails",3.25
+BMBY,2024-08,BMBY-32,FE Devs,"Registry",12.25
+BMBY,2024-08,BMBY-37,FE Devs,"Brands",2.50
+BMBY,2024-08,BMBY-86,Design,"Components",1.00
+BMBY,2024-08,BMBY-86,FE Devs,"Components",16.50
+BMBY,2024-08,BMBY-90,FE Devs,"Account",1.75
+BMBY,2024-09,BMBY-1,BE Devs,"Project Oversight / Support",4.25
+BMBY,2024-09,BMBY-1,Design,"Project Oversight / Support",3.00
+BMBY,2024-09,BMBY-1,FE Devs,"Project Oversight / Support",41.25
+BMBY,2024-09,BMBY-1,PMs,"Project Oversight / Support",23.00
+BMBY,2024-09,BMBY-1,UX,"Project Oversight / Support",1.25
+BMBY,2024-09,BMBY-13,FE Devs,"Globals & Style Guide",1.25
+BMBY,2024-09,BMBY-132,PMs,"Launch Set Up",2.00
+BMBY,2024-09,BMBY-147,FE Devs,"Store Attribution",2.00
+BMBY,2024-09,BMBY-147,PMs,"Store Attribution",0.75
+BMBY,2024-09,BMBY-15,FE Devs,"Footer",0.25
+BMBY,2024-09,BMBY-16,FE Devs,"Mega Menu",0.25
+BMBY,2024-09,BMBY-17,PMs,"Search",0.25
+BMBY,2024-09,BMBY-17,UX,"Search",0.50
+BMBY,2024-09,BMBY-18,Design,"PLP / SRP",0.50
+BMBY,2024-09,BMBY-18,FE Devs,"PLP / SRP",7.50
+BMBY,2024-09,BMBY-18,PMs,"PLP / SRP",0.50
+BMBY,2024-09,BMBY-18,UX,"PLP / SRP",2.25
+BMBY,2024-09,BMBY-19,FE Devs,"Quick View",4.50
+BMBY,2024-09,BMBY-20,Design,"PDP Image & Summary",0.50
+BMBY,2024-09,BMBY-20,FE Devs,"PDP Image & Summary",7.00
+BMBY,2024-09,BMBY-20,PMs,"PDP Image & Summary",1.00
+BMBY,2024-09,BMBY-20,UX,"PDP Image & Summary",1.25
+BMBY,2024-09,BMBY-21,FE Devs,"PDP Details",2.25
+BMBY,2024-09,BMBY-21,PMs,"PDP Details",0.50
+BMBY,2024-09,BMBY-23,FE Devs,"Cart",0.75
+BMBY,2024-09,BMBY-23,PMs,"Cart",0.50
+BMBY,2024-09,BMBY-24,FE Devs,"BOPIS / Locations",1.25
+BMBY,2024-09,BMBY-25,FE Devs,"Blog",2.00
+BMBY,2024-09,BMBY-27,Design,"Content Sections",0.25
+BMBY,2024-09,BMBY-27,FE Devs,"Content Sections",5.00
+BMBY,2024-09,BMBY-27,PMs,"Content Sections",1.00
+BMBY,2024-09,BMBY-27,UX,"Content Sections",0.25
+BMBY,2024-09,BMBY-28,FE Devs,"Reviews",9.25
+BMBY,2024-09,BMBY-29,FE Devs,"Emails",2.50
+BMBY,2024-09,BMBY-32,FE Devs,"Registry",0.75
+BMBY,2024-09,BMBY-32,PMs,"Registry",0.50
+BMBY,2024-09,BMBY-33,FE Devs,"Buy Now Pay Later",0.75
+BMBY,2024-09,BMBY-37,FE Devs,"Brands",0.50
+BMBY,2024-09,BMBY-37,PMs,"Brands",0.50
+BMBY,2024-09,BMBY-86,FE Devs,"Components",2.50
+BMBY,2024-09,BMBY-91,FE Devs,"3rd Party Apps",1.75
+BMBY,2024-10,BMBY-1,FE Devs,"Project Oversight / Support",5.00
+BMBY,2024-10,BMBY-1,PMs,"Project Oversight / Support",0.75
+BMBY,2024-10,BMBY-20,FE Devs,"PDP Image & Summary",3.75
+BMBY,2024-10,BMBY-20,PMs,"PDP Image & Summary",0.25
+BMBY,2024-10,No Epic,FE Devs,"",1.00
+BMBY,2024-11,BMBY-1,BE Devs,"Project Oversight / Support",0.50
+BMBY,2024-11,BMBY-1,FE Devs,"Project Oversight / Support",1.00
+BMBY,2024-11,BMBY-1,PMs,"Project Oversight / Support",0.50
+BMBY,2024-11,BMBY-20,FE Devs,"PDP Image & Summary",5.50
+BMBY,2024-11,BMBY-20,PMs,"PDP Image & Summary",0.25
+BMBY,2024-11,No Epic,FE Devs,"",0.25

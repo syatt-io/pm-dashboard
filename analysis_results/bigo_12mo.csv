@@ -1,0 +1,89 @@
+Project,Month,Epic,Team,Epic_Summary,Hours
+BIGO,2024-11,BIGO-1,FE Devs,"Project oversight / support",10.33
+BIGO,2024-11,BIGO-1,PMs,"Project oversight / support",10.00
+BIGO,2024-11,BIGO-118,FE Devs,"CI & Deployment",2.00
+BIGO,2024-11,BIGO-27,FE Devs,"UX",3.50
+BIGO,2024-11,BIGO-45,FE Devs,"Site Structure",5.50
+BIGO,2024-11,No Epic,FE Devs,"",38.75
+BIGO,2024-11,No Epic,PMs,"",5.00
+BIGO,2024-11,No Epic,UX,"",3.50
+BIGO,2024-12,BIGO-1,FE Devs,"Project oversight / support",3.50
+BIGO,2024-12,BIGO-1,PMs,"Project oversight / support",4.00
+BIGO,2024-12,BIGO-1,UX,"Project oversight / support",2.00
+BIGO,2024-12,BIGO-118,FE Devs,"CI & Deployment",0.50
+BIGO,2024-12,No Epic,Design,"",1.50
+BIGO,2024-12,No Epic,FE Devs,"",20.25
+BIGO,2024-12,No Epic,PMs,"",3.08
+BIGO,2025-01,BIGO-1,FE Devs,"Project oversight / support",9.50
+BIGO,2025-01,BIGO-1,PMs,"Project oversight / support",12.25
+BIGO,2025-01,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-01,BIGO-349,UX,"Strategy ",9.00
+BIGO,2025-01,No Epic,FE Devs,"",31.50
+BIGO,2025-01,No Epic,PMs,"",5.25
+BIGO,2025-01,No Epic,UX,"",1.00
+BIGO,2025-02,BIGO-1,FE Devs,"Project oversight / support",1.67
+BIGO,2025-02,BIGO-1,PMs,"Project oversight / support",20.50
+BIGO,2025-02,BIGO-349,UX,"Strategy ",7.00
+BIGO,2025-02,No Epic,Design,"",3.00
+BIGO,2025-02,No Epic,FE Devs,"",6.25
+BIGO,2025-02,No Epic,PMs,"",4.42
+BIGO,2025-03,BIGO-1,Design,"Project oversight / support",0.50
+BIGO,2025-03,BIGO-1,FE Devs,"Project oversight / support",4.50
+BIGO,2025-03,BIGO-1,PMs,"Project oversight / support",14.00
+BIGO,2025-03,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-03,BIGO-118,FE Devs,"CI & Deployment",0.50
+BIGO,2025-03,BIGO-313,FE Devs,"Shopify Markets Setup",0.50
+BIGO,2025-03,BIGO-313,PMs,"Shopify Markets Setup",2.75
+BIGO,2025-03,BIGO-317,FE Devs,"Product Bundles",5.00
+BIGO,2025-03,BIGO-317,PMs,"Product Bundles",2.50
+BIGO,2025-03,No Epic,FE Devs,"",21.25
+BIGO,2025-03,No Epic,PMs,"",5.75
+BIGO,2025-03,No Epic,UX,"",0.50
+BIGO,2025-04,BIGO-1,FE Devs,"Project oversight / support",2.50
+BIGO,2025-04,BIGO-1,PMs,"Project oversight / support",10.50
+BIGO,2025-04,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-04,BIGO-313,Design,"Shopify Markets Setup",2.25
+BIGO,2025-04,BIGO-313,FE Devs,"Shopify Markets Setup",14.25
+BIGO,2025-04,BIGO-313,PMs,"Shopify Markets Setup",5.25
+BIGO,2025-04,BIGO-349,UX,"Strategy ",1.00
+BIGO,2025-04,No Epic,FE Devs,"",7.00
+BIGO,2025-04,No Epic,PMs,"",1.75
+BIGO,2025-04,No Epic,UX,"",0.50
+BIGO,2025-05,BIGO-1,FE Devs,"Project oversight / support",0.75
+BIGO,2025-05,BIGO-1,PMs,"Project oversight / support",19.75
+BIGO,2025-05,BIGO-313,FE Devs,"Shopify Markets Setup",6.25
+BIGO,2025-05,BIGO-313,PMs,"Shopify Markets Setup",0.25
+BIGO,2025-05,BIGO-349,PMs,"Strategy ",1.00
+BIGO,2025-05,No Epic,FE Devs,"",30.00
+BIGO,2025-05,No Epic,PMs,"",1.25
+BIGO,2025-05,No Epic,UX,"",0.75
+BIGO,2025-06,BIGO-1,FE Devs,"Project oversight / support",1.50
+BIGO,2025-06,BIGO-1,PMs,"Project oversight / support",23.75
+BIGO,2025-06,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-06,BIGO-313,PMs,"Shopify Markets Setup",0.25
+BIGO,2025-06,BIGO-349,PMs,"Strategy ",0.50
+BIGO,2025-06,No Epic,FE Devs,"",22.75
+BIGO,2025-06,No Epic,PMs,"",10.75
+BIGO,2025-07,BIGO-1,FE Devs,"Project oversight / support",1.00
+BIGO,2025-07,BIGO-1,PMs,"Project oversight / support",29.50
+BIGO,2025-07,No Epic,FE Devs,"",4.75
+BIGO,2025-07,No Epic,PMs,"",3.75
+BIGO,2025-08,BIGO-1,FE Devs,"Project oversight / support",3.50
+BIGO,2025-08,BIGO-1,PMs,"Project oversight / support",13.75
+BIGO,2025-08,No Epic,Design,"",11.00
+BIGO,2025-08,No Epic,FE Devs,"",19.50
+BIGO,2025-08,No Epic,PMs,"",2.00
+BIGO,2025-09,BIGO-1,FE Devs,"Project oversight / support",7.50
+BIGO,2025-09,BIGO-1,PMs,"Project oversight / support",20.50
+BIGO,2025-09,BIGO-1,UX,"Project oversight / support",1.00
+BIGO,2025-09,BIGO-313,PMs,"Shopify Markets Setup",1.75
+BIGO,2025-09,No Epic,FE Devs,"",55.75
+BIGO,2025-09,No Epic,PMs,"",4.00
+BIGO,2025-10,BIGO-1,FE Devs,"Project oversight / support",15.45
+BIGO,2025-10,BIGO-1,PMs,"Project oversight / support",23.00
+BIGO,2025-10,BIGO-313,FE Devs,"Shopify Markets Setup",1.25
+BIGO,2025-10,No Epic,FE Devs,"",15.50
+BIGO,2025-10,No Epic,PMs,"",2.58
+BIGO,2025-11,BIGO-1,FE Devs,"Project oversight / support",0.25
+BIGO,2025-11,No Epic,FE Devs,"",0.50
+BIGO,2025-11,No Epic,PMs,"",1.00

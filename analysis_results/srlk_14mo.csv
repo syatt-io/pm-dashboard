@@ -1,0 +1,214 @@
+Project,Month,Epic,Team,Epic_Summary,Hours
+SRLK,2024-10,SRLK-1,BE Devs,"Project Oversight / Support",10.50
+SRLK,2024-10,SRLK-1,Design,"Project Oversight / Support",6.00
+SRLK,2024-10,SRLK-1,FE Devs,"Project Oversight / Support",25.00
+SRLK,2024-10,SRLK-1,PMs,"Project Oversight / Support",19.50
+SRLK,2024-10,SRLK-1,UX,"Project Oversight / Support",4.00
+SRLK,2024-10,SRLK-13,Design,"Globals & Style Guide",11.25
+SRLK,2024-10,SRLK-13,PMs,"Globals & Style Guide",0.25
+SRLK,2024-10,SRLK-14,PMs,"Analytics",0.75
+SRLK,2024-10,SRLK-14,UX,"Analytics",5.50
+SRLK,2024-10,SRLK-17,Design,"Content Sections",2.00
+SRLK,2024-10,SRLK-17,PMs,"Content Sections",0.25
+SRLK,2024-10,SRLK-31,BE Devs,"Catalog Integration",3.00
+SRLK,2024-11,SRLK-1,BE Devs,"Project Oversight / Support",18.75
+SRLK,2024-11,SRLK-1,Design,"Project Oversight / Support",10.25
+SRLK,2024-11,SRLK-1,FE Devs,"Project Oversight / Support",50.17
+SRLK,2024-11,SRLK-1,PMs,"Project Oversight / Support",30.75
+SRLK,2024-11,SRLK-1,UX,"Project Oversight / Support",4.25
+SRLK,2024-11,SRLK-13,Design,"Globals & Style Guide",7.00
+SRLK,2024-11,SRLK-13,FE Devs,"Globals & Style Guide",17.25
+SRLK,2024-11,SRLK-13,PMs,"Globals & Style Guide",0.25
+SRLK,2024-11,SRLK-14,UX,"Analytics",3.00
+SRLK,2024-11,SRLK-15,FE Devs,"Header",19.50
+SRLK,2024-11,SRLK-16,FE Devs,"Footer",6.50
+SRLK,2024-11,SRLK-17,Design,"Content Sections",5.00
+SRLK,2024-11,SRLK-17,PMs,"Content Sections",0.25
+SRLK,2024-11,SRLK-18,FE Devs,"Mega Menu",6.00
+SRLK,2024-11,SRLK-20,Design,"PDP Image & Summary",8.25
+SRLK,2024-11,SRLK-20,FE Devs,"PDP Image & Summary",0.75
+SRLK,2024-11,SRLK-23,Design,"PLP / SRP",7.25
+SRLK,2024-11,SRLK-27,Design,"BOPIS / Locations",5.50
+SRLK,2024-11,SRLK-27,FE Devs,"BOPIS / Locations",0.50
+SRLK,2024-11,SRLK-29,Design,"Brands",1.50
+SRLK,2024-11,SRLK-31,BE Devs,"Catalog Integration",15.00
+SRLK,2024-11,SRLK-33,PMs,"User Migration",0.25
+SRLK,2024-12,SRLK-1,BE Devs,"Project Oversight / Support",9.50
+SRLK,2024-12,SRLK-1,Design,"Project Oversight / Support",7.50
+SRLK,2024-12,SRLK-1,FE Devs,"Project Oversight / Support",23.50
+SRLK,2024-12,SRLK-1,PMs,"Project Oversight / Support",12.25
+SRLK,2024-12,SRLK-1,UX,"Project Oversight / Support",2.25
+SRLK,2024-12,SRLK-13,Design,"Globals & Style Guide",5.00
+SRLK,2024-12,SRLK-13,FE Devs,"Globals & Style Guide",1.00
+SRLK,2024-12,SRLK-136,PMs,"Instagram Section",0.25
+SRLK,2024-12,SRLK-15,Design,"Header",0.50
+SRLK,2024-12,SRLK-15,FE Devs,"Header",8.00
+SRLK,2024-12,SRLK-15,PMs,"Header",0.75
+SRLK,2024-12,SRLK-16,FE Devs,"Footer",29.00
+SRLK,2024-12,SRLK-17,FE Devs,"Content Sections",47.25
+SRLK,2024-12,SRLK-17,PMs,"Content Sections",1.75
+SRLK,2024-12,SRLK-18,PMs,"Mega Menu",0.75
+SRLK,2024-12,SRLK-19,FE Devs,"Search",11.50
+SRLK,2024-12,SRLK-19,PMs,"Search",0.25
+SRLK,2024-12,SRLK-20,FE Devs,"PDP Image & Summary",8.25
+SRLK,2024-12,SRLK-21,PMs,"PDP Details",0.25
+SRLK,2024-12,SRLK-23,FE Devs,"PLP / SRP",29.00
+SRLK,2024-12,SRLK-23,PMs,"PLP / SRP",1.00
+SRLK,2024-12,SRLK-24,FE Devs,"Cart",14.00
+SRLK,2024-12,SRLK-24,PMs,"Cart",0.25
+SRLK,2024-12,SRLK-27,FE Devs,"BOPIS / Locations",79.00
+SRLK,2024-12,SRLK-31,BE Devs,"Catalog Integration",84.00
+SRLK,2024-12,SRLK-39,FE Devs,"Components",17.75
+SRLK,2024-12,SRLK-39,PMs,"Components",0.25
+SRLK,2025-01,SRLK-1,BE Devs,"Project Oversight / Support",7.25
+SRLK,2025-01,SRLK-1,Design,"Project Oversight / Support",0.25
+SRLK,2025-01,SRLK-1,FE Devs,"Project Oversight / Support",25.50
+SRLK,2025-01,SRLK-1,PMs,"Project Oversight / Support",28.00
+SRLK,2025-01,SRLK-1,UX,"Project Oversight / Support",1.00
+SRLK,2025-01,SRLK-13,FE Devs,"Globals & Style Guide",16.25
+SRLK,2025-01,SRLK-13,PMs,"Globals & Style Guide",0.50
+SRLK,2025-01,SRLK-132,FE Devs,"Reviews",5.50
+SRLK,2025-01,SRLK-132,PMs,"Reviews",0.25
+SRLK,2025-01,SRLK-136,FE Devs,"Instagram Section",4.75
+SRLK,2025-01,SRLK-14,PMs,"Analytics",0.25
+SRLK,2025-01,SRLK-15,PMs,"Header",0.25
+SRLK,2025-01,SRLK-154,FE Devs,"Wishlist",6.75
+SRLK,2025-01,SRLK-154,PMs,"Wishlist",1.00
+SRLK,2025-01,SRLK-16,PMs,"Footer",0.25
+SRLK,2025-01,SRLK-17,FE Devs,"Content Sections",1.50
+SRLK,2025-01,SRLK-17,PMs,"Content Sections",0.50
+SRLK,2025-01,SRLK-18,PMs,"Mega Menu",1.50
+SRLK,2025-01,SRLK-20,FE Devs,"PDP Image & Summary",15.75
+SRLK,2025-01,SRLK-20,PMs,"PDP Image & Summary",0.75
+SRLK,2025-01,SRLK-21,FE Devs,"PDP Details",14.00
+SRLK,2025-01,SRLK-212,FE Devs,"Pages",1.50
+SRLK,2025-01,SRLK-22,FE Devs,"PDP Upsells",19.75
+SRLK,2025-01,SRLK-22,PMs,"PDP Upsells",0.75
+SRLK,2025-01,SRLK-23,FE Devs,"PLP / SRP",1.75
+SRLK,2025-01,SRLK-23,PMs,"PLP / SRP",1.00
+SRLK,2025-01,SRLK-24,FE Devs,"Cart",7.75
+SRLK,2025-01,SRLK-24,PMs,"Cart",0.75
+SRLK,2025-01,SRLK-26,PMs,"Shipping",0.25
+SRLK,2025-01,SRLK-27,BE Devs,"BOPIS / Locations",20.97
+SRLK,2025-01,SRLK-27,Design,"BOPIS / Locations",0.75
+SRLK,2025-01,SRLK-27,FE Devs,"BOPIS / Locations",45.75
+SRLK,2025-01,SRLK-27,PMs,"BOPIS / Locations",1.50
+SRLK,2025-01,SRLK-29,FE Devs,"Brands",2.75
+SRLK,2025-01,SRLK-29,PMs,"Brands",0.50
+SRLK,2025-01,SRLK-31,BE Devs,"Catalog Integration",74.25
+SRLK,2025-01,SRLK-31,PMs,"Catalog Integration",1.00
+SRLK,2025-01,SRLK-35,PMs,"User Integration",0.25
+SRLK,2025-01,SRLK-36,BE Devs,"Bulk Image Uploader",35.25
+SRLK,2025-01,SRLK-36,FE Devs,"Bulk Image Uploader",0.50
+SRLK,2025-01,SRLK-36,PMs,"Bulk Image Uploader",0.50
+SRLK,2025-01,SRLK-37,FE Devs,"Launch Set Up",1.75
+SRLK,2025-01,SRLK-38,PMs,"Emails",0.25
+SRLK,2025-01,SRLK-39,FE Devs,"Components",22.00
+SRLK,2025-01,SRLK-39,PMs,"Components",0.50
+SRLK,2025-02,SRLK-1,BE Devs,"Project Oversight / Support",4.25
+SRLK,2025-02,SRLK-1,FE Devs,"Project Oversight / Support",6.00
+SRLK,2025-02,SRLK-1,PMs,"Project Oversight / Support",17.08
+SRLK,2025-02,SRLK-13,FE Devs,"Globals & Style Guide",0.50
+SRLK,2025-02,SRLK-136,FE Devs,"Instagram Section",0.50
+SRLK,2025-02,SRLK-154,FE Devs,"Wishlist",6.00
+SRLK,2025-02,SRLK-154,PMs,"Wishlist",0.25
+SRLK,2025-02,SRLK-17,FE Devs,"Content Sections",11.00
+SRLK,2025-02,SRLK-18,FE Devs,"Mega Menu",1.00
+SRLK,2025-02,SRLK-20,FE Devs,"PDP Image & Summary",0.75
+SRLK,2025-02,SRLK-20,PMs,"PDP Image & Summary",0.25
+SRLK,2025-02,SRLK-23,PMs,"PLP / SRP",0.25
+SRLK,2025-02,SRLK-24,PMs,"Cart",0.25
+SRLK,2025-02,SRLK-25,PMs,"Checkout",0.25
+SRLK,2025-02,SRLK-27,FE Devs,"BOPIS / Locations",1.25
+SRLK,2025-02,SRLK-31,BE Devs,"Catalog Integration",20.00
+SRLK,2025-02,SRLK-31,FE Devs,"Catalog Integration",0.18
+SRLK,2025-02,SRLK-31,PMs,"Catalog Integration",0.50
+SRLK,2025-02,SRLK-32,BE Devs,"Order Integration",40.25
+SRLK,2025-02,SRLK-36,BE Devs,"Bulk Image Uploader",0.25
+SRLK,2025-02,SRLK-37,FE Devs,"Launch Set Up",9.25
+SRLK,2025-02,SRLK-37,UX,"Launch Set Up",6.00
+SRLK,2025-02,SRLK-38,FE Devs,"Emails",5.00
+SRLK,2025-02,SRLK-39,PMs,"Components",0.25
+SRLK,2025-02,SRLK-58,BE Devs,"Fulfillment Integration",20.00
+SRLK,2025-02,SRLK-58,PMs,"Fulfillment Integration",0.25
+SRLK,2025-03,SRLK-1,BE Devs,"Project Oversight / Support",6.42
+SRLK,2025-03,SRLK-1,FE Devs,"Project Oversight / Support",1.50
+SRLK,2025-03,SRLK-1,PMs,"Project Oversight / Support",18.75
+SRLK,2025-03,SRLK-13,FE Devs,"Globals & Style Guide",3.00
+SRLK,2025-03,SRLK-13,PMs,"Globals & Style Guide",0.25
+SRLK,2025-03,SRLK-23,FE Devs,"PLP / SRP",0.25
+SRLK,2025-03,SRLK-23,PMs,"PLP / SRP",0.50
+SRLK,2025-03,SRLK-27,PMs,"BOPIS / Locations",0.25
+SRLK,2025-03,SRLK-31,BE Devs,"Catalog Integration",40.00
+SRLK,2025-03,SRLK-31,FE Devs,"Catalog Integration",0.17
+SRLK,2025-03,SRLK-32,BE Devs,"Order Integration",0.50
+SRLK,2025-03,SRLK-36,BE Devs,"Bulk Image Uploader",20.00
+SRLK,2025-03,SRLK-36,PMs,"Bulk Image Uploader",1.25
+SRLK,2025-03,SRLK-38,FE Devs,"Emails",5.25
+SRLK,2025-03,SRLK-39,FE Devs,"Components",1.50
+SRLK,2025-03,SRLK-39,PMs,"Components",0.50
+SRLK,2025-03,SRLK-57,BE Devs,"Gift Card Integration",7.47
+SRLK,2025-03,SRLK-57,PMs,"Gift Card Integration",0.75
+SRLK,2025-03,SRLK-58,FE Devs,"Fulfillment Integration",0.28
+SRLK,2025-04,SRLK-1,BE Devs,"Project Oversight / Support",3.00
+SRLK,2025-04,SRLK-1,FE Devs,"Project Oversight / Support",7.75
+SRLK,2025-04,SRLK-1,PMs,"Project Oversight / Support",16.50
+SRLK,2025-04,SRLK-20,FE Devs,"PDP Image & Summary",2.75
+SRLK,2025-04,SRLK-21,FE Devs,"PDP Details",1.50
+SRLK,2025-04,SRLK-23,FE Devs,"PLP / SRP",1.00
+SRLK,2025-04,SRLK-255,BE Devs,"Returns & Refunds",28.00
+SRLK,2025-04,SRLK-255,PMs,"Returns & Refunds",0.25
+SRLK,2025-04,SRLK-31,BE Devs,"Catalog Integration",97.25
+SRLK,2025-04,SRLK-36,BE Devs,"Bulk Image Uploader",38.50
+SRLK,2025-04,SRLK-36,PMs,"Bulk Image Uploader",0.75
+SRLK,2025-04,SRLK-38,FE Devs,"Emails",4.00
+SRLK,2025-04,SRLK-39,FE Devs,"Components",0.75
+SRLK,2025-05,SRLK-1,BE Devs,"Project Oversight / Support",6.25
+SRLK,2025-05,SRLK-1,FE Devs,"Project Oversight / Support",3.50
+SRLK,2025-05,SRLK-1,PMs,"Project Oversight / Support",13.25
+SRLK,2025-05,SRLK-1,UX,"Project Oversight / Support",3.00
+SRLK,2025-05,SRLK-17,FE Devs,"Content Sections",3.75
+SRLK,2025-05,SRLK-20,FE Devs,"PDP Image & Summary",7.25
+SRLK,2025-05,SRLK-23,PMs,"PLP / SRP",0.25
+SRLK,2025-05,SRLK-268,BE Devs,"Phase 2 Integration Features ",12.50
+SRLK,2025-05,SRLK-268,PMs,"Phase 2 Integration Features ",1.00
+SRLK,2025-05,SRLK-27,BE Devs,"BOPIS / Locations",2.00
+SRLK,2025-05,SRLK-27,FE Devs,"BOPIS / Locations",2.00
+SRLK,2025-05,SRLK-27,PMs,"BOPIS / Locations",0.25
+SRLK,2025-05,SRLK-29,PMs,"Brands",0.50
+SRLK,2025-05,SRLK-31,BE Devs,"Catalog Integration",22.50
+SRLK,2025-05,SRLK-37,BE Devs,"Launch Set Up",12.75
+SRLK,2025-05,SRLK-37,PMs,"Launch Set Up",0.50
+SRLK,2025-05,SRLK-57,BE Devs,"Gift Card Integration",11.00
+SRLK,2025-06,SRLK-1,BE Devs,"Project Oversight / Support",2.25
+SRLK,2025-06,SRLK-1,PMs,"Project Oversight / Support",11.00
+SRLK,2025-06,SRLK-13,UX,"Globals & Style Guide",0.50
+SRLK,2025-06,SRLK-268,BE Devs,"Phase 2 Integration Features ",20.00
+SRLK,2025-06,SRLK-268,PMs,"Phase 2 Integration Features ",0.50
+SRLK,2025-06,SRLK-37,BE Devs,"Launch Set Up",0.25
+SRLK,2025-06,SRLK-37,PMs,"Launch Set Up",0.25
+SRLK,2025-07,No Epic,UX,"",1.00
+SRLK,2025-07,SRLK-1,BE Devs,"Project Oversight / Support",1.50
+SRLK,2025-07,SRLK-1,FE Devs,"Project Oversight / Support",1.25
+SRLK,2025-07,SRLK-1,PMs,"Project Oversight / Support",9.50
+SRLK,2025-07,SRLK-14,FE Devs,"Analytics",0.75
+SRLK,2025-07,SRLK-38,FE Devs,"Emails",1.25
+SRLK,2025-08,No Epic,BE Devs,"",1.00
+SRLK,2025-08,No Epic,UX,"",0.50
+SRLK,2025-08,SRLK-1,BE Devs,"Project Oversight / Support",0.50
+SRLK,2025-08,SRLK-1,PMs,"Project Oversight / Support",2.25
+SRLK,2025-08,SRLK-32,BE Devs,"Order Integration",7.25
+SRLK,2025-08,SRLK-37,BE Devs,"Launch Set Up",0.25
+SRLK,2025-09,No Epic,BE Devs,"",6.00
+SRLK,2025-09,No Epic,UX,"",0.50
+SRLK,2025-09,SRLK-1,BE Devs,"Project Oversight / Support",1.00
+SRLK,2025-09,SRLK-1,FE Devs,"Project Oversight / Support",0.25
+SRLK,2025-09,SRLK-1,PMs,"Project Oversight / Support",4.00
+SRLK,2025-09,SRLK-31,BE Devs,"Catalog Integration",3.00
+SRLK,2025-10,No Epic,BE Devs,"",3.00
+SRLK,2025-10,No Epic,UX,"",2.00
+SRLK,2025-10,SRLK-1,BE Devs,"Project Oversight / Support",0.50
+SRLK,2025-10,SRLK-1,FE Devs,"Project Oversight / Support",0.25
+SRLK,2025-10,SRLK-1,PMs,"Project Oversight / Support",2.00
+SRLK,2025-10,SRLK-31,BE Devs,"Catalog Integration",11.75
+SRLK,2025-11,No Epic,BE Devs,"",3.00

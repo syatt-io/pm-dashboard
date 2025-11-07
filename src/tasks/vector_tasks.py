@@ -931,7 +931,7 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-@celery_app.task(name='src.tasks.vector_tasks.backfill_tempo', bind=True, time_limit=3600)
+@celery_app.task(name='src.tasks.vector_tasks.backfill_tempo', bind=True)
 def backfill_tempo(
     self,
     days_back: int = None,
@@ -943,6 +943,8 @@ def backfill_tempo(
 
     NOT scheduled - trigger manually via API or Celery CLI.
     Uses Celery for robust long-running execution with checkpointing.
+
+    Time limit: Inherits global config (120 minutes / 2 hours) for large backfills.
 
     Args:
         days_back: Number of days to backfill (default 365) - ignored if from_date/to_date provided

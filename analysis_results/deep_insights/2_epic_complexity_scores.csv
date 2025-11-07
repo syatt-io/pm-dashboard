@@ -1,0 +1,90 @@
+Project,Epic,Epic_Summary,Num_Teams,Total_Hours,Complexity_Score,Complexity_Level
+BIGO,BIGO-1,Project oversight / support,5,706.01,32.81,Very High
+SRLK,SRLK-1,Project Oversight / Support,5,439.67,30.44,Very High
+BMBY,BMBY-1,Project Oversight / Support,5,347.42,29.27,High
+BIGO,No Epic,,4,405.33,24.03,High
+SRLK,SRLK-27,BOPIS / Locations,4,159.72,20.32,High
+BIGO,BIGO-47,Content Sections,4,129.04,19.47,Medium
+BMBY,BMBY-27,Content Sections,4,114.25,18.99,Medium
+BIGO,BIGO-46,PLP / Search,4,89.75,18.03,Medium
+BIGO,BIGO-43,Product Details,4,86.37,17.88,Medium
+SRLK,SRLK-31,Catalog Integration,3,372.60,17.77,Medium
+SRLK,SRLK-13,Globals & Style Guide,4,63.00,16.64,Medium
+BMBY,BMBY-20,PDP Image & Summary,4,54.75,16.08,Medium
+BIGO,BIGO-144,Cart,4,38.75,14.73,Medium
+BMBY,BMBY-18,PLP / SRP,4,31.50,13.92,Medium
+SRLK,SRLK-37,Launch Set Up,4,31.00,13.86,Medium
+SRLK,SRLK-36,Bulk Image Uploader,3,97.00,13.75,Medium
+BIGO,BIGO-45,Site Structure,3,95.00,13.69,Medium
+SRLK,SRLK-17,Content Sections,3,73.25,12.92,Medium
+BIGO,BIGO-42,Pages,3,66.50,12.64,Medium
+BIGO,BIGO-23,Migrations and Automation,3,49.12,11.74,Medium
+SRLK,SRLK-20,PDP Image & Summary,3,44.75,11.47,Medium
+SRLK,SRLK-23,PLP / SRP,3,42.25,11.30,Medium
+BMBY,BMBY-17,Search,3,38.00,10.99,Medium
+BIGO,BIGO-313,Shopify Markets Setup,3,34.75,10.73,Medium
+BMBY,BMBY-13,Globals & Style Guide,3,33.25,10.60,Medium
+SRLK,SRLK-15,Header,3,29.00,10.20,Medium
+BIGO,BIGO-40,Blog,3,25.75,9.86,Low
+BIGO,BIGO-27,UX,3,22.25,9.44,Low
+BIGO,BIGO-44,Components,3,21.75,9.37,Low
+SRLK,SRLK-58,Fulfillment Integration,3,20.53,9.21,Low
+BIGO,BIGO-41,Account,3,14.50,8.22,Low
+SRLK,SRLK-39,Components,2,43.50,7.59,Low
+SRLK,SRLK-14,Analytics,3,10.25,7.26,Low
+SRLK,SRLK-16,Footer,2,35.75,7.21,Low
+SRLK,SRLK-268,Phase 2 Integration Features ,2,34.00,7.11,Low
+BIGO,BIGO-28,Design Ideation phase,2,32.50,7.02,Low
+BMBY,BMBY-14,Header,2,32.25,7.01,Low
+BIGO,BIGO-113,Design Prototyping and Refinement,2,31.00,6.93,Low
+BMBY,BMBY-15,Footer,2,28.25,6.75,Low
+SRLK,SRLK-255,Returns & Refunds,2,28.25,6.75,Low
+SRLK,SRLK-24,Cart,2,23.00,6.36,Low
+BIGO,BIGO-38,Globals,2,21.00,6.18,Low
+SRLK,SRLK-22,PDP Upsells,2,20.50,6.14,Low
+BMBY,BMBY-86,Components,2,20.00,6.09,Low
+SRLK,SRLK-57,Gift Card Integration,2,19.22,6.01,Low
+BIGO,BIGO-349,Strategy ,2,18.50,5.94,Low
+SRLK,No Epic,,2,17.00,5.78,Low
+BIGO,BIGO-25,3rd Party apps,3,5.75,5.73,Low
+SRLK,SRLK-21,PDP Details,2,15.75,5.64,Low
+SRLK,SRLK-38,Emails,2,15.75,5.64,Low
+SRLK,SRLK-29,Brands,3,5.25,5.50,Low
+BMBY,BMBY-21,PDP Details,2,14.25,5.45,Low
+SRLK,SRLK-154,Wishlist,2,14.00,5.42,Low
+BMBY,BMBY-32,Registry,2,13.50,5.35,Low
+SRLK,SRLK-19,Search,2,11.75,5.09,Low
+SRLK,SRLK-18,Mega Menu,2,9.25,4.65,Low
+BMBY,BMBY-23,Cart,2,8.25,4.45,Low
+BIGO,BIGO-317,Product Bundles,2,7.50,4.28,Low
+SRLK,SRLK-32,Order Integration,1,48.00,3.89,Low
+SRLK,SRLK-132,Reviews,2,5.75,3.82,Low
+SRLK,SRLK-136,Instagram Section,2,5.50,3.74,Low
+BMBY,BMBY-147,Store Attribution,2,4.25,3.32,Low
+BMBY,BMBY-37,Brands,2,3.50,3.01,Low
+BMBY,BMBY-35,Analytics,1,18.50,2.97,Low
+BMBY,BMBY-22,PDP Upsells & Cross Sells,1,14.00,2.71,Low
+BMBY,BMBY-25,Blog,1,13.75,2.69,Low
+BMBY,BMBY-24,BOPIS / Locations,1,11.75,2.55,Low
+BIGO,BIGO-153,Design cart/mini cart,2,2.25,2.36,Low
+BMBY,BMBY-28,Reviews,1,9.25,2.33,Low
+BMBY,BMBY-19,Quick View,1,8.50,2.25,Low
+BMBY,BMBY-16,Mega Menu,1,7.75,2.17,Low
+BMBY,BMBY-29,Emails,1,5.75,1.91,Low
+BIGO,BIGO-118,CI & Deployment,1,3.00,1.39,Low
+BIGO,BIGO-173,UAT | PDP,1,2.75,1.32,Low
+BMBY,BMBY-132,Launch Set Up,1,2.00,1.10,Low
+BMBY,BMBY-90,Account,1,1.75,1.01,Low
+BMBY,BMBY-91,3rd Party Apps,1,1.75,1.01,Low
+BIGO,BIGO-165,UAT | PLP,1,1.50,0.92,Low
+SRLK,SRLK-212,Pages,1,1.50,0.92,Low
+BMBY,No Epic,,1,1.25,0.81,Low
+BIGO,BIGO-193,UAT | Global Site Functionality,1,0.75,0.56,Low
+BMBY,BMBY-33,Buy Now Pay Later,1,0.75,0.56,Low
+BIGO,BIGO-194,UAT | Homepage Sections,1,0.50,0.41,Low
+BIGO,BIGO-253,UAT | Discounts/Promotions,1,0.50,0.41,Low
+BIGO,BIGO-155,Analytics & SEO,1,0.25,0.22,Low
+SRLK,SRLK-25,Checkout,1,0.25,0.22,Low
+SRLK,SRLK-26,Shipping,1,0.25,0.22,Low
+SRLK,SRLK-33,User Migration,1,0.25,0.22,Low
+SRLK,SRLK-35,User Integration,1,0.25,0.22,Low

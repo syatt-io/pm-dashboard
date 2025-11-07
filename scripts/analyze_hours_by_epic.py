@@ -119,9 +119,9 @@ class HoursByEpicAnalyzer:
         project_keys: List[str],
         start_date: str,
         end_date: str
-    ) -> Dict[str, Dict[str, Dict[str, float]]]:
+    ) -> Dict[str, Dict[str, Dict[str, Dict[str, float]]]]:
         """
-        Analyze worklogs grouped by project, epic, and month.
+        Analyze worklogs grouped by project, epic, month, and team.
 
         Args:
             project_keys: List of project keys to analyze (e.g., ["COOP", "SUBS"])
@@ -129,7 +129,7 @@ class HoursByEpicAnalyzer:
             end_date: End date in YYYY-MM-DD format
 
         Returns:
-            Nested dict: {project_key: {month: {epic_key: hours}}}
+            Nested dict: {project_key: {month: {epic_key: {team: hours}}}}
         """
         logger.info(f"Fetching worklogs from {start_date} to {end_date}")
 
@@ -137,8 +137,8 @@ class HoursByEpicAnalyzer:
         worklogs = self.tempo_client.get_worklogs(start_date, end_date)
         logger.info(f"Retrieved {len(worklogs)} worklogs")
 
-        # Structure: {project: {month: {epic: hours}}}
-        results = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+        # Structure: {project: {month: {epic: {team: hours}}}}
+        results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
 
         # Track epic summaries
         epic_summaries = {}
@@ -185,8 +185,15 @@ class HoursByEpicAnalyzer:
                 seconds = worklog.get("timeSpentSeconds", 0)
                 hours = seconds / 3600
 
-                # Add to results
-                results[project_key][month_key][epic_key] += hours
+                # Get user's team
+                author = worklog.get("author", {})
+                account_id = author.get("accountId")
+                team = self.tempo_client.get_user_team(account_id) if account_id else "Unassigned"
+                if not team:
+                    team = "Unassigned"
+
+                # Add to results (now includes team dimension)
+                results[project_key][month_key][epic_key][team] += hours
                 processed += 1
 
             except Exception as e:
@@ -204,14 +211,14 @@ class HoursByEpicAnalyzer:
 
     def print_report(
         self,
-        results: Dict[str, Dict[str, Dict[str, float]]],
+        results: Dict[str, Dict[str, Dict[str, Dict[str, float]]]],
         format_type: str = "table"
     ):
         """
         Print analysis results in various formats.
 
         Args:
-            results: Analysis results from analyze_worklogs
+            results: Analysis results from analyze_worklogs (project -> month -> epic -> team -> hours)
             format_type: Output format - "table", "csv", or "json"
         """
         if format_type == "json":
@@ -220,17 +227,18 @@ class HoursByEpicAnalyzer:
             return
 
         if format_type == "csv":
-            print("Project,Month,Epic,Epic_Summary,Hours")
+            print("Project,Month,Epic,Team,Epic_Summary,Hours")
             for project, months in sorted(results.items()):
                 for month, epics in sorted(months.items()):
-                    for epic, hours in sorted(epics.items()):
+                    for epic, teams in sorted(epics.items()):
                         epic_summary = self.epic_summaries.get(epic, "")
-                        print(f"{project},{month},{epic},\"{epic_summary}\",{hours:.2f}")
+                        for team, hours in sorted(teams.items()):
+                            print(f"{project},{month},{epic},{team},\"{epic_summary}\",{hours:.2f}")
             return
 
         # Table format (default)
         print("\n" + "=" * 100)
-        print("HOURS ANALYSIS BY PROJECT, EPIC, AND MONTH")
+        print("HOURS ANALYSIS BY PROJECT, EPIC, MONTH, AND TEAM")
         print("=" * 100)
 
         for project in sorted(results.keys()):
@@ -240,9 +248,10 @@ class HoursByEpicAnalyzer:
 
             months = results[project]
 
-            # Calculate totals
+            # Calculate project totals
             project_total = sum(
-                sum(epics.values()) for epics in months.values()
+                sum(sum(teams.values()) for teams in epics.values())
+                for epics in months.values()
             )
 
             print(f"\n   Total Hours: {project_total:.2f}h")
@@ -250,42 +259,65 @@ class HoursByEpicAnalyzer:
             # Print by month
             for month in sorted(months.keys()):
                 epics = months[month]
-                month_total = sum(epics.values())
+
+                # Calculate month total
+                month_total = sum(
+                    sum(teams.values()) for teams in epics.values()
+                )
 
                 print(f"\n   {'─' * 90}")
                 print(f"   📅 {month} - Total: {month_total:.2f}h")
                 print(f"   {'─' * 90}")
 
-                # Sort epics by hours (descending)
-                sorted_epics = sorted(epics.items(), key=lambda x: x[1], reverse=True)
+                # Sort epics by total hours (descending)
+                epic_totals = {
+                    epic: sum(teams.values())
+                    for epic, teams in epics.items()
+                }
+                sorted_epics = sorted(epic_totals.items(), key=lambda x: x[1], reverse=True)
 
-                for epic_key, hours in sorted_epics:
+                for epic_key, epic_total_hours in sorted_epics:
                     epic_summary = self.epic_summaries.get(epic_key, "")
-                    percentage = (hours / month_total * 100) if month_total > 0 else 0
+                    percentage = (epic_total_hours / month_total * 100) if month_total > 0 else 0
 
+                    # Print epic header
                     if epic_summary:
-                        print(f"      🎯 {epic_key}: {hours:6.2f}h ({percentage:5.1f}%) - {epic_summary}")
+                        print(f"      🎯 {epic_key}: {epic_total_hours:6.2f}h ({percentage:5.1f}%) - {epic_summary}")
                     else:
-                        print(f"      🎯 {epic_key}: {hours:6.2f}h ({percentage:5.1f}%)")
+                        print(f"      🎯 {epic_key}: {epic_total_hours:6.2f}h ({percentage:5.1f}%)")
+
+                    # Print team breakdown for this epic
+                    teams = epics[epic_key]
+                    sorted_teams = sorted(teams.items(), key=lambda x: x[1], reverse=True)
+                    for team, hours in sorted_teams:
+                        team_percentage = (hours / epic_total_hours * 100) if epic_total_hours > 0 else 0
+                        print(f"         └─ {team}: {hours:6.2f}h ({team_percentage:5.1f}%)")
 
         print("\n" + "=" * 100)
         print("SUMMARY")
         print("=" * 100)
 
         # Print grand totals by project
-        print("\n| Project | Total Hours | Months | Epics |")
-        print("|---------|-------------|--------|-------|")
+        print("\n| Project | Total Hours | Months | Epics | Teams |")
+        print("|---------|-------------|--------|-------|-------|")
 
         for project in sorted(results.keys()):
             months = results[project]
-            total_hours = sum(sum(epics.values()) for epics in months.values())
+            total_hours = sum(
+                sum(sum(teams.values()) for teams in epics.values())
+                for epics in months.values()
+            )
             num_months = len(months)
             all_epics = set()
+            all_teams = set()
             for epics in months.values():
                 all_epics.update(epics.keys())
+                for teams in epics.values():
+                    all_teams.update(teams.keys())
             num_epics = len(all_epics)
+            num_teams = len(all_teams)
 
-            print(f"| {project:7} | {total_hours:11.2f} | {num_months:6} | {num_epics:5} |")
+            print(f"| {project:7} | {total_hours:11.2f} | {num_months:6} | {num_epics:5} | {num_teams:5} |")
 
 
 def main():
