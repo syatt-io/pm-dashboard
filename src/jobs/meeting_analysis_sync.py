@@ -122,6 +122,11 @@ class MeetingAnalysisSyncJob:
         """
         Filter meetings by project keywords.
 
+        Uses the same sophisticated matching logic as the web app:
+        - Blacklists common terms (e.g., 'syatt') to prevent over-matching
+        - Uses word boundary regex matching to prevent false positives
+        - Checks both title AND summary for keywords
+
         Args:
             meetings: List of meeting dictionaries
             projects: List of active projects with keywords
@@ -129,28 +134,57 @@ class MeetingAnalysisSyncJob:
         Returns:
             List of tuples: (meeting, matched_project)
         """
+        import re
+
+        # Blacklist of common company terms that should be ignored for project matching
+        # These terms appear in too many meetings to be useful discriminators
+        KEYWORD_BLACKLIST = {'syatt'}
+
         matched_meetings = []
 
         for meeting in meetings:
-            title = meeting.get("title", "").lower()
+            title_lower = meeting.get("title", "").lower()
+            summary_lower = meeting.get("summary", "").lower()
 
             # Try to match against project keywords
             for project in projects:
                 if not project.get("keywords"):
                     continue
 
-                # Check if any keyword appears in meeting title
-                for keyword in project["keywords"]:
-                    if keyword in title:
-                        matched_meetings.append((meeting, project))
-                        logger.info(
-                            f"Matched meeting '{meeting.get('title')}' to project {project['key']} "
-                            f"via keyword '{keyword}'"
-                        )
-                        break  # Only match to first project found
-                else:
+                # Filter out blacklisted keywords
+                filtered_keywords = [
+                    kw for kw in project["keywords"]
+                    if kw.lower() not in KEYWORD_BLACKLIST
+                ]
+
+                if not filtered_keywords:
                     continue
-                break  # Break outer loop if match found
+
+                # Use word boundary regex matching to prevent false positives
+                # e.g., "project" won't match "projections"
+                def matches_keyword(text, keyword):
+                    # Escape special regex characters in the keyword
+                    escaped_keyword = re.escape(keyword)
+                    # Match whole words only using word boundaries
+                    pattern = r'\b' + escaped_keyword + r'\b'
+                    return bool(re.search(pattern, text, re.IGNORECASE))
+
+                # Check if any keyword appears in title or summary
+                matched = False
+                matched_keyword = None
+                for keyword in filtered_keywords:
+                    if matches_keyword(title_lower, keyword) or matches_keyword(summary_lower, keyword):
+                        matched = True
+                        matched_keyword = keyword
+                        break
+
+                if matched:
+                    matched_meetings.append((meeting, project))
+                    logger.info(
+                        f"Matched meeting '{meeting.get('title')}' to project {project['key']} "
+                        f"via keyword '{matched_keyword}'"
+                    )
+                    break  # Only match to first project found
 
         logger.info(f"Matched {len(matched_meetings)} meetings to active projects")
         return matched_meetings
