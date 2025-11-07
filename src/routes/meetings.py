@@ -380,6 +380,9 @@ def get_meeting_detail(user, meeting_id):
                 'action_items': cached_dto.action_items or [],
                 # New topic-based structure
                 'topics': cached_dto.topics or [],
+                # AI model tracking
+                'ai_provider': cached_dto.ai_provider if hasattr(cached_dto, 'ai_provider') else None,
+                'ai_model': cached_dto.ai_model if hasattr(cached_dto, 'ai_model') else None,
                 # Legacy fields for backward compatibility (deprecated)
                 'executive_summary': cached_dto.executive_summary if hasattr(cached_dto, 'executive_summary') else None,
                 'outcomes': cached_dto.outcomes or [] if hasattr(cached_dto, 'outcomes') else [],
