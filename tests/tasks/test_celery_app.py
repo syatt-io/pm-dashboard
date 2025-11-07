@@ -238,8 +238,9 @@ class TestCeleryConfiguration:
 
         # Neither backfill task should have time_limit override in decorator
         # They should inherit the global 2-hour limit
-        assert not hasattr(backfill_jira, 'time_limit'), "backfill_jira should not override time_limit"
-        assert not hasattr(backfill_tempo, 'time_limit'), "backfill_tempo should not override time_limit"
+        # Check if time_limit was explicitly set in decorator (not None)
+        assert backfill_jira.time_limit is None, "backfill_jira should not override time_limit (should be None to inherit global)"
+        assert backfill_tempo.time_limit is None, "backfill_tempo should not override time_limit (should be None to inherit global)"
 
     def test_celery_late_ack_enabled(self):
         """Test that late acknowledgment is enabled (resilience fix)."""
