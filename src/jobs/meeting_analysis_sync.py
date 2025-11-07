@@ -142,9 +142,17 @@ class MeetingAnalysisSyncJob:
 
         matched_meetings = []
 
+        # Log what we're working with for debugging
+        logger.info(f"Filtering {len(meetings)} meetings against {len(projects)} projects")
+        logger.info(f"Sample meeting titles: {[m.get('title', 'Untitled')[:50] for m in meetings[:3]]}")
+
         for meeting in meetings:
             title_lower = meeting.get("title", "").lower()
             summary_lower = meeting.get("summary", "").lower()
+
+            logger.debug(f"Checking meeting: '{meeting.get('title', 'Untitled')}'")
+            logger.debug(f"  Title: '{title_lower[:100]}'")
+            logger.debug(f"  Summary preview: '{summary_lower[:100]}'")
 
             # Try to match against project keywords
             for project in projects:
@@ -157,7 +165,10 @@ class MeetingAnalysisSyncJob:
                     if kw.lower() not in KEYWORD_BLACKLIST
                 ]
 
+                logger.debug(f"  Project {project['key']}: keywords={project.get('keywords', [])} -> filtered={filtered_keywords}")
+
                 if not filtered_keywords:
+                    logger.debug(f"  Project {project['key']}: Skipped (no keywords after blacklist filter)")
                     continue
 
                 # Use word boundary regex matching to prevent false positives
