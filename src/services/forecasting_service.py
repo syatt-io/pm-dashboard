@@ -55,14 +55,29 @@ class ForecastingService:
         return baselines
 
     def _load_lifecycle_percentages(self) -> Dict[str, Dict[str, float]]:
-        """Load lifecycle distribution percentages."""
+        """
+        Load lifecycle distribution percentages.
+
+        These represent the intensity curve for each discipline based on
+        their dependencies in the project workflow:
+        - Design/UX: Front-loaded (need to complete before dev starts)
+        - FE/BE Devs: Bell curve (ramp up after design, peak mid-project)
+        - PMs/Data: Sustained throughout
+        """
         return {
-            'BE Devs': {'ramp_up': 45.1, 'busy': 40.5, 'ramp_down': 14.5},
-            'FE Devs': {'ramp_up': 45.9, 'busy': 41.0, 'ramp_down': 13.1},
-            'Design': {'ramp_up': 87.1, 'busy': 7.6, 'ramp_down': 5.3},
-            'UX': {'ramp_up': 82.8, 'busy': 13.6, 'ramp_down': 3.7},
-            'PMs': {'ramp_up': 55.5, 'busy': 27.3, 'ramp_down': 17.1},
-            'Data': {'ramp_up': 50.0, 'busy': 35.0, 'ramp_down': 15.0}
+            # Devs: Bell curve - low start (waiting for design), peak middle, taper end
+            'BE Devs': {'ramp_up': 20.0, 'busy': 60.0, 'ramp_down': 20.0},
+            'FE Devs': {'ramp_up': 15.0, 'busy': 65.0, 'ramp_down': 20.0},
+
+            # Design/UX: Front-loaded - most work early, minimal later
+            'Design': {'ramp_up': 85.0, 'busy': 10.0, 'ramp_down': 5.0},
+            'UX': {'ramp_up': 80.0, 'busy': 15.0, 'ramp_down': 5.0},
+
+            # PMs: Sustained with slight front-load for planning
+            'PMs': {'ramp_up': 40.0, 'busy': 40.0, 'ramp_down': 20.0},
+
+            # Data: Balanced with back-end focus for analytics
+            'Data': {'ramp_up': 25.0, 'busy': 50.0, 'ramp_down': 25.0}
         }
 
     def calculate_forecast(
