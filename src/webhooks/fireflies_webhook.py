@@ -235,16 +235,39 @@ def process_fireflies_meeting(self, meeting_id: str):
                 )
                 project["keywords"] = [row[0].lower() for row in keyword_result]
 
-            # Find matching project
+            # Find matching project using sophisticated matching logic
+            # (same as web app and nightly job for consistency)
+            import re
+
+            # Blacklist of common company terms that should be ignored for project matching
+            KEYWORD_BLACKLIST = {'syatt'}
+
             matched_project = None
             title_lower = meeting_title.lower()
+            summary_lower = transcript_data.get("summary", "").lower()
 
             for project in projects:
                 if not project.get("keywords"):
                     continue
 
-                for keyword in project["keywords"]:
-                    if keyword in title_lower:
+                # Filter out blacklisted keywords
+                filtered_keywords = [
+                    kw for kw in project["keywords"]
+                    if kw.lower() not in KEYWORD_BLACKLIST
+                ]
+
+                if not filtered_keywords:
+                    continue
+
+                # Use word boundary regex matching to prevent false positives
+                def matches_keyword(text, keyword):
+                    escaped_keyword = re.escape(keyword)
+                    pattern = r'\b' + escaped_keyword + r'\b'
+                    return bool(re.search(pattern, text, re.IGNORECASE))
+
+                # Check if any keyword appears in title or summary
+                for keyword in filtered_keywords:
+                    if matches_keyword(title_lower, keyword) or matches_keyword(summary_lower, keyword):
                         matched_project = project
                         logger.info(
                             f"Matched meeting '{meeting_title}' to project {project['key']} "
