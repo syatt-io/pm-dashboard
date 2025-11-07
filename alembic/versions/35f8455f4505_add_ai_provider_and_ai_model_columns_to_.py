@@ -20,14 +20,31 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add ai_provider and ai_model columns to processed_meetings table."""
-    # Add ai_provider column (e.g., "openai", "anthropic", "google")
-    op.add_column('processed_meetings', sa.Column('ai_provider', sa.String(length=50), nullable=True))
+    # Check if columns already exist (idempotent migration)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('processed_meetings')]
 
-    # Add ai_model column (e.g., "gpt-4", "claude-3-5-sonnet", etc.)
-    op.add_column('processed_meetings', sa.Column('ai_model', sa.String(length=100), nullable=True))
+    # Add ai_provider column if it doesn't exist
+    if 'ai_provider' not in columns:
+        op.add_column('processed_meetings', sa.Column('ai_provider', sa.String(length=50), nullable=True))
+
+    # Add ai_model column if it doesn't exist
+    if 'ai_model' not in columns:
+        op.add_column('processed_meetings', sa.Column('ai_model', sa.String(length=100), nullable=True))
 
 
 def downgrade() -> None:
     """Remove ai_provider and ai_model columns from processed_meetings table."""
-    op.drop_column('processed_meetings', 'ai_model')
-    op.drop_column('processed_meetings', 'ai_provider')
+    # Check if columns exist before trying to drop them (idempotent migration)
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('processed_meetings')]
+
+    # Drop ai_model column if it exists
+    if 'ai_model' in columns:
+        op.drop_column('processed_meetings', 'ai_model')
+
+    # Drop ai_provider column if it exists
+    if 'ai_provider' in columns:
+        op.drop_column('processed_meetings', 'ai_provider')
