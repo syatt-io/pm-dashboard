@@ -389,12 +389,14 @@ def fireflies_webhook():
 
 logger.info("✅ Fireflies webhook endpoint registered at /api/webhooks/fireflies (CSRF exempt)")
 
-# ✅ FIXED: Apply rate limiting to critical backfill endpoints (expensive operations)
+# ✅ Apply rate limiting to backfill endpoints (expensive operations)
 if limiter:
-    limiter.limit("3 per hour")(app.view_functions['backfill.trigger_jira_backfill'])
-    limiter.limit("3 per hour")(app.view_functions['backfill.trigger_notion_backfill'])
-    limiter.limit("5 per hour")(app.view_functions['backfill.trigger_tempo_backfill'])
-    limiter.limit("5 per hour")(app.view_functions['backfill.trigger_fireflies_backfill'])
+    limiter.limit("3 per hour")(app.view_functions['backfill.backfill_jira'])
+    limiter.limit("3 per hour")(app.view_functions['backfill.backfill_slack'])
+    limiter.limit("3 per hour")(app.view_functions['backfill.backfill_notion'])
+    limiter.limit("5 per hour")(app.view_functions['backfill.backfill_fireflies'])
+    limiter.limit("5 per hour")(app.view_functions['backfill.backfill_github'])
+    limiter.limit("5 per hour")(app.view_functions['backfill.backfill_tempo'])
     logger.info("✅ Rate limits applied to backfill endpoints")
 else:
     logger.warning("⚠️  Skipping rate limit application (limiter not available)")
