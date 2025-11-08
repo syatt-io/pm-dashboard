@@ -112,12 +112,39 @@ async def get_all_projects(jira_client: JiraMCPClient) -> List[Dict[str, Any]]:
         return []
 
 
-async def backfill_jira_issues(days_back: int = 730, resume: bool = True) -> Dict[str, Any]:
+def get_active_projects_from_db() -> List[str]:
+    """Get active project keys from database."""
+    try:
+        from sqlalchemy import create_engine, text
+        import os
+
+        # Use DATABASE_URL from settings or environment
+        database_url = os.getenv('DATABASE_URL') or settings.database_url
+        if not database_url:
+            logger.warning("⚠️  No DATABASE_URL configured, cannot filter by active projects")
+            return []
+
+        engine = create_engine(database_url)
+        with engine.connect() as conn:
+            result = conn.execute(text(
+                "SELECT project_key FROM projects WHERE is_active = true ORDER BY project_key"
+            ))
+            active_keys = [row[0] for row in result]
+            logger.info(f"✅ Found {len(active_keys)} active projects in database: {', '.join(active_keys)}")
+            return active_keys
+    except Exception as e:
+        logger.error(f"❌ Error querying database for active projects: {e}")
+        return []
+
+
+async def backfill_jira_issues(days_back: int = 730, resume: bool = True, project_filter: List[str] = None, active_only: bool = False) -> Dict[str, Any]:
     """Backfill all Jira issues from the last N days.
 
     Args:
         days_back: Number of days to look back
         resume: If True, skip projects that are already cached
+        project_filter: Optional list of project keys to process (e.g., ['SUBS', 'SATG'])
+        active_only: If True, only process projects marked as active in database
     """
     logger.info(f"🔄 Starting Jira backfill ({days_back} days / ~{days_back/365:.1f} years)...")
 
@@ -147,6 +174,20 @@ async def backfill_jira_issues(days_back: int = 730, resume: bool = True) -> Dic
         logger.warning("⚠️  No projects found")
         return {"success": True, "issues_found": 0, "issues_ingested": 0}
 
+    # Filter by active projects if requested
+    if active_only:
+        active_keys = get_active_projects_from_db()
+        if active_keys:
+            projects = [p for p in projects if p.get('key') in active_keys]
+            logger.info(f"🔍 Filtered to {len(projects)} active projects")
+        else:
+            logger.warning("⚠️  Could not get active projects from database, processing all projects")
+
+    # Filter by specific projects if provided
+    if project_filter:
+        projects = [p for p in projects if p.get('key') in project_filter]
+        logger.info(f"🔍 Filtered to {len(projects)} specific projects: {', '.join(project_filter)}")
+
     # Sort projects by key for consistent processing
     projects.sort(key=lambda x: x.get('key', ''))
 
@@ -174,38 +215,21 @@ async def backfill_jira_issues(days_back: int = 730, resume: bool = True) -> Dic
             jql = f"project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC"
             logger.info(f"[{i}/{len(projects)}] Fetching {project_key} ({project_name})...")
 
-            # Fetch all pages for this project
+            # Fetch all issues for this project in ONE call
+            # NOTE: /search/jql endpoint doesn't support pagination properly (always returns first page)
+            # So we fetch all results with maxResults=1000 (Jira's max)
             project_issues = []
-            start_at = 0
-            batch_count = 0
 
-            while True:
-                # Add delay between batches
-                if batch_count > 0:
-                    await asyncio.sleep(DELAY_BETWEEN_BATCHES)
-
-                try:
-                    result = await jira_client.search_issues(
-                        jql=jql,
-                        max_results=BATCH_SIZE,
-                        start_at=start_at,
-                        expand_comments=False
-                    )
-                    issues_batch = result.get('issues', [])
-
-                    if not issues_batch:
-                        break
-
-                    project_issues.extend(issues_batch)
-                    batch_count += 1
-
-                    if len(issues_batch) < BATCH_SIZE:
-                        break
-
-                    start_at += BATCH_SIZE
-                except Exception as e:
-                    logger.error(f"   ❌ Error fetching batch {batch_count + 1}: {e}")
-                    break
+            try:
+                result = await jira_client.search_issues(
+                    jql=jql,
+                    max_results=1000,  # Get all results in one call (Jira max is 1000)
+                    start_at=0,
+                    expand_comments=False
+                )
+                project_issues = result.get('issues', [])
+            except Exception as e:
+                logger.error(f"   ❌ Error fetching issues: {e}")
 
             if project_issues:
                 # Save to disk immediately
@@ -292,6 +316,8 @@ if __name__ == "__main__":
     parser.add_argument('--days', type=int, default=730, help='Number of days to backfill (default: 730 / 2 years)')
     parser.add_argument('--no-resume', action='store_true', help='Disable resume mode (re-fetch all projects)')
     parser.add_argument('--clear-cache', action='store_true', help='Clear cache directory before starting')
+    parser.add_argument('--projects', type=str, help='Comma-separated list of project keys to backfill (e.g., "SUBS,SATG,BEVI")')
+    parser.add_argument('--active-only', action='store_true', help='Only backfill projects marked as active in database')
     args = parser.parse_args()
 
     # Clear cache if requested
@@ -302,7 +328,18 @@ if __name__ == "__main__":
             logger.info(f"🗑️  Cleared cache directory: {CACHE_DIR}")
         CACHE_DIR.mkdir(exist_ok=True)
 
-    result = asyncio.run(backfill_jira_issues(days_back=args.days, resume=not args.no_resume))
+    # Parse project filter
+    project_filter = None
+    if args.projects:
+        project_filter = [p.strip().upper() for p in args.projects.split(',')]
+        logger.info(f"🎯 Will process specific projects: {', '.join(project_filter)}")
+
+    result = asyncio.run(backfill_jira_issues(
+        days_back=args.days,
+        resume=not args.no_resume,
+        project_filter=project_filter,
+        active_only=args.active_only
+    ))
 
     if result.get("success"):
         sys.exit(0)
