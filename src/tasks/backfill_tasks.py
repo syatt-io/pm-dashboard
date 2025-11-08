@@ -238,24 +238,37 @@ def backfill_github_task(
     logger.info(f"🔄 Starting GitHub backfill: days={days_back}")
 
     try:
-        # Check if GitHub credentials are configured
+        from src.services.vector_ingest import VectorIngestService
+        from src.integrations.github_client import GitHubClient
+
+        # Check for GitHub credentials (token or app credentials)
         github_token = os.getenv('GITHUB_API_TOKEN', '')
-        if not github_token:
-            logger.warning("⚠️  GITHUB_API_TOKEN not set - returning success with 0 items")
+        github_app_id = os.getenv('GITHUB_APP_ID', '')
+        github_private_key = os.getenv('GITHUB_APP_PRIVATE_KEY', '')
+        github_installation_id = os.getenv('GITHUB_APP_INSTALLATION_ID', '')
+        github_org = os.getenv('GITHUB_ORGANIZATION', '')
+
+        # Initialize GitHub client with available credentials
+        if github_token:
+            github_client = GitHubClient(api_token=github_token)
+        elif github_app_id and github_private_key and github_installation_id:
+            github_client = GitHubClient(
+                app_id=github_app_id,
+                private_key=github_private_key,
+                installation_id=github_installation_id,
+                organization=github_org
+            )
+        else:
+            logger.warning("⚠️  No GitHub credentials configured - returning success with 0 items")
             return {
                 'success': True,
                 'items_found': 0,
                 'items_ingested': 0,
                 'days_back': days_back,
                 'timestamp': datetime.now().isoformat(),
-                'note': 'GitHub backfill skipped (GITHUB_API_TOKEN not configured)'
+                'note': 'GitHub backfill skipped (no credentials configured)'
             }
 
-        from src.services.vector_ingest import VectorIngestService
-        from src.integrations.github_client import GitHubClient
-
-        # Initialize services with API token
-        github_client = GitHubClient(api_token=github_token)
         ingest_service = VectorIngestService()
 
         # Calculate time range
@@ -329,8 +342,8 @@ def backfill_tempo_task(
 
         logger.info(f"📥 Fetched {len(worklogs)} Tempo worklogs")
 
-        # Ingest into Pinecone
-        count = ingest_service.ingest_tempo_worklogs(worklogs)
+        # Ingest into Pinecone (pass tempo_client as required)
+        count = ingest_service.ingest_tempo_worklogs(worklogs, tempo_client)
 
         result = {
             'success': True,
