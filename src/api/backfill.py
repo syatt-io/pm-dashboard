@@ -20,10 +20,16 @@ backfill_bp = Blueprint('backfill', __name__, url_prefix='/api/backfill')
 
 def verify_admin_key() -> bool:
     """Verify X-Admin-Key header for security."""
-    from config.settings import settings
+    import os
 
     admin_key = request.headers.get('X-Admin-Key')
-    if not admin_key or admin_key != settings.admin_api_key:
+    expected_key = os.getenv('ADMIN_API_KEY')
+
+    if not expected_key:
+        logger.error("ADMIN_API_KEY environment variable not set")
+        return False
+
+    if not admin_key or admin_key != expected_key:
         return False
     return True
 
