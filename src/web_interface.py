@@ -274,7 +274,7 @@ from src.routes.tempo import tempo_bp
 from src.routes.user import user_bp
 from src.routes.dashboard import dashboard_bp
 from src.routes.feedback import feedback_bp
-from src.routes.backfill import backfill_bp
+from src.api.backfill import backfill_bp
 from src.routes.admin_settings import admin_settings_bp
 from src.routes.insights import insights_bp
 from src.routes.escalation import escalation_bp
@@ -333,6 +333,11 @@ logger.info("✅ Analytics endpoints exempted from CSRF protection")
 # Forecasts endpoints are called from React frontend with JWT auth
 csrf.exempt(forecasts_bp)
 logger.info("✅ Forecasts endpoints exempted from CSRF protection")
+
+# ✅ SECURITY: Exempt Backfill endpoints from CSRF protection
+# Backfill endpoints use X-Admin-Key header authentication (called from GitHub Actions)
+csrf.exempt(backfill_bp)
+logger.info("✅ Backfill endpoints exempted from CSRF protection")
 
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
