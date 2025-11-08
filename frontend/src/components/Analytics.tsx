@@ -34,8 +34,7 @@ import {
 } from '@mui/icons-material';
 import { usePermissions } from 'react-admin';
 import axios from 'axios';
-import { ProjectScheduleTab } from './ProjectSchedule';
-import { TeamForecastingTab } from './TeamForecastingTab';
+import ProjectForecastTab from './ProjectForecastTab';
 
 interface EpicBaseline {
   epic_category: string;
@@ -280,8 +279,7 @@ export const AnalyticsList = () => {
           <Tab icon={<AnalyticsIcon />} label="Epic Baselines" />
           <Tab icon={<ForecastIcon />} label="Project Forecasting" />
           <Tab icon={<WarningIcon />} label="High-Risk Epics" />
-          <Tab icon={<ScheduleIcon />} label="Project Schedule" />
-          <Tab icon={<TeamIcon />} label="Team Forecasting" />
+          <Tab icon={<TeamIcon />} label="Project Forecast" />
         </Tabs>
       </Box>
 
@@ -567,11 +565,8 @@ export const AnalyticsList = () => {
         </Card>
       )}
 
-      {/* Tab 4: Project Schedule */}
-      {tabValue === 3 && <ProjectScheduleTab />}
-
-      {/* Tab 5: Team Forecasting */}
-      {tabValue === 4 && <TeamForecastingTab />}
+      {/* Tab 4: Project Forecast (Unified) */}
+      {tabValue === 3 && <ProjectForecastTab />}
     </Box>
   );
 };

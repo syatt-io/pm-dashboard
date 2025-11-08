@@ -81,7 +81,7 @@ def backfill_slack_task(
     """
     Backfill Slack messages into Pinecone.
 
-    Note: Slack client not yet implemented. This is a placeholder.
+    Delegates to the existing backfill_slack implementation in vector_tasks.
 
     Args:
         days_back: Number of days to look back
@@ -93,19 +93,13 @@ def backfill_slack_task(
     logger.info(f"🔄 Starting Slack backfill: days={days_back}")
 
     try:
-        # TODO: Implement Slack backfill when client is ready
-        # For now, return success with 0 items
-        logger.warning("⚠️  Slack backfill not yet implemented - returning success with 0 items")
+        # Import the existing working implementation
+        from src.tasks.vector_tasks import backfill_slack
 
-        result = {
-            'success': True,
-            'messages_found': 0,
-            'messages_ingested': 0,
-            'days_back': days_back,
-            'timestamp': datetime.now().isoformat(),
-            'note': 'Slack backfill not yet implemented'
-        }
+        # Call the existing backfill function
+        result = backfill_slack(days_back=days_back)
 
+        logger.info(f"✅ Slack backfill completed: {result.get('messages_ingested', 0)} messages from {result.get('channels_processed', 0)} channels")
         return result
 
     except Exception as e:
@@ -126,6 +120,8 @@ def backfill_notion_task(
     """
     Backfill Notion pages into Pinecone.
 
+    Delegates to the existing backfill_notion implementation in vector_tasks.
+
     Args:
         days_back: Number of days to look back
 
@@ -135,19 +131,13 @@ def backfill_notion_task(
     logger.info(f"🔄 Starting Notion backfill: days={days_back}")
 
     try:
-        # TODO: Implement Notion backfill when get_updated_pages method is added
-        # For now, return success with 0 items
-        logger.warning("⚠️  Notion backfill not yet implemented - NotionClient.get_page() only supports single pages")
+        # Import the existing working implementation
+        from src.tasks.vector_tasks import backfill_notion
 
-        result = {
-            'success': True,
-            'pages_found': 0,
-            'pages_ingested': 0,
-            'days_back': days_back,
-            'timestamp': datetime.now().isoformat(),
-            'note': 'Notion backfill not yet implemented (needs get_updated_pages method)'
-        }
+        # Call the existing backfill function
+        result = backfill_notion(days_back=days_back)
 
+        logger.info(f"✅ Notion backfill completed: {result.get('pages_ingested', 0)} pages ingested from {result.get('pages_found', 0)} found")
         return result
 
     except Exception as e:

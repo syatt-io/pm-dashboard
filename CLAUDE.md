@@ -394,6 +394,13 @@ When working on this project:
 
 ### ⚠️ IMPORTANT: Always Use V2 Backfill Scripts
 
+**See the comprehensive guide: [docs/BACKFILL_BEST_PRACTICES.md](docs/BACKFILL_BEST_PRACTICES.md)** for:
+- Complete V2 disk-caching pattern
+- API-specific gotchas (Jira pagination bug, etc.)
+- Verification and validation strategies
+- Troubleshooting checklist
+- Production-ready example scripts
+
 When creating or running backfill scripts (Jira, Slack, GitHub, Tempo, etc.), **ALWAYS use the disk-caching pattern** from `scripts/backfill_jira_standalone_v2.py`.
 
 **Why V2 is Critical:**
@@ -435,5 +442,23 @@ cat /tmp/jira_backfill_cache/SUBS.json | jq '.issue_count'
 ```
 
 **DO NOT use V1 scripts** (in-memory only) for production backfills - they risk losing hours of work if the process crashes!
+
+### 🐛 Critical: Jira Cloud API Pagination Bug
+
+**NEVER use pagination with Jira's `/rest/api/3/search/jql` GET endpoint** - it completely ignores the `startAt` parameter and always returns the first page, causing massive duplication!
+
+**Solution:** Fetch all results in ONE call with `maxResults=1000` (Jira's max):
+```python
+result = await client.search_issues(
+    jql=jql,
+    max_results=1000,  # Get all in one call
+    start_at=0         # Always 0
+)
+```
+
+See [docs/BACKFILL_BEST_PRACTICES.md](docs/BACKFILL_BEST_PRACTICES.md) section "Jira Cloud API Pagination Bug" for full details and workarounds.
+
+---
+
 - always refer to @docs/README_MIGRATIONS.md when doing DB migrations.
 - Locally use the Postgres DB, not SQLlite

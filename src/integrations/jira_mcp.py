@@ -152,14 +152,18 @@ class JiraMCPClient:
                 auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
 
                 # Build params for /search/jql endpoint
-                # This endpoint returns minimal data, so we need to fetch full issue details after
+                # NOTE: POST /search endpoints return 410 Gone, must use GET /search/jql
+                # CRITICAL BUG FIX: /search/jql ignores startAt parameter and always returns first page!
+                # WORKAROUND: Always fetch from startAt=0 and use maxResults=1000 (Jira max)
+                # Then skip already-returned results on subsequent calls
+                # For now, just increase maxResults to get all results in one call
                 params = {
                     "jql": jql,
-                    "maxResults": max_results,
-                    "startAt": start_at
+                    "maxResults": 1000,  # Jira's max allowed value
+                    "startAt": 0  # Always 0 since pagination doesn't work
                 }
 
-                # Step 1: Get issue IDs using /search/jql endpoint
+                # Step 1: Get issue IDs using GET /search/jql endpoint
                 response = await self.client.get(
                     f"{self.jira_url}/rest/api/3/search/jql",
                     params=params,
@@ -171,6 +175,13 @@ class JiraMCPClient:
                 response.raise_for_status()
 
                 search_result = response.json()
+
+                # Debug: log pagination info
+                total = search_result.get('total', 0)
+                returned_start = search_result.get('startAt', 0)
+                max_results = search_result.get('maxResults', 0)
+                logger.info(f"Jira search: startAt={returned_start}, maxResults={max_results}, total={total}, got {len(search_result.get('issues', []))} issues")
+
                 issue_ids = [issue.get('id') for issue in search_result.get('issues', [])]
 
                 if not issue_ids:

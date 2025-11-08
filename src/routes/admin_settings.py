@@ -133,6 +133,54 @@ def update_ai_settings(user):
         }), 500
 
 
+@admin_settings_bp.route("/system-settings/epic", methods=["PUT"])
+@auth_required
+@admin_required
+def update_epic_settings(user):
+    """Update Epic Reconciliation settings (admin only)."""
+    try:
+        data = request.get_json()
+        auto_update = data.get('epic_auto_update_enabled')
+
+        # Validate auto_update is boolean
+        if auto_update is not None and not isinstance(auto_update, bool):
+            return jsonify({
+                'success': False,
+                'error': 'epic_auto_update_enabled must be a boolean'
+            }), 400
+
+        with session_scope() as db_session:
+            settings = db_session.query(SystemSettings).first()
+
+            if not settings:
+                # Create new settings
+                settings = SystemSettings()
+                db_session.add(settings)
+
+            # Update field
+            if auto_update is not None:
+                settings.epic_auto_update_enabled = auto_update
+
+            settings.updated_by_user_id = user.id
+
+            db_session.flush()
+
+            logger.info(f"Admin {user.email} updated epic reconciliation settings: auto_update={auto_update}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Epic reconciliation settings updated successfully',
+                'data': settings.to_dict()
+            })
+
+    except Exception as e:
+        logger.error(f"Error updating epic settings: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @admin_settings_bp.route("/system-settings/ai/api-key", methods=["POST"])
 @auth_required
 @admin_required

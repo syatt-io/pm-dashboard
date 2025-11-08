@@ -98,6 +98,7 @@ interface AISettings {
   has_openai_key: boolean;
   has_anthropic_key: boolean;
   has_google_key: boolean;
+  epic_auto_update_enabled: boolean;
   updated_at: string | null;
   updated_by_user_id: number | null;
 }
@@ -622,6 +623,38 @@ export const Settings = () => {
       showSnackbar('Failed to delete API key', 'error');
     } finally {
       setDeletingAIKey(false);
+    }
+  };
+
+  const saveEpicSettings = async () => {
+    if (!aiSettings) return;
+
+    try {
+      setSavingAI(true);
+
+      const response = await fetch(getApiUrl('/api/admin/system-settings/epic'), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          epic_auto_update_enabled: aiSettings.epic_auto_update_enabled,
+        }),
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (data.success) {
+        showSnackbar(data.message || 'Epic reconciliation settings saved successfully', 'success');
+        setAISettings(data.data);
+      } else {
+        throw new globalThis.Error(data.error || 'Failed to save epic settings');
+      }
+    } catch (error) {
+      showSnackbar('Failed to save epic reconciliation settings', 'error');
+    } finally {
+      setSavingAI(false);
     }
   };
 
@@ -2167,6 +2200,64 @@ export const Settings = () => {
                   </CardContent>
                 </Card>
               ))}
+
+              {/* Epic Reconciliation Settings */}
+              <Card sx={{ mb: 3 }}>
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    📊 Epic Reconciliation Settings
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                    Configure how the Monthly Epic Reconciliation job handles unassigned tickets.
+                  </Typography>
+
+                  <Alert severity="info" sx={{ my: 2 }}>
+                    <Typography variant="body2" paragraph>
+                      <strong>Monthly Epic Reconciliation</strong> runs on the 3rd of every month to ensure all tickets are properly associated with epics before generating reports.
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Summary Mode (OFF):</strong> AI will analyze tickets and show suggestions without making changes to Jira.
+                      <br />
+                      <strong>Auto-Update Mode (ON):</strong> AI will automatically update Jira tickets with suggested epic associations.
+                    </Typography>
+                  </Alert>
+
+                  <Box sx={{ mt: 3 }}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={aiSettings.epic_auto_update_enabled}
+                          onChange={(e) => setAISettings({ ...aiSettings, epic_auto_update_enabled: e.target.checked })}
+                          color="primary"
+                        />
+                      }
+                      label={
+                        <Box>
+                          <Typography variant="body1">
+                            {aiSettings.epic_auto_update_enabled ? '✅ Auto-Update Mode (ON)' : '📋 Summary Mode (OFF)'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {aiSettings.epic_auto_update_enabled
+                              ? 'AI will automatically update tickets in Jira with suggested epics'
+                              : 'AI will only show suggestions without making changes to Jira'}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </Box>
+
+                  <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={saveEpicSettings}
+                      disabled={savingAI}
+                      startIcon={savingAI ? <CircularProgress size={16} /> : <Save />}
+                    >
+                      {savingAI ? 'Saving...' : 'Save Epic Settings'}
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
             </>
           ) : (
             <Alert severity="info">No AI settings configured yet.</Alert>

@@ -1,5 +1,5 @@
 """User model and authentication-related models."""
-from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean, ForeignKey, UniqueConstraint, Text
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Boolean, ForeignKey, UniqueConstraint, Text, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 import enum
@@ -44,6 +44,12 @@ class User(Base):
     notify_daily_todo_digest = Column(Boolean, default=True, nullable=False)
     notify_project_hours_forecast = Column(Boolean, default=True, nullable=False)
 
+    # Team tracking and time compliance (for Tempo integration)
+    jira_account_id = Column(String(100), unique=True, nullable=True)  # Jira/Tempo account ID
+    team = Column(String(50), nullable=True)  # Team discipline (PMs, Design, UX, FE Devs, BE Devs, Data)
+    project_team = Column(String(50), nullable=True)  # Project team (Waffle House, Space Cowboiz, Other)
+    weekly_hours_minimum = Column(Float, default=32.0, nullable=False)  # Per-user time tracking threshold
+
     # Relationships
     # todos = relationship("TodoItem", back_populates="user", cascade="all, delete-orphan")
     # meetings = relationship("ProcessedMeeting", back_populates="user", cascade="all, delete-orphan")
@@ -68,7 +74,13 @@ class User(Base):
             'has_fireflies_key': self.has_fireflies_api_key(),
             'has_google_oauth': self.has_google_oauth_token(),
             'has_notion_key': self.has_notion_api_key(),
-            'has_slack_user_token': self.has_slack_user_token()
+            'has_slack_user_token': self.has_slack_user_token(),
+            # Team tracking fields
+            'jira_account_id': self.jira_account_id,
+            'team': self.team,
+            'project_team': self.project_team,
+            'weekly_hours_minimum': self.weekly_hours_minimum,
+            'slack_user_id': self.slack_user_id
         }
 
     def has_role(self, role):

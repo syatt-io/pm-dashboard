@@ -2,11 +2,13 @@
 API endpoints for epic forecasting.
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, make_response
 from src.services.forecasting_service import ForecastingService
 from src.models import EpicForecast
 from src.utils.database import get_session
 import logging
+import csv
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -279,12 +281,15 @@ def calculate_from_total_hours():
     Request body:
     {
         "total_hours": float,
-        "be_integrations": bool,
-        "custom_theme": bool,
-        "custom_designs": bool,
-        "ux_research": bool,
+        "be_integrations": int (1-5 slider value),
+        "custom_theme": int (1-5 slider value),
+        "custom_designs": int (1-5 slider value),
+        "ux_research": int (1-5 slider value),
+        "extensive_customizations": int (1-5 slider value, optional, default: 1),
+        "project_oversight": int (1-5 slider value, optional, default: 3),
         "teams_selected": [...],
-        "estimated_months": int
+        "estimated_months": int,
+        "start_date": str (YYYY-MM-DD, optional)
     }
     """
     try:
@@ -304,11 +309,156 @@ def calculate_from_total_hours():
             custom_designs=data['custom_designs'],
             ux_research=data['ux_research'],
             teams_selected=data['teams_selected'],
-            estimated_months=data['estimated_months']
+            estimated_months=data['estimated_months'],
+            extensive_customizations=data.get('extensive_customizations', 1),
+            project_oversight=data.get('project_oversight', 3),
+            start_date=data.get('start_date')
         )
 
         return jsonify(result), 200
 
     except Exception as e:
         logger.error(f"Error calculating team distribution: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@forecasts_bp.route('/export-combined-forecast', methods=['POST'])
+def export_combined_forecast():
+    """
+    Export combined project forecast (team distribution + epic schedule) as CSV.
+
+    Request body:
+    {
+        "total_hours": float,
+        "be_integrations": int (1-5),
+        "custom_theme": int (1-5),
+        "custom_designs": int (1-5),
+        "ux_research": int (1-5),
+        "extensive_customizations": int (1-5, optional),
+        "project_oversight": int (1-5, optional),
+        "teams_selected": [...],
+        "estimated_months": int,
+        "start_date": str (YYYY-MM-DD)
+    }
+    """
+    try:
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+        from src.api.analytics_schedule import generate_project_schedule
+
+        data = request.json
+
+        # Validate required fields
+        required_fields = ['total_hours', 'be_integrations', 'custom_theme', 'custom_designs',
+                          'ux_research', 'teams_selected', 'estimated_months', 'start_date']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        # Get team distribution data
+        team_result = forecasting_service.calculate_from_total_hours(
+            total_hours=data['total_hours'],
+            be_integrations=data['be_integrations'],
+            custom_theme=data['custom_theme'],
+            custom_designs=data['custom_designs'],
+            ux_research=data['ux_research'],
+            teams_selected=data['teams_selected'],
+            estimated_months=data['estimated_months'],
+            extensive_customizations=data.get('extensive_customizations', 1),
+            project_oversight=data.get('project_oversight', 3)
+        )
+
+        # Get epic schedule data
+        epic_schedule = generate_project_schedule(
+            total_hours=data['total_hours'],
+            duration_months=data['estimated_months'],
+            start_date=data['start_date']
+        )
+
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        # Section 1: Project Summary
+        writer.writerow(['PROJECT FORECAST SUMMARY'])
+        writer.writerow([''])
+        writer.writerow(['Total Hours', data['total_hours']])
+        writer.writerow(['Duration (Months)', data['estimated_months']])
+        writer.writerow(['Start Date', data['start_date']])
+        writer.writerow([''])
+        writer.writerow(['Project Characteristics'])
+        writer.writerow(['Backend Integrations', data['be_integrations']])
+        writer.writerow(['Custom Theme', data['custom_theme']])
+        writer.writerow(['Custom Designs', data['custom_designs']])
+        writer.writerow(['UX Research', data['ux_research']])
+        writer.writerow(['Extensive Customizations', data.get('extensive_customizations', 1)])
+        writer.writerow([''])
+        writer.writerow([''])
+
+        # Section 2: Team Distribution
+        writer.writerow(['TEAM DISTRIBUTION'])
+        writer.writerow([''])
+        writer.writerow(['Team', 'Total Hours', 'Percentage'])
+        for team_data in team_result['teams']:
+            writer.writerow([
+                team_data['team'],
+                team_data['total_hours'],
+                f"{team_data['percentage']}%"
+            ])
+        writer.writerow([''])
+        writer.writerow([''])
+
+        # Section 3: Team Monthly Breakdown
+        writer.writerow(['TEAM MONTHLY BREAKDOWN'])
+        writer.writerow([''])
+        for team_data in team_result['teams']:
+            writer.writerow([f"{team_data['team']} ({team_data['total_hours']}h total)"])
+            writer.writerow(['Month', 'Phase', 'Hours'])
+            for month_data in team_data['monthly_breakdown']:
+                writer.writerow([
+                    f"Month {month_data['month']}",
+                    month_data['phase'],
+                    month_data['hours']
+                ])
+            writer.writerow([''])
+        writer.writerow([''])
+
+        # Section 4: Epic Schedule Breakdown
+        writer.writerow(['EPIC SCHEDULE BREAKDOWN'])
+        writer.writerow([''])
+
+        # Epic schedule header
+        header_row = ['Epic', 'Temporal Pattern', 'Total Hours']
+        start_date_obj = datetime.strptime(data['start_date'], '%Y-%m-%d')
+        for i in range(data['estimated_months']):
+            month_date = start_date_obj + relativedelta(months=i)
+            header_row.append(month_date.strftime('%b %Y'))
+        writer.writerow(header_row)
+
+        # Epic schedule data
+        for epic in epic_schedule.get('epics', []):
+            row = [
+                epic['name'],
+                epic.get('temporal_pattern', 'Even'),
+                epic['total_hours']
+            ]
+            for month_hours in epic['monthly_hours']:
+                row.append(month_hours)
+            writer.writerow(row)
+
+        writer.writerow([''])
+        writer.writerow(['Total Hours', epic_schedule.get('total_hours', data['total_hours'])])
+
+        # Create response
+        output.seek(0)
+        response = make_response(output.getvalue())
+        response.headers['Content-Type'] = 'text/csv'
+        response.headers['Content-Disposition'] = f'attachment; filename=project_forecast_{data["start_date"]}.csv'
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Error exporting combined forecast: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500

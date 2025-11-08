@@ -77,9 +77,9 @@ class ForecastingService:
             # FE waits for design approval, then concentrates work in peak period
             'FE Devs': {'ramp_up': 1.0, 'busy': 77.0, 'ramp_down': 22.0},
 
-            # Based on 3 projects: 52.2% / 35.2% / 12.6%
-            # Design front-loads work in first 30% of timeline (BMBY: 67% in Month 1)
-            'Design': {'ramp_up': 52.0, 'busy': 35.0, 'ramp_down': 13.0},
+            # Based on real data: 70-80% of ALL Design work done in first 2 months
+            # Heavily front-loaded - most design completed early, minimal work later
+            'Design': {'ramp_up': 80.0, 'busy': 15.0, 'ramp_down': 5.0},
 
             # Based on 3 projects: 57.1% / 28.5% / 14.3%
             # UX front-loads research/strategy in first 30% of timeline
@@ -140,7 +140,8 @@ class ForecastingService:
             monthly_breakdown = self._distribute_hours_by_month(
                 team_total_hours,
                 estimated_months,
-                lifecycle
+                lifecycle,
+                team  # Pass team name for Design/UX front-loading
             )
 
             forecast_data[team] = {
@@ -168,19 +169,61 @@ class ForecastingService:
         self,
         total_hours: float,
         num_months: int,
-        lifecycle: Dict[str, float]
+        lifecycle: Dict[str, float],
+        team_name: str = '',
+        start_date: str = None
     ) -> List[Dict[str, Any]]:
         """
         Distribute hours across months based on lifecycle percentages.
+
+        For Design/UX teams with high ramp_up percentages (52%/57%), uses
+        exponential front-loading to concentrate hours in first 1-2 months,
+        matching real data patterns (BMBY: 67% Month 1, 25% Month 2, 7% Month 3).
 
         Args:
             total_hours: Total hours for this team
             num_months: Number of months to distribute across
             lifecycle: Dictionary with ramp_up, busy, ramp_down percentages
+            team_name: Team name for special front-loading logic
+            start_date: Optional start date (YYYY-MM-DD) for proration
 
         Returns:
             List of monthly hour allocations with phase labels
         """
+        from datetime import datetime
+        from calendar import monthrange
+
+        # Calculate proration factors for first and last months
+        first_month_factor = 1.0
+        last_month_factor = 1.0
+
+        if start_date and num_months > 1:
+            try:
+                start_dt = datetime.fromisoformat(start_date)
+                start_day = start_dt.day
+
+                # Calculate days available in first month
+                days_in_start_month = monthrange(start_dt.year, start_dt.month)[1]
+                days_available_first = days_in_start_month - start_day + 1
+                first_month_factor = days_available_first / days_in_start_month
+
+                # Calculate days available in last month
+                # Last month ends when we run out of the project duration
+                last_month = start_dt
+                for _ in range(num_months - 1):
+                    if last_month.month == 12:
+                        last_month = last_month.replace(year=last_month.year + 1, month=1)
+                    else:
+                        last_month = last_month.replace(month=last_month.month + 1)
+
+                # Last month ends on the same day as start (e.g., Jan 15 -> Jun 15)
+                # So we need days from day 1 to start_day
+                last_month_factor = start_day / monthrange(last_month.year, last_month.month)[1]
+
+            except (ValueError, AttributeError):
+                # If date parsing fails, use full months
+                pass
+
         monthly_breakdown = []
 
         # Calculate which months fall into which phase
@@ -208,10 +251,6 @@ class ForecastingService:
             })
         else:
             # 3+ months = ramp up → busy → ramp down
-            # First third = ramp up
-            # Middle third(s) = busy
-            # Last third = ramp down
-
             ramp_up_pct = lifecycle['ramp_up'] / 100
             busy_pct = lifecycle['busy'] / 100
             ramp_down_pct = lifecycle['ramp_down'] / 100
@@ -220,22 +259,93 @@ class ForecastingService:
             busy_hours = total_hours * busy_pct
             ramp_down_hours = total_hours * ramp_down_pct
 
+            # DATA-DRIVEN TEMPORAL PATTERNS (based on real project analysis)
+            # Design: 70-80% of ALL hours in first 2 months (EXTREMELY FRONT-LOADED)
+            # UX: 47% first third (FRONT-LOADED)
+            # FE Devs: 55% middle third (MID-PEAKED)
+            # BE Devs: 45% middle, even distribution (EVEN)
+            # PMs: 41% middle, even distribution (EVEN)
+
+            # Determine temporal pattern for this team
+            temporal_pattern = None
+            if team_name == 'Design':
+                # Design is heavily front-loaded: 54% in first third
+                temporal_pattern = 'front_heavy'  # ~85-90% in first 2 months
+            elif team_name == 'UX':
+                # UX is front-loaded: 47% in first third
+                temporal_pattern = 'front'  # ~70-75% in first third
+            elif team_name == 'FE Devs':
+                # FE is mid-peaked: 55% in middle third
+                temporal_pattern = 'mid_peak'
+            else:
+                # BE Devs, PMs, Others: relatively even
+                temporal_pattern = 'even'
+
             # Determine phase boundaries
             ramp_up_months = max(1, int(num_months * 0.33))
             ramp_down_months = max(1, int(num_months * 0.33))
             busy_months = num_months - ramp_up_months - ramp_down_months
 
-            # Distribute hours evenly within each phase
+            # Distribute hours within each phase based on temporal pattern
             for i in range(1, num_months + 1):
-                if i <= ramp_up_months:
+                # Special Design handling: 64% in M1, 14.4% in M2 (total 78.4%)
+                # This overrides phase boundaries to ensure extreme front-loading
+                if temporal_pattern == 'front_heavy':
+                    if i == 1:
+                        hours = total_hours * 0.64  # 64% of ALL hours in month 1
+                        phase = 'Ramp Up'
+                    elif i == 2:
+                        hours = total_hours * 0.144  # 14.4% of ALL hours in month 2
+                        phase = 'Ramp Up' if i <= ramp_up_months else 'Busy (Peak)'
+                    else:
+                        # Remaining 21.6% distributed evenly across other months
+                        remaining_hours = total_hours * 0.216
+                        remaining_months = num_months - 2
+                        hours = remaining_hours / remaining_months if remaining_months > 0 else 0
+
+                        if i <= ramp_up_months:
+                            phase = 'Ramp Up'
+                        elif i > num_months - ramp_down_months:
+                            phase = 'Ramp Down'
+                        else:
+                            phase = 'Busy (Peak)'
+
+                elif i <= ramp_up_months:
                     phase = 'Ramp Up'
-                    hours = ramp_up_hours / ramp_up_months
+
+                    if temporal_pattern == 'front':
+                        # UX: Strong front-loading (75% in first third)
+                        if i == 1:
+                            hours = ramp_up_hours * 0.55  # 55% in month 1
+                        elif i == 2 and ramp_up_months >= 2:
+                            hours = ramp_up_hours * 0.30  # 30% in month 2
+                        else:
+                            # Remaining 15% split across other ramp-up months
+                            remaining_months = max(1, ramp_up_months - 2)
+                            hours = (ramp_up_hours * 0.15) / remaining_months
+                    else:
+                        # Even distribution for BE Devs, PMs
+                        hours = ramp_up_hours / ramp_up_months
+
                 elif i > num_months - ramp_down_months:
                     phase = 'Ramp Down'
                     hours = ramp_down_hours / ramp_down_months
                 else:
                     phase = 'Busy (Peak)'
-                    hours = busy_hours / busy_months if busy_months > 0 else 0
+                    if temporal_pattern == 'mid_peak':
+                        # FE Devs: Peak in middle months
+                        middle_position = (i - ramp_up_months) / busy_months if busy_months > 0 else 0.5
+                        # Bell curve: peak at 1.5x average, edges at 0.7x average
+                        peak_multiplier = 1.5 - 0.8 * abs(middle_position - 0.5)
+                        hours = (busy_hours / busy_months) * peak_multiplier if busy_months > 0 else 0
+                    else:
+                        hours = busy_hours / busy_months if busy_months > 0 else 0
+
+                # Apply proration for first and last months
+                if i == 1 and first_month_factor != 1.0:
+                    hours = hours * first_month_factor
+                elif i == num_months and last_month_factor != 1.0:
+                    hours = hours * last_month_factor
 
                 monthly_breakdown.append({
                     'month': i,
@@ -261,55 +371,151 @@ class ForecastingService:
     def calculate_from_total_hours(
         self,
         total_hours: float,
-        be_integrations: bool,
-        custom_theme: bool,
-        custom_designs: bool,
-        ux_research: bool,
+        be_integrations: int,  # Now accepts 1-5 slider value
+        custom_theme: int,  # Now accepts 1-5 slider value
+        custom_designs: int,  # Now accepts 1-5 slider value
+        ux_research: int,  # Now accepts 1-5 slider value
         teams_selected: List[str],
-        estimated_months: int
+        estimated_months: int,
+        extensive_customizations: int = 1,  # NEW: 1-5 slider value (default: 1 = standard)
+        project_oversight: int = 3,  # NEW: 1-5 slider value (default: 3 = typical)
+        start_date: str = None  # Optional start date (YYYY-MM-DD) for proration
     ) -> Dict[str, Any]:
         """
         Distribute total hours budget across teams using intelligent historical analysis.
 
         Uses machine learning-informed distribution based on project characteristics:
-        - Backend Integrations → Heavy BE involvement, shifted distribution
-        - Custom Theme → Increased FE hours
-        - Custom Designs → Design/UX front-loaded in early months
-        - UX Research → Extended UX engagement across lifecycle
+        - Backend Integrations (≥3) → Heavy BE involvement, shifted distribution
+        - Extensive Customizations (≥3) → Increased BE Dev allocation up to +30%
+        - Custom Theme (≥3) → Increased FE hours
+        - Custom Designs (≥3) → Design/UX front-loaded in early months
+        - UX Research (≥3) → Extended UX engagement across lifecycle
+        - Project Oversight → Adjusts PM allocation (1=less, 3=typical, 5=high)
 
         Args:
             total_hours: Total hours budget for the project
-            be_integrations: Backend integrations required
-            custom_theme: Custom theme development needed
-            custom_designs: Custom designs required
-            ux_research: Extensive UX research/strategy
+            be_integrations: Backend integrations complexity (1-5 slider)
+            custom_theme: Custom theme development complexity (1-5 slider)
+            custom_designs: Custom designs complexity (1-5 slider)
+            ux_research: UX research/strategy complexity (1-5 slider)
+            extensive_customizations: Extensive customizations complexity (1-5 slider)
+            project_oversight: Project oversight needs (1-5 slider)
             teams_selected: Teams working on this epic
             estimated_months: Project duration in months
 
         Returns:
             Dictionary with team distribution including monthly breakdown
         """
-        # Select baseline set based on integration requirement
-        baseline_set = 'with_integration' if be_integrations else 'no_integration'
+        # NEW APPROACH: Blend between baseline sets based on slider values
+        # Instead of binary threshold (≥3), use gradual interpolation (1-5 scale)
 
-        # Get baseline ratios for selected teams
+        # Calculate blend factor (0.0 = no_integration, 1.0 = with_integration)
+        # Use the maximum of be_integrations and extensive_customizations
+        max_integration_factor = max(be_integrations, extensive_customizations)
+        # Map 1-5 slider to 0-1 blend: 1→0.0, 2→0.25, 3→0.5, 4→0.75, 5→1.0
+        blend_factor = (max_integration_factor - 1) / 4.0
+
+        # Get blended baseline hours for selected teams
         selected_baselines = {}
         for team in teams_selected:
-            if team in self.baselines[baseline_set]:
-                selected_baselines[team] = self.baselines[baseline_set][team]
+            if team in self.baselines['no_integration'] and team in self.baselines['with_integration']:
+                no_int_hours = self.baselines['no_integration'][team]
+                with_int_hours = self.baselines['with_integration'][team]
+                # Linear interpolation between baselines
+                blended_hours = no_int_hours + (with_int_hours - no_int_hours) * blend_factor
+                selected_baselines[team] = blended_hours
+            elif team in self.baselines['no_integration']:
+                selected_baselines[team] = self.baselines['no_integration'][team]
+            elif team in self.baselines['with_integration']:
+                selected_baselines[team] = self.baselines['with_integration'][team]
 
         if not selected_baselines:
             raise ValueError("No valid teams selected")
 
-        # Calculate distribution ratios by normalizing baselines
-        # The baseline selection already accounts for be_integrations
-        # (no_integration vs with_integration baseline sets)
-        # So we don't need additional multipliers - they would double-count
-        total_baseline = sum(selected_baselines.values())
+        # Apply AGGRESSIVE characteristic multipliers for visible redistribution
+        # Since we're working with a fixed total_hours budget, these multipliers
+        # dramatically shift the distribution percentages
+        adjusted_baselines = selected_baselines.copy()
+
+        # Custom Designs: DRAMATICALLY increase Design allocation (1→1.0x, 5→4.0x)
+        # This ensures Design gets a much larger SHARE of the total budget
+        if 'Design' in adjusted_baselines:
+            # Exponential scaling: 1→1.0x, 2→1.5x, 3→2.0x, 4→3.0x, 5→4.0x
+            design_multiplier = 1.0 + (custom_designs - 1) * 0.75
+            adjusted_baselines['Design'] *= design_multiplier
+
+        # UX Research: DRAMATICALLY increase UX allocation (1→1.0x, 5→4.0x)
+        if 'UX' in adjusted_baselines:
+            ux_multiplier = 1.0 + (ux_research - 1) * 0.75
+            adjusted_baselines['UX'] *= ux_multiplier
+
+        # Custom Theme: SIGNIFICANTLY increase FE allocation (1→1.0x, 5→3.0x)
+        if 'FE Devs' in adjusted_baselines:
+            fe_multiplier = 1.0 + (custom_theme - 1) * 0.5
+            adjusted_baselines['FE Devs'] *= fe_multiplier
+
+        # Project Oversight: Adjust PM allocation (1→0.5x less, 3→1.0x baseline, 5→1.5x more)
+        # Uses linear interpolation centered at value 3 (typical oversight)
+        if 'PMs' in adjusted_baselines:
+            # Map slider: 1→0.5x, 2→0.75x, 3→1.0x, 4→1.25x, 5→1.5x
+            # Formula: 1.0 + (value - 3) * 0.25
+            pm_multiplier = 1.0 + (project_oversight - 3) * 0.25
+            adjusted_baselines['PMs'] *= pm_multiplier
+
+        # Calculate distribution ratios by normalizing adjusted baselines
+        # NOTE: After normalization, these become PROPORTIONS that sum to 1.0
+        # The actual hours will be: team_hours = total_hours * ratio
+        # So the multipliers change the DISTRIBUTION, not the absolute hours
+        total_baseline = sum(adjusted_baselines.values())
         distribution_ratios = {
             team: (hours / total_baseline)
-            for team, hours in selected_baselines.items()
+            for team, hours in adjusted_baselines.items()
         }
+
+        # Apply BE Dev boost for extensive customizations
+        # User requirement: "extensive customization also generally means more BE Dev support is needed"
+        if extensive_customizations >= 3 and 'BE Devs' in distribution_ratios:
+            # Determine multiplier based on slider value
+            be_boost_multipliers = {
+                3: 1.1,  # +10%
+                4: 1.2,  # +20%
+                5: 1.3   # +30%
+            }
+            multiplier = be_boost_multipliers.get(extensive_customizations, 1.0)
+
+            # Calculate boosted BE hours
+            baseline_be_ratio = distribution_ratios['BE Devs']
+            boosted_be_ratio = baseline_be_ratio * multiplier
+            extra_ratio = boosted_be_ratio - baseline_be_ratio
+
+            # Reduce other teams proportionally to absorb the extra BE allocation
+            # Calculate total ratio of non-BE teams
+            other_teams_total_ratio = sum(
+                ratio for team, ratio in distribution_ratios.items()
+                if team != 'BE Devs'
+            )
+
+            if other_teams_total_ratio > 0:
+                # Reduce each non-BE team proportionally
+                reduction_factor = (1.0 - extra_ratio) / (1.0 - baseline_be_ratio)
+
+                adjusted_ratios = {}
+                for team, ratio in distribution_ratios.items():
+                    if team == 'BE Devs':
+                        adjusted_ratios[team] = boosted_be_ratio
+                    else:
+                        adjusted_ratios[team] = ratio * reduction_factor
+
+                distribution_ratios = adjusted_ratios
+
+        # IMPORTANT: Final normalization to ensure ratios sum to exactly 1.0
+        # This prevents rounding errors from causing total hours mismatch
+        ratio_sum = sum(distribution_ratios.values())
+        if ratio_sum != 1.0:
+            distribution_ratios = {
+                team: ratio / ratio_sum
+                for team, ratio in distribution_ratios.items()
+            }
 
         # Calculate actual hours per team
         teams_data = []
@@ -320,12 +526,12 @@ class ForecastingService:
             team_hours = total_hours * distribution_ratios[team]
             percentage = distribution_ratios[team] * 100
 
-            # Get lifecycle percentages with characteristic-based adjustments
+            # Get lifecycle percentages (historical data-based, no adjustments needed)
             lifecycle = self._get_adjusted_lifecycle(
                 team,
-                be_integrations=be_integrations,
-                custom_designs=custom_designs,
-                ux_research=ux_research,
+                be_integrations=be_integrations >= 3,
+                custom_designs=custom_designs >= 3,
+                ux_research=ux_research >= 3,
                 estimated_months=estimated_months
             )
 
@@ -333,7 +539,9 @@ class ForecastingService:
             monthly_breakdown = self._distribute_hours_by_month(
                 team_hours,
                 estimated_months,
-                lifecycle
+                lifecycle,
+                team,  # Pass team name for Design/UX front-loading
+                start_date  # Pass start date for proration
             )
 
             teams_data.append({
@@ -343,6 +551,18 @@ class ForecastingService:
                 'monthly_breakdown': monthly_breakdown
             })
 
+        # CRITICAL FIX: Ensure team hours sum exactly to total_hours
+        # Rounding can cause small discrepancies, so adjust the largest team
+        actual_sum = sum(team['total_hours'] for team in teams_data)
+        if actual_sum != total_hours:
+            # Find largest team and adjust its hours to make total exact
+            largest_team = max(teams_data, key=lambda t: t['total_hours'])
+            adjustment = total_hours - actual_sum
+            largest_team['total_hours'] = round(largest_team['total_hours'] + adjustment, 2)
+
+        # Report baseline as blend percentage
+        baseline_description = f"Blended ({int(blend_factor * 100)}% integration baseline)"
+
         return {
             'total_hours': total_hours,
             'estimated_months': estimated_months,
@@ -351,7 +571,14 @@ class ForecastingService:
                 team: round(ratio * 100, 2)
                 for team, ratio in distribution_ratios.items()
             },
-            'baseline_set_used': baseline_set
+            'baseline_set_used': baseline_description,
+            'characteristics': {
+                'be_integrations': be_integrations,
+                'custom_theme': custom_theme,
+                'custom_designs': custom_designs,
+                'ux_research': ux_research,
+                'extensive_customizations': extensive_customizations
+            }
         }
 
     def _apply_characteristic_adjustments(

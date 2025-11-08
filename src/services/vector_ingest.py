@@ -105,21 +105,68 @@ class VectorIngestService:
             logger.error(f"Error getting embedding: {e}")
             return None
 
+    def get_embeddings_batch(self, texts: List[str]) -> List[Optional[List[float]]]:
+        """Get OpenAI embeddings for multiple texts in a single API call.
+
+        OpenAI supports up to 2048 inputs per request - this is MUCH faster than individual calls!
+
+        Args:
+            texts: List of texts to embed (max 2048)
+
+        Returns:
+            List of embedding vectors (same length as input), None for failed embedd ings
+        """
+        if not texts:
+            return []
+
+        # Truncate each text to ~8000 chars
+        truncated_texts = [text[:8000] if text else "" for text in texts]
+
+        # Remove empty texts but remember their positions
+        text_indices = []
+        valid_texts = []
+        for i, text in enumerate(truncated_texts):
+            if text and text.strip():
+                text_indices.append(i)
+                valid_texts.append(text)
+
+        if not valid_texts:
+            return [None] * len(texts)
+
+        try:
+            # Single API call for up to 2048 texts!
+            response = self.openai_client.embeddings.create(
+                model="text-embedding-3-small",
+                input=valid_texts
+            )
+
+            # Map embeddings back to original positions
+            result = [None] * len(texts)
+            for idx, embedding_data in enumerate(response.data):
+                original_idx = text_indices[idx]
+                result[original_idx] = embedding_data.embedding
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting batch embeddings: {e}")
+            return [None] * len(texts)
+
     def upsert_documents(
         self,
         documents: List[VectorDocument],
         batch_size: int = 100,
-        embedding_chunk_size: int = 500  # Process embeddings in chunks
+        embedding_batch_size: int = 2000  # OpenAI supports up to 2048 per request!
     ) -> int:
-        """Upsert documents into Pinecone in batches with chunked embedding generation.
+        """Upsert documents into Pinecone in batches with OPTIMIZED batch embedding generation.
 
-        For large datasets (>1000 documents), this method processes embeddings in chunks
-        to avoid timeouts and memory issues.
+        This method uses OpenAI's batch embeddings API to generate up to 2000 embeddings
+        per API call, which is 100x+ faster than calling the API once per document!
 
         Args:
             documents: List of documents to upsert
             batch_size: Number of documents per Pinecone upsert batch
-            embedding_chunk_size: Number of documents to generate embeddings for at once
+            embedding_batch_size: Number of embeddings to generate per OpenAI API call (max 2048)
 
         Returns:
             Number of successfully upserted documents
@@ -135,44 +182,59 @@ class VectorIngestService:
         total_docs = len(documents)
         logger.info(f"📝 Ingesting {total_docs} documents into Pinecone...")
 
-        # Process documents in chunks to avoid timeouts
+        # Process embeddings in large batches (up to 2000 at once!)
         all_valid_docs = []
-        total_chunks = (total_docs + embedding_chunk_size - 1) // embedding_chunk_size
+        total_batches = (total_docs + embedding_batch_size - 1) // embedding_batch_size
 
-        logger.info(f"🔄 Processing {total_chunks} chunks of {embedding_chunk_size} documents each...")
+        logger.info(f"🚀 Processing {total_batches} batches of up to {embedding_batch_size} embeddings each (FAST MODE)...")
 
-        for chunk_idx in range(0, total_docs, embedding_chunk_size):
-            chunk_end = min(chunk_idx + embedding_chunk_size, total_docs)
-            chunk = documents[chunk_idx:chunk_end]
-            chunk_num = (chunk_idx // embedding_chunk_size) + 1
+        for batch_idx in range(0, total_docs, embedding_batch_size):
+            batch_end = min(batch_idx + embedding_batch_size, total_docs)
+            batch = documents[batch_idx:batch_end]
+            batch_num = (batch_idx // embedding_batch_size) + 1
 
-            logger.info(f"🔄 Chunk {chunk_num}/{total_chunks}: Generating embeddings for {len(chunk)} documents...")
+            logger.info(f"🔄 Batch {batch_num}/{total_batches}: Generating {len(batch)} embeddings in ONE API call...")
 
-            # Generate embeddings for this chunk
-            valid_in_chunk = 0
-            failed_in_chunk = 0
+            try:
+                # Collect texts to embed (skip docs that already have embeddings)
+                texts_to_embed = []
+                doc_indices = []
 
-            for idx, doc in enumerate(chunk):
-                if (idx + 1) % 100 == 0:
-                    logger.info(f"   Chunk {chunk_num} embedding progress: {idx + 1}/{len(chunk)}")
-
-                try:
+                for idx, doc in enumerate(batch):
                     if not doc.embedding:
-                        doc.embedding = self.get_embedding(doc.content)
-                        if not doc.embedding:
-                            logger.warning(f"Failed to generate embedding for document {doc.id}")
-                            failed_in_chunk += 1
-                            continue
+                        texts_to_embed.append(doc.content)
+                        doc_indices.append(idx)
 
-                    all_valid_docs.append(doc)
-                    valid_in_chunk += 1
+                # Generate ALL embeddings in a single API call!
+                if texts_to_embed:
+                    embeddings = self.get_embeddings_batch(texts_to_embed)
 
-                except Exception as e:
-                    logger.error(f"Error generating embedding for document {doc.id}: {e}")
-                    failed_in_chunk += 1
-                    continue
+                    # Assign embeddings back to documents
+                    for i, embedding in enumerate(embeddings):
+                        if embedding:
+                            doc_idx = doc_indices[i]
+                            batch[doc_idx].embedding = embedding
 
-            logger.info(f"✅ Chunk {chunk_num}/{total_chunks} complete: {valid_in_chunk} valid, {failed_in_chunk} failed")
+                # Collect valid documents (those with embeddings)
+                valid_in_batch = 0
+                failed_in_batch = 0
+
+                for doc in batch:
+                    if doc.embedding:
+                        all_valid_docs.append(doc)
+                        valid_in_batch += 1
+                    else:
+                        failed_in_batch += 1
+
+                logger.info(f"✅ Batch {batch_num}/{total_batches} complete: {valid_in_batch} valid, {failed_in_batch} failed")
+
+            except Exception as e:
+                logger.error(f"❌ Error processing batch {batch_num}/{total_batches}: {e}")
+                # Try to salvage what we can from this batch
+                for doc in batch:
+                    if doc.embedding:
+                        all_valid_docs.append(doc)
+                continue
 
         if not all_valid_docs:
             logger.warning("No valid documents to upsert (all failed embedding generation)")
@@ -190,23 +252,63 @@ class VectorIngestService:
             batch_num = (i // batch_size) + 1
 
             try:
-                # Format for Pinecone
+                # Format for Pinecone with metadata size limits
                 vectors = []
                 for doc in batch:
+                    # Build metadata carefully to avoid exceeding 40KB limit
+                    metadata = {
+                        "source": doc.source,
+                        "title": doc.title[:500],  # Truncate title
+                        "content_preview": doc.content[:500]  # Reduced from 1000 to 500
+                    }
+
+                    # Add other metadata fields with truncation
+                    for key, value in doc.metadata.items():
+                        if isinstance(value, str):
+                            # Truncate string values to max 500 chars
+                            metadata[key] = value[:500]
+                        elif isinstance(value, (int, float, bool)):
+                            # Keep numeric/boolean values as-is
+                            metadata[key] = value
+                        elif value is None:
+                            # Keep None values
+                            metadata[key] = value
+                        # Skip complex types (lists, dicts) to avoid size issues
+
+                    # Estimate metadata size (rough calculation)
+                    import json
+                    metadata_size = len(json.dumps(metadata))
+                    if metadata_size > 35000:  # Leave 5KB buffer under 40KB limit
+                        logger.warning(f"⚠️  Metadata for {doc.id} is {metadata_size} bytes, truncating content_preview")
+                        # Further reduce content_preview if still too large
+                        metadata["content_preview"] = doc.content[:200]
+
                     vectors.append({
                         "id": doc.id,
                         "values": doc.embedding,
-                        "metadata": {
-                            **doc.metadata,
-                            "source": doc.source,
-                            "title": doc.title[:500],  # Truncate title
-                            "content_preview": doc.content[:1000]  # Store preview for display
-                        }
+                        "metadata": metadata
                     })
 
-                # Upsert to Pinecone
-                response = self.pinecone_index.upsert(vectors=vectors)
-                upserted += len(vectors)
+                # Upsert to Pinecone (using empty namespace to match query behavior)
+                response = self.pinecone_index.upsert(vectors=vectors, namespace="")
+
+                # Debug: log full response for first batch
+                if batch_num == 1:
+                    logger.info(f"🔍 DEBUG: First batch upsert response: {response}")
+                    logger.info(f"🔍 DEBUG: Response type: {type(response)}")
+                    logger.info(f"🔍 DEBUG: Response attributes: {dir(response)}")
+
+                # Validate response
+                if hasattr(response, 'upserted_count'):
+                    actual_upserted = response.upserted_count
+                    if actual_upserted != len(vectors):
+                        logger.error(f"❌ Pinecone upsert mismatch! Sent {len(vectors)}, upserted {actual_upserted}")
+                    upserted += actual_upserted
+                else:
+                    # Fallback if response doesn't have upserted_count
+                    logger.warning(f"⚠️  Response has no upserted_count attribute")
+                    upserted += len(vectors)
+
                 logger.info(f"✅ Upserted batch {batch_num}/{total_batches}: {len(vectors)} vectors ({upserted}/{len(all_valid_docs)} total)")
 
             except Exception as e:

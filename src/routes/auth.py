@@ -282,6 +282,159 @@ def create_auth_blueprint(db_session_factory, limiter=None):
         finally:
             db_session.close()
 
+    @auth_bp.route('/api/auth/users/<int:user_id>/team-settings', methods=['PUT'])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
+    @admin_required
+    def update_user_team_settings(current_user, user_id):
+        """Update user team tracking settings (admin only)."""
+        db_session = db_session_factory()
+        try:
+            from src.models.user import User
+            data = request.get_json()
+
+            # Extract team settings fields
+            jira_account_id = data.get('jira_account_id')
+            team = data.get('team')
+            project_team = data.get('project_team')
+            weekly_hours_minimum = data.get('weekly_hours_minimum')
+            slack_user_id = data.get('slack_user_id')
+
+            # Validate weekly_hours_minimum if provided
+            if weekly_hours_minimum is not None:
+                try:
+                    weekly_hours_minimum = float(weekly_hours_minimum)
+                    if weekly_hours_minimum < 0:
+                        return jsonify({'error': 'weekly_hours_minimum must be >= 0'}), 400
+                except (TypeError, ValueError):
+                    return jsonify({'error': 'weekly_hours_minimum must be a number'}), 400
+
+            user = db_session.query(User).filter_by(id=user_id).first()
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+            # Check if jira_account_id already exists for another user
+            if jira_account_id and jira_account_id != user.jira_account_id:
+                existing_user = db_session.query(User).filter_by(jira_account_id=jira_account_id).first()
+                if existing_user and existing_user.id != user_id:
+                    return jsonify({'error': f'Jira Account ID already assigned to {existing_user.name}'}), 400
+
+            # Check if slack_user_id already exists for another user
+            if slack_user_id and slack_user_id != user.slack_user_id:
+                existing_user = db_session.query(User).filter_by(slack_user_id=slack_user_id).first()
+                if existing_user and existing_user.id != user_id:
+                    return jsonify({'error': f'Slack User ID already assigned to {existing_user.name}'}), 400
+
+            # Update fields (only if provided)
+            if jira_account_id is not None:
+                user.jira_account_id = jira_account_id if jira_account_id else None
+            if team is not None:
+                user.team = team if team else None
+            if project_team is not None:
+                user.project_team = project_team if project_team else None
+            if weekly_hours_minimum is not None:
+                user.weekly_hours_minimum = weekly_hours_minimum
+            if slack_user_id is not None:
+                user.slack_user_id = slack_user_id if slack_user_id else None
+
+            db_session.commit()
+
+            return jsonify({
+                'message': 'User team settings updated',
+                'user': user.to_dict()
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to update user team settings: {e}")
+            db_session.rollback()
+            return jsonify({'error': 'Failed to update user team settings'}), 500
+        finally:
+            db_session.close()
+
+    @auth_bp.route('/api/auth/users', methods=['POST'])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
+    @admin_required
+    def create_user(current_user):
+        """Create a new user (admin only)."""
+        db_session = db_session_factory()
+        try:
+            from src.models.user import User
+            data = request.get_json()
+
+            # Required fields
+            email = data.get('email')
+            name = data.get('name')
+            google_id = data.get('google_id')
+
+            if not email or not name or not google_id:
+                return jsonify({'error': 'email, name, and google_id are required'}), 400
+
+            # Check if user already exists
+            existing_user = db_session.query(User).filter(
+                (User.email == email) | (User.google_id == google_id)
+            ).first()
+            if existing_user:
+                return jsonify({'error': 'User with this email or google_id already exists'}), 400
+
+            # Create new user
+            new_user = User(
+                email=email,
+                name=name,
+                google_id=google_id,
+                role=UserRole[data.get('role', 'NO_ACCESS').upper()],
+                is_active=data.get('is_active', True),
+                jira_account_id=data.get('jira_account_id'),
+                team=data.get('team'),
+                project_team=data.get('project_team'),
+                weekly_hours_minimum=data.get('weekly_hours_minimum', 32.0),
+                slack_user_id=data.get('slack_user_id')
+            )
+
+            db_session.add(new_user)
+            db_session.commit()
+
+            return jsonify({
+                'message': 'User created successfully',
+                'user': new_user.to_dict()
+            }), 201
+
+        except Exception as e:
+            logger.error(f"Failed to create user: {e}")
+            db_session.rollback()
+            return jsonify({'error': 'Failed to create user'}), 500
+        finally:
+            db_session.close()
+
+    @auth_bp.route('/api/auth/users/<int:user_id>', methods=['DELETE'])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
+    @admin_required
+    def delete_user(current_user, user_id):
+        """Delete a user (admin only)."""
+        db_session = db_session_factory()
+        try:
+            from src.models.user import User
+
+            user = db_session.query(User).filter_by(id=user_id).first()
+            if not user:
+                return jsonify({'error': 'User not found'}), 404
+
+            # Prevent self-deletion
+            if user.id == current_user.id:
+                return jsonify({'error': 'Cannot delete your own account'}), 400
+
+            db_session.delete(user)
+            db_session.commit()
+
+            return jsonify({
+                'message': f'User {user.name} deleted successfully'
+            })
+
+        except Exception as e:
+            logger.error(f"Failed to delete user: {e}")
+            db_session.rollback()
+            return jsonify({'error': 'Failed to delete user'}), 500
+        finally:
+            db_session.close()
+
     @auth_bp.route('/api/auth/google/workspace/authorize', methods=['GET'])
     @auth_required
     def google_workspace_authorize(user):

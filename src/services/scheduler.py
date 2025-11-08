@@ -15,6 +15,8 @@ from src.managers.slack_bot import SlackTodoBot
 from src.services.hours_report_agent import HoursReportAgent
 from src.integrations.jira_mcp import JiraMCPClient
 from src.jobs.tempo_sync import run_tempo_sync
+from src.jobs.time_tracking_compliance import run_time_tracking_compliance
+from src.jobs.monthly_epic_reconciliation import run_monthly_epic_reconciliation
 from src.services.insight_detector import detect_insights_for_all_users
 from src.services.daily_brief_generator import send_daily_briefs
 from src.services.auto_escalation import AutoEscalationService
@@ -90,6 +92,15 @@ class TodoScheduler:
         # Tempo hours sync at 4 AM EST (9 AM UTC)
         # Note: This runs at 9 AM UTC which is 4 AM EST (during DST) or 10 AM UTC for standard time
         schedule.every().day.at("09:00").do(self._run_sync, self.sync_tempo_hours)
+
+        # Phase 1 PM Automation Jobs
+        # Time Tracking Compliance - Every Monday at 10 AM EST
+        schedule.every().monday.at("10:00").do(self._run_sync, self.run_time_tracking_compliance)
+
+        # Monthly Epic Reconciliation - 3rd of every month at 9 AM EST
+        # Note: schedule library doesn't support monthly schedules, so we check date in the function
+        # Runs on 3rd to allow time for hours to be logged after month-end
+        schedule.every().day.at("09:00").do(self._run_sync, self.run_monthly_reconciliation)
 
         # Proactive insights detection every 4 hours during work hours (8am, 12pm, 4pm EST)
         schedule.every().day.at("08:00").do(self._run_sync, self.detect_proactive_insights)
@@ -705,6 +716,52 @@ class TodoScheduler:
 
             # Re-raise exception to ensure Celery task is marked as failed
             raise
+
+    def run_time_tracking_compliance(self):
+        """Run weekly time tracking compliance check (Phase 1)."""
+        try:
+            logger.info("Starting scheduled Time Tracking Compliance check")
+            stats = run_time_tracking_compliance()
+
+            if stats.get("success"):
+                logger.info(
+                    f"Time Tracking Compliance completed: "
+                    f"{stats['total_users']} users checked, {stats['compliance_percentage']:.1f}% compliant, "
+                    f"{stats['notifications_sent']} notifications sent in {stats['duration_seconds']:.2f}s"
+                )
+            else:
+                logger.error(f"Time Tracking Compliance failed: {stats.get('error')}")
+
+        except Exception as e:
+            logger.error(f"Error running Time Tracking Compliance: {e}")
+
+    def run_monthly_reconciliation(self):
+        """Run monthly epic reconciliation with epic association."""
+        from datetime import datetime
+
+        # Only run on the 3rd of the month (allows time for hours to be logged after month-end)
+        if datetime.now().day != 3:
+            return
+
+        try:
+            logger.info("Starting scheduled Monthly Epic Reconciliation (3rd of month)")
+            stats = run_monthly_epic_reconciliation()
+
+            if stats.get("success"):
+                epic_assoc = stats.get('epic_association', {})
+                logger.info(
+                    f"Monthly Epic Reconciliation completed: "
+                    f"{stats.get('projects_analyzed', 0)} projects, {stats.get('epics_processed', 0)} epics analyzed, "
+                    f"variance: {stats.get('total_variance_pct', 0):.1f}%, "
+                    f"epic associations: {epic_assoc.get('matches_found', 0)} matches "
+                    f"({epic_assoc.get('updates_applied', 0)} applied) "
+                    f"in {stats['duration_seconds']:.2f}s"
+                )
+            else:
+                logger.error(f"Monthly Epic Reconciliation failed: {stats.get('error')}")
+
+        except Exception as e:
+            logger.error(f"Error running Monthly Epic Reconciliation: {e}")
 
     def _get_project_hours_summary(self):
         """Get summary of actual vs forecasted hours for current month."""

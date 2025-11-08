@@ -1,5 +1,5 @@
 """System settings model for admin-configurable application settings."""
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean
 from datetime import datetime, timezone
 import logging
 
@@ -25,6 +25,9 @@ class SystemSettings(Base):
     anthropic_api_key_encrypted = Column(Text, nullable=True)
     google_api_key_encrypted = Column(Text, nullable=True)
 
+    # Epic Association Configuration
+    epic_auto_update_enabled = Column(Boolean, default=False, nullable=False)  # Auto-update Jira vs summary mode
+
     # Metadata
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     updated_by_user_id = Column(Integer, nullable=True)  # Track who made the change
@@ -40,6 +43,7 @@ class SystemSettings(Base):
             'has_openai_key': bool(self.openai_api_key_encrypted),
             'has_anthropic_key': bool(self.anthropic_api_key_encrypted),
             'has_google_key': bool(self.google_api_key_encrypted),
+            'epic_auto_update_enabled': self.epic_auto_update_enabled,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'updated_by_user_id': self.updated_by_user_id
         }
