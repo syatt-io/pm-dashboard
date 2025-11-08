@@ -63,6 +63,7 @@ celery_app = Celery(
     include=[
         'src.tasks.vector_tasks',
         'src.tasks.notification_tasks',
+        'src.tasks.backfill_tasks',  # Include backfill tasks for data synchronization
         'src.webhooks.fireflies_webhook'  # Include webhook task for Fireflies meeting processing
     ]
 )
