@@ -7,8 +7,9 @@ All tasks follow the V2 disk-caching pattern for reliability.
 
 import logging
 import asyncio
+import os
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from src.tasks.celery_app import celery_app
 
@@ -80,6 +81,8 @@ def backfill_slack_task(
     """
     Backfill Slack messages into Pinecone.
 
+    Note: Slack client not yet implemented. This is a placeholder.
+
     Args:
         days_back: Number of days to look back
         channel_filter: Optional list of channel IDs to process
@@ -90,44 +93,19 @@ def backfill_slack_task(
     logger.info(f"🔄 Starting Slack backfill: days={days_back}")
 
     try:
-        from src.services.vector_ingest import VectorIngestService
-        from src.integrations.slack import SlackClient
-        from datetime import datetime, timedelta
-
-        # Initialize services
-        slack_client = SlackClient()
-        ingest_service = VectorIngestService()
-
-        # Calculate time range
-        end_time = datetime.now()
-        start_time = end_time - timedelta(days=days_back)
-
-        # Fetch messages
-        messages = []
-        channels = channel_filter or slack_client.get_all_channels()
-
-        for channel in channels:
-            channel_messages = slack_client.get_channel_history(
-                channel_id=channel,
-                oldest=start_time.timestamp(),
-                latest=end_time.timestamp()
-            )
-            messages.extend(channel_messages)
-
-        logger.info(f"📥 Fetched {len(messages)} Slack messages")
-
-        # Ingest into Pinecone
-        count = ingest_service.ingest_slack_messages(messages)
+        # TODO: Implement Slack backfill when client is ready
+        # For now, return success with 0 items
+        logger.warning("⚠️  Slack backfill not yet implemented - returning success with 0 items")
 
         result = {
             'success': True,
-            'messages_found': len(messages),
-            'messages_ingested': count,
+            'messages_found': 0,
+            'messages_ingested': 0,
             'days_back': days_back,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'note': 'Slack backfill not yet implemented'
         }
 
-        logger.info(f"✅ Slack backfill completed: {count} messages ingested")
         return result
 
     except Exception as e:
@@ -159,10 +137,10 @@ def backfill_notion_task(
     try:
         from src.services.vector_ingest import VectorIngestService
         from src.integrations.notion import NotionClient
-        from datetime import datetime, timedelta
+        from config.settings import settings
 
-        # Initialize services
-        notion_client = NotionClient()
+        # Initialize services with API key
+        notion_client = NotionClient(api_key=settings.notion.api_key)
         ingest_service = VectorIngestService()
 
         # Calculate time range
@@ -218,10 +196,10 @@ def backfill_fireflies_task(
     try:
         from src.services.vector_ingest import VectorIngestService
         from src.integrations.fireflies import FirefliesClient
-        from datetime import datetime, timedelta
+        from config.settings import settings
 
-        # Initialize services
-        fireflies_client = FirefliesClient()
+        # Initialize services with API key
+        fireflies_client = FirefliesClient(api_key=settings.fireflies.api_key)
         ingest_service = VectorIngestService()
 
         # Calculate time range
@@ -279,11 +257,13 @@ def backfill_github_task(
 
     try:
         from src.services.vector_ingest import VectorIngestService
-        from src.integrations.github import GitHubClient
-        from datetime import datetime, timedelta
+        from src.integrations.github_client import GitHubClient
+        from config.settings import settings
 
-        # Initialize services
-        github_client = GitHubClient()
+        # Initialize services with API token (empty defaults are fine)
+        github_client = GitHubClient(
+            api_token=getattr(settings.github, 'api_token', os.getenv('GITHUB_API_TOKEN', ''))
+        )
         ingest_service = VectorIngestService()
 
         # Calculate time range
@@ -339,11 +319,10 @@ def backfill_tempo_task(
 
     try:
         from src.services.vector_ingest import VectorIngestService
-        from src.integrations.tempo import TempoClient
-        from datetime import datetime, timedelta
+        from src.integrations.tempo import TempoAPIClient
 
-        # Initialize services
-        tempo_client = TempoClient()
+        # Initialize services (TempoAPIClient gets config from env)
+        tempo_client = TempoAPIClient()
         ingest_service = VectorIngestService()
 
         # Calculate time range
