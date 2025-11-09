@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Typography,
@@ -22,6 +23,7 @@ import {
   Check as CheckIcon,
   Close as CloseIcon,
   Delete as DeleteIcon,
+  Sync as SyncIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -49,6 +51,7 @@ interface ProjectBudgetActualsProps {
 const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey }) => {
   const [budgets, setBudgets] = useState<EpicBudget[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -124,6 +127,22 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     }
   };
 
+  const handleSyncHours = async () => {
+    try {
+      setSyncing(true);
+      setError(null);
+
+      await axios.post(`${API_BASE_URL}/api/jira/projects/${projectKey}/sync-hours`);
+
+      alert(`Started syncing epic hours for ${projectKey}. This will take a few minutes. Refresh the page in 2-3 minutes to see updated data.`);
+    } catch (err: any) {
+      console.error('Error syncing hours:', err);
+      setError(err.response?.data?.error || 'Failed to start sync');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const getStatusColor = (pctComplete: number) => {
     if (pctComplete >= 100) return '#ef5350'; // Red - over budget
     if (pctComplete >= 80) return '#ff9800'; // Orange - warning
@@ -163,9 +182,22 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
   return (
     <Card>
       <CardContent>
-        <Typography variant="h6" gutterBottom>
-          Epic Budget vs Actuals
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h6">
+            Epic Budget vs Actuals
+          </Typography>
+          <Tooltip title="Sync epic hours from Tempo to populate monthly breakdown">
+            <Button
+              variant="outlined"
+              startIcon={syncing ? <CircularProgress size={20} /> : <SyncIcon />}
+              onClick={handleSyncHours}
+              disabled={syncing}
+              size="small"
+            >
+              {syncing ? 'Syncing...' : 'Sync Hours from Tempo'}
+            </Button>
+          </Tooltip>
+        </Box>
 
         <TableContainer component={Paper} sx={{ mt: 2 }}>
           <Table size="small" stickyHeader>
