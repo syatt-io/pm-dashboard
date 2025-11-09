@@ -13,8 +13,17 @@ import {
   CircularProgress,
   Chip,
   Alert,
+  Checkbox,
+  Collapse,
+  IconButton,
 } from '@mui/material';
-import { Download as DownloadIcon, Refresh as RefreshIcon, CloudDownload as ImportIcon } from '@mui/icons-material';
+import {
+  Download as DownloadIcon,
+  Refresh as RefreshIcon,
+  CloudDownload as ImportIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+} from '@mui/icons-material';
 import { useNotify } from 'react-admin';
 
 interface Epic {
@@ -33,8 +42,10 @@ interface ProjectEpicsTabProps {
 
 export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) => {
   const [epics, setEpics] = useState<Epic[]>([]);
+  const [selectedEpics, setSelectedEpics] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const notify = useNotify();
 
@@ -73,17 +84,36 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
   };
 
   const importToBudgets = async () => {
+    if (selectedEpics.size === 0) {
+      notify('Please select at least one epic to import', { type: 'warning' });
+      return;
+    }
+
     setImporting(true);
     setError(null);
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/jira/projects/${projectKey}/epics/import`, {
+
+      // Filter epics to only include selected ones
+      const epicsToImport = epics
+        .filter(epic => selectedEpics.has(epic.key))
+        .map(epic => ({
+          epic_key: epic.key,
+          epic_summary: epic.summary,
+          estimated_hours: 0
+        }));
+
+      const response = await fetch(`/api/epic-budgets/bulk`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          project_key: projectKey,
+          budgets: epicsToImport
+        }),
       });
 
       if (!response.ok) {
@@ -92,17 +122,17 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
 
       const data = await response.json();
 
-      if (data.success) {
-        const { created, skipped } = data.data;
-        notify(
-          `Import complete: ${created} new budgets created, ${skipped} already existed`,
-          { type: 'success' }
-        );
-        // Optionally refresh the page to show updated budgets section
-        window.location.reload();
-      } else {
-        throw new Error(data.error || 'Failed to import epics');
-      }
+      notify(
+        `Import complete: ${data.created} new budgets created, ${data.updated} already existed`,
+        { type: 'success' }
+      );
+
+      // Clear selection and collapse section
+      setSelectedEpics(new Set());
+      setIsExpanded(false);
+
+      // Optionally refresh the page to show updated budgets section
+      window.location.reload();
     } catch (err: any) {
       const errorMessage = err.message || 'An error occurred while importing epics';
       setError(errorMessage);
@@ -110,6 +140,24 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
     } finally {
       setImporting(false);
     }
+  };
+
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedEpics(new Set(epics.map(e => e.key)));
+    } else {
+      setSelectedEpics(new Set());
+    }
+  };
+
+  const handleSelectEpic = (epicKey: string) => {
+    const newSelection = new Set(selectedEpics);
+    if (newSelection.has(epicKey)) {
+      newSelection.delete(epicKey);
+    } else {
+      newSelection.add(epicKey);
+    }
+    setSelectedEpics(newSelection);
   };
 
   useEffect(() => {
@@ -137,8 +185,16 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h6">Epics from Jira</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h6">Import Epics from Jira</Typography>
+          <IconButton
+            size="small"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
             variant="outlined"
@@ -153,85 +209,100 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
             color="primary"
             startIcon={importing ? <CircularProgress size={20} /> : <ImportIcon />}
             onClick={importToBudgets}
-            disabled={loading || importing || epics.length === 0}
+            disabled={loading || importing || selectedEpics.size === 0}
           >
-            {importing ? 'Importing...' : 'Import to Budgets'}
+            {importing ? 'Importing...' : `Import Selected (${selectedEpics.size})`}
           </Button>
         </Box>
       </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      <Collapse in={isExpanded}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
 
-      {epics.length === 0 && !loading && !error && (
-        <Alert severity="info">
-          No epics found for this project. Click "Refresh Epics" to fetch from Jira.
-        </Alert>
-      )}
+        {epics.length === 0 && !loading && !error && (
+          <Alert severity="info">
+            No epics found for this project. Click "Refresh Epics" to fetch from Jira.
+          </Alert>
+        )}
 
-      {epics.length > 0 && (
-        <>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Showing {epics.length} epic{epics.length !== 1 ? 's' : ''}
-          </Typography>
+        {epics.length > 0 && (
+          <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Showing {epics.length} epic{epics.length !== 1 ? 's' : ''} • {selectedEpics.size} selected
+            </Typography>
 
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell><strong>Key</strong></TableCell>
-                  <TableCell><strong>Summary</strong></TableCell>
-                  <TableCell><strong>Status</strong></TableCell>
-                  <TableCell><strong>Assignee</strong></TableCell>
-                  <TableCell><strong>Created</strong></TableCell>
-                  <TableCell><strong>Updated</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {epics.map((epic) => (
-                  <TableRow key={epic.key} hover>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="medium">
-                        {epic.key}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {epic.summary}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={epic.status}
-                        size="small"
-                        color={getStatusColor(epic.status)}
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell padding="checkbox">
+                      <Checkbox
+                        checked={selectedEpics.size === epics.length && epics.length > 0}
+                        indeterminate={selectedEpics.size > 0 && selectedEpics.size < epics.length}
+                        onChange={handleSelectAll}
                       />
                     </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {epic.assignee || 'Unassigned'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatDate(epic.created)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatDate(epic.updated)}
-                      </Typography>
-                    </TableCell>
+                    <TableCell><strong>Key</strong></TableCell>
+                    <TableCell><strong>Summary</strong></TableCell>
+                    <TableCell><strong>Status</strong></TableCell>
+                    <TableCell><strong>Assignee</strong></TableCell>
+                    <TableCell><strong>Created</strong></TableCell>
+                    <TableCell><strong>Updated</strong></TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </>
-      )}
+                </TableHead>
+                <TableBody>
+                  {epics.map((epic) => (
+                    <TableRow key={epic.key} hover>
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedEpics.has(epic.key)}
+                          onChange={() => handleSelectEpic(epic.key)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {epic.key}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {epic.summary}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={epic.status}
+                          size="small"
+                          color={getStatusColor(epic.status)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {epic.assignee || 'Unassigned'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatDate(epic.created)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {formatDate(epic.updated)}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )}
+      </Collapse>
     </Box>
   );
 };

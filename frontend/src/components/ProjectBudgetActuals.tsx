@@ -21,6 +21,7 @@ import {
   Edit as EditIcon,
   Check as CheckIcon,
   Close as CloseIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -108,6 +109,21 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     setEditValue('');
   };
 
+  const handleDelete = async (budgetId: number, epicKey: string) => {
+    if (!window.confirm(`Are you sure you want to delete the budget for ${epicKey}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API_BASE_URL}/api/epic-budgets/${budgetId}`);
+      // Reload budgets after deletion
+      await loadBudgets();
+    } catch (err: any) {
+      console.error('Error deleting budget:', err);
+      alert(err.response?.data?.error || 'Failed to delete budget');
+    }
+  };
+
   const getStatusColor = (pctComplete: number) => {
     if (pctComplete >= 100) return '#ef5350'; // Red - over budget
     if (pctComplete >= 80) return '#ff9800'; // Orange - warning
@@ -174,6 +190,7 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                   % Complete
                 </TableCell>
                 <TableCell sx={{ minWidth: 60 }}>Status</TableCell>
+                <TableCell sx={{ minWidth: 80 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -213,9 +230,11 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                         <Typography variant="body2">
                           {budget.estimated_hours.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
                         </Typography>
-                        <IconButton size="small" onClick={() => handleStartEdit(budget)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
+                        <Tooltip title="Edit estimate">
+                          <IconButton size="small" onClick={() => handleStartEdit(budget)}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     )}
                   </TableCell>
@@ -254,6 +273,17 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                     <Typography variant="body2">
                       {getStatusIcon(budget.pct_complete)}
                     </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="Delete epic budget">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDelete(budget.id, budget.epic_key)}
+                        color="error"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}
