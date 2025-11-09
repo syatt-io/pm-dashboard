@@ -5,6 +5,8 @@ import logging
 import os
 import sys
 
+import pytest
+
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -18,6 +20,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+@pytest.mark.asyncio
 async def test_slack_search():
     """Simulate exact Slack bot search flow."""
 

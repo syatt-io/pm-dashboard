@@ -23,6 +23,7 @@ import {
   useUpdate,
   ListButton,
   useGetList,
+  usePermissions,
 } from 'react-admin';
 import {
   Card,
@@ -94,6 +95,7 @@ import { InlineSelectField } from './InlineEdit/InlineSelectField';
 import { InlineNumberField } from './InlineEdit/InlineNumberField';
 import { InlineToggleField } from './InlineEdit/InlineToggleField';
 import ProjectBudgetActuals from './ProjectBudgetActuals';
+import AddEpicBudgetDialog from './AddEpicBudgetDialog';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -2146,6 +2148,17 @@ const ProjectShowContent = () => {
   const notify = useNotify();
   const refresh = useRefresh();
   const [update] = useUpdate();
+  const { permissions } = usePermissions();
+
+  // Tab state
+  const [tabValue, setTabValue] = useState(0);
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  // AddEpicBudgetDialog state
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+
   const [keywords, setKeywords] = useState<string[]>([]);
   const [loadingKeywords, setLoadingKeywords] = useState(false);
   const [editingKeywords, setEditingKeywords] = useState(false);
@@ -2427,8 +2440,18 @@ const ProjectShowContent = () => {
         {record.name}
       </Typography>
 
-      {/* Key Metrics Summary Card */}
-      <Card sx={{
+      {/* Tabs Navigation */}
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
+        <Tab label="📋 Overview" />
+        {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
+          <Tab label="💰 Budget & Actuals" />
+        )}
+      </Tabs>
+
+      {/* Tab Panel 0: Overview */}
+      <TabPanel value={tabValue} index={0}>
+        {/* Key Metrics Summary Card */}
+        <Card sx={{
         mb: 3,
         background: 'linear-gradient(135deg, #554DFF 0%, #7D00FF 100%)',
         color: 'white',
@@ -3014,18 +3037,11 @@ const ProjectShowContent = () => {
           </Grid>
         </Grid>
       </Box>
+      </TabPanel>
 
-      {/* Budget & Actuals Section - Only for project-based projects */}
-      {(record.project_work_type === 'project-based' || record.show_budget_tab) && (
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <TrendingUpIcon sx={{ color: 'primary.main' }} />
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Budget & Actuals
-            </Typography>
-          </Box>
-          <Divider sx={{ mb: 3 }} />
-
+      {/* Tab Panel 1: Budget & Actuals (Admin Only) */}
+      {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
+        <TabPanel value={tabValue} index={1}>
           {/* Project Dates Section */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
@@ -3067,9 +3083,20 @@ const ProjectShowContent = () => {
             </CardContent>
           </Card>
 
-          {/* Epic Budgets Table */}
+          {/* Epic Budgets Section with Add Button */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Epic Budgets</Typography>
+            <MuiButton
+              variant="contained"
+              onClick={() => setBudgetDialogOpen(true)}
+              sx={{ textTransform: 'none' }}
+            >
+              + Add Epic Budget
+            </MuiButton>
+          </Box>
+
           <ProjectBudgetActuals projectKey={record.key} />
-        </Box>
+        </TabPanel>
       )}
 
       {/* Weekly Recap Modal */}
@@ -3229,6 +3256,17 @@ const ProjectShowContent = () => {
           loading={generatingComparison}
           projectName={record?.name || record?.key || 'Project'}
         />
+
+      {/* Add Epic Budget Dialog */}
+      <AddEpicBudgetDialog
+        open={budgetDialogOpen}
+        onClose={() => setBudgetDialogOpen(false)}
+        projectKey={record.key}
+        onSuccess={() => {
+          refresh(); // Refresh the project data to reload budget table
+          notify('Epic budget created successfully', { type: 'success' });
+        }}
+      />
     </Box>
   );
 };

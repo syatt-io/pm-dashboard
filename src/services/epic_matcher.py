@@ -192,10 +192,9 @@ Return your suggestion as JSON."""
                 )
                 match_result['epic_summary'] = epic_summary
 
-                # Always add to results, regardless of confidence
-                results.append(match_result)
-
+                # Only add to results if confidence meets threshold
                 if match_result['confidence'] >= confidence_threshold:
+                    results.append(match_result)
                     logger.info(
                         f"  ✅ Matched to {match_result['suggested_epic_key']} "
                         f"(confidence: {match_result['confidence']:.2f})"

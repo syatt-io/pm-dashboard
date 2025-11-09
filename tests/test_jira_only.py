@@ -1,6 +1,9 @@
 """Test JIRA search only."""
 import asyncio
 import logging
+
+import pytest
+
 from src.services.context_search import ContextSearchService
 
 # Enable debug logging
@@ -9,6 +12,7 @@ logging.basicConfig(
     format='%(message)s'
 )
 
+@pytest.mark.asyncio
 async def test_jira():
     """Test Jira source only."""
     search_service = ContextSearchService()

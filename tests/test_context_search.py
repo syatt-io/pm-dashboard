@@ -1,6 +1,9 @@
 """Diagnostic test for context search - verify all sources are being searched."""
 import asyncio
 import logging
+
+import pytest
+
 from src.services.context_search import ContextSearchService
 
 # Enable debug logging
@@ -9,6 +12,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+@pytest.mark.asyncio
 async def test_search():
     """Test search across all sources."""
     search_service = ContextSearchService()

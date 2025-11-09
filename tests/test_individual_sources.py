@@ -1,6 +1,9 @@
 """Test each search source individually to isolate issues."""
 import asyncio
 import logging
+
+import pytest
+
 from src.services.context_search import ContextSearchService
 
 # Enable debug logging
@@ -9,6 +12,7 @@ logging.basicConfig(
     format='%(message)s'
 )
 
+@pytest.mark.asyncio
 async def test_individual_sources():
     """Test each source separately."""
     search_service = ContextSearchService()
