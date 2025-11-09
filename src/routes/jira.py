@@ -95,6 +95,8 @@ def get_jira_projects():
                             p.weekly_meeting_day,
                             p.retainer_hours,
                             p.send_meeting_emails,
+                            p.start_date,
+                            p.launch_date,
                             pmf.forecasted_hours,
                             pmf.actual_monthly_hours
                         FROM projects p
@@ -129,8 +131,10 @@ def get_jira_projects():
                             "weekly_meeting_day": row[5] if row[5] else None,
                             "retainer_hours": float(row[6]) if row[6] else 0,
                             "send_meeting_emails": bool(row[7]) if row[7] is not None else False,
-                            "forecasted_hours_month": float(row[8]) if row[8] else 0,
-                            "current_month_hours": float(row[9]) if row[9] else 0,
+                            "start_date": row[8].isoformat() if (row[8] and hasattr(row[8], 'isoformat')) else None,
+                            "launch_date": row[9].isoformat() if (row[9] and hasattr(row[9], 'isoformat')) else None,
+                            "forecasted_hours_month": float(row[10]) if row[10] else 0,
+                            "current_month_hours": float(row[11]) if row[11] else 0,
                             "keywords": keywords_map.get(project_key, [])
                         }
 
@@ -151,6 +155,8 @@ def get_jira_projects():
                             enhanced_project["weekly_meeting_day"] = None
                             enhanced_project["retainer_hours"] = 0
                             enhanced_project["send_meeting_emails"] = False
+                            enhanced_project["start_date"] = None
+                            enhanced_project["launch_date"] = None
                             enhanced_project["forecasted_hours_month"] = 0
                             enhanced_project["current_month_hours"] = 0
                             enhanced_project["keywords"] = keywords_map.get(project_key, [])
