@@ -93,6 +93,7 @@ import { InlineTextField } from './InlineEdit/InlineTextField';
 import { InlineSelectField } from './InlineEdit/InlineSelectField';
 import { InlineNumberField } from './InlineEdit/InlineNumberField';
 import { InlineToggleField } from './InlineEdit/InlineToggleField';
+import ProjectBudgetActuals from './ProjectBudgetActuals';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -3013,6 +3014,63 @@ const ProjectShowContent = () => {
           </Grid>
         </Grid>
       </Box>
+
+      {/* Budget & Actuals Section - Only for project-based projects */}
+      {(record.project_work_type === 'project-based' || record.show_budget_tab) && (
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <TrendingUpIcon sx={{ color: 'primary.main' }} />
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              Budget & Actuals
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
+
+          {/* Project Dates Section */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Project Timeline
+              </Typography>
+              <Grid container spacing={3} sx={{ mt: 1 }}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">
+                    Start Date
+                  </Typography>
+                  <Box sx={{ mt: 0.5 }}>
+                    <MuiTextField
+                      type="date"
+                      size="small"
+                      fullWidth
+                      value={record.start_date || ''}
+                      onChange={(e) => handleFieldUpdate('start_date', e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Box>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">
+                    Launch Date
+                  </Typography>
+                  <Box sx={{ mt: 0.5 }}>
+                    <MuiTextField
+                      type="date"
+                      size="small"
+                      fullWidth
+                      value={record.launch_date || ''}
+                      onChange={(e) => handleFieldUpdate('launch_date', e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Box>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Epic Budgets Table */}
+          <ProjectBudgetActuals projectKey={record.key} />
+        </Box>
+      )}
 
       {/* Weekly Recap Modal */}
         <Dialog
