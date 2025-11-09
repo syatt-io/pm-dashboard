@@ -597,6 +597,120 @@ def get_project_epics(project_key):
         return error_response(str(e), status_code=500)
 
 
+@jira_bp.route('/projects/<project_key>/epics/import', methods=['POST'])
+def import_project_epics(project_key):
+    """Import Jira epics as budget entries.
+
+    This endpoint fetches all epics from Jira for the given project and creates
+    or updates budget entries with estimated_hours = 0 (to be filled in by user).
+    Skips epics that already have budget entries.
+
+    Returns:
+        - created: number of new budget entries created
+        - skipped: number of epics that already had budgets
+        - epics: list of all imported epics with their budget status
+    """
+    try:
+        from src.utils.database import get_session
+        from src.models import EpicBudget
+        from decimal import Decimal
+
+        # Check if Jira credentials are configured
+        if not settings.jira.url or not settings.jira.username or not settings.jira.api_token:
+            logger.error("Jira credentials not configured")
+            return error_response("Jira credentials not configured", status_code=500)
+
+        logger.info(f"Importing epics as budgets for project {project_key}")
+
+        # Fetch epics from Jira using JQL
+        async def fetch_epics():
+            async with JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token
+            ) as jira_client:
+                # JQL to get all epics for the project
+                jql = f'project = {project_key} AND issuetype = Epic ORDER BY created DESC'
+                issues = await jira_client.search_tickets(jql, max_results=1000)
+                return issues
+
+        epics = asyncio.run(fetch_epics())
+
+        if not epics:
+            logger.info(f"No epics found for project {project_key}")
+            return success_response(data={
+                'created': 0,
+                'skipped': 0,
+                'epics': [],
+                'message': 'No epics found in Jira for this project'
+            })
+
+        session = get_session()
+        created_count = 0
+        skipped_count = 0
+        imported_epics = []
+
+        try:
+            for epic in epics:
+                fields = epic.get('fields', {})
+                epic_key = epic.get('key')
+                epic_summary = fields.get('summary', '')
+
+                if not epic_key:
+                    continue
+
+                # Check if budget already exists
+                existing = session.query(EpicBudget).filter_by(
+                    project_key=project_key,
+                    epic_key=epic_key
+                ).first()
+
+                if existing:
+                    skipped_count += 1
+                    imported_epics.append({
+                        'epic_key': epic_key,
+                        'epic_summary': epic_summary,
+                        'status': 'skipped',
+                        'reason': 'Budget already exists'
+                    })
+                else:
+                    # Create new budget with 0 hours (user will fill in estimate)
+                    new_budget = EpicBudget(
+                        project_key=project_key,
+                        epic_key=epic_key,
+                        epic_summary=epic_summary,
+                        estimated_hours=Decimal('0')
+                    )
+                    session.add(new_budget)
+                    created_count += 1
+                    imported_epics.append({
+                        'epic_key': epic_key,
+                        'epic_summary': epic_summary,
+                        'status': 'created',
+                        'reason': 'New budget entry created'
+                    })
+
+            session.commit()
+
+            logger.info(f"Import complete: {created_count} created, {skipped_count} skipped")
+            return success_response(data={
+                'created': created_count,
+                'skipped': skipped_count,
+                'epics': imported_epics,
+                'message': f'Successfully imported {created_count} epics as budgets ({skipped_count} already existed)'
+            })
+
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    except Exception as e:
+        logger.error(f"Error importing epics for project {project_key}: {e}")
+        return error_response(str(e), status_code=500)
+
+
 @jira_bp.route('/project-forecasts/batch', methods=['POST'])
 def get_project_forecasts_batch():
     """Get monthly forecasts for multiple projects in a single request (rolling 6 months from current month)."""

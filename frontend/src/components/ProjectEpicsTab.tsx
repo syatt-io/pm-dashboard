@@ -14,7 +14,7 @@ import {
   Chip,
   Alert,
 } from '@mui/material';
-import { Download as DownloadIcon, Refresh as RefreshIcon } from '@mui/icons-material';
+import { Download as DownloadIcon, Refresh as RefreshIcon, CloudDownload as ImportIcon } from '@mui/icons-material';
 import { useNotify } from 'react-admin';
 
 interface Epic {
@@ -34,6 +34,7 @@ interface ProjectEpicsTabProps {
 export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) => {
   const [epics, setEpics] = useState<Epic[]>([]);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const notify = useNotify();
 
@@ -71,6 +72,46 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
     }
   };
 
+  const importToBudgets = async () => {
+    setImporting(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/jira/projects/${projectKey}/epics/import`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to import epics: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        const { created, skipped } = data.data;
+        notify(
+          `Import complete: ${created} new budgets created, ${skipped} already existed`,
+          { type: 'success' }
+        );
+        // Optionally refresh the page to show updated budgets section
+        window.location.reload();
+      } else {
+        throw new Error(data.error || 'Failed to import epics');
+      }
+    } catch (err: any) {
+      const errorMessage = err.message || 'An error occurred while importing epics';
+      setError(errorMessage);
+      notify(errorMessage, { type: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   useEffect(() => {
     if (projectKey) {
       fetchEpics();
@@ -98,14 +139,25 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h6">Epics from Jira</Typography>
-        <Button
-          variant="contained"
-          startIcon={loading ? <CircularProgress size={20} /> : <RefreshIcon />}
-          onClick={fetchEpics}
-          disabled={loading}
-        >
-          {loading ? 'Loading...' : 'Refresh Epics'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={loading ? <CircularProgress size={20} /> : <RefreshIcon />}
+            onClick={fetchEpics}
+            disabled={loading || importing}
+          >
+            {loading ? 'Loading...' : 'Refresh Epics'}
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={importing ? <CircularProgress size={20} /> : <ImportIcon />}
+            onClick={importToBudgets}
+            disabled={loading || importing || epics.length === 0}
+          >
+            {importing ? 'Importing...' : 'Import to Budgets'}
+          </Button>
+        </Box>
       </Box>
 
       {error && (
