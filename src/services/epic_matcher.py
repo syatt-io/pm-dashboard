@@ -183,6 +183,15 @@ Return your suggestion as JSON."""
             )
 
             if match_result and match_result['confidence'] >= confidence_threshold:
+                # Enhance match result with summaries for better readability
+                match_result['ticket_summary'] = ticket['summary']
+                # Find the epic summary
+                epic_summary = next(
+                    (e['summary'] for e in available_epics if e['key'] == match_result['suggested_epic_key']),
+                    'Unknown Epic'
+                )
+                match_result['epic_summary'] = epic_summary
+
                 results.append(match_result)
                 logger.info(
                     f"  ✅ Matched to {match_result['suggested_epic_key']} "

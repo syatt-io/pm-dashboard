@@ -71,6 +71,7 @@ class EpicAssociationAnalyzer:
     async def get_unassigned_tickets(self, project_key: str) -> List[Dict[str, Any]]:
         """
         Fetch tickets without epic link for a project.
+        Only includes tickets with time logged in the last 60 days (actively worked on).
 
         Args:
             project_key: Project key (e.g., "SUBS")
@@ -79,8 +80,10 @@ class EpicAssociationAnalyzer:
             List of ticket dicts with 'key', 'summary', 'description'
         """
         try:
-            # JQL to find unassigned tickets
-            jql = f'project = {project_key} AND "Epic Link" IS EMPTY AND status != Done ORDER BY created DESC'
+            # JQL to find unassigned tickets with recent work
+            # worklogDate >= -60d filters to tickets with time logged in last 60 days
+            # issuetype != Epic excludes Epic-type issues (which don't need epic links)
+            jql = f'project = {project_key} AND "Epic Link" IS EMPTY AND issuetype != Epic AND status != Done AND worklogDate >= -60d ORDER BY created DESC'
 
             logger.info(f"Fetching unassigned tickets for {project_key}")
             issues = await self.jira_client.search_tickets(jql=jql, max_results=1000)
@@ -319,6 +322,9 @@ class EpicAssociationAnalyzer:
             'projects': project_results
         }
 
+        # 4.5. Save detailed match results to CSV
+        self._save_detailed_results(all_matches, project_results)
+
         # 5. Log summary
         logger.info("="*80)
         logger.info("ANALYSIS SUMMARY")
@@ -343,6 +349,68 @@ class EpicAssociationAnalyzer:
         self.send_slack_notification(summary)
 
         return summary
+
+    def _save_detailed_results(self, all_matches: List[Dict[str, Any]], project_results: List[Dict[str, Any]]) -> None:
+        """Save detailed match results to CSV files for review."""
+        try:
+            import csv
+            from pathlib import Path
+
+            # Save all matches to a detailed CSV
+            detailed_file = Path("/Users/msamimi/syatt/projects/agent-pm/epic_matches_detailed.csv")
+
+            with open(detailed_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'Ticket Key',
+                    'Ticket Summary',
+                    'Suggested Epic',
+                    'Epic Summary',
+                    'Confidence',
+                    'Confidence Level',
+                    'Reason'
+                ])
+
+                for match in sorted(all_matches, key=lambda x: (-x['confidence'], x['ticket_key'])):
+                    level = 'HIGH' if match['confidence'] >= 0.8 else ('MEDIUM' if match['confidence'] >= 0.5 else 'LOW')
+                    writer.writerow([
+                        match['ticket_key'],
+                        match.get('ticket_summary', 'N/A'),
+                        match['suggested_epic_key'],
+                        match.get('epic_summary', 'N/A'),
+                        f"{match['confidence']:.2f}",
+                        level,
+                        match.get('reason', '')
+                    ])
+
+            logger.info(f"Saved detailed results to {detailed_file}")
+
+            # Save project summary
+            summary_file = Path("/Users/msamimi/syatt/projects/agent-pm/epic_matches_by_project.csv")
+
+            with open(summary_file, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Project', 'Total Tickets', 'Matches Found', 'High Conf', 'Medium Conf', 'Low Conf'])
+
+                for project in project_results:
+                    matches = project.get('matches', [])
+                    high = sum(1 for m in matches if m['confidence'] >= 0.8)
+                    medium = sum(1 for m in matches if 0.5 <= m['confidence'] < 0.8)
+                    low = sum(1 for m in matches if m['confidence'] < 0.5)
+
+                    writer.writerow([
+                        project['project_key'],
+                        project['total_tickets'],
+                        len(matches),
+                        high,
+                        medium,
+                        low
+                    ])
+
+            logger.info(f"Saved project summary to {summary_file}")
+
+        except Exception as e:
+            logger.error(f"Failed to save detailed results: {e}", exc_info=True)
 
     def send_slack_notification(self, summary: Dict[str, Any]) -> None:
         """Send Slack notification with epic association results."""
