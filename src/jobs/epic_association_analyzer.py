@@ -201,11 +201,22 @@ class EpicAssociationAnalyzer:
         # 2. Fetch project epics
         epics = await self.get_project_epics(project_key)
         if not epics:
-            logger.warning(f"No epics found in {project_key}, skipping analysis")
+            logger.warning(f"No epics found in {project_key}, marking tickets as NO_MATCH")
+            # Include all tickets as NO_MATCH since we can't analyze without epics
+            no_match_results = []
+            for ticket in tickets:
+                no_match_results.append({
+                    'ticket_key': ticket['key'],
+                    'ticket_summary': ticket['summary'],
+                    'suggested_epic_key': 'NO_EPICS',
+                    'epic_summary': 'No epics available in project',
+                    'confidence': 0.0,
+                    'reason': f'Cannot suggest epic association - {project_key} has no epics defined'
+                })
             return {
                 'project_key': project_key,
                 'total_tickets': len(tickets),
-                'matches': [],
+                'matches': no_match_results,
                 'updates_applied': 0,
                 'update_failures': 0,
                 'error': 'No epics available'

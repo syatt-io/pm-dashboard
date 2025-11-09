@@ -182,7 +182,7 @@ Return your suggestion as JSON."""
                 available_epics=available_epics
             )
 
-            if match_result and match_result['confidence'] >= confidence_threshold:
+            if match_result:
                 # Enhance match result with summaries for better readability
                 match_result['ticket_summary'] = ticket['summary']
                 # Find the epic summary
@@ -192,19 +192,34 @@ Return your suggestion as JSON."""
                 )
                 match_result['epic_summary'] = epic_summary
 
+                # Always add to results, regardless of confidence
                 results.append(match_result)
-                logger.info(
-                    f"  ✅ Matched to {match_result['suggested_epic_key']} "
-                    f"(confidence: {match_result['confidence']:.2f})"
-                )
-            elif match_result:
-                logger.info(
-                    f"  ⚠️  Low confidence match ({match_result['confidence']:.2f}), skipping"
-                )
+
+                if match_result['confidence'] >= confidence_threshold:
+                    logger.info(
+                        f"  ✅ Matched to {match_result['suggested_epic_key']} "
+                        f"(confidence: {match_result['confidence']:.2f})"
+                    )
+                else:
+                    logger.info(
+                        f"  ⚠️  Low confidence match to {match_result['suggested_epic_key']} "
+                        f"({match_result['confidence']:.2f})"
+                    )
             else:
+                # No match at all - add as failed match
+                results.append({
+                    'ticket_key': ticket['key'],
+                    'ticket_summary': ticket['summary'],
+                    'suggested_epic_key': 'NO_MATCH',
+                    'epic_summary': 'No suitable epic found',
+                    'confidence': 0.0,
+                    'reason': 'AI failed to find a suitable epic match for this ticket'
+                })
                 logger.warning(f"  ❌ Failed to match ticket {ticket['key']}")
 
-        logger.info(f"Batch matching complete: {len(results)}/{len(tickets)} matches above threshold")
+        # Count matches by confidence level
+        above_threshold = sum(1 for r in results if r['confidence'] >= confidence_threshold)
+        logger.info(f"Batch matching complete: {len(results)} total tickets, {above_threshold} above confidence threshold")
 
         return results
 
