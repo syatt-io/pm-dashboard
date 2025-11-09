@@ -547,6 +547,56 @@ def update_project(project_key):
         return error_response(str(e), status_code=500)
 
 
+@jira_bp.route('/projects/<project_key>/epics', methods=['GET'])
+def get_project_epics(project_key):
+    """Get all epics for a specific project from Jira.
+
+    Returns list of epics with their key, summary, status, and other metadata.
+    """
+    try:
+        # Check if Jira credentials are configured
+        if not settings.jira.url or not settings.jira.username or not settings.jira.api_token:
+            logger.error("Jira credentials not configured")
+            return error_response("Jira credentials not configured", status_code=500)
+
+        logger.info(f"Fetching epics for project {project_key}")
+
+        # Fetch epics from Jira using JQL
+        async def fetch_epics():
+            async with JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token
+            ) as jira_client:
+                # JQL to get all epics for the project
+                jql = f'project = {project_key} AND issuetype = Epic ORDER BY created DESC'
+                issues = await jira_client.search_tickets(jql, max_results=1000)
+                return issues
+
+        epics = asyncio.run(fetch_epics())
+
+        # Format epic data for frontend
+        formatted_epics = []
+        for epic in epics:
+            fields = epic.get('fields', {})
+            formatted_epics.append({
+                'key': epic.get('key'),
+                'summary': fields.get('summary', ''),
+                'status': fields.get('status', {}).get('name', 'Unknown'),
+                'created': fields.get('created'),
+                'updated': fields.get('updated'),
+                'assignee': fields.get('assignee', {}).get('displayName') if fields.get('assignee') else None,
+                'description': fields.get('description', ''),
+            })
+
+        logger.info(f"Retrieved {len(formatted_epics)} epics for project {project_key}")
+        return success_response(data={'epics': formatted_epics, 'count': len(formatted_epics)})
+
+    except Exception as e:
+        logger.error(f"Error fetching epics for project {project_key}: {e}")
+        return error_response(str(e), status_code=500)
+
+
 @jira_bp.route('/project-forecasts/batch', methods=['POST'])
 def get_project_forecasts_batch():
     """Get monthly forecasts for multiple projects in a single request (rolling 6 months from current month)."""

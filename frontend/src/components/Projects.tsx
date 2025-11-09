@@ -96,6 +96,7 @@ import { InlineNumberField } from './InlineEdit/InlineNumberField';
 import { InlineToggleField } from './InlineEdit/InlineToggleField';
 import ProjectBudgetActuals from './ProjectBudgetActuals';
 import AddEpicBudgetDialog from './AddEpicBudgetDialog';
+import { ProjectEpicsTab } from './ProjectEpicsTab';
 
 // API Configuration
 const API_BASE_URL = process.env.REACT_APP_API_URL || '' + (window.location.hostname === 'localhost' ? 'http://localhost:4000' : 'https://agent-pm-tsbbb.ondigitalocean.app') + '';
@@ -3080,6 +3081,13 @@ const ProjectShowContent = () => {
                   </Box>
                 </Grid>
               </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Epics from Jira Section */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <ProjectEpicsTab projectKey={record.key} />
             </CardContent>
           </Card>
 
