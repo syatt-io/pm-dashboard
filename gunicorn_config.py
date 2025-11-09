@@ -55,16 +55,25 @@ def post_worker_init(worker):
         acquired = cursor.fetchone()[0]
 
         if acquired:
-            logger.info(f"✓ Worker {worker.pid} acquired PostgreSQL advisory lock - starting scheduler")
+            logger.info(f"✓ Worker {worker.pid} acquired PostgreSQL advisory lock")
+            logger.info(f"ℹ️  Old scheduler DISABLED - all scheduled tasks now run via Celery Beat")
+            logger.info(f"ℹ️  See src/tasks/celery_app.py for current Celery Beat schedule")
 
-            # Store connection in worker to keep lock alive
+            # Store connection in worker to keep lock alive (for future use if needed)
             worker.scheduler_db_conn = conn
             worker.scheduler_db_cursor = cursor
 
-            from src.services.scheduler import start_scheduler
-            start_scheduler()
+            # OLD SCHEDULER DISABLED - Migrated to Celery Beat
+            # The old Python 'schedule' library scheduler has been replaced with Celery Beat
+            # for better reliability, timezone handling, and production deployment.
+            # All scheduled tasks (TODO digest, Tempo sync, etc.) are now defined in:
+            # - src/tasks/celery_app.py (Celery Beat schedule)
+            # - Celery Beat worker runs in production via .do/app.yaml
+            #
+            # from src.services.scheduler import start_scheduler
+            # start_scheduler()
 
-            logger.info(f"✓ Scheduler started successfully in worker {worker.pid}")
+            logger.info(f"✓ Worker {worker.pid} initialized (scheduler runs in Celery Beat)")
         else:
             logger.info(f"Worker {worker.pid} - scheduler already running in another worker")
             cursor.close()

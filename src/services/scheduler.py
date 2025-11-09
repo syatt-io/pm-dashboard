@@ -232,50 +232,54 @@ class TodoScheduler:
                 except Exception as user_error:
                     logger.error(f"Error sending daily digest to user {user.email}: {user_error}")
 
-            # Also send system-wide digest to channel (for admins/monitoring)
-            if not active_todos:
-                # Send "no todos" message
-                content = NotificationContent(
-                    title="Daily TODO Digest",
-                    body="🎉 No active TODOs today! Great job team!",
-                    priority="normal"
-                )
-                await self.notifier.send_notification(content, channels=["slack"])
-                return
-
-            # Group TODOs by project for system-wide message
-            todos_by_project = {}
-            for todo in active_todos:
-                project = todo.project_key or "No Project"
-                if project not in todos_by_project:
-                    todos_by_project[project] = []
-                todos_by_project[project].append(todo)
-
-            # Create minimal digest content
-            body = f"📋 *Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}*\n\n"
-
-            # Show TODOs grouped by project
-            for project in sorted(todos_by_project.keys()):
-                todos = todos_by_project[project]
-                body += f"*{project}*\n"
-                for todo in todos:
-                    assignee = todo.assignee or "Unassigned"
-                    body += f"• {todo.title}"
-                    if todo.description:
-                        # Truncate description to 50 chars
-                        desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
-                        body += f" - {desc}"
-                    body += f" ({assignee})\n"
-                body += "\n"
-
-            content = NotificationContent(
-                title="Daily TODO Digest",
-                body=body,
-                priority="normal"
-            )
-
-            # Send to all channels (system-wide)
-            await self.notifier.send_notification(content, channels=["slack"])
+            # CHANNEL BROADCAST DISABLED - DM-only by design
+            # Notifications are now sent ONLY as DMs to opted-in users (via notify_daily_todo_digest preference)
+            # This prevents notification fatigue and respects user opt-in preferences.
+            # Channel broadcasts were removed to eliminate duplicate notifications.
+            #
+            # if not active_todos:
+            #     # Send "no todos" message
+            #     content = NotificationContent(
+            #         title="Daily TODO Digest",
+            #         body="🎉 No active TODOs today! Great job team!",
+            #         priority="normal"
+            #     )
+            #     await self.notifier.send_notification(content, channels=["slack"])
+            #     return
+            #
+            # # Group TODOs by project for system-wide message
+            # todos_by_project = {}
+            # for todo in active_todos:
+            #     project = todo.project_key or "No Project"
+            #     if project not in todos_by_project:
+            #         todos_by_project[project] = []
+            #     todos_by_project[project].append(todo)
+            #
+            # # Create minimal digest content
+            # body = f"📋 *Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}*\n\n"
+            #
+            # # Show TODOs grouped by project
+            # for project in sorted(todos_by_project.keys()):
+            #     todos = todos_by_project[project]
+            #     body += f"*{project}*\n"
+            #     for todo in todos:
+            #         assignee = todo.assignee or "Unassigned"
+            #         body += f"• {todo.title}"
+            #         if todo.description:
+            #             # Truncate description to 50 chars
+            #             desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+            #             body += f" - {desc}"
+            #         body += f" ({assignee})\n"
+            #     body += "\n"
+            #
+            # content = NotificationContent(
+            #     title="Daily TODO Digest",
+            #     body=body,
+            #     priority="normal"
+            # )
+            #
+            # # Send to all channels (system-wide)
+            # await self.notifier.send_notification(content, channels=["slack"])
 
             logger.info(f"Daily digest sent: {len(active_todos)} active TODOs, {len(opted_in_users)} users notified")
 
@@ -635,9 +639,13 @@ class TodoScheduler:
                         priority="normal"
                     )
                     try:
-                        # Send system-wide notification to channel
-                        asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
-                        logger.info("✅ Tempo sync notification sent to channel successfully")
+                        # CHANNEL BROADCAST DISABLED - DM-only by design
+                        # Notifications are now sent ONLY as DMs to opted-in users (via notify_project_hours_forecast preference)
+                        # This prevents notification fatigue and respects user opt-in preferences.
+                        # Channel broadcasts were removed to eliminate duplicate notifications.
+                        #
+                        # asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                        # logger.info("✅ Tempo sync notification sent to channel successfully")
 
                         # Send individual DMs to opted-in users
                         from src.utils.database import session_scope
@@ -681,19 +689,22 @@ class TodoScheduler:
                 error_msg = stats.get("error", "Unknown error")
                 logger.error(f"Tempo sync failed: {error_msg}")
 
-                # Send error notification
-                content = NotificationContent(
-                    title="⚠️ Tempo Hours Sync Failed",
-                    body=f"Error: {error_msg}\n\nPlease check logs for details.",
-                    priority="high"
-                )
-
-                import os
-                if os.getenv('FLASK_ENV') == 'production':
-                    try:
-                        asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
-                    except Exception as notif_error:
-                        logger.error(f"❌ Failed to send error notification: {notif_error}", exc_info=True)
+                # CHANNEL BROADCAST DISABLED - Error notifications also DM-only by design
+                # Error notifications are logged but not sent to avoid notification fatigue.
+                # Ops teams should monitor logs or set up alerting based on log aggregation.
+                #
+                # content = NotificationContent(
+                #     title="⚠️ Tempo Hours Sync Failed",
+                #     body=f"Error: {error_msg}\n\nPlease check logs for details.",
+                #     priority="high"
+                # )
+                #
+                # import os
+                # if os.getenv('FLASK_ENV') == 'production':
+                #     try:
+                #         asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                #     except Exception as notif_error:
+                #         logger.error(f"❌ Failed to send error notification: {notif_error}", exc_info=True)
 
                 # Raise exception to mark Celery task as failed
                 raise Exception(f"Tempo sync failed: {error_msg}")

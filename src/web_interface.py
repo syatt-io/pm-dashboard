@@ -239,13 +239,20 @@ app.auth_service = auth_service
 # NOTE: When running under Gunicorn, the scheduler is started by gunicorn_config.py
 # to ensure it only runs in ONE worker (prevents duplicate notifications)
 if __name__ == '__main__':
-    # Only start scheduler when running in development mode
-    logger.info("Starting TODO scheduler (dev mode)...")
-    start_scheduler()
+    # OLD SCHEDULER DISABLED - Migrated to Celery Beat
+    # The old Python 'schedule' library scheduler has been replaced with Celery Beat
+    # for better reliability, timezone handling, and production deployment.
+    # All scheduled tasks (TODO digest, Tempo sync, etc.) are now defined in:
+    # - src/tasks/celery_app.py (Celery Beat schedule)
+    # - Celery Beat worker runs via: celery -A src.tasks.celery_app beat
+    #
+    # logger.info("Starting TODO scheduler (dev mode)...")
+    # start_scheduler()
+    # import atexit
+    # atexit.register(stop_scheduler)
 
-    # Register cleanup on application shutdown
-    import atexit
-    atexit.register(stop_scheduler)
+    logger.info("ℹ️  Old scheduler DISABLED - all scheduled tasks now run via Celery Beat")
+    logger.info("ℹ️  To run scheduler locally: celery -A src.tasks.celery_app beat")
 else:
     # In production (Gunicorn), scheduler is managed by gunicorn_config.py
     logger.info("Scheduler will be started by Gunicorn config (production mode)")
