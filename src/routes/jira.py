@@ -711,6 +711,58 @@ def import_project_epics(project_key):
         return error_response(str(e), status_code=500)
 
 
+@jira_bp.route('/projects/<project_key>/sync-hours', methods=['POST'])
+def sync_project_hours(project_key):
+    """Sync epic hours from Tempo for a specific project.
+
+    This triggers a Tempo worklog analysis for the project and populates the epic_hours table
+    with monthly breakdowns of actual hours per epic.
+    """
+    try:
+        import subprocess
+        import threading
+
+        logger.info(f"Starting Tempo hours sync for project {project_key}")
+
+        # Run the backfill script in a background thread to avoid timeout
+        def run_backfill():
+            try:
+                # Use the epic hours backfill script
+                result = subprocess.run(
+                    [
+                        'python',
+                        'scripts/backfill_epic_hours.py'
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=300  # 5 minute timeout
+                )
+
+                if result.returncode == 0:
+                    logger.info(f"Successfully synced hours for {project_key}")
+                    logger.debug(f"Output: {result.stdout}")
+                else:
+                    logger.error(f"Error syncing hours for {project_key}: {result.stderr}")
+
+            except subprocess.TimeoutExpired:
+                logger.error(f"Timeout syncing hours for {project_key}")
+            except Exception as e:
+                logger.error(f"Exception syncing hours for {project_key}: {e}", exc_info=True)
+
+        # Start background thread
+        thread = threading.Thread(target=run_backfill, daemon=True)
+        thread.start()
+
+        return success_response(data={
+            'message': f'Started syncing epic hours for {project_key}. This may take a few minutes.',
+            'project_key': project_key
+        })
+
+    except Exception as e:
+        logger.error(f"Error starting sync for project {project_key}: {e}")
+        return error_response(str(e), status_code=500)
+
+
 @jira_bp.route('/project-forecasts/batch', methods=['POST'])
 def get_project_forecasts_batch():
     """Get monthly forecasts for multiple projects in a single request (rolling 6 months from current month)."""
