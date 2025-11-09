@@ -448,6 +448,14 @@ def update_project(project_key):
                     update_fields.append("send_meeting_emails = :send_meeting_emails")
                     update_params['send_meeting_emails'] = data['send_meeting_emails']
 
+                if 'start_date' in data:
+                    update_fields.append("start_date = :start_date")
+                    update_params['start_date'] = data['start_date']
+
+                if 'launch_date' in data:
+                    update_fields.append("launch_date = :launch_date")
+                    update_params['launch_date'] = data['launch_date']
+
                 # Always update the timestamp
                 if update_fields:
                     update_fields.append("updated_at = CURRENT_TIMESTAMP")
@@ -492,7 +500,7 @@ def update_project(project_key):
             try:
                 result = conn.execute(text("""
                     SELECT key, name, is_active, project_work_type, total_hours, retainer_hours,
-                           weekly_meeting_day, send_meeting_emails, updated_at
+                           weekly_meeting_day, send_meeting_emails, start_date, launch_date, updated_at
                     FROM projects
                     WHERE key = :key
                 """), {"key": project_key})
@@ -508,7 +516,9 @@ def update_project(project_key):
                         'retainer_hours': updated_project[5],
                         'weekly_meeting_day': updated_project[6],
                         'send_meeting_emails': updated_project[7],
-                        'updated_at': updated_project[8].isoformat() if updated_project[8] else None
+                        'start_date': updated_project[8].isoformat() if updated_project[8] else None,
+                        'launch_date': updated_project[9].isoformat() if updated_project[9] else None,
+                        'updated_at': updated_project[10].isoformat() if updated_project[10] else None
                     }
                     return success_response(data=project_dict, message='Project updated successfully')
             except (IndexError, TypeError, AttributeError) as e:
