@@ -14,6 +14,7 @@ from .meeting_metadata import MeetingMetadata
 from .escalation import EscalationHistory, EscalationPreferences
 from .epic_hours import EpicHours
 from .epic_baselines import EpicBaseline
+from .epic_budget import EpicBudget
 from .user_team import UserTeam
 from .forecast import EpicForecast
 from .time_tracking_compliance import TimeTrackingCompliance
@@ -136,6 +137,7 @@ __all__ = [
     'EscalationPreferences',
     'EpicHours',
     'EpicBaseline',
+    'EpicBudget',
     'UserTeam',
     'EpicForecast',
     'TimeTrackingCompliance',
