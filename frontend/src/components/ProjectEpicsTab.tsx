@@ -160,11 +160,12 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
     setSelectedEpics(newSelection);
   };
 
-  useEffect(() => {
-    if (projectKey) {
-      fetchEpics();
-    }
-  }, [projectKey]);
+  // Removed automatic epic fetching on mount - user must click "Refresh Epics" button
+  // useEffect(() => {
+  //   if (projectKey) {
+  //     fetchEpics();
+  //   }
+  // }, [projectKey]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
