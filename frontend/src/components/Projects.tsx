@@ -3084,12 +3084,8 @@ const ProjectShowContent = () => {
             </CardContent>
           </Card>
 
-          {/* Epics from Jira Section */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <ProjectEpicsTab projectKey={record.key} />
-            </CardContent>
-          </Card>
+          {/* Epics from Jira Section - Collapsible */}
+          <ProjectEpicsTab projectKey={record.key} />
 
           {/* Epic Budgets Section with Add Button */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

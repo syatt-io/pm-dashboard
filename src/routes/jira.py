@@ -719,35 +719,138 @@ def sync_project_hours(project_key):
     with monthly breakdowns of actual hours per epic.
     """
     try:
-        import subprocess
         import threading
+        from datetime import datetime, date
+        from collections import defaultdict
+        from src.integrations.tempo import TempoAPIClient
+        from src.models import EpicHours
+        from src.utils.database import get_session
+        from sqlalchemy.dialects.postgresql import insert
 
         logger.info(f"Starting Tempo hours sync for project {project_key}")
 
-        # Run the backfill script in a background thread to avoid timeout
+        # Run the backfill in a background thread to avoid timeout
         def run_backfill():
             try:
-                # Use the epic hours backfill script
-                result = subprocess.run(
-                    [
-                        'python',
-                        'scripts/backfill_epic_hours.py'
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=300  # 5 minute timeout
-                )
+                tempo = TempoAPIClient()
+                session = get_session()
 
-                if result.returncode == 0:
-                    logger.info(f"Successfully synced hours for {project_key}")
-                    logger.debug(f"Output: {result.stdout}")
-                else:
-                    logger.error(f"Error syncing hours for {project_key}: {result.stderr}")
+                # Fetch worklogs for last 2 years
+                start_date = '2023-01-01'
+                end_date = datetime.now().strftime('%Y-%m-%d')
 
-            except subprocess.TimeoutExpired:
-                logger.error(f"Timeout syncing hours for {project_key}")
+                logger.info(f"Fetching worklogs for {project_key} from {start_date} to {end_date}")
+                worklogs = tempo.get_worklogs(from_date=start_date, to_date=end_date)
+
+                if not worklogs:
+                    logger.warning(f"No worklogs found for {project_key}")
+                    session.close()
+                    return
+
+                # Group by epic → month → team
+                epic_month_team_hours = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+                processed = 0
+                skipped = 0
+
+                for worklog in worklogs:
+                    issue = worklog.get('issue', {})
+                    issue_id = issue.get('id')
+                    if not issue_id:
+                        skipped += 1
+                        continue
+
+                    # Get issue key
+                    issue_key = tempo.get_issue_key_from_jira(issue_id)
+                    if not issue_key:
+                        skipped += 1
+                        continue
+
+                    # Extract project from issue key
+                    wl_project_key = issue_key.split('-')[0] if '-' in issue_key else None
+                    if wl_project_key != project_key:
+                        skipped += 1
+                        continue
+
+                    # Get epic
+                    epic_key = None
+                    attributes = worklog.get('attributes', {})
+                    if attributes:
+                        values = attributes.get('values', [])
+                        for attr in values:
+                            if attr.get('key') == '_Epic_':
+                                epic_key = attr.get('value')
+                                break
+
+                    if not epic_key:
+                        epic_key = 'NO_EPIC'
+
+                    # Get month
+                    started = worklog.get('startDate')
+                    if not started:
+                        skipped += 1
+                        continue
+
+                    worklog_date = datetime.strptime(started[:10], '%Y-%m-%d').date()
+                    month = date(worklog_date.year, worklog_date.month, 1)
+
+                    # Get hours
+                    time_spent_seconds = worklog.get('timeSpentSeconds', 0)
+                    hours = time_spent_seconds / 3600.0
+
+                    # Get team
+                    author = worklog.get('author', {})
+                    account_id = author.get('accountId')
+                    if account_id:
+                        team = tempo.get_user_team(account_id)
+                        if not team or team == 'Unassigned':
+                            team = 'Other'
+                    else:
+                        team = 'Other'
+
+                    # Accumulate
+                    epic_month_team_hours[epic_key][month][team] += hours
+                    processed += 1
+
+                logger.info(f"Processed {processed} worklogs for {project_key}, skipped {skipped}")
+
+                # Insert into database
+                records_inserted = 0
+                for epic_key, months in epic_month_team_hours.items():
+                    for month, teams in months.items():
+                        for team, hours in teams.items():
+                            if hours > 0:
+                                stmt = insert(EpicHours).values(
+                                    project_key=project_key,
+                                    epic_key=epic_key,
+                                    epic_summary=epic_key,
+                                    month=month,
+                                    team=team,
+                                    hours=round(hours, 2),
+                                    created_at=datetime.now(),
+                                    updated_at=datetime.now()
+                                )
+                                stmt = stmt.on_conflict_do_update(
+                                    index_elements=['project_key', 'epic_key', 'month', 'team'],
+                                    set_={
+                                        'hours': stmt.excluded.hours,
+                                        'updated_at': datetime.now()
+                                    }
+                                )
+                                session.execute(stmt)
+                                records_inserted += 1
+
+                session.commit()
+                session.close()
+
+                logger.info(f"Successfully synced {records_inserted} records for {project_key}")
+
             except Exception as e:
                 logger.error(f"Exception syncing hours for {project_key}: {e}", exc_info=True)
+                try:
+                    session.rollback()
+                    session.close()
+                except:
+                    pass
 
         # Start background thread
         thread = threading.Thread(target=run_backfill, daemon=True)
