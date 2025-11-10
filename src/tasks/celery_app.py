@@ -44,7 +44,8 @@ gcp_project_id = os.getenv('GCP_PROJECT_ID', 'syatt-io')
 broker_url = f'gcpubsub://projects/{gcp_project_id}'
 
 # Use PostgreSQL for result backend (storing task results)
-database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
+# Default to pm_agent_local for local development to match Flask app
+database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/pm_agent_local')
 if database_url.startswith('postgresql://'):
     result_backend_url = 'db+' + database_url
 elif database_url.startswith('postgres://'):

@@ -33,7 +33,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL ||
     : 'https://agent-pm-tsbbb.ondigitalocean.app');
 
 interface EpicBudget {
-  id: number;
+  id: number | null;
   project_key: string;
   epic_key: string;
   epic_summary: string;
@@ -42,6 +42,7 @@ interface EpicBudget {
   remaining: number;
   pct_complete: number;
   actuals_by_month: { [month: string]: number };
+  is_budgeted: boolean;
 }
 
 interface ProjectBudgetActualsProps {
@@ -230,16 +231,44 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                 .slice()
                 .sort((a, b) => (a.epic_summary || a.epic_key).localeCompare(b.epic_summary || b.epic_key))
                 .map((budget) => (
-                <TableRow key={budget.id} hover>
+                <TableRow
+                  key={budget.id || budget.epic_key}
+                  hover
+                  sx={{
+                    backgroundColor: !budget.is_budgeted ? 'rgba(255, 152, 0, 0.08)' : 'inherit'
+                  }}
+                >
                   <TableCell>
-                    <Tooltip title={budget.epic_summary || budget.epic_key}>
-                      <Typography variant="body2" fontWeight="medium" noWrap sx={{ maxWidth: 200 }}>
-                        {budget.epic_summary || budget.epic_key}
-                      </Typography>
-                    </Tooltip>
-                    <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
-                      {budget.epic_key}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Tooltip title={budget.epic_summary || budget.epic_key}>
+                          <Typography variant="body2" fontWeight="medium" noWrap sx={{ maxWidth: 200 }}>
+                            {budget.epic_summary || budget.epic_key}
+                          </Typography>
+                        </Tooltip>
+                        <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
+                          {budget.epic_key}
+                        </Typography>
+                      </Box>
+                      {!budget.is_budgeted && (
+                        <Tooltip title="This epic has actual hours but no budget estimate set. Synced from Tempo.">
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              backgroundColor: '#ff9800',
+                              color: 'white',
+                              px: 0.75,
+                              py: 0.25,
+                              borderRadius: 1,
+                              fontWeight: 600,
+                              fontSize: '0.65rem'
+                            }}
+                          >
+                            UNBUDGETED
+                          </Typography>
+                        </Tooltip>
+                      )}
+                    </Box>
                   </TableCell>
                   <TableCell align="right">
                     {editingId === budget.id ? (

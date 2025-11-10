@@ -88,7 +88,7 @@ const EpicTemplates: React.FC = () => {
 
   const fetchTemplates = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${getApiUrl()}/api/epic-templates`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -158,7 +158,7 @@ const EpicTemplates: React.FC = () => {
 
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const url = editingTemplate
         ? `${getApiUrl()}/api/epic-templates/${editingTemplate.id}`
         : `${getApiUrl()}/api/epic-templates`;
@@ -199,7 +199,7 @@ const EpicTemplates: React.FC = () => {
 
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${getApiUrl()}/api/epic-templates/${template.id}`, {
         method: 'DELETE',
         headers: {
@@ -236,7 +236,7 @@ const EpicTemplates: React.FC = () => {
 
     // Save new order to backend
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${getApiUrl()}/api/epic-templates/reorder`, {
         method: 'POST',
         headers: {

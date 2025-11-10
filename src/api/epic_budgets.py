@@ -21,12 +21,20 @@ def get_project_budgets(project_key):
 
     Returns budget estimates alongside actual hours by month from epic_hours table,
     calculating variance, remaining hours, and % complete for each epic.
+
+    Uses FULL OUTER JOIN pattern to show:
+    - Epics with budgets (imported from Jira)
+    - Epics with actual hours (synced from Tempo)
+    - Or both
+
+    This ensures actual hours show up even if epic has no budget estimate set.
     """
     try:
         session = get_session()
 
         # Get all budgets for this project
         budgets = session.query(EpicBudget).filter_by(project_key=project_key).all()
+        budgets_by_epic = {b.epic_key: b for b in budgets}
 
         # Get actual hours by epic and month
         actual_hours_query = session.query(
@@ -42,34 +50,49 @@ def get_project_budgets(project_key):
 
         # Organize actuals by epic and month
         actuals_by_epic = {}
+        all_epic_keys = set(budgets_by_epic.keys())  # Start with budgeted epics
+
         for epic_key, month, hours in actual_hours_query:
+            all_epic_keys.add(epic_key)  # Add epics with actuals (even if not budgeted)
             if epic_key not in actuals_by_epic:
                 actuals_by_epic[epic_key] = {}
             month_str = month.strftime('%Y-%m') if month else None
             if month_str:
                 actuals_by_epic[epic_key][month_str] = float(hours)
 
-        # Build response with budgets and actuals
+        # Build response for ALL epics (budgeted OR with actuals OR both)
         result = []
-        for budget in budgets:
-            actuals = actuals_by_epic.get(budget.epic_key, {})
+        for epic_key in all_epic_keys:
+            budget = budgets_by_epic.get(epic_key)
+            actuals = actuals_by_epic.get(epic_key, {})
             total_actual = sum(actuals.values())
-            estimated = float(budget.estimated_hours) if budget.estimated_hours else 0.0
+            estimated = float(budget.estimated_hours) if budget and budget.estimated_hours else 0.0
             remaining = estimated - total_actual
-            pct_complete = (total_actual / estimated * 100) if estimated > 0 else 0
+
+            # Calculate % complete:
+            # - If estimate > 0: standard calculation
+            # - If estimate = 0 but has actuals: show 100% (over budget)
+            # - If estimate = 0 and no actuals: show 0%
+            if estimated > 0:
+                pct_complete = (total_actual / estimated * 100)
+            elif total_actual > 0:
+                pct_complete = 100.0  # Has actuals but no estimate = over budget
+            else:
+                pct_complete = 0.0
 
             result.append({
-                'id': budget.id,
-                'project_key': budget.project_key,
-                'epic_key': budget.epic_key,
-                'epic_summary': budget.epic_summary,
+                'id': budget.id if budget else None,
+                'project_key': project_key,
+                'epic_key': epic_key,
+                'epic_summary': budget.epic_summary if budget else epic_key,
                 'estimated_hours': estimated,
                 'total_actual': total_actual,
                 'remaining': remaining,
                 'pct_complete': round(pct_complete, 1),
                 'actuals_by_month': actuals,
-                'created_at': budget.created_at.isoformat() if budget.created_at else None,
-                'updated_at': budget.updated_at.isoformat() if budget.updated_at else None,
+                'is_budgeted': budget is not None,  # Flag to indicate if budget exists
+                'created_at': budget.created_at.isoformat() if budget and budget.created_at else None,
+                'updated_at': budget.updated_at.isoformat() if budget and budget.updated_at else None,
             })
 
         return jsonify({'budgets': result}), 200
