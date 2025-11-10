@@ -136,8 +136,12 @@ class TempoAPIClient:
 
             # Try Epic Link field first (legacy)
             epic_key = fields.get("customfield_10014")
-            if epic_key:
-                return epic_key
+            # Validate it's actually an issue key (PROJECT-NUMBER format), not a date or other string
+            if epic_key and isinstance(epic_key, str) and '-' in epic_key:
+                # Check if it looks like an issue key (contains letters before dash)
+                parts = epic_key.split('-')
+                if len(parts) == 2 and parts[0].isalpha() and parts[1].isdigit():
+                    return epic_key
 
             # Try parent field (modern Jira hierarchy)
             parent = fields.get("parent")
