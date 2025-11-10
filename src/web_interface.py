@@ -422,11 +422,39 @@ if limiter:
 else:
     logger.warning("⚠️  Skipping rate limit application (limiter not available)")
 
-# Initialize components
-fireflies = FirefliesClient(settings.fireflies.api_key)
-analyzer = TranscriptAnalyzer()
-notifier = NotificationManager(settings.notifications)
-todo_manager = TodoManager()
+# Initialize components (lazy-loaded to speed up startup)
+fireflies = None
+analyzer = None
+notifier = None
+todo_manager = None
+
+def get_fireflies():
+    """Lazy-load Fireflies client on first use."""
+    global fireflies
+    if fireflies is None:
+        fireflies = FirefliesClient(settings.fireflies.api_key)
+    return fireflies
+
+def get_analyzer():
+    """Lazy-load TranscriptAnalyzer on first use."""
+    global analyzer
+    if analyzer is None:
+        analyzer = TranscriptAnalyzer()
+    return analyzer
+
+def get_notifier():
+    """Lazy-load NotificationManager on first use."""
+    global notifier
+    if notifier is None:
+        notifier = NotificationManager(settings.notifications)
+    return notifier
+
+def get_todo_manager():
+    """Lazy-load TodoManager on first use."""
+    global todo_manager
+    if todo_manager is None:
+        todo_manager = TodoManager()
+    return todo_manager
 
 # Initialize Slack routes with config (lazy initialization - bot created on first use)
 init_slack_routes(
@@ -435,8 +463,8 @@ init_slack_routes(
 )
 logger.info("Slack routes initialized (bot will be created on first use)")
 
-# Initialize Projects routes with notifier
-init_projects_routes(notifier)
+# Initialize Projects routes with lazy notifier
+init_projects_routes(get_notifier)
 
 
 # ============================================================================
