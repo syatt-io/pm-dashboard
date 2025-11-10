@@ -1,11 +1,10 @@
 import React from 'react';
 import { Admin, Resource, usePermissions } from 'react-admin';
+import { QueryClient } from '@tanstack/react-query';
 import { dataProvider } from './dataProvider';
 import { authProvider } from './authProvider';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { customLightTheme } from './theme';
-
-// NOTE: React Admin provides its own router - do NOT wrap in BrowserRouter!
 
 // Icons
 import TaskIcon from '@mui/icons-material/Task';
@@ -36,6 +35,25 @@ import { FeedbackEdit } from './components/FeedbackEdit';
 import Login from './components/Login';
 import Settings from './components/Settings';
 import EpicTemplates from './components/EpicTemplates';
+
+// Configure React Query to stop retrying on auth failures
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error: any) => {
+        // Don't retry on 401/403 errors
+        if (error?.response?.status === 401 || error?.response?.status === 403) {
+          return false;
+        }
+        // Retry other errors max 3 times
+        return failureCount < 3;
+      },
+      retryDelay: 1000,
+    },
+  },
+});
+
+// NOTE: React Admin provides its own router - do NOT wrap in BrowserRouter!
 
 // Component to render resources based on permissions
 const AdminResources = () => {
@@ -127,6 +145,7 @@ const AdminApp = () => {
     <Admin
       dataProvider={dataProvider}
       authProvider={authProvider}
+      queryClient={queryClient}
       dashboard={Dashboard}
       title="PM Command Center"
       layout={CustomLayout}
