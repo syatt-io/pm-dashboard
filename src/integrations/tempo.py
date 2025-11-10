@@ -271,7 +271,7 @@ class TempoAPIClient:
 
         # Add project filter if specified
         if project_key:
-            params["project"] = project_key
+            params["projectKey"] = project_key
 
         all_worklogs = []
 
