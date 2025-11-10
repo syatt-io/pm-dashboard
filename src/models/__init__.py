@@ -150,6 +150,9 @@ __all__ = [
     'Project',
     'ProjectCharacteristics',
     'StandardEpicTemplate',
+    'ProjectKeyword',
+    'ProjectResourceMapping',
+    'ProjectMonthlyForecast',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',
