@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
-from src.models import EpicHours
+from src.models import EpicHours, ProjectCharacteristics
 
 load_dotenv()
 
@@ -31,51 +31,40 @@ engine = create_engine(database_url)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# Project categorization based on known characteristics
-PROJECT_CHARACTERISTICS = {
-    'SRLK': {
-        'be_integrations': True,
-        'custom_theme': True,
-        'custom_designs': True,
-        'ux_research': True
-    },
-    'COOP': {
-        'be_integrations': True,
-        'custom_theme': True,
-        'custom_designs': True,
-        'ux_research': True
-    },
-    'CAR': {
-        'be_integrations': True,
-        'custom_theme': True,
-        'custom_designs': True,
-        'ux_research': True
-    },
-    'BIGO': {
-        'be_integrations': False,
-        'custom_theme': True,
-        'custom_designs': True,
-        'ux_research': False
-    },
-    'BMBY': {
-        'be_integrations': False,
-        'custom_theme': True,
-        'custom_designs': True,
-        'ux_research': False
-    },
-    'IRIS': {
-        'be_integrations': False,
-        'custom_theme': True,
-        'custom_designs': True,
-        'ux_research': False
-    },
-    'BEVS': {
-        'be_integrations': False,
-        'custom_theme': True,
-        'custom_designs': True,
-        'ux_research': False
-    }
-}
+
+def load_project_characteristics():
+    """
+    Load project characteristics from database.
+
+    Converts 1-5 scale to boolean categories:
+    - High (4-5) = True
+    - Low/Medium (1-3) = False
+
+    This allows historical analysis to group projects by characteristic levels.
+    """
+    characteristics_records = session.query(ProjectCharacteristics).all()
+
+    project_chars = {}
+    for record in characteristics_records:
+        project_chars[record.project_key] = {
+            'be_integrations': record.be_integrations >= 4,
+            'custom_theme': record.custom_theme >= 4,
+            'custom_designs': record.custom_designs >= 4,
+            'ux_research': record.ux_research >= 4,
+            'extensive_customizations': record.extensive_customizations >= 4,
+            'project_oversight': record.project_oversight >= 4
+        }
+
+    print(f"\n📊 Loaded characteristics for {len(project_chars)} projects from database")
+    for proj_key, chars in sorted(project_chars.items()):
+        high_chars = [k for k, v in chars.items() if v]
+        print(f"   • {proj_key}: High complexity in {', '.join(high_chars) if high_chars else 'none'}")
+
+    return project_chars
+
+
+# Load project characteristics from database
+PROJECT_CHARACTERISTICS = load_project_characteristics()
 
 # Output directory
 output_dir = Path(__file__).parent.parent / 'analysis_results' / 'forecasting_baselines'
