@@ -346,8 +346,14 @@ export const Settings = () => {
         previousData: project,
       });
 
+      // Update local state instead of reloading all projects
+      setAllProjects(prevProjects =>
+        prevProjects.map(p =>
+          p.key === project.key ? { ...p, is_active: !p.is_active } : p
+        )
+      );
+
       showSnackbar(`Project ${project.name} is now ${updatedProject.is_active ? 'active' : 'inactive'}`, 'success');
-      loadProjects();
     } catch (error) {
       showSnackbar('Error updating project status', 'error');
     }
@@ -1487,14 +1493,23 @@ export const Settings = () => {
                       <TableRow
                         key={project.key}
                         sx={{
-                          cursor: 'pointer',
                           '&:hover': {
                             backgroundColor: 'rgba(85, 77, 255, 0.08)'
                           }
                         }}
-                        onClick={() => redirect('show', 'projects', project.key)}
                       >
-                        <TableCell>{project.name}</TableCell>
+                        <TableCell
+                          sx={{
+                            cursor: 'pointer',
+                            '&:hover': {
+                              textDecoration: 'underline',
+                              color: 'primary.main'
+                            }
+                          }}
+                          onClick={() => redirect('show', 'projects', project.key)}
+                        >
+                          {project.name}
+                        </TableCell>
                         <TableCell>
                           <Chip label={project.key} size="small" />
                         </TableCell>
@@ -1504,10 +1519,7 @@ export const Settings = () => {
                             control={
                               <Switch
                                 checked={project.is_active || false}
-                                onChange={(e) => {
-                                  e.stopPropagation(); // Prevent row click when toggling switch
-                                  handleActiveToggle(project);
-                                }}
+                                onChange={() => handleActiveToggle(project)}
                                 color="primary"
                                 size="small"
                               />

@@ -416,7 +416,7 @@ def update_project(project_key):
         now = datetime.now()
         current_month = datetime(now.year, now.month, 1).date()
 
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             # Check if project exists in local DB
             result = conn.execute(text("""
                 SELECT * FROM projects WHERE key = :key
@@ -478,8 +478,8 @@ def update_project(project_key):
             else:
                 # Insert new project
                 conn.execute(text("""
-                    INSERT INTO projects (key, name, is_active, project_work_type, total_hours, retainer_hours, weekly_meeting_day, send_meeting_emails)
-                    VALUES (:key, :name, :is_active, :project_work_type, :total_hours, :retainer_hours, :weekly_meeting_day, :send_meeting_emails)
+                    INSERT INTO projects (key, name, is_active, project_work_type, total_hours, retainer_hours, weekly_meeting_day, send_meeting_emails, created_at, updated_at)
+                    VALUES (:key, :name, :is_active, :project_work_type, :total_hours, :retainer_hours, :weekly_meeting_day, :send_meeting_emails, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """), {
                     "key": project_key,
                     "name": data.get('name', 'Unknown'),
@@ -507,8 +507,6 @@ def update_project(project_key):
                     "month_year": current_month,
                     "forecasted_hours": data.get('forecasted_hours_month', 0)
                 })
-
-            conn.commit()
 
             # Fetch and return updated project data with explicit column selection
             try:

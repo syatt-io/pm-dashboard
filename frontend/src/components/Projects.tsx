@@ -1529,14 +1529,22 @@ export const ProjectList = () => {
                         <TableRow
                           key={project.key}
                           sx={{
-                            cursor: 'pointer',
                             '&:hover': {
                               backgroundColor: 'rgba(85, 77, 255, 0.08)'
                             }
                           }}
-                          onClick={() => redirect('show', 'projects', project.key)}
                         >
-                          <TableCell>
+                          <TableCell
+                            sx={{
+                              cursor: 'pointer',
+                              '&:hover': {
+                                '& .MuiTypography-root': {
+                                  color: 'primary.main'
+                                }
+                              }
+                            }}
+                            onClick={() => redirect('show', 'projects', project.key)}
+                          >
                             <Typography variant="body2" fontWeight="medium">
                               {project.name}
                             </Typography>
@@ -1568,13 +1576,10 @@ export const ProjectList = () => {
                               ? `${project.retainer_hours.toFixed(1)}h`
                               : '-'}
                           </TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
+                          <TableCell>
                             <Switch
                               checked={project.send_meeting_emails || false}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                handleEmailNotificationToggle(project.key, project.send_meeting_emails || false);
-                              }}
+                              onChange={() => handleEmailNotificationToggle(project.key, project.send_meeting_emails || false)}
                               size="small"
                               color="primary"
                             />
@@ -1671,15 +1676,24 @@ export const ProjectList = () => {
                           <TableRow
                             key={project.key}
                             sx={{
-                              cursor: 'pointer',
                               backgroundColor: isWatched ? 'rgba(85, 77, 255, 0.08)' : 'inherit', // Light purple background for watched projects
                               '&:hover': {
                                 backgroundColor: isWatched ? 'rgba(85, 77, 255, 0.12)' : 'rgba(0, 0, 0, 0.04)'
                               }
                             }}
-                            onClick={() => redirect('show', 'projects', project.key)}
                           >
-                            <TableCell>{project.name}</TableCell>
+                            <TableCell
+                              sx={{
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  textDecoration: 'underline',
+                                  color: 'primary.main'
+                                }
+                              }}
+                              onClick={() => redirect('show', 'projects', project.key)}
+                            >
+                              {project.name}
+                            </TableCell>
                             <TableCell>
                               <Chip label={project.key} size="small" />
                             </TableCell>
