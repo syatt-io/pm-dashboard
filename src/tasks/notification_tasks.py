@@ -192,7 +192,7 @@ def sync_project_epic_hours(self, project_key):
             end_date = datetime.now().strftime('%Y-%m-%d')
 
             logger.info(f"Fetching worklogs for {project_key} from {start_date} to {end_date}")
-            worklogs = tempo.get_worklogs(from_date=start_date, to_date=end_date)
+            worklogs = tempo.get_worklogs(from_date=start_date, to_date=end_date, project_key=project_key)
 
             if not worklogs:
                 logger.warning(f"No worklogs found for {project_key}")
@@ -217,11 +217,7 @@ def sync_project_epic_hours(self, project_key):
                     skipped += 1
                     continue
 
-                # Extract project from issue key
-                wl_project_key = issue_key.split('-')[0] if '-' in issue_key else None
-                if wl_project_key != project_key:
-                    skipped += 1
-                    continue
+                # Note: No need to validate project key since Tempo API filtered by project
 
                 # Get epic - try Tempo attributes first, then query Jira
                 epic_key = None

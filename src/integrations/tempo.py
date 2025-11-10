@@ -247,7 +247,8 @@ class TempoAPIClient:
         self,
         from_date: str,
         to_date: str,
-        limit: int = 5000
+        limit: int = 5000,
+        project_key: Optional[str] = None
     ) -> List[Dict]:
         """
         Fetch all worklogs for a date range with pagination.
@@ -256,6 +257,7 @@ class TempoAPIClient:
             from_date: Start date in YYYY-MM-DD format
             to_date: End date in YYYY-MM-DD format
             limit: Maximum results per request (default 5000, max allowed)
+            project_key: Optional project key to filter worklogs (e.g., "SUBS", "RNWL")
 
         Returns:
             List of worklog dictionaries
@@ -266,6 +268,10 @@ class TempoAPIClient:
             "to": to_date,
             "limit": limit
         }
+
+        # Add project filter if specified
+        if project_key:
+            params["project"] = project_key
 
         all_worklogs = []
 
