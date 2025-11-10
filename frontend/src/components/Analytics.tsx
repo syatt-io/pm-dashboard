@@ -35,6 +35,7 @@ import {
 import { usePermissions } from 'react-admin';
 import axios from 'axios';
 import ProjectForecastTab from './ProjectForecastTab';
+import { useTabWithUrl } from '../hooks/useTabWithUrl';
 
 interface EpicBaseline {
   epic_category: string;
@@ -131,7 +132,7 @@ const getConfidenceColor = (confidence: string) => {
 
 export const AnalyticsList = () => {
   const { permissions, isLoading: permissionsLoading } = usePermissions();
-  const [tabValue, setTabValue] = useState(0);
+  const [tabValue, setTabValue] = useTabWithUrl('meetings-tab', 0);
   const [baselines, setBaselines] = useState<EpicBaseline[]>([]);
   const [highRiskEpics, setHighRiskEpics] = useState<EpicBaseline[]>([]);
   const [loading, setLoading] = useState(true);

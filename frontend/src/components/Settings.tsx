@@ -55,6 +55,7 @@ import {
 import { Loading, Title, useDataProvider, useNotify, useRedirect } from 'react-admin';
 import { getApiUrl } from '../config';
 import UserManagement from './UserManagement';
+import { useTabWithUrl } from '../hooks/useTabWithUrl';
 
 interface Project {
   key: string;
@@ -153,7 +154,7 @@ export const Settings = () => {
   const notify = useNotify();
   const dataProvider = useDataProvider();
   const redirect = useRedirect();
-  const [tabValue, setTabValue] = useState(0);
+  const [tabValue, setTabValue] = useTabWithUrl('settings-tab', 0);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
 

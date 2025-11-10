@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
+import { useTabWithUrl } from '../hooks/useTabWithUrl';
 import {
   TextField,
   useNotify,
@@ -1075,7 +1076,7 @@ export const ProjectList = () => {
   const notify = useNotify();
   const dataProvider = useDataProvider();
   const [update] = useUpdate();
-  const [tabValue, setTabValue] = useState(0);
+  const [tabValue, setTabValue] = useTabWithUrl('projects-tab', 0);
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [activeProjects, setActiveProjects] = useState<Project[]>([]);
   const [watchedProjects, setWatchedProjects] = useState<Project[]>([]);
@@ -2151,8 +2152,8 @@ const ProjectShowContent = () => {
   const [update] = useUpdate();
   const { permissions } = usePermissions();
 
-  // Tab state
-  const [tabValue, setTabValue] = useState(0);
+  // Tab state with URL persistence
+  const [tabValue, setTabValue] = useTabWithUrl('project-show-tab', 0);
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
