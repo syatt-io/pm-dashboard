@@ -143,92 +143,15 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const WatchToggle = ({ record }: { record: any }) => {
-  const [watched, setWatched] = useState(false);
+const WatchToggle = ({ record, isWatched, onToggle }: { record: any, isWatched: boolean, onToggle: (projectKey: string, projectName: string, currentStatus: boolean) => Promise<void> }) => {
   const [loading, setLoading] = useState(false);
-  const notify = useNotify();
-
-  useEffect(() => {
-    // Load watched projects from API
-    const loadWatchedProjectsFromAPI = async () => {
-      if (loading) return; // Prevent multiple simultaneous requests
-
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('auth_token');
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/watched-projects`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setWatched(data.watched_projects.includes(record.key));
-        } else if (response.status === 401) {
-          // Silently handle auth errors - user may not be logged in yet
-        }
-      } catch (error) {
-        // Silently handle errors to prevent infinite retry loop
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadWatchedProjectsFromAPI();
-  }, [record.key]); // Only re-run when record.key changes
 
   const handleToggle = async () => {
+    setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        notify('Authentication required', { type: 'error' });
-        return;
-      }
-
-      if (watched) {
-        // Remove from watched list
-        const response = await fetch(`${API_BASE_URL}/api/watched-projects/${record.key}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.ok) {
-          setWatched(false);
-          notify(`Stopped watching ${record.name}`, { type: 'info' });
-          window.dispatchEvent(new Event('watchedProjectsChanged'));
-        } else {
-          throw new Error('Failed to unwatch project');
-        }
-      } else {
-        // Add to watched list
-        const response = await fetch(`${API_BASE_URL}/api/watched-projects/${record.key}`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.ok) {
-          setWatched(true);
-          notify(`Now watching ${record.name}`, { type: 'success' });
-          window.dispatchEvent(new Event('watchedProjectsChanged'));
-        } else {
-          throw new Error('Failed to watch project');
-        }
-      }
-    } catch (error) {
-      notify('Error updating project watch status', { type: 'error' });
+      await onToggle(record.key, record.name, isWatched);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -236,16 +159,17 @@ const WatchToggle = ({ record }: { record: any }) => {
     <FormControlLabel
       control={
         <Switch
-          checked={watched}
+          checked={isWatched}
           onChange={handleToggle}
+          disabled={loading}
           color="primary"
           size="small"
         />
       }
       label={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          {watched ? <Star color="primary" fontSize="small" /> : <StarBorder fontSize="small" />}
-          {watched ? 'Watching' : 'Watch'}
+          {isWatched ? <Star color="primary" fontSize="small" /> : <StarBorder fontSize="small" />}
+          {isWatched ? 'Watching' : 'Watch'}
         </Box>
       }
     />
@@ -1440,6 +1364,64 @@ export const ProjectList = () => {
     return Boolean(pendingChanges[projectKey] && Object.keys(pendingChanges[projectKey]).length > 0);
   };
 
+  const handleWatchToggle = async (projectKey: string, projectName: string, currentStatus: boolean) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        showSnackbar('Authentication required', 'error');
+        return;
+      }
+
+      if (currentStatus) {
+        // Remove from watched list
+        const response = await fetch(`${API_BASE_URL}/api/watched-projects/${projectKey}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          // Update local state
+          setActiveProjects(prevProjects =>
+            prevProjects.map(p =>
+              p.key === projectKey ? { ...p, is_watched: false } : p
+            )
+          );
+          showSnackbar(`Stopped watching ${projectName}`, 'info');
+          window.dispatchEvent(new Event('watchedProjectsChanged'));
+        } else {
+          throw new Error('Failed to unwatch project');
+        }
+      } else {
+        // Add to watched list
+        const response = await fetch(`${API_BASE_URL}/api/watched-projects/${projectKey}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          // Update local state
+          setActiveProjects(prevProjects =>
+            prevProjects.map(p =>
+              p.key === projectKey ? { ...p, is_watched: true } : p
+            )
+          );
+          showSnackbar(`Now watching ${projectName}`, 'success');
+          window.dispatchEvent(new Event('watchedProjectsChanged'));
+        } else {
+          throw new Error('Failed to watch project');
+        }
+      }
+    } catch (error) {
+      showSnackbar('Error updating project watch status', 'error');
+    }
+  };
+
   return (
     <Box>
       <WatchedProjectsHeader />
@@ -1794,7 +1776,11 @@ export const ProjectList = () => {
                               </TableCell>
                             )}
                             <TableCell>
-                              <WatchToggle record={project} />
+                              <WatchToggle
+                                record={project}
+                                isWatched={project.is_watched || false}
+                                onToggle={handleWatchToggle}
+                              />
                             </TableCell>
                             <TableCell>
                               <MuiButton
