@@ -151,7 +151,6 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export const Settings = () => {
-  const notify = useNotify();
   const dataProvider = useDataProvider();
   const redirect = useRedirect();
   const [tabValue, setTabValue] = useTabWithUrl('settings-tab', 0);
@@ -180,7 +179,6 @@ export const Settings = () => {
   const [notionValidationResult, setNotionValidationResult] = useState<{ valid: boolean; message: string } | null>(null);
 
   // Google OAuth state
-  const [googleOAuthToken, setGoogleOAuthToken] = useState('');
   const [deletingGoogle, setDeletingGoogle] = useState(false);
   const [deleteGoogleDialog, setDeleteGoogleDialog] = useState(false);
 

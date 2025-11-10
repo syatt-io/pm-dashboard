@@ -226,19 +226,20 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
               </TableRow>
             </TableHead>
             <TableBody>
-              {budgets.map((budget) => (
+              {budgets
+                .slice()
+                .sort((a, b) => (a.epic_summary || a.epic_key).localeCompare(b.epic_summary || b.epic_key))
+                .map((budget) => (
                 <TableRow key={budget.id} hover>
                   <TableCell>
                     <Tooltip title={budget.epic_summary || budget.epic_key}>
-                      <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                        {budget.epic_key}
+                      <Typography variant="body2" fontWeight="medium" noWrap sx={{ maxWidth: 200 }}>
+                        {budget.epic_summary || budget.epic_key}
                       </Typography>
                     </Tooltip>
-                    {budget.epic_summary && (
-                      <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
-                        {budget.epic_summary}
-                      </Typography>
-                    )}
+                    <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
+                      {budget.epic_key}
+                    </Typography>
                   </TableCell>
                   <TableCell align="right">
                     {editingId === budget.id ? (

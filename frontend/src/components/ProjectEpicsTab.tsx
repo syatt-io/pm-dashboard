@@ -45,7 +45,7 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
   const [selectedEpics, setSelectedEpics] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const notify = useNotify();
 

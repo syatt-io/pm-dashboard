@@ -4,14 +4,12 @@ import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
 import {
-  TextField,
   useNotify,
   useDataProvider,
   useRefresh,
   Button,
   useRedirect,
   Show,
-  SimpleShowLayout,
   useRecordContext,
   Edit,
   SimpleForm,
@@ -19,7 +17,6 @@ import {
   SelectInput,
   NumberInput,
   BooleanInput,
-  EditButton,
   TopToolbar,
   useUpdate,
   ListButton,
