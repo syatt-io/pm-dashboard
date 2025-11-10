@@ -1,7 +1,8 @@
 import React from 'react';
-import { Menu, usePermissions, MenuItemLink, useSidebarState } from 'react-admin';
+import { Menu, usePermissions, MenuItemLink, useSidebarState, DashboardMenuItem } from 'react-admin';
 import { useResourceDefinitions } from 'react-admin';
 import { styled } from '@mui/material/styles';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 
 /**
  * Custom Menu that filters resources based on user permissions.
@@ -49,6 +50,10 @@ export const CustomMenu = () => {
 
   return (
     <StyledMenuContainer>
+      <DashboardMenuItem
+        leftIcon={<DashboardIcon />}
+        sidebarIsOpen={open}
+      />
       {Object.keys(resources).map((name) => {
         const resource = resources[name];
 
