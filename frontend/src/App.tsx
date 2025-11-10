@@ -1,5 +1,5 @@
 import React from 'react';
-import { Admin, Resource } from 'react-admin';
+import { Admin, Resource, usePermissions } from 'react-admin';
 import { dataProvider } from './dataProvider';
 import { authProvider } from './authProvider';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -37,6 +37,85 @@ import Login from './components/Login';
 import Settings from './components/Settings';
 import EpicTemplates from './components/EpicTemplates';
 
+// Component to render resources based on permissions
+const AdminResources = () => {
+  const { permissions } = usePermissions();
+  const isAdmin = permissions === 'admin';
+
+  return (
+    <>
+      <Resource
+        name="projects"
+        list={ProjectList}
+        show={ProjectShow}
+        edit={ProjectEdit}
+        icon={BusinessIcon}
+        options={{ label: 'My Projects' }}
+      />
+      <Resource
+        name="analysis"
+        list={AnalysisList}
+        show={AnalysisShow}
+        icon={FavoriteIcon}
+        options={{ label: 'My Meetings' }}
+      />
+      <Resource
+        name="todos"
+        list={TodoList}
+        show={TodoShow}
+        edit={TodoEdit}
+        create={TodoCreate}
+        icon={TaskIcon}
+        options={{ label: 'My TODOs' }}
+      />
+      <Resource
+        name="feedback"
+        list={FeedbackList}
+        create={FeedbackCreate}
+        edit={FeedbackEdit}
+        icon={FeedbackIcon}
+        options={{ label: 'My Feedback' }}
+      />
+      <Resource
+        name="learnings"
+        list={LearningsList}
+        show={LearningShow}
+        create={LearningCreate}
+        edit={LearningEdit}
+        icon={LightbulbIcon}
+        options={{ label: 'Team Learnings' }}
+      />
+      <Resource
+        name="analytics"
+        list={AnalyticsList}
+        icon={AnalyticsIcon}
+        options={{ label: 'Analytics' }}
+      />
+      {/* Epic Templates - Admin only */}
+      {isAdmin && (
+        <Resource
+          name="epic-templates"
+          list={EpicTemplates}
+          icon={CategoryIcon}
+          options={{ label: 'Epic Templates' }}
+        />
+      )}
+      <Resource
+        name="settings"
+        list={Settings}
+        icon={SettingsIcon}
+        options={{ label: 'Settings' }}
+      />
+      {/* Meetings resource hidden from nav - accessible via Analysis tabs */}
+      <Resource
+        name="meetings"
+        show={MeetingShow}
+        edit={MeetingEdit}
+      />
+    </>
+  );
+};
+
 const AdminApp = () => {
   return (
     <Admin
@@ -50,72 +129,8 @@ const AdminApp = () => {
       requireAuth
       disableTelemetry
     >
-        <Resource
-          name="projects"
-          list={ProjectList}
-          show={ProjectShow}
-          edit={ProjectEdit}
-          icon={BusinessIcon}
-          options={{ label: 'My Projects' }}
-        />
-        <Resource
-          name="analysis"
-          list={AnalysisList}
-          show={AnalysisShow}
-          icon={FavoriteIcon}
-          options={{ label: 'My Meetings' }}
-        />
-        <Resource
-          name="todos"
-          list={TodoList}
-          show={TodoShow}
-          edit={TodoEdit}
-          create={TodoCreate}
-          icon={TaskIcon}
-          options={{ label: 'My TODOs' }}
-        />
-        <Resource
-          name="feedback"
-          list={FeedbackList}
-          create={FeedbackCreate}
-          edit={FeedbackEdit}
-          icon={FeedbackIcon}
-          options={{ label: 'My Feedback' }}
-        />
-        <Resource
-          name="learnings"
-          list={LearningsList}
-          show={LearningShow}
-          create={LearningCreate}
-          edit={LearningEdit}
-          icon={LightbulbIcon}
-          options={{ label: 'Team Learnings' }}
-        />
-        <Resource
-          name="analytics"
-          list={AnalyticsList}
-          icon={AnalyticsIcon}
-          options={{ label: 'Analytics' }}
-        />
-        <Resource
-          name="epic-templates"
-          list={EpicTemplates}
-          icon={CategoryIcon}
-          options={{ label: 'Epic Templates' }}
-        />
-        <Resource
-          name="settings"
-          list={Settings}
-          icon={SettingsIcon}
-          options={{ label: 'Settings' }}
-        />
-        {/* Meetings resource hidden from nav - accessible via Analysis tabs */}
-        <Resource
-          name="meetings"
-          show={MeetingShow}
-          edit={MeetingEdit}
-        />
-      </Admin>
+      <AdminResources />
+    </Admin>
   );
 };
 

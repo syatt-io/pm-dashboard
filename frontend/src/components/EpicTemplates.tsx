@@ -31,7 +31,7 @@ import {
   Cancel as CancelIcon,
   DragIndicator as DragIcon,
 } from '@mui/icons-material';
-import { Title, Loading, useNotify } from 'react-admin';
+import { Title, Loading, useNotify, usePermissions } from 'react-admin';
 import { getApiUrl } from '../config';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
@@ -45,6 +45,10 @@ interface EpicTemplate {
 }
 
 const EpicTemplates: React.FC = () => {
+  const { permissions } = usePermissions();
+  const notify = useNotify();
+
+  // All hooks must be called before any conditional returns
   const [templates, setTemplates] = useState<EpicTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,11 +65,26 @@ const EpicTemplates: React.FC = () => {
     message: '',
     severity: 'success',
   });
-  const notify = useNotify();
 
   useEffect(() => {
-    fetchTemplates();
-  }, []);
+    if (permissions === 'admin') {
+      fetchTemplates();
+    }
+  }, [permissions]);
+
+  // Admin only - show access denied if not admin
+  if (permissions !== 'admin') {
+    return (
+      <Card>
+        <Title title="Epic Templates" />
+        <CardContent>
+          <Alert severity="error">
+            Access Denied. This page is only accessible to administrators.
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const fetchTemplates = async () => {
     try {
