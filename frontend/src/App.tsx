@@ -39,7 +39,13 @@ import EpicTemplates from './components/EpicTemplates';
 
 // Component to render resources based on permissions
 const AdminResources = () => {
-  const { permissions } = usePermissions();
+  const { permissions, isLoading } = usePermissions();
+
+  // Don't render anything while permissions are loading to prevent infinite loop
+  if (isLoading) {
+    return null;
+  }
+
   const isAdmin = permissions === 'admin';
 
   return (
