@@ -40,6 +40,12 @@ export const authProvider: AuthProvider = {
 
   // Called when the user navigates to a new location to check for permissions
   getPermissions: async (params: any) => {
+    // Don't even try to fetch permissions if there's no token
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      return Promise.reject({ message: 'No auth token', redirectTo: '/login' });
+    }
+
     try {
       const response = await axios.get('/api/auth/user');
       const user = response.data.user;
@@ -50,12 +56,18 @@ export const authProvider: AuthProvider = {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('rememberMe');
       }
-      return Promise.reject();
+      return Promise.reject({ message: 'Auth failed', redirectTo: '/login' });
     }
   },
 
   // Get user identity
   getIdentity: async () => {
+    // Don't even try to fetch identity if there's no token
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      return Promise.reject({ message: 'No auth token', redirectTo: '/login' });
+    }
+
     try {
       const response = await axios.get('/api/auth/user');
       const user = response.data.user;
@@ -70,7 +82,7 @@ export const authProvider: AuthProvider = {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('rememberMe');
       }
-      return Promise.reject();
+      return Promise.reject({ message: 'Auth failed', redirectTo: '/login' });
     }
   }
 };

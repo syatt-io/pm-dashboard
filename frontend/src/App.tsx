@@ -41,10 +41,20 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: (failureCount, error: any) => {
-        // Don't retry on 401/403 errors
-        if (error?.response?.status === 401 || error?.response?.status === 403) {
+        // Don't retry on 401/403 errors - check multiple error formats
+        const status = error?.response?.status || error?.status || error?.statusCode;
+        const message = error?.message || '';
+
+        if (status === 401 || status === 403) {
           return false;
         }
+
+        // Also check for auth-related error messages
+        if (message.includes('401') || message.includes('403') ||
+            message.includes('Unauthorized') || message.includes('Forbidden')) {
+          return false;
+        }
+
         // Retry other errors max 3 times
         return failureCount < 3;
       },
@@ -55,19 +65,38 @@ const queryClient = new QueryClient({
 
 // NOTE: React Admin provides its own router - do NOT wrap in BrowserRouter!
 
-// Component to render resources based on permissions
-const AdminResources = () => {
-  const { permissions, isLoading } = usePermissions();
+// Component to render admin-only resources
+const AdminOnlyResources = () => {
+  const { permissions } = usePermissions();
 
-  // Don't render anything while permissions are loading to prevent infinite loop
-  if (isLoading) {
-    return null;
+  if (permissions === 'admin') {
+    return (
+      <Resource
+        name="epic-templates"
+        list={EpicTemplates}
+        icon={CategoryIcon}
+        options={{ label: 'Epic Templates' }}
+      />
+    );
   }
 
-  const isAdmin = permissions === 'admin';
+  return null;
+};
 
+const AdminApp = () => {
   return (
-    <>
+    <Admin
+      dataProvider={dataProvider}
+      authProvider={authProvider}
+      queryClient={queryClient}
+      dashboard={Dashboard}
+      title="PM Command Center"
+      layout={CustomLayout}
+      theme={customLightTheme}
+      loginPage={Login}
+      requireAuth
+      disableTelemetry
+    >
       <Resource
         name="projects"
         list={ProjectList}
@@ -115,46 +144,18 @@ const AdminResources = () => {
         icon={AnalyticsIcon}
         options={{ label: 'Analytics' }}
       />
-      {/* Epic Templates - Admin only */}
-      {isAdmin && (
-        <Resource
-          name="epic-templates"
-          list={EpicTemplates}
-          icon={CategoryIcon}
-          options={{ label: 'Epic Templates' }}
-        />
-      )}
+      <AdminOnlyResources />
       <Resource
         name="settings"
         list={Settings}
         icon={SettingsIcon}
         options={{ label: 'Settings' }}
       />
-      {/* Meetings resource hidden from nav - accessible via Analysis tabs */}
       <Resource
         name="meetings"
         show={MeetingShow}
         edit={MeetingEdit}
       />
-    </>
-  );
-};
-
-const AdminApp = () => {
-  return (
-    <Admin
-      dataProvider={dataProvider}
-      authProvider={authProvider}
-      queryClient={queryClient}
-      dashboard={Dashboard}
-      title="PM Command Center"
-      layout={CustomLayout}
-      theme={customLightTheme}
-      loginPage={Login}
-      requireAuth
-      disableTelemetry
-    >
-      <AdminResources />
     </Admin>
   );
 };
