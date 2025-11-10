@@ -108,6 +108,54 @@ class TempoAPIClient:
             return None
 
     @retry_with_backoff(max_retries=3, base_delay=1.0)
+    def get_epic_from_jira(self, issue_key: str) -> Optional[str]:
+        """
+        Get epic key from Jira issue via Epic Link or parent hierarchy.
+
+        Checks two places for epic:
+        1. customfield_10014 (Epic Link field) - legacy approach
+        2. parent field (modern Jira hierarchy) - checks if parent is an Epic
+
+        Args:
+            issue_key: Jira issue key (e.g., "SUBS-123")
+
+        Returns:
+            Epic key (e.g., "SUBS-456") or None if not found
+        """
+        try:
+            # Rate limit to avoid hitting Jira API limits
+            self._rate_limit()
+
+            url = f"{self.jira_url}/rest/api/3/issue/{issue_key}"
+            params = {"fields": "customfield_10014,parent"}
+            response = requests.get(url, headers=self.jira_headers, params=params, timeout=10)
+            response.raise_for_status()
+
+            issue_data = response.json()
+            fields = issue_data.get("fields", {})
+
+            # Try Epic Link field first (legacy)
+            epic_key = fields.get("customfield_10014")
+            if epic_key:
+                return epic_key
+
+            # Try parent field (modern Jira hierarchy)
+            parent = fields.get("parent")
+            if parent:
+                parent_key = parent.get("key")
+                # Check if parent is an Epic
+                parent_fields = parent.get("fields", {})
+                parent_issue_type = parent_fields.get("issuetype", {})
+                if parent_issue_type.get("name") == "Epic":
+                    return parent_key
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"Error getting epic for issue {issue_key}: {e}")
+            return None
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
     def get_user_name(self, account_id: str) -> Optional[str]:
         """
         Resolve Jira account ID to user display name via Jira API with rate limiting.

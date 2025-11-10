@@ -223,7 +223,7 @@ def sync_project_epic_hours(self, project_key):
                     skipped += 1
                     continue
 
-                # Get epic
+                # Get epic - try Tempo attributes first, then query Jira
                 epic_key = None
                 attributes = worklog.get('attributes', {})
                 if attributes:
@@ -233,6 +233,11 @@ def sync_project_epic_hours(self, project_key):
                             epic_key = attr.get('value')
                             break
 
+                # If not in Tempo attributes, query Jira API for Epic Link field
+                if not epic_key:
+                    epic_key = tempo.get_epic_from_jira(issue_key)
+
+                # Final fallback
                 if not epic_key:
                     epic_key = 'NO_EPIC'
 
