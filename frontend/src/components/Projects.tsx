@@ -1608,6 +1608,7 @@ export const ProjectList = () => {
               const getTypeLabel = (type: string) => {
                 switch (type) {
                   case 'project-based': return 'Project-based Projects';
+                  case 'ongoing': return 'Ongoing Projects';
                   case 'growth-support': return 'Growth & Support Projects';
                   case 'n-a': return 'N/A Projects';
                   default: return 'Other Projects';

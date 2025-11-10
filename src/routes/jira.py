@@ -484,7 +484,7 @@ def update_project(project_key):
                     "key": project_key,
                     "name": data.get('name', 'Unknown'),
                     "is_active": data.get('is_active', True),
-                    "project_work_type": data.get('project_work_type', 'ongoing'),
+                    "project_work_type": data.get('project_work_type', 'project-based'),
                     "total_hours": data.get('total_hours', 0),
                     "retainer_hours": data.get('retainer_hours', 0),
                     "weekly_meeting_day": data.get('weekly_meeting_day'),
