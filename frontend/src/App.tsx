@@ -1,5 +1,5 @@
 import React from 'react';
-import { Admin, Resource, usePermissions } from 'react-admin';
+import { Admin, Resource } from 'react-admin';
 import { QueryClient } from '@tanstack/react-query';
 import { dataProvider } from './dataProvider';
 import { authProvider } from './authProvider';
@@ -65,24 +65,6 @@ const queryClient = new QueryClient({
 
 // NOTE: React Admin provides its own router - do NOT wrap in BrowserRouter!
 
-// Component to render admin-only resources
-const AdminOnlyResources = () => {
-  const { permissions } = usePermissions();
-
-  if (permissions === 'admin') {
-    return (
-      <Resource
-        name="epic-templates"
-        list={EpicTemplates}
-        icon={CategoryIcon}
-        options={{ label: 'Epic Templates' }}
-      />
-    );
-  }
-
-  return null;
-};
-
 const AdminApp = () => {
   return (
     <Admin
@@ -97,65 +79,77 @@ const AdminApp = () => {
       requireAuth
       disableTelemetry
     >
-      <Resource
-        name="projects"
-        list={ProjectList}
-        show={ProjectShow}
-        edit={ProjectEdit}
-        icon={BusinessIcon}
-        options={{ label: 'My Projects' }}
-      />
-      <Resource
-        name="analysis"
-        list={AnalysisList}
-        show={AnalysisShow}
-        icon={FavoriteIcon}
-        options={{ label: 'My Meetings' }}
-      />
-      <Resource
-        name="todos"
-        list={TodoList}
-        show={TodoShow}
-        edit={TodoEdit}
-        create={TodoCreate}
-        icon={TaskIcon}
-        options={{ label: 'My TODOs' }}
-      />
-      <Resource
-        name="feedback"
-        list={FeedbackList}
-        create={FeedbackCreate}
-        edit={FeedbackEdit}
-        icon={FeedbackIcon}
-        options={{ label: 'My Feedback' }}
-      />
-      <Resource
-        name="learnings"
-        list={LearningsList}
-        show={LearningShow}
-        create={LearningCreate}
-        edit={LearningEdit}
-        icon={LightbulbIcon}
-        options={{ label: 'Team Learnings' }}
-      />
-      <Resource
-        name="analytics"
-        list={AnalyticsList}
-        icon={AnalyticsIcon}
-        options={{ label: 'Analytics' }}
-      />
-      <AdminOnlyResources />
-      <Resource
-        name="settings"
-        list={Settings}
-        icon={SettingsIcon}
-        options={{ label: 'Settings' }}
-      />
-      <Resource
-        name="meetings"
-        show={MeetingShow}
-        edit={MeetingEdit}
-      />
+      {(permissions) => (
+        <>
+          <Resource
+            name="projects"
+            list={ProjectList}
+            show={ProjectShow}
+            edit={ProjectEdit}
+            icon={BusinessIcon}
+            options={{ label: 'My Projects' }}
+          />
+          <Resource
+            name="analysis"
+            list={AnalysisList}
+            show={AnalysisShow}
+            icon={FavoriteIcon}
+            options={{ label: 'My Meetings' }}
+          />
+          <Resource
+            name="todos"
+            list={TodoList}
+            show={TodoShow}
+            edit={TodoEdit}
+            create={TodoCreate}
+            icon={TaskIcon}
+            options={{ label: 'My TODOs' }}
+          />
+          <Resource
+            name="feedback"
+            list={FeedbackList}
+            create={FeedbackCreate}
+            edit={FeedbackEdit}
+            icon={FeedbackIcon}
+            options={{ label: 'My Feedback' }}
+          />
+          <Resource
+            name="learnings"
+            list={LearningsList}
+            show={LearningShow}
+            create={LearningCreate}
+            edit={LearningEdit}
+            icon={LightbulbIcon}
+            options={{ label: 'Team Learnings' }}
+          />
+          <Resource
+            name="analytics"
+            list={AnalyticsList}
+            icon={AnalyticsIcon}
+            options={{ label: 'Analytics' }}
+          />
+          {/* Epic Templates - Admin only */}
+          {permissions === 'admin' && (
+            <Resource
+              name="epic-templates"
+              list={EpicTemplates}
+              icon={CategoryIcon}
+              options={{ label: 'Epic Templates' }}
+            />
+          )}
+          <Resource
+            name="settings"
+            list={Settings}
+            icon={SettingsIcon}
+            options={{ label: 'Settings' }}
+          />
+          <Resource
+            name="meetings"
+            show={MeetingShow}
+            edit={MeetingEdit}
+          />
+        </>
+      )}
     </Admin>
   );
 };
