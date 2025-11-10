@@ -44,7 +44,12 @@ export const authProvider: AuthProvider = {
       const response = await axios.get('/api/auth/user');
       const user = response.data.user;
       return Promise.resolve(user.role);
-    } catch (error) {
+    } catch (error: any) {
+      // If 401, clear token and force login
+      if (error?.response?.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('rememberMe');
+      }
       return Promise.reject();
     }
   },
@@ -59,7 +64,12 @@ export const authProvider: AuthProvider = {
         fullName: user.name,
         avatar: user.picture
       });
-    } catch (error) {
+    } catch (error: any) {
+      // If 401, clear token and force login
+      if (error?.response?.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('rememberMe');
+      }
       return Promise.reject();
     }
   }
