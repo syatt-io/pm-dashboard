@@ -149,6 +149,170 @@ def sync_tempo_hours(self):
 
 
 @shared_task(
+    name='src.tasks.notification_tasks.sync_project_epic_hours',
+    bind=True,  # Bind task instance to get retry info
+    autoretry_for=(Exception,),  # Auto-retry on any exception
+    retry_kwargs={'max_retries': 2, 'countdown': 180},  # Retry 2 times, wait 3 min between retries
+    retry_backoff=True,  # Exponential backoff
+    retry_backoff_max=900,  # Max 15 min backoff
+    retry_jitter=True  # Add jitter to prevent thundering herd
+)
+def sync_project_epic_hours(self, project_key):
+    """
+    Sync epic hours for a specific project from Tempo (Celery task).
+
+    This task extracts the logic from the /api/jira/projects/<key>/sync-hours endpoint
+    to run it reliably via Celery instead of a daemon thread.
+
+    Args:
+        project_key: The Jira project key to sync (e.g., 'RNWL')
+
+    Resilience features:
+    - Auto-retry up to 2 times with exponential backoff
+    - 3-minute initial wait, up to 15-minute max backoff
+    - Jitter to prevent simultaneous retries
+    """
+    try:
+        from datetime import datetime, date
+        from collections import defaultdict
+        from src.integrations.tempo import TempoAPIClient
+        from src.models import EpicHours
+        from src.utils.database import get_session
+        from sqlalchemy.dialects.postgresql import insert
+
+        retry_info = f" (attempt {self.request.retries + 1}/3)" if self.request.retries > 0 else ""
+        logger.info(f"⏰ Starting epic hours sync for {project_key}{retry_info}...")
+
+        tempo = TempoAPIClient()
+        session = get_session()
+
+        try:
+            # Fetch worklogs for last 2+ years
+            start_date = '2023-01-01'
+            end_date = datetime.now().strftime('%Y-%m-%d')
+
+            logger.info(f"Fetching worklogs for {project_key} from {start_date} to {end_date}")
+            worklogs = tempo.get_worklogs(from_date=start_date, to_date=end_date)
+
+            if not worklogs:
+                logger.warning(f"No worklogs found for {project_key}")
+                session.close()
+                return {'success': True, 'project_key': project_key, 'records': 0, 'message': 'No worklogs found'}
+
+            # Group by epic → month → team
+            epic_month_team_hours = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+            processed = 0
+            skipped = 0
+
+            for worklog in worklogs:
+                issue = worklog.get('issue', {})
+                issue_id = issue.get('id')
+                if not issue_id:
+                    skipped += 1
+                    continue
+
+                # Get issue key
+                issue_key = tempo.get_issue_key_from_jira(issue_id)
+                if not issue_key:
+                    skipped += 1
+                    continue
+
+                # Extract project from issue key
+                wl_project_key = issue_key.split('-')[0] if '-' in issue_key else None
+                if wl_project_key != project_key:
+                    skipped += 1
+                    continue
+
+                # Get epic
+                epic_key = None
+                attributes = worklog.get('attributes', {})
+                if attributes:
+                    values = attributes.get('values', [])
+                    for attr in values:
+                        if attr.get('key') == '_Epic_':
+                            epic_key = attr.get('value')
+                            break
+
+                if not epic_key:
+                    epic_key = 'NO_EPIC'
+
+                # Get month
+                started = worklog.get('startDate')
+                if not started:
+                    skipped += 1
+                    continue
+
+                worklog_date = datetime.strptime(started[:10], '%Y-%m-%d').date()
+                month = date(worklog_date.year, worklog_date.month, 1)
+
+                # Get hours
+                time_spent_seconds = worklog.get('timeSpentSeconds', 0)
+                hours = time_spent_seconds / 3600.0
+
+                # Get team
+                author = worklog.get('author', {})
+                account_id = author.get('accountId')
+                if account_id:
+                    team = tempo.get_user_team(account_id)
+                    if not team or team == 'Unassigned':
+                        team = 'Other'
+                else:
+                    team = 'Other'
+
+                # Accumulate
+                epic_month_team_hours[epic_key][month][team] += hours
+                processed += 1
+
+            logger.info(f"Processed {processed} worklogs for {project_key}, skipped {skipped}")
+
+            # Insert into database
+            records_inserted = 0
+            for epic_key, months in epic_month_team_hours.items():
+                for month, teams in months.items():
+                    for team, hours in teams.items():
+                        if hours > 0:
+                            stmt = insert(EpicHours).values(
+                                project_key=project_key,
+                                epic_key=epic_key,
+                                epic_summary=epic_key,
+                                month=month,
+                                team=team,
+                                hours=round(hours, 2),
+                                created_at=datetime.now(),
+                                updated_at=datetime.now()
+                            )
+                            stmt = stmt.on_conflict_do_update(
+                                index_elements=['project_key', 'epic_key', 'month', 'team'],
+                                set_={
+                                    'hours': stmt.excluded.hours,
+                                    'updated_at': datetime.now()
+                                }
+                            )
+                            session.execute(stmt)
+                            records_inserted += 1
+
+            session.commit()
+            logger.info(f"✅ Successfully synced {records_inserted} epic hours records for {project_key}")
+
+            return {
+                'success': True,
+                'project_key': project_key,
+                'records': records_inserted,
+                'processed': processed,
+                'skipped': skipped,
+                'retries': self.request.retries
+            }
+
+        finally:
+            session.close()
+
+    except Exception as e:
+        logger.error(f"❌ Error in epic hours sync for {project_key} (attempt {self.request.retries + 1}/3): {e}", exc_info=True)
+        # Re-raise to trigger auto-retry
+        raise
+
+
+@shared_task(
     name='src.tasks.notification_tasks.analyze_meetings',
     bind=True,  # Bind task instance to get retry info
     autoretry_for=(Exception,),  # Auto-retry on any exception
