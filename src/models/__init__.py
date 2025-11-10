@@ -19,6 +19,11 @@ from .user_team import UserTeam
 from .forecast import EpicForecast
 from .time_tracking_compliance import TimeTrackingCompliance
 from .monthly_reconciliation import MonthlyReconciliationReport
+from .project import Project, ProjectCharacteristics
+from .standard_epic_template import StandardEpicTemplate
+from .project_keyword import ProjectKeyword
+from .project_resource_mapping import ProjectResourceMapping
+from .project_monthly_forecast import ProjectMonthlyForecast
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -142,6 +147,9 @@ __all__ = [
     'EpicForecast',
     'TimeTrackingCompliance',
     'MonthlyReconciliationReport',
+    'Project',
+    'ProjectCharacteristics',
+    'StandardEpicTemplate',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',

@@ -16,6 +16,7 @@ import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CategoryIcon from '@mui/icons-material/Category';
 
 // Components
 import { MeetingShow, MeetingEdit } from './components/Meetings';
@@ -34,6 +35,7 @@ import { FeedbackCreate } from './components/FeedbackCreate';
 import { FeedbackEdit } from './components/FeedbackEdit';
 import Login from './components/Login';
 import Settings from './components/Settings';
+import EpicTemplates from './components/EpicTemplates';
 
 const AdminApp = () => {
   return (
@@ -94,6 +96,12 @@ const AdminApp = () => {
           list={AnalyticsList}
           icon={AnalyticsIcon}
           options={{ label: 'Analytics' }}
+        />
+        <Resource
+          name="epic-templates"
+          list={EpicTemplates}
+          icon={CategoryIcon}
+          options={{ label: 'Epic Templates' }}
         />
         <Resource
           name="settings"

@@ -31,6 +31,7 @@ import {
   CalendarMonth as ScheduleIcon,
   Download as DownloadIcon,
   Group as TeamIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import { usePermissions } from 'react-admin';
 import axios from 'axios';
@@ -142,6 +143,8 @@ export const AnalyticsList = () => {
   const [error, setError] = useState<string | null>(null);
   const [sortField, setSortField] = useState<'epic_category' | 'median_hours' | 'project_count'>('epic_category');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [rebuildLoading, setRebuildLoading] = useState(false);
+  const [rebuildResult, setRebuildResult] = useState<any>(null);
 
   useEffect(() => {
     // Only fetch data if user is admin
@@ -170,6 +173,33 @@ export const AnalyticsList = () => {
       setHighRiskEpics(response.data.high_risk_epics || []);
     } catch (err) {
       console.error('Error fetching high-risk epics:', err);
+    }
+  };
+
+  const handleRebuildModels = async () => {
+    if (!window.confirm('This will rebuild all forecasting models and may take several minutes. Continue?')) {
+      return;
+    }
+
+    setRebuildLoading(true);
+    setRebuildResult(null);
+    setError(null);
+
+    try {
+      const response = await axios.post('/api/analytics/rebuild-models');
+      setRebuildResult(response.data);
+
+      if (response.data.success) {
+        // Refresh baselines after successful rebuild
+        await fetchBaselines();
+        await fetchHighRiskEpics();
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to rebuild models';
+      setError(errorMessage);
+      setRebuildResult(err.response?.data);
+    } finally {
+      setRebuildLoading(false);
     }
   };
 
@@ -268,12 +298,51 @@ export const AnalyticsList = () => {
 
   return (
     <Box p={3}>
-      <Typography variant="h4" gutterBottom>
-        Analytics & Forecasting
-      </Typography>
-      <Typography variant="body2" color="textSecondary" gutterBottom>
-        Historical baseline estimates and project forecasting tools
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Box>
+          <Typography variant="h4" gutterBottom>
+            Analytics & Forecasting
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Historical baseline estimates and project forecasting tools
+          </Typography>
+        </Box>
+        <MuiButton
+          variant="outlined"
+          color="primary"
+          startIcon={rebuildLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+          onClick={handleRebuildModels}
+          disabled={rebuildLoading}
+        >
+          {rebuildLoading ? 'Rebuilding...' : 'Rebuild Models'}
+        </MuiButton>
+      </Box>
+
+      {rebuildResult && (
+        <Alert
+          severity={rebuildResult.success ? 'success' : 'error'}
+          onClose={() => setRebuildResult(null)}
+          sx={{ mb: 2 }}
+        >
+          <Typography variant="body2" fontWeight="bold">
+            {rebuildResult.message}
+          </Typography>
+          {rebuildResult.total_duration_seconds && (
+            <Typography variant="caption" display="block">
+              Completed in {rebuildResult.total_duration_seconds}s
+            </Typography>
+          )}
+          {rebuildResult.results && (
+            <Box sx={{ mt: 1 }}>
+              {Object.entries(rebuildResult.results).map(([script, result]: [string, any]) => (
+                <Typography key={script} variant="caption" display="block">
+                  {script}: {result.success ? '✓' : '✗'} {result.error && `(${result.error})`}
+                </Typography>
+              ))}
+            </Box>
+          )}
+        </Alert>
+      )}
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 3, mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>

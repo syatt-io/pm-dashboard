@@ -526,3 +526,149 @@ def export_project_schedule(user):
     except Exception as e:
         logger.error(f"Error exporting project schedule: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@analytics_bp.route('/rebuild-models', methods=['POST'])
+@admin_required
+def rebuild_forecasting_models(user):
+    """
+    Trigger a full rebuild of all forecasting models and analytics data.
+
+    Runs all 3 analysis scripts in sequence:
+    1. deep_analysis_epic_hours.py - Analyze epic hours data
+    2. epic_lifecycle_analysis.py - Analyze epic lifecycle patterns
+    3. build_forecasting_baselines.py - Build forecasting baselines
+
+    This endpoint runs the scripts synchronously, which may take several minutes
+    depending on the amount of data. Consider implementing async processing
+    if rebuild times become too long.
+
+    Returns:
+    {
+        "success": bool,
+        "message": str,
+        "results": {
+            "deep_analysis": {"success": bool, "output": str, "error": str},
+            "lifecycle_analysis": {"success": bool, "output": str, "error": str},
+            "baselines": {"success": bool, "output": str, "error": str}
+        },
+        "total_duration_seconds": float
+    }
+    """
+    try:
+        import subprocess
+        import os
+        import time
+
+        logger.info("Starting forecasting models rebuild...")
+        start_time = time.time()
+
+        # Get project root directory
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+        scripts_dir = os.path.join(project_root, 'scripts')
+
+        # Define scripts to run in order
+        scripts = [
+            {
+                'name': 'deep_analysis',
+                'path': os.path.join(scripts_dir, 'deep_analysis_epic_hours.py'),
+                'description': 'Deep analysis of epic hours'
+            },
+            {
+                'name': 'lifecycle_analysis',
+                'path': os.path.join(scripts_dir, 'epic_lifecycle_analysis.py'),
+                'description': 'Epic lifecycle pattern analysis'
+            },
+            {
+                'name': 'baselines',
+                'path': os.path.join(scripts_dir, 'build_forecasting_baselines.py'),
+                'description': 'Build forecasting baselines'
+            }
+        ]
+
+        results = {}
+        all_success = True
+
+        # Run each script in sequence
+        for script_info in scripts:
+            script_name = script_info['name']
+            script_path = script_info['path']
+            description = script_info['description']
+
+            logger.info(f"Running {description}: {script_path}")
+
+            try:
+                # Check if script exists
+                if not os.path.exists(script_path):
+                    results[script_name] = {
+                        'success': False,
+                        'output': '',
+                        'error': f'Script not found: {script_path}'
+                    }
+                    all_success = False
+                    logger.error(f"Script not found: {script_path}")
+                    continue
+
+                # Run script using subprocess
+                # Use shell=False for better security
+                result = subprocess.run(
+                    ['python', script_path],
+                    cwd=project_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=600  # 10 minute timeout per script
+                )
+
+                # Store results
+                results[script_name] = {
+                    'success': result.returncode == 0,
+                    'output': result.stdout[-2000:] if len(result.stdout) > 2000 else result.stdout,  # Last 2000 chars
+                    'error': result.stderr[-2000:] if len(result.stderr) > 2000 else result.stderr
+                }
+
+                if result.returncode != 0:
+                    all_success = False
+                    logger.error(f"{description} failed with return code {result.returncode}")
+                    logger.error(f"Error output: {result.stderr}")
+                else:
+                    logger.info(f"{description} completed successfully")
+
+            except subprocess.TimeoutExpired:
+                results[script_name] = {
+                    'success': False,
+                    'output': '',
+                    'error': 'Script execution timed out (10 minutes)'
+                }
+                all_success = False
+                logger.error(f"{description} timed out")
+
+            except Exception as e:
+                results[script_name] = {
+                    'success': False,
+                    'output': '',
+                    'error': str(e)
+                }
+                all_success = False
+                logger.error(f"Error running {description}: {e}")
+
+        end_time = time.time()
+        duration = end_time - start_time
+
+        logger.info(f"Forecasting models rebuild completed in {duration:.2f} seconds")
+
+        return jsonify({
+            'success': all_success,
+            'message': 'All analysis scripts completed successfully' if all_success else 'Some analysis scripts failed',
+            'results': results,
+            'total_duration_seconds': round(duration, 2)
+        }), 200 if all_success else 500
+
+    except Exception as e:
+        logger.error(f"Error rebuilding forecasting models: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'message': 'Failed to rebuild forecasting models'
+        }), 500

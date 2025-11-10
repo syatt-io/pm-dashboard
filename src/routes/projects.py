@@ -733,3 +733,111 @@ def update_project_keywords(project_key):
     except Exception as e:
         logger.error(f"Error updating project keywords: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ============================================================================
+# Project Characteristics Routes
+# ============================================================================
+
+@projects_bp.route('/projects/<project_key>/characteristics', methods=['GET'])
+@auth_required
+def get_project_characteristics(user, project_key):
+    """Get characteristics for a project."""
+    try:
+        with session_scope() as db:
+            from src.models import ProjectCharacteristics
+
+            characteristics = db.query(ProjectCharacteristics)\
+                .filter_by(project_key=project_key)\
+                .first()
+
+            if characteristics:
+                return jsonify({
+                    'success': True,
+                    'characteristics': characteristics.to_dict()
+                })
+            else:
+                # Return defaults if not set
+                return jsonify({
+                    'success': True,
+                    'characteristics': {
+                        'project_key': project_key,
+                        'be_integrations': 3,
+                        'custom_theme': 3,
+                        'custom_designs': 3,
+                        'ux_research': 3,
+                        'extensive_customizations': 3,
+                        'project_oversight': 3
+                    }
+                })
+
+    except Exception as e:
+        logger.error(f"Failed to get characteristics for {project_key}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@projects_bp.route('/projects/<project_key>/characteristics', methods=['PUT'])
+@auth_required
+def update_project_characteristics(user, project_key):
+    """Update or create characteristics for a project."""
+    try:
+        data = request.json
+
+        # Validate values are in range 1-5
+        for field in ['be_integrations', 'custom_theme', 'custom_designs',
+                      'ux_research', 'extensive_customizations', 'project_oversight']:
+            value = data.get(field)
+            if value is not None:
+                if not isinstance(value, int) or value < 1 or value > 5:
+                    return jsonify({
+                        'success': False,
+                        'error': f'{field} must be an integer between 1 and 5'
+                    }), 400
+
+        with session_scope() as db:
+            from src.models import ProjectCharacteristics
+
+            # Check if characteristics exist
+            characteristics = db.query(ProjectCharacteristics)\
+                .filter_by(project_key=project_key)\
+                .first()
+
+            if characteristics:
+                # Update existing
+                if 'be_integrations' in data:
+                    characteristics.be_integrations = data['be_integrations']
+                if 'custom_theme' in data:
+                    characteristics.custom_theme = data['custom_theme']
+                if 'custom_designs' in data:
+                    characteristics.custom_designs = data['custom_designs']
+                if 'ux_research' in data:
+                    characteristics.ux_research = data['ux_research']
+                if 'extensive_customizations' in data:
+                    characteristics.extensive_customizations = data['extensive_customizations']
+                if 'project_oversight' in data:
+                    characteristics.project_oversight = data['project_oversight']
+
+                characteristics.updated_at = datetime.now()
+            else:
+                # Create new
+                characteristics = ProjectCharacteristics(
+                    project_key=project_key,
+                    be_integrations=data.get('be_integrations', 3),
+                    custom_theme=data.get('custom_theme', 3),
+                    custom_designs=data.get('custom_designs', 3),
+                    ux_research=data.get('ux_research', 3),
+                    extensive_customizations=data.get('extensive_customizations', 3),
+                    project_oversight=data.get('project_oversight', 3)
+                )
+                db.add(characteristics)
+
+            db.flush()
+
+            return jsonify({
+                'success': True,
+                'characteristics': characteristics.to_dict()
+            })
+
+    except Exception as e:
+        logger.error(f"Failed to update characteristics for {project_key}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

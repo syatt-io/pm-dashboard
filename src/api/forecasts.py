@@ -462,3 +462,363 @@ def export_combined_forecast():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@forecasts_bp.route('/match-jira-epics', methods=['POST'])
+def match_jira_epics():
+    """
+    Fuzzy match forecast epic names to existing Jira epics.
+
+    Request body:
+    {
+        "project_key": str,
+        "epic_names": [str]  # List of epic names from forecast/templates
+    }
+
+    Returns:
+    {
+        "matches": [
+            {
+                "forecast_epic": str,
+                "suggestions": [
+                    {
+                        "key": str,
+                        "name": str,
+                        "score": int (0-100),
+                        "status": str
+                    }
+                ]
+            }
+        ]
+    }
+    """
+    try:
+        from fuzzywuzzy import fuzz
+        from src.integrations.jira_mcp import JiraMCPClient
+        from src.config.settings import config
+        import asyncio
+
+        data = request.json
+
+        # Validate required fields
+        if 'project_key' not in data or 'epic_names' not in data:
+            return jsonify({'error': 'Missing required fields: project_key, epic_names'}), 400
+
+        project_key = data['project_key']
+        epic_names = data['epic_names']
+
+        if not isinstance(epic_names, list) or len(epic_names) == 0:
+            return jsonify({'error': 'epic_names must be a non-empty list'}), 400
+
+        # Initialize Jira client
+        jira_client = JiraMCPClient(
+            jira_url=config.JIRA_URL,
+            username=config.JIRA_USERNAME,
+            api_token=config.JIRA_API_TOKEN
+        )
+
+        # Search for existing epics in Jira project
+        async def search_epics():
+            jql = f'project = {project_key} AND type = Epic ORDER BY created DESC'
+            return await jira_client.search_tickets(jql=jql, max_results=200)
+
+        # Run async search
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        jira_epics = loop.run_until_complete(search_epics())
+        loop.close()
+
+        # Extract epic names from Jira
+        jira_epic_list = []
+        for epic in jira_epics:
+            fields = epic.get('fields', {})
+            jira_epic_list.append({
+                'key': epic.get('key'),
+                'name': fields.get('summary', ''),
+                'status': fields.get('status', {}).get('name', 'Unknown')
+            })
+
+        # Perform fuzzy matching for each forecast epic
+        matches = []
+        for epic_name in epic_names:
+            suggestions = []
+
+            for jira_epic in jira_epic_list:
+                # Calculate fuzzy match score
+                score = fuzz.ratio(epic_name.lower(), jira_epic['name'].lower())
+
+                # Only include matches with score >= 60 (configurable threshold)
+                if score >= 60:
+                    suggestions.append({
+                        'key': jira_epic['key'],
+                        'name': jira_epic['name'],
+                        'score': score,
+                        'status': jira_epic['status']
+                    })
+
+            # Sort suggestions by score (highest first)
+            suggestions.sort(key=lambda x: x['score'], reverse=True)
+
+            # Limit to top 5 suggestions
+            matches.append({
+                'forecast_epic': epic_name,
+                'suggestions': suggestions[:5]
+            })
+
+        return jsonify({
+            'success': True,
+            'project_key': project_key,
+            'matches': matches
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error matching Jira epics: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@forecasts_bp.route('/export-to-jira', methods=['POST'])
+def export_to_jira():
+    """
+    Export forecast epics to Jira with mapping to existing or new epics.
+
+    Request body:
+    {
+        "project_key": str,
+        "epics": [
+            {
+                "name": str,
+                "description": str (optional),
+                "estimated_hours": float,
+                "action": "create" | "link",  # create new epic or link to existing
+                "existing_epic_key": str (optional, required if action="link"),
+                "story_points": int (optional)
+            }
+        ]
+    }
+
+    Returns:
+    {
+        "success": bool,
+        "results": [
+            {
+                "epic_name": str,
+                "action": "created" | "linked",
+                "epic_key": str,
+                "error": str (optional, if failed)
+            }
+        ]
+    }
+    """
+    try:
+        from src.integrations.jira_mcp import JiraMCPClient, JiraTicket
+        from src.config.settings import config
+        import asyncio
+
+        data = request.json
+
+        # Validate required fields
+        if 'project_key' not in data or 'epics' not in data:
+            return jsonify({'error': 'Missing required fields: project_key, epics'}), 400
+
+        project_key = data['project_key']
+        epics = data['epics']
+
+        if not isinstance(epics, list) or len(epics) == 0:
+            return jsonify({'error': 'epics must be a non-empty list'}), 400
+
+        # Initialize Jira client
+        jira_client = JiraMCPClient(
+            jira_url=config.JIRA_URL,
+            username=config.JIRA_USERNAME,
+            api_token=config.JIRA_API_TOKEN
+        )
+
+        results = []
+
+        # Process each epic
+        async def process_epics():
+            for epic_data in epics:
+                try:
+                    epic_name = epic_data.get('name')
+                    action = epic_data.get('action', 'create')
+
+                    if not epic_name:
+                        results.append({
+                            'epic_name': 'Unknown',
+                            'action': 'failed',
+                            'error': 'Epic name is required'
+                        })
+                        continue
+
+                    if action == 'link':
+                        # Link to existing epic
+                        existing_key = epic_data.get('existing_epic_key')
+                        if not existing_key:
+                            results.append({
+                                'epic_name': epic_name,
+                                'action': 'failed',
+                                'error': 'existing_epic_key is required for link action'
+                            })
+                            continue
+
+                        # Verify epic exists and optionally update estimate
+                        epic = await jira_client.get_ticket(existing_key)
+                        if epic.get('success') is False:
+                            results.append({
+                                'epic_name': epic_name,
+                                'action': 'failed',
+                                'error': f'Epic {existing_key} not found'
+                            })
+                            continue
+
+                        # Optionally update story points if provided
+                        if 'story_points' in epic_data:
+                            await jira_client.update_ticket(
+                                existing_key,
+                                {'customfield_10016': epic_data['story_points']}  # Story points field
+                            )
+
+                        results.append({
+                            'epic_name': epic_name,
+                            'action': 'linked',
+                            'epic_key': existing_key
+                        })
+
+                    elif action == 'create':
+                        # Create new epic
+                        description = epic_data.get('description', '')
+                        estimated_hours = epic_data.get('estimated_hours', 0)
+                        story_points = epic_data.get('story_points')
+
+                        # Build description with hours estimate
+                        full_description = f"{description}\n\nEstimated Hours: {estimated_hours}h"
+
+                        ticket = JiraTicket(
+                            project_key=project_key,
+                            summary=epic_name,
+                            description=full_description,
+                            issue_type='Epic',
+                            story_points=story_points
+                        )
+
+                        result = await jira_client.create_ticket(ticket)
+
+                        if result.get('success'):
+                            results.append({
+                                'epic_name': epic_name,
+                                'action': 'created',
+                                'epic_key': result.get('key')
+                            })
+                        else:
+                            results.append({
+                                'epic_name': epic_name,
+                                'action': 'failed',
+                                'error': result.get('error', 'Unknown error')
+                            })
+
+                    else:
+                        results.append({
+                            'epic_name': epic_name,
+                            'action': 'failed',
+                            'error': f'Invalid action: {action}. Must be "create" or "link"'
+                        })
+
+                except Exception as e:
+                    logger.error(f"Error processing epic {epic_data.get('name', 'Unknown')}: {e}")
+                    results.append({
+                        'epic_name': epic_data.get('name', 'Unknown'),
+                        'action': 'failed',
+                        'error': str(e)
+                    })
+
+        # Run async processing
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(process_epics())
+        loop.close()
+
+        # Check if all succeeded
+        all_success = all(r['action'] in ['created', 'linked'] for r in results)
+
+        return jsonify({
+            'success': all_success,
+            'project_key': project_key,
+            'results': results
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error exporting to Jira: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@forecasts_bp.route('/epic-monthly-breakdown', methods=['POST'])
+def epic_monthly_breakdown():
+    """
+    Calculate epic-by-epic monthly hour breakdown for project forecasting.
+
+    Request body:
+    {
+        "epics": [
+            {
+                "name": str,
+                "estimated_hours": float,
+                "estimated_months": int,
+                "teams_selected": [str],
+                "be_integrations": int (1-5),
+                "custom_theme": int (1-5),
+                "custom_designs": int (1-5),
+                "ux_research": int (1-5),
+                "extensive_customizations": int (1-5, optional),
+                "project_oversight": int (1-5, optional),
+                "start_date": str (YYYY-MM-DD, optional)
+            }
+        ],
+        "project_start_date": str (YYYY-MM-DD, optional)
+    }
+
+    Returns:
+    {
+        "success": true,
+        "breakdown": {
+            "epics": [...],
+            "months": [...],
+            "totals_by_month": [...]
+        }
+    }
+    """
+    try:
+        data = request.json
+
+        if 'epics' not in data or not data['epics']:
+            return jsonify({'error': 'Missing or empty epics list'}), 400
+
+        # Validate epic data
+        required_fields = ['name', 'estimated_hours', 'estimated_months', 'teams_selected']
+        for epic in data['epics']:
+            for field in required_fields:
+                if field not in epic:
+                    return jsonify({'error': f'Epic missing required field: {field}'}), 400
+
+        # Get project start date if provided
+        project_start_date = data.get('project_start_date')
+
+        # Calculate breakdown
+        breakdown = forecasting_service.get_epic_monthly_breakdown(
+            epics=data['epics'],
+            project_start_date=project_start_date
+        )
+
+        return jsonify({
+            'success': True,
+            'breakdown': breakdown
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error calculating epic monthly breakdown: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

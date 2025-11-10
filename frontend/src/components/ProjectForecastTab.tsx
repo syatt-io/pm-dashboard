@@ -22,8 +22,18 @@ import {
   Checkbox,
   FormControlLabel,
   FormGroup,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  RadioGroup,
+  Radio,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
-import { Download } from '@mui/icons-material';
+import { Download, Upload } from '@mui/icons-material';
 import axios from 'axios';
 import {
   BarChart,
@@ -112,6 +122,14 @@ const ProjectForecastTab: React.FC = () => {
   const [epicSchedule, setEpicSchedule] = useState<ProjectSchedule | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Jira export modal state
+  const [exportModalOpen, setExportModalOpen] = useState<boolean>(false);
+  const [projectKey, setProjectKey] = useState<string>('');
+  const [fuzzyMatches, setFuzzyMatches] = useState<any>(null);
+  const [epicMappings, setEpicMappings] = useState<{[key: string]: {action: string, existing_key?: string, story_points?: number}}>({});
+  const [exportLoading, setExportLoading] = useState<boolean>(false);
+  const [exportResult, setExportResult] = useState<any>(null);
 
   // Helper functions
   const handleTeamToggle = (team: string) => {
@@ -210,6 +228,99 @@ const ProjectForecastTab: React.FC = () => {
     } catch (err) {
       console.error('CSV download error:', err);
       setError('Failed to download CSV');
+    }
+  };
+
+  const handleExportToJira = async () => {
+    if (!epicSchedule || !epicSchedule.epics || epicSchedule.epics.length === 0) {
+      setError('No epic schedule to export');
+      return;
+    }
+
+    setExportModalOpen(true);
+    setExportResult(null);
+
+    if (!projectKey) {
+      // Default to first available project key or show input
+      return;
+    }
+
+    // Call fuzzy matching endpoint
+    try {
+      const epicNames = epicSchedule.epics.map((e) => e.epic_category);
+      const response = await axios.post(
+        'http://localhost:4000/api/forecasts/match-jira-epics',
+        {
+          project_key: projectKey,
+          epic_names: epicNames,
+        }
+      );
+
+      setFuzzyMatches(response.data.matches);
+
+      // Initialize mappings with default "create" action
+      const initialMappings: any = {};
+      response.data.matches.forEach((match: any) => {
+        initialMappings[match.forecast_epic] = {
+          action: 'create',
+        };
+      });
+      setEpicMappings(initialMappings);
+    } catch (err: any) {
+      console.error('Fuzzy matching error:', err);
+      setError(err.response?.data?.error || 'Failed to match epics');
+    }
+  };
+
+  const handleMappingChange = (epicName: string, field: string, value: any) => {
+    setEpicMappings((prev) => ({
+      ...prev,
+      [epicName]: {
+        ...prev[epicName],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleConfirmExport = async () => {
+    if (!epicSchedule || !projectKey) {
+      setError('Missing required data for export');
+      return;
+    }
+
+    setExportLoading(true);
+    setExportResult(null);
+
+    try {
+      // Prepare export payload
+      const epicsToExport = epicSchedule.epics.map((epic) => {
+        const mapping = epicMappings[epic.epic_category] || { action: 'create' };
+
+        return {
+          name: epic.epic_category,
+          description: `Forecasted epic from project planning.\n\nTotal Hours: ${epic.allocated_hours.toFixed(1)}h`,
+          estimated_hours: epic.allocated_hours,
+          story_points: mapping.story_points,
+          action: mapping.action,
+          existing_epic_key: mapping.existing_key,
+        };
+      });
+
+      const response = await axios.post(
+        'http://localhost:4000/api/forecasts/export-to-jira',
+        {
+          project_key: projectKey,
+          epics: epicsToExport,
+        }
+      );
+
+      setExportResult(response.data);
+    } catch (err: any) {
+      console.error('Export error:', err);
+      setError(err.response?.data?.error || 'Failed to export to Jira');
+      setExportResult(err.response?.data);
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -661,6 +772,17 @@ const ProjectForecastTab: React.FC = () => {
                       ? formatMonth(epicSchedule.months[0])
                       : startDate
                   }`}
+                  action={
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<Upload />}
+                      onClick={handleExportToJira}
+                      size="small"
+                    >
+                      Export to Jira
+                    </Button>
+                  }
                 />
                 <CardContent>
                   <TableContainer component={Paper}>
@@ -737,6 +859,175 @@ const ProjectForecastTab: React.FC = () => {
           </Box>
         )}
       </Grid>
+
+      {/* Jira Export Modal */}
+      <Dialog
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Export Forecast to Jira</DialogTitle>
+        <DialogContent>
+          {!exportResult ? (
+            <>
+              <TextField
+                label="Jira Project Key"
+                value={projectKey}
+                onChange={(e) => setProjectKey(e.target.value.toUpperCase())}
+                fullWidth
+                margin="normal"
+                placeholder="e.g., PROJ"
+                helperText="Enter the Jira project key where epics will be created"
+              />
+
+              {fuzzyMatches && fuzzyMatches.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Epic Mapping
+                  </Typography>
+                  {fuzzyMatches.map((match: any) => {
+                    const mapping = epicMappings[match.forecast_epic] || { action: 'create' };
+                    return (
+                      <Card key={match.forecast_epic} sx={{ mb: 2, p: 2 }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {match.forecast_epic}
+                        </Typography>
+
+                        <FormControl component="fieldset" sx={{ mt: 2 }}>
+                          <RadioGroup
+                            value={mapping.action || 'create'}
+                            onChange={(e) =>
+                              handleMappingChange(
+                                match.forecast_epic,
+                                'action',
+                                e.target.value
+                              )
+                            }
+                          >
+                            <FormControlLabel
+                              value="create"
+                              control={<Radio />}
+                              label="Create New Epic"
+                            />
+                            {match.suggestions && match.suggestions.length > 0 && (
+                              <FormControlLabel
+                                value="link"
+                                control={<Radio />}
+                                label="Link to Existing Epic"
+                              />
+                            )}
+                          </RadioGroup>
+                        </FormControl>
+
+                        {mapping.action === 'link' &&
+                          match.suggestions &&
+                          match.suggestions.length > 0 && (
+                            <FormControl fullWidth sx={{ mt: 2 }}>
+                              <InputLabel>Select Existing Epic</InputLabel>
+                              <Select
+                                value={mapping.existing_key || ''}
+                                onChange={(e) =>
+                                  handleMappingChange(
+                                    match.forecast_epic,
+                                    'existing_key',
+                                    e.target.value
+                                  )
+                                }
+                                label="Select Existing Epic"
+                              >
+                                {match.suggestions.map((suggestion: any) => (
+                                  <MenuItem
+                                    key={suggestion.key}
+                                    value={suggestion.key}
+                                  >
+                                    {suggestion.key} - {suggestion.name} (Score:{' '}
+                                    {suggestion.score})
+                                  </MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          )}
+
+                        <TextField
+                          label="Story Points (optional)"
+                          type="number"
+                          value={mapping.story_points || ''}
+                          onChange={(e) =>
+                            handleMappingChange(
+                              match.forecast_epic,
+                              'story_points',
+                              parseInt(e.target.value) || undefined
+                            )
+                          }
+                          fullWidth
+                          margin="normal"
+                          helperText="Optionally set story points for this epic"
+                        />
+                      </Card>
+                    );
+                  })}
+                </Box>
+              )}
+            </>
+          ) : (
+            <Box>
+              {exportResult.success ? (
+                <Alert severity="success" sx={{ mb: 2 }}>
+                  Successfully exported {exportResult.results?.length || 0} epics
+                  to Jira!
+                </Alert>
+              ) : (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {exportResult.error || 'Export failed'}
+                </Alert>
+              )}
+
+              {exportResult.results && exportResult.results.length > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Results:
+                  </Typography>
+                  {exportResult.results.map((result: any, index: number) => (
+                    <Box key={index} sx={{ mb: 1 }}>
+                      <Typography variant="body2">
+                        <strong>{result.epic_name}:</strong>{' '}
+                        {result.success ? (
+                          <>
+                            ✓ {result.action === 'created' ? 'Created' : 'Updated'}{' '}
+                            ({result.epic_key})
+                          </>
+                        ) : (
+                          <>✗ {result.error}</>
+                        )}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          {!exportResult ? (
+            <>
+              <Button onClick={() => setExportModalOpen(false)}>Cancel</Button>
+              <Button
+                onClick={handleConfirmExport}
+                variant="contained"
+                color="primary"
+                disabled={exportLoading || !projectKey || !fuzzyMatches}
+              >
+                {exportLoading ? <CircularProgress size={20} /> : 'Confirm Export'}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => setExportModalOpen(false)} variant="contained">
+              Close
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </Grid>
   );
 };

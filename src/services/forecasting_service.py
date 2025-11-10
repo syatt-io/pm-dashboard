@@ -640,3 +640,143 @@ class ForecastingService:
         }).copy()
 
         return base_lifecycle
+
+    def get_epic_monthly_breakdown(
+        self,
+        epics: List[Dict[str, Any]],
+        project_start_date: str = None
+    ) -> Dict[str, Any]:
+        """
+        Calculate epic-by-epic monthly hour breakdown for project forecasting.
+
+        Args:
+            epics: List of epic dictionaries with:
+                - name: Epic name
+                - estimated_hours: Total hours for epic
+                - estimated_months: Duration in months
+                - teams_selected: List of team names
+                - be_integrations: Backend integrations slider value (1-5)
+                - custom_theme: Custom theme slider value (1-5)
+                - custom_designs: Custom designs slider value (1-5)
+                - ux_research: UX research slider value (1-5)
+                - extensive_customizations: Customizations slider value (1-5)
+                - project_oversight: Oversight slider value (1-5)
+                - start_date: Optional start date for this epic (YYYY-MM-DD)
+            project_start_date: Optional project start date (YYYY-MM-DD) for all epics
+
+        Returns:
+            Dictionary with:
+                - epics: List of epic breakdowns with monthly hours per team
+                - months: List of month labels
+                - totals_by_month: Total hours per month across all epics
+        """
+        from datetime import datetime
+        from dateutil.relativedelta import relativedelta
+
+        # Calculate forecast for each epic
+        epic_breakdowns = []
+        all_months = set()
+        month_totals = {}
+
+        for epic in epics:
+            # Use epic-specific start date or project start date
+            epic_start_date = epic.get('start_date', project_start_date)
+
+            # Calculate team distribution for this epic
+            forecast = self.calculate_from_total_hours(
+                total_hours=epic['estimated_hours'],
+                be_integrations=epic.get('be_integrations', 3),
+                custom_theme=epic.get('custom_theme', 3),
+                custom_designs=epic.get('custom_designs', 3),
+                ux_research=epic.get('ux_research', 3),
+                extensive_customizations=epic.get('extensive_customizations', 1),
+                project_oversight=epic.get('project_oversight', 3),
+                teams_selected=epic['teams_selected'],
+                estimated_months=epic['estimated_months'],
+                start_date=epic_start_date
+            )
+
+            # Build monthly breakdown for this epic
+            epic_monthly = {
+                'epic_name': epic['name'],
+                'total_hours': epic['estimated_hours'],
+                'estimated_months': epic['estimated_months'],
+                'start_date': epic_start_date,
+                'teams': [],
+                'months': []
+            }
+
+            # If we have a start date, calculate actual month labels
+            if epic_start_date:
+                try:
+                    start_dt = datetime.fromisoformat(epic_start_date)
+                    for i in range(epic['estimated_months']):
+                        month_dt = start_dt + relativedelta(months=i)
+                        month_label = month_dt.strftime('%Y-%m')
+                        epic_monthly['months'].append(month_label)
+                        all_months.add(month_label)
+
+                        # Initialize month total if not exists
+                        if month_label not in month_totals:
+                            month_totals[month_label] = 0.0
+                except (ValueError, AttributeError):
+                    # If date parsing fails, use generic month numbers
+                    for i in range(epic['estimated_months']):
+                        month_label = f"Month {i + 1}"
+                        epic_monthly['months'].append(month_label)
+                        all_months.add(month_label)
+
+                        if month_label not in month_totals:
+                            month_totals[month_label] = 0.0
+            else:
+                # No date provided, use generic month numbers
+                for i in range(epic['estimated_months']):
+                    month_label = f"Month {i + 1}"
+                    epic_monthly['months'].append(month_label)
+                    all_months.add(month_label)
+
+                    if month_label not in month_totals:
+                        month_totals[month_label] = 0.0
+
+            # Process each team's breakdown
+            for team_data in forecast['teams']:
+                team_monthly = {
+                    'team': team_data['team'],
+                    'total_hours': team_data['total_hours'],
+                    'monthly_hours': []
+                }
+
+                # Add monthly hours and aggregate to month totals
+                for month_idx, month_breakdown in enumerate(team_data['monthly_breakdown']):
+                    hours = month_breakdown['hours']
+                    team_monthly['monthly_hours'].append({
+                        'month': epic_monthly['months'][month_idx],
+                        'hours': hours,
+                        'phase': month_breakdown['phase']
+                    })
+
+                    # Add to month total
+                    month_label = epic_monthly['months'][month_idx]
+                    month_totals[month_label] += hours
+
+                epic_monthly['teams'].append(team_monthly)
+
+            epic_breakdowns.append(epic_monthly)
+
+        # Sort months chronologically
+        sorted_months = sorted(list(all_months))
+
+        # Build totals by month in sorted order
+        totals_list = [
+            {
+                'month': month,
+                'total_hours': round(month_totals.get(month, 0.0), 2)
+            }
+            for month in sorted_months
+        ]
+
+        return {
+            'epics': epic_breakdowns,
+            'months': sorted_months,
+            'totals_by_month': totals_list
+        }
