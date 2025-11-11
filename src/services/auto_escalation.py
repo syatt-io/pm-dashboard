@@ -43,7 +43,13 @@ class AutoEscalationService:
         self.slack_client = slack_client or WebClient(
             token=settings.notifications.slack_bot_token
         )
-        self.github_client = github_client or GitHubClient()
+        self.github_client = github_client or GitHubClient(
+            api_token=settings.github.api_token,
+            organization=settings.github.organization,
+            app_id=settings.github.app_id,
+            private_key=settings.github.private_key,
+            installation_id=settings.github.installation_id
+        )
         self.channel_validator = ChannelSafetyValidator(db)
 
     def run_escalation_check(self) -> Dict[str, Any]:

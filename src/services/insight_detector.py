@@ -25,9 +25,9 @@ class InsightDetector:
         """
         self.db = db
         self.github_client = None
-        if settings.github.token:
+        if settings.github.api_token:
             self.github_client = GitHubClient(
-                token=settings.github.token,
+                api_token=settings.github.api_token,
                 organization=settings.github.organization
             )
 
