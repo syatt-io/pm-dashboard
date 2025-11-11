@@ -21,6 +21,7 @@ import {
   Select,
   MenuItem,
   FormControl,
+  Checkbox,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -64,6 +65,8 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
   const [editValue, setEditValue] = useState<string>('');
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryMappings, setCategoryMappings] = useState<{ [epicKey: string]: string }>({});
+  const [selectedEpics, setSelectedEpics] = useState<string[]>([]);
+  const [bulkCategory, setBulkCategory] = useState<string>('');
 
   // Get unique months from all budgets
   const allMonths = Array.from(
@@ -132,6 +135,46 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     } catch (err: any) {
       console.error('Error updating category:', err);
       alert(err.response?.data?.error || 'Failed to update category');
+    }
+  };
+
+  const handleBulkAssign = async () => {
+    if (selectedEpics.length === 0) {
+      alert('Please select at least one epic');
+      return;
+    }
+
+    if (!bulkCategory) {
+      alert('Please select a category');
+      return;
+    }
+
+    try {
+      // Update all selected epics
+      for (const epicKey of selectedEpics) {
+        if (bulkCategory === '') {
+          // Delete category mapping
+          await axios.delete(`${API_BASE_URL}/api/epic-categories/mappings/${epicKey}`);
+        } else {
+          // Set/update category mapping
+          await axios.put(`${API_BASE_URL}/api/epic-categories/mappings/${epicKey}`, {
+            category: bulkCategory,
+          });
+        }
+      }
+
+      // Reload data
+      await loadCategories();
+      await loadBudgets();
+
+      // Clear selection
+      setSelectedEpics([]);
+      setBulkCategory('');
+
+      alert(`Successfully assigned ${selectedEpics.length} epic(s) to category "${bulkCategory}"`);
+    } catch (err: any) {
+      console.error('Error bulk assigning categories:', err);
+      alert(err.response?.data?.error || 'Failed to bulk assign categories');
     }
   };
 
@@ -255,6 +298,27 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     }
   };
 
+  const handleToggleEpic = (epicKey: string) => {
+    setSelectedEpics((prev) =>
+      prev.includes(epicKey)
+        ? prev.filter((key) => key !== epicKey)
+        : [...prev, epicKey]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedEpics.length === budgets.length) {
+      // Deselect all
+      setSelectedEpics([]);
+    } else {
+      // Select all
+      setSelectedEpics(budgets.map((b) => b.epic_key));
+    }
+  };
+
+  const isAllSelected = budgets.length > 0 && selectedEpics.length === budgets.length;
+  const isSomeSelected = selectedEpics.length > 0 && selectedEpics.length < budgets.length;
+
   const getStatusColor = (pctComplete: number) => {
     if (pctComplete >= 100) return '#ef5350'; // Red - over budget
     if (pctComplete >= 80) return '#ff9800'; // Orange - warning
@@ -311,6 +375,57 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
           </Tooltip>
         </Box>
 
+        {/* Bulk Assignment Toolbar */}
+        {selectedEpics.length > 0 && (
+          <Box
+            sx={{
+              mb: 2,
+              p: 2,
+              backgroundColor: '#f5f5f5',
+              borderRadius: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {selectedEpics.length} epic{selectedEpics.length > 1 ? 's' : ''} selected
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <Select
+                value={bulkCategory}
+                onChange={(e) => setBulkCategory(e.target.value)}
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Select category...</em>
+                </MenuItem>
+                {categories.map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {cat}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleBulkAssign}
+              disabled={!bulkCategory}
+              size="small"
+            >
+              Assign Category
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setSelectedEpics([])}
+              size="small"
+            >
+              Clear Selection
+            </Button>
+          </Box>
+        )}
+
         {/* Progress indicator */}
         {syncing && syncProgress && (
           <Box sx={{ mb: 2 }}>
@@ -340,6 +455,14 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox" sx={{ width: 50 }}>
+                  <Checkbox
+                    indeterminate={isSomeSelected}
+                    checked={isAllSelected}
+                    onChange={handleSelectAll}
+                    inputProps={{ 'aria-label': 'Select all epics' }}
+                  />
+                </TableCell>
                 <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Epic</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', minWidth: 150 }}>Category</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', minWidth: 120 }}>
@@ -375,6 +498,13 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                     backgroundColor: !budget.is_budgeted ? 'rgba(255, 152, 0, 0.08)' : 'inherit'
                   }}
                 >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedEpics.includes(budget.epic_key)}
+                      onChange={() => handleToggleEpic(budget.epic_key)}
+                      inputProps={{ 'aria-label': `Select ${budget.epic_key}` }}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Box sx={{ flex: 1 }}>
@@ -508,6 +638,7 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
 
               {/* Totals Row */}
               <TableRow sx={{ backgroundColor: '#f5f5f5', borderTop: '2px solid #ddd' }}>
+                <TableCell padding="checkbox" />
                 <TableCell sx={{ fontWeight: 'bold' }}>
                   TOTAL
                 </TableCell>
