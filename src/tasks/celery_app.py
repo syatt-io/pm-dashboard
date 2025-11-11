@@ -148,6 +148,11 @@ celery_app.conf.beat_schedule = {
         'task': 'src.tasks.notification_tasks.send_daily_digest',
         'schedule': crontab(hour=13, minute=0)
     },
+    # Job monitoring digest at 9:05 AM EST (13:05 UTC) - runs after TODO digest
+    'job-monitoring-digest': {
+        'task': 'src.tasks.notification_tasks.send_job_monitoring_digest',
+        'schedule': crontab(hour=13, minute=5)
+    },
     # Due today reminders at 9:30 AM EST (14:30 UTC during DST)
     'due-today-reminders': {
         'task': 'src.tasks.notification_tasks.send_due_today_reminders',

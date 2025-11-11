@@ -682,3 +682,87 @@ def celery_health_check():
     except Exception as e:
         logger.error(f"❌ Error in Celery health check task: {e}", exc_info=True)
         raise
+
+
+@shared_task(name='src.tasks.notification_tasks.send_job_monitoring_digest')
+def send_job_monitoring_digest():
+    """
+    Send daily job monitoring digest via email and Slack (Celery task wrapper).
+    Scheduled to run at 9 AM EST (13:00 UTC).
+
+    Generates a comprehensive report of all job executions from the past 24 hours:
+    - Overall success rate
+    - Failed jobs with error details
+    - Slow jobs that exceeded expected duration
+    - Category-based breakdown
+    - Actionable recommendations
+
+    This replaces individual job success notifications to prevent alert fatigue.
+    """
+    try:
+        logger.info("📊 Starting job monitoring digest task...")
+        from src.utils.database import get_db
+        from src.services.job_monitoring_digest import JobMonitoringDigestService
+        from src.managers.notifications import NotificationManager
+        from config.settings import settings
+
+        # Get database session
+        db = next(get_db())
+
+        try:
+            # Generate digest
+            digest_service = JobMonitoringDigestService(db)
+            digest = digest_service.generate_daily_digest(hours_back=24)
+
+            logger.info(
+                f"Generated digest: {digest['summary']['total_executions']} executions, "
+                f"{digest['summary']['success_rate']}% success rate"
+            )
+
+            # Format email HTML
+            email_html = digest_service.format_email_body(digest)
+
+            # Format Slack message
+            slack_message = digest_service.format_slack_message(digest)
+
+            # Send email if configured
+            if settings.email.sendgrid_api_key:
+                try:
+                    from src.integrations.email import send_email
+                    send_email(
+                        to_email=settings.email.to_email or settings.email.from_email,
+                        subject=f"Job Monitoring Daily Digest - {digest['summary']['period_start'][:10]}",
+                        html_content=email_html
+                    )
+                    logger.info("✅ Email digest sent successfully")
+                except Exception as email_err:
+                    logger.error(f"Failed to send email digest: {email_err}")
+
+            # Send Slack notification
+            if settings.notifications.slack_bot_token:
+                try:
+                    notifier = NotificationManager(settings.notifications)
+                    # Send to PM channel if configured, otherwise default channel
+                    channel = getattr(settings.notifications, 'slack_pm_channel', None) or settings.notifications.slack_channel
+                    notifier.send_slack_message(slack_message, channel=channel)
+                    logger.info("✅ Slack digest sent successfully")
+                except Exception as slack_err:
+                    logger.error(f"Failed to send Slack digest: {slack_err}")
+
+            logger.info("✅ Job monitoring digest completed")
+
+            return {
+                'success': True,
+                'task': 'job_monitoring_digest',
+                'executions_analyzed': digest['summary']['total_executions'],
+                'success_rate': digest['summary']['success_rate'],
+                'failures': len(digest['failures']),
+                'slow_jobs': len(digest['slow_jobs'])
+            }
+
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"❌ Error in job monitoring digest task: {e}", exc_info=True)
+        raise

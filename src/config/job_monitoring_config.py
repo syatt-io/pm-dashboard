@@ -200,7 +200,19 @@ JOBS: Dict[str, JobConfig] = {
     ),
 
     # ========================================================================
-    # 6. PROACTIVE AGENT JOBS (3 Tasks) - HIGH/NORMAL
+    # 6. JOB MONITORING DIGEST (1 Task) - NORMAL
+    # ========================================================================
+    "job-monitoring-digest": JobConfig(
+        job_name="job-monitoring-digest",
+        category=NOTIFICATIONS,
+        priority=NORMAL,
+        expected_duration_seconds=60,  # 1 minute
+        description="Daily job monitoring digest via email and Slack (9:05 AM EST)",
+        alert_on_failure=False,  # Digest only
+    ),
+
+    # ========================================================================
+    # 7. PROACTIVE AGENT JOBS (3 Tasks) - HIGH/NORMAL
     # ========================================================================
     "proactive-insights-8am": JobConfig(
         job_name="proactive-insights-8am",
