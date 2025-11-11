@@ -265,11 +265,11 @@ celery_app.conf.beat_schedule = {
     },
 
     # ========== Monitoring & Health Check Tasks ==========
-    # Celery health check - Every hour
-    'celery-health-check': {
-        'task': 'src.tasks.notification_tasks.celery_health_check',
-        'schedule': crontab(minute=0)  # Every hour at :00
-    },
+    # Celery health check - DISABLED (replaced by daily job monitoring digest)
+    # 'celery-health-check': {
+    #     'task': 'src.tasks.notification_tasks.celery_health_check',
+    #     'schedule': crontab(minute=0)  # Every hour at :00
+    # },
 }
 
 # Register worker startup signal handler for missed task recovery
