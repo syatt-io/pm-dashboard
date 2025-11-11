@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify
 from src.models import EpicCategoryMapping, EpicCategory
 from src.utils.database import get_session
 from src.routes.admin_settings import admin_required
+from src.middleware.auth import auth_required
 from datetime import datetime, timezone
 import logging
 
@@ -51,8 +52,9 @@ def list_categories():
 
 
 @epic_categories_bp.route('', methods=['POST'])
+@auth_required
 @admin_required
-def create_category():
+def create_category(user):
     """
     Create a new global epic category.
 
@@ -140,8 +142,9 @@ def create_category():
 
 
 @epic_categories_bp.route('/<int:category_id>', methods=['PUT'])
+@auth_required
 @admin_required
-def update_category(category_id):
+def update_category(user, category_id):
     """
     Update an epic category's name or display_order.
 
@@ -235,8 +238,9 @@ def update_category(category_id):
 
 
 @epic_categories_bp.route('/<int:category_id>', methods=['DELETE'])
+@auth_required
 @admin_required
-def delete_category(category_id):
+def delete_category(user, category_id):
     """
     Delete an epic category.
 
@@ -294,8 +298,9 @@ def delete_category(category_id):
 
 
 @epic_categories_bp.route('/reorder', methods=['PUT'])
+@auth_required
 @admin_required
-def reorder_categories():
+def reorder_categories(user):
     """
     Bulk update display_order for drag-and-drop reordering.
 
