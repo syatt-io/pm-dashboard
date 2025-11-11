@@ -282,9 +282,9 @@ class TempoAPIClient:
             "limit": limit
         }
 
-        # Add project filter if specified
-        if project_key:
-            params["projectKey"] = project_key
+        # Note: Tempo API v4 doesn't support filtering by project key in query params
+        # (projectKey param is ignored, project param returns 400, dedicated endpoint returns 404)
+        # We'll filter client-side using epic-based filtering in the calling code
 
         all_worklogs = []
 
