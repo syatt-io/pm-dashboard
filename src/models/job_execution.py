@@ -1,7 +1,6 @@
 """Job execution tracking model for monitoring scheduled tasks."""
 
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, Boolean, Index
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, Text, TIMESTAMP, Boolean, Index, JSON
 from datetime import datetime, timezone
 from src.models.base import Base
 
@@ -36,7 +35,7 @@ class JobExecution(Base):
                              comment="Execution duration in seconds (completed_at - started_at)")
 
     # Results & metrics
-    result_data = Column(JSONB, nullable=True,
+    result_data = Column(JSON, nullable=True,
                         comment="Task return value as JSON (e.g., {items_processed: 150, channels: 5})")
     error_message = Column(Text, nullable=True,
                           comment="Error message if job failed")
