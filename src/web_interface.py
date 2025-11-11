@@ -288,6 +288,7 @@ from src.routes.escalation import escalation_bp
 from src.api.analytics import analytics_bp
 from src.api.forecasts import forecasts_bp
 from src.api.epic_budgets import epic_budgets_bp
+from src.api.epic_categories import epic_categories_bp
 from src.routes.epic_templates import epic_templates_bp
 
 app.register_blueprint(health_bp)
@@ -348,6 +349,11 @@ logger.info("✅ Forecasts endpoints exempted from CSRF protection")
 csrf.exempt(epic_budgets_bp)
 logger.info("✅ Epic Budgets endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Epic Categories endpoints from CSRF protection
+# Epic Categories endpoints are called from React frontend with JWT auth
+csrf.exempt(epic_categories_bp)
+logger.info("✅ Epic Categories endpoints exempted from CSRF protection")
+
 # ✅ SECURITY: Exempt Epic Templates endpoints from CSRF protection
 # Epic Templates endpoints are called from React frontend with JWT auth
 csrf.exempt(epic_templates_bp)
@@ -376,6 +382,7 @@ app.register_blueprint(escalation_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(forecasts_bp)
 app.register_blueprint(epic_budgets_bp)
+app.register_blueprint(epic_categories_bp)
 app.register_blueprint(epic_templates_bp)
 
 # ✅ SECURITY: CSRF token endpoint for frontend to fetch tokens
