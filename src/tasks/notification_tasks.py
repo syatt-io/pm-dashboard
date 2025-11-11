@@ -228,7 +228,25 @@ def sync_project_epic_hours(self, project_key):
                     skipped += 1
                     continue
 
-                # Get issue key using FAST PATH first (extract from description)
+                # OPTIMIZATION: Get epic FIRST to filter by project early (avoids API calls)
+                epic_key = None
+                attributes = worklog.get('attributes', {})
+                if attributes:
+                    values = attributes.get('values', [])
+                    for attr in values:
+                        if attr.get('key') == '_Epic_':
+                            epic_key = attr.get('value')
+                            break
+
+                # Early filtering: If epic has project info and doesn't match, skip without API call
+                if epic_key and epic_key != 'NO_EPIC' and '-' in epic_key:
+                    epic_project = epic_key.split('-')[0]
+                    if epic_project != project_key:
+                        # Not our project, skip this worklog entirely (saves Jira API call!)
+                        skipped += 1
+                        continue
+
+                # Get issue key (needed for worklogs without epic or to double-check project)
                 issue_key = None
                 description = worklog.get('description', '')
 
@@ -244,20 +262,14 @@ def sync_project_epic_hours(self, project_key):
                     skipped += 1
                     continue
 
-                # Note: No need to validate project key since Tempo API filtered by project
+                # Validate project from issue_key (for worklogs without epic or with NO_EPIC)
+                project_from_key = issue_key.split('-')[0] if '-' in issue_key else None
+                if project_from_key != project_key:
+                    # Not our project after all
+                    skipped += 1
+                    continue
 
-                # Get epic from Tempo attributes (same as working backfill script)
-                epic_key = None
-                attributes = worklog.get('attributes', {})
-                if attributes:
-                    values = attributes.get('values', [])
-                    for attr in values:
-                        if attr.get('key') == '_Epic_':
-                            epic_key = attr.get('value')
-                            break
-
-                # Use NO_EPIC if not found in Tempo attributes
-                # Note: This matches the proven backfill script approach
+                # Set epic to NO_EPIC if we didn't find one earlier
                 if not epic_key:
                     epic_key = 'NO_EPIC'
 
