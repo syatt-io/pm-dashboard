@@ -794,7 +794,7 @@ def sync_project_hours(project_key):
     """
     try:
         from src.tasks.notification_tasks import sync_project_epic_hours
-        from src.celery_app import celery_app
+        from src.tasks.celery_app import celery_app
 
         # Check Celery health before queuing task
         try:
