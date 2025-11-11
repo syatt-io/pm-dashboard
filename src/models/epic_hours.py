@@ -17,6 +17,7 @@ class EpicHours(Base):
     project_key = Column(String(50), nullable=False)
     epic_key = Column(String(50), nullable=False)
     epic_summary = Column(String(500))
+    epic_category = Column(String(100))  # Epic category (e.g., "Project Oversight", "FE Dev")
     month = Column(Date, nullable=False)  # First day of month (e.g., 2025-01-01)
     team = Column(String(50), nullable=False)  # Team name (e.g., "FE Devs", "BE Devs")
     hours = Column(Float, nullable=False, default=0.0)
