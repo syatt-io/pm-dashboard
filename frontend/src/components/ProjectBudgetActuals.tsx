@@ -13,6 +13,7 @@ import {
   TableRow,
   Paper,
   CircularProgress,
+  LinearProgress,
   Alert,
   TextField,
   IconButton,
@@ -53,6 +54,7 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
   const [budgets, setBudgets] = useState<EpicBudget[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{current: number; total: number; percent: number; message: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -128,19 +130,78 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     }
   };
 
+  const pollTaskStatus = async (taskId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/jira/celery/task-status/${taskId}`);
+        const status = response.data?.data;
+
+        if (!status) {
+          return;
+        }
+
+        // Update progress if task is running
+        if (status.state === 'PROGRESS' && status.progress) {
+          setSyncProgress({
+            current: status.progress.current,
+            total: status.progress.total,
+            percent: status.progress.percent,
+            message: status.progress.message,
+          });
+        }
+
+        // Handle completion
+        if (status.ready) {
+          clearInterval(pollInterval);
+          setSyncing(false);
+          setSyncTaskId(null);
+
+          if (status.successful) {
+            setSyncProgress(null);
+            // Reload budgets to show updated data
+            await loadBudgets();
+            alert('✅ Sync completed successfully! Data has been refreshed.');
+          } else if (status.failed) {
+            setSyncProgress(null);
+            const errorMsg = status.error || 'Task failed';
+            setError(`Sync failed: ${errorMsg}`);
+          }
+        }
+      } catch (err: any) {
+        console.error('Error polling task status:', err);
+        // Don't clear interval on poll errors - keep trying
+      }
+    }, 2000); // Poll every 2 seconds
+
+    // Set timeout to stop polling after 10 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (syncing) {
+        setSyncing(false);
+        setError('Sync timed out after 10 minutes. Please try again or contact support.');
+      }
+    }, 600000);
+  };
+
   const handleSyncHours = async () => {
     try {
       setSyncing(true);
       setError(null);
+      setSyncProgress(null);
 
-      await axios.post(`${API_BASE_URL}/api/jira/projects/${projectKey}/sync-hours`);
+      const response = await axios.post(`${API_BASE_URL}/api/jira/projects/${projectKey}/sync-hours`);
+      const taskId = response.data?.data?.task_id;
 
-      alert(`Started syncing epic hours for ${projectKey}. This will take a few minutes. Refresh the page in 2-3 minutes to see updated data.`);
+      if (taskId) {
+        // Start polling for task status
+        await pollTaskStatus(taskId);
+      } else {
+        throw new Error('No task ID returned from sync request');
+      }
     } catch (err: any) {
       console.error('Error syncing hours:', err);
-      setError(err.response?.data?.error || 'Failed to start sync');
-    } finally {
       setSyncing(false);
+      setError(err.response?.data?.error || 'Failed to start sync');
     }
   };
 
@@ -199,6 +260,31 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
             </Button>
           </Tooltip>
         </Box>
+
+        {/* Progress indicator */}
+        {syncing && syncProgress && (
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {syncProgress.message}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" fontWeight="bold">
+                {syncProgress.percent}%
+              </Typography>
+            </Box>
+            <LinearProgress variant="determinate" value={syncProgress.percent} />
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              {syncProgress.current} / {syncProgress.total} worklogs processed
+            </Typography>
+          </Box>
+        )}
+
+        {/* Error display */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
         <TableContainer component={Paper} sx={{ mt: 2 }}>
           <Table size="small" stickyHeader>

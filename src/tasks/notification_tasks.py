@@ -199,12 +199,25 @@ def sync_project_epic_hours(self, project_key):
                 session.close()
                 return {'success': True, 'project_key': project_key, 'records': 0, 'message': 'No worklogs found'}
 
+            total_worklogs = len(worklogs)
+            logger.info(f"Found {total_worklogs} worklogs for {project_key}")
+
+            # Update progress: fetching complete
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': 0,
+                    'total': total_worklogs,
+                    'message': f'Fetched {total_worklogs} worklogs, starting to process...'
+                }
+            )
+
             # Group by epic → month → team
             epic_month_team_hours = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
             processed = 0
             skipped = 0
 
-            for worklog in worklogs:
+            for idx, worklog in enumerate(worklogs):
                 issue = worklog.get('issue', {})
                 issue_id = issue.get('id')
                 if not issue_id:
@@ -264,7 +277,29 @@ def sync_project_epic_hours(self, project_key):
                 epic_month_team_hours[epic_key][month][team] += hours
                 processed += 1
 
+                # Update progress every 50 worklogs
+                if (idx + 1) % 50 == 0 or (idx + 1) == total_worklogs:
+                    percent = round(((idx + 1) / total_worklogs) * 100, 1)
+                    self.update_state(
+                        state='PROGRESS',
+                        meta={
+                            'current': idx + 1,
+                            'total': total_worklogs,
+                            'message': f'Processing worklogs... {idx + 1}/{total_worklogs} ({percent}%)'
+                        }
+                    )
+
             logger.info(f"Processed {processed} worklogs for {project_key}, skipped {skipped}")
+
+            # Update progress: processing complete, now saving to database
+            self.update_state(
+                state='PROGRESS',
+                meta={
+                    'current': total_worklogs,
+                    'total': total_worklogs,
+                    'message': 'Saving to database...'
+                }
+            )
 
             # Insert into database
             records_inserted = 0

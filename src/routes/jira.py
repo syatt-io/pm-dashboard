@@ -709,6 +709,79 @@ def import_project_epics(project_key):
         return error_response(str(e), status_code=500)
 
 
+@jira_bp.route('/celery/health', methods=['GET'])
+def celery_health_check():
+    """Check if Celery and Redis are responsive."""
+    try:
+        from src.celery_app import celery_app
+
+        # Try to ping Celery via Redis
+        inspector = celery_app.control.inspect()
+        active_workers = inspector.active()
+
+        if not active_workers:
+            return error_response(
+                'No Celery workers are currently active. Background tasks cannot be processed.',
+                status_code=503
+            )
+
+        worker_count = len(active_workers)
+        logger.info(f"✅ Celery health check passed: {worker_count} worker(s) active")
+
+        return success_response(data={
+            'status': 'healthy',
+            'workers': worker_count,
+            'worker_names': list(active_workers.keys())
+        })
+
+    except Exception as e:
+        logger.error(f"❌ Celery health check failed: {e}", exc_info=True)
+        return error_response(
+            f'Celery health check failed: {str(e)}. Background worker may be offline.',
+            status_code=503
+        )
+
+
+@jira_bp.route('/celery/task-status/<task_id>', methods=['GET'])
+def get_task_status(task_id):
+    """Get the status of a Celery task by ID."""
+    try:
+        from celery.result import AsyncResult
+        from src.celery_app import celery_app
+
+        task_result = AsyncResult(task_id, app=celery_app)
+
+        response = {
+            'task_id': task_id,
+            'state': task_result.state,
+            'ready': task_result.ready(),
+            'successful': task_result.successful() if task_result.ready() else None,
+            'failed': task_result.failed() if task_result.ready() else None,
+        }
+
+        # Add progress info if task is running
+        if task_result.state == 'PROGRESS' and task_result.info:
+            response['progress'] = {
+                'current': task_result.info.get('current', 0),
+                'total': task_result.info.get('total', 0),
+                'percent': round((task_result.info.get('current', 0) / task_result.info.get('total', 1)) * 100, 1) if task_result.info.get('total', 0) > 0 else 0,
+                'message': task_result.info.get('message', '')
+            }
+
+        # Add result if task completed
+        if task_result.ready():
+            if task_result.successful():
+                response['result'] = task_result.result
+            elif task_result.failed():
+                response['error'] = str(task_result.info) if task_result.info else 'Task failed'
+
+        return success_response(data=response)
+
+    except Exception as e:
+        logger.error(f"Error getting task status for {task_id}: {e}", exc_info=True)
+        return error_response(str(e), status_code=500)
+
+
 @jira_bp.route('/projects/<project_key>/sync-hours', methods=['POST'])
 def sync_project_hours(project_key):
     """Sync epic hours from Tempo for a specific project.
@@ -721,6 +794,19 @@ def sync_project_hours(project_key):
     """
     try:
         from src.tasks.notification_tasks import sync_project_epic_hours
+        from src.celery_app import celery_app
+
+        # Check Celery health before queuing task
+        try:
+            inspector = celery_app.control.inspect()
+            active_workers = inspector.active()
+            if not active_workers:
+                return error_response(
+                    'Background worker is offline. Cannot start sync. Please contact support.',
+                    status_code=503
+                )
+        except Exception as health_error:
+            logger.warning(f"Could not verify Celery health: {health_error}. Proceeding anyway...")
 
         logger.info(f"Queueing epic hours sync task for project {project_key}")
 
