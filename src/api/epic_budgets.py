@@ -48,6 +48,17 @@ def get_project_budgets(project_key):
             func.date_trunc('month', EpicHours.month)
         ).all()
 
+        # Get epic categories (one per epic - they should all be the same)
+        categories_query = session.query(
+            EpicHours.epic_key,
+            EpicHours.epic_category
+        ).filter(
+            EpicHours.project_key == project_key,
+            EpicHours.epic_category.isnot(None)
+        ).distinct(EpicHours.epic_key).all()
+
+        categories_by_epic = {epic_key: category for epic_key, category in categories_query}
+
         # Organize actuals by epic and month
         actuals_by_epic = {}
         all_epic_keys = set(budgets_by_epic.keys())  # Start with budgeted epics
@@ -85,6 +96,7 @@ def get_project_budgets(project_key):
                 'project_key': project_key,
                 'epic_key': epic_key,
                 'epic_summary': budget.epic_summary if budget else epic_key,
+                'epic_category': categories_by_epic.get(epic_key),  # Category from epic_hours table
                 'estimated_hours': estimated,
                 'total_actual': total_actual,
                 'remaining': remaining,

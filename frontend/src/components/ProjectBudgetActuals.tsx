@@ -18,6 +18,9 @@ import {
   TextField,
   IconButton,
   Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -38,6 +41,7 @@ interface EpicBudget {
   project_key: string;
   epic_key: string;
   epic_summary: string;
+  epic_category: string | null;
   estimated_hours: number;
   total_actual: number;
   remaining: number;
@@ -58,6 +62,8 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState<string>('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryMappings, setCategoryMappings] = useState<{ [epicKey: string]: string }>({});
 
   // Get unique months from all budgets
   const allMonths = Array.from(
@@ -68,6 +74,7 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
 
   useEffect(() => {
     loadBudgets();
+    loadCategories();
   }, [projectKey]);
 
   const loadBudgets = async () => {
@@ -81,6 +88,50 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
       setError(err.response?.data?.error || 'Failed to load budget data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCategories = async () => {
+    try {
+      // Load available categories
+      const categoriesResponse = await axios.get(`${API_BASE_URL}/api/epic-categories/categories`);
+      setCategories(categoriesResponse.data.categories || []);
+
+      // Load category mappings
+      const mappingsResponse = await axios.get(`${API_BASE_URL}/api/epic-categories/mappings`);
+      setCategoryMappings(mappingsResponse.data.mappings || {});
+    } catch (err: any) {
+      console.error('Error loading categories:', err);
+      // Don't set error state for categories - it's not critical
+    }
+  };
+
+  const handleCategoryChange = async (epicKey: string, newCategory: string) => {
+    try {
+      if (newCategory === '') {
+        // Delete category mapping
+        await axios.delete(`${API_BASE_URL}/api/epic-categories/mappings/${epicKey}`);
+        setCategoryMappings((prev) => {
+          const updated = { ...prev };
+          delete updated[epicKey];
+          return updated;
+        });
+      } else {
+        // Set/update category mapping
+        await axios.put(`${API_BASE_URL}/api/epic-categories/mappings/${epicKey}`, {
+          category: newCategory,
+        });
+        setCategoryMappings((prev) => ({
+          ...prev,
+          [epicKey]: newCategory,
+        }));
+      }
+
+      // Reload budgets to refresh epic_category field
+      await loadBudgets();
+    } catch (err: any) {
+      console.error('Error updating category:', err);
+      alert(err.response?.data?.error || 'Failed to update category');
     }
   };
 
@@ -290,6 +341,7 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Epic</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', minWidth: 150 }}>Category</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold', minWidth: 120 }}>
                   Estimate
                 </TableCell>
@@ -354,6 +406,25 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                         </Tooltip>
                       )}
                     </Box>
+                  </TableCell>
+                  <TableCell>
+                    <FormControl size="small" fullWidth>
+                      <Select
+                        value={categoryMappings[budget.epic_key] || budget.epic_category || ''}
+                        onChange={(e) => handleCategoryChange(budget.epic_key, e.target.value)}
+                        displayEmpty
+                        sx={{ fontSize: '0.875rem' }}
+                      >
+                        <MenuItem value="">
+                          <em>None</em>
+                        </MenuItem>
+                        {categories.map((cat) => (
+                          <MenuItem key={cat} value={cat}>
+                            {cat}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                   </TableCell>
                   <TableCell align="right">
                     {editingId === budget.id ? (
@@ -440,6 +511,7 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                 <TableCell sx={{ fontWeight: 'bold' }}>
                   TOTAL
                 </TableCell>
+                <TableCell />
                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>
                   {budgets.reduce((sum, b) => sum + b.estimated_hours, 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
                 </TableCell>
