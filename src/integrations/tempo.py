@@ -62,6 +62,9 @@ class TempoAPIClient:
         # Cache for issue key to epic key mappings
         self.epic_cache: Dict[str, Optional[str]] = {}
 
+        # Cache for project key to numeric project ID mappings
+        self.project_id_cache: Dict[str, Optional[str]] = {}
+
         # Rate limiting: Track last request time to avoid hitting Jira API limits
         self.last_jira_request_time = 0.0
         self.min_request_interval = 0.1  # 100ms between Jira API calls (max 10 req/sec)
@@ -76,6 +79,40 @@ class TempoAPIClient:
             time.sleep(sleep_time)
 
         self.last_jira_request_time = time.time()
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    def get_project_id(self, project_key: str) -> Optional[str]:
+        """
+        Get numeric project ID from Jira API using project key.
+
+        Args:
+            project_key: Jira project key (e.g., "RNWL", "SUBS")
+
+        Returns:
+            Numeric project ID (e.g., "10440") or None if not found
+        """
+        if project_key in self.project_id_cache:
+            return self.project_id_cache[project_key]
+
+        try:
+            # Rate limit to avoid hitting Jira API limits
+            self._rate_limit()
+
+            url = f"{self.jira_url}/rest/api/3/project/{project_key}"
+            response = requests.get(url, headers=self.jira_headers, timeout=10)
+            response.raise_for_status()
+
+            project_data = response.json()
+            project_id = project_data.get("id")
+
+            self.project_id_cache[project_key] = project_id
+            logger.debug(f"Resolved project {project_key} to ID {project_id}")
+            return project_id
+
+        except Exception as e:
+            logger.debug(f"Error getting project ID for {project_key}: {e}")
+            self.project_id_cache[project_key] = None
+            return None
 
     @retry_with_backoff(max_retries=3, base_delay=1.0)
     def get_issue_key_from_jira(self, issue_id: str) -> Optional[str]:
@@ -282,9 +319,15 @@ class TempoAPIClient:
             "limit": limit
         }
 
-        # Note: Tempo API v4 doesn't support filtering by project key in query params
-        # (projectKey param is ignored, project param returns 400, dedicated endpoint returns 404)
-        # We'll filter client-side using epic-based filtering in the calling code
+        # Tempo API v4 requires numeric projectId (not projectKey string)
+        # Get numeric project ID from Jira and add to query params for server-side filtering
+        if project_key:
+            project_id = self.get_project_id(project_key)
+            if project_id:
+                params["projectId"] = project_id
+                logger.info(f"Filtering worklogs by project {project_key} (ID: {project_id})")
+            else:
+                logger.warning(f"Could not get project ID for {project_key}, fetching all worklogs")
 
         all_worklogs = []
 
