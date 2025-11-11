@@ -232,7 +232,7 @@ def sync_project_epic_hours(self, project_key):
 
                 # Note: No need to validate project key since Tempo API filtered by project
 
-                # Get epic - try Tempo attributes first, then query Jira
+                # Get epic from Tempo attributes (same as working backfill script)
                 epic_key = None
                 attributes = worklog.get('attributes', {})
                 if attributes:
@@ -242,11 +242,8 @@ def sync_project_epic_hours(self, project_key):
                             epic_key = attr.get('value')
                             break
 
-                # If not in Tempo attributes, query Jira API for Epic Link field
-                if not epic_key:
-                    epic_key = tempo.get_epic_from_jira(issue_key)
-
-                # Final fallback
+                # Use NO_EPIC if not found in Tempo attributes
+                # Note: This matches the proven backfill script approach
                 if not epic_key:
                     epic_key = 'NO_EPIC'
 
