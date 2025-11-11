@@ -93,7 +93,6 @@ import { InlineSelectField } from './InlineEdit/InlineSelectField';
 import { InlineNumberField } from './InlineEdit/InlineNumberField';
 import { InlineToggleField } from './InlineEdit/InlineToggleField';
 import ProjectBudgetActuals from './ProjectBudgetActuals';
-import AddEpicBudgetDialog from './AddEpicBudgetDialog';
 import { ProjectEpicsTab } from './ProjectEpicsTab';
 
 // API Configuration
@@ -2156,9 +2155,6 @@ const ProjectShowContent = () => {
     setTabValue(newValue);
   };
 
-  // AddEpicBudgetDialog state
-  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
-
   const [keywords, setKeywords] = useState<string[]>([]);
   const [loadingKeywords, setLoadingKeywords] = useState(false);
   const [editingKeywords, setEditingKeywords] = useState(false);
@@ -2441,7 +2437,29 @@ const ProjectShowContent = () => {
       </Typography>
 
       {/* Tabs Navigation */}
-      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
+      <Tabs
+        value={tabValue}
+        onChange={handleTabChange}
+        sx={{
+          mb: 3,
+          backgroundColor: 'background.paper',
+          borderRadius: 2,
+          boxShadow: 1,
+          '& .MuiTab-root': {
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            textTransform: 'none',
+            minHeight: 56,
+          },
+          '& .Mui-selected': {
+            backgroundColor: 'rgba(85, 77, 255, 0.08)',
+          },
+          '& .MuiTabs-indicator': {
+            height: 3,
+            borderRadius: '3px 3px 0 0',
+          }
+        }}
+      >
         <Tab label="📋 Overview" />
         {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
           <Tab label="💰 Budget & Actuals" />
@@ -3044,59 +3062,54 @@ const ProjectShowContent = () => {
         <TabPanel value={tabValue} index={1}>
           {/* Project Dates Section */}
           <Card sx={{ mb: 3 }}>
-            <CardContent>
+            <CardContent sx={{ pb: 2 }}>
               <Typography variant="h6" gutterBottom>
                 Project Timeline
               </Typography>
-              <Grid container spacing={3} sx={{ mt: 1 }}>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="caption" color="text.secondary">
+              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                <Grid item xs={12} sm={4}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
                     Start Date
                   </Typography>
-                  <Box sx={{ mt: 0.5 }}>
-                    <MuiTextField
-                      type="date"
-                      size="small"
-                      fullWidth
-                      value={record.start_date || ''}
-                      onChange={(e) => handleFieldUpdate('start_date', e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Box>
+                  <MuiTextField
+                    type="date"
+                    size="small"
+                    fullWidth
+                    value={record.start_date || ''}
+                    onChange={(e) => handleFieldUpdate('start_date', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography variant="caption" color="text.secondary">
+                <Grid item xs={12} sm={4}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
                     Launch Date
                   </Typography>
-                  <Box sx={{ mt: 0.5 }}>
-                    <MuiTextField
-                      type="date"
-                      size="small"
-                      fullWidth
-                      value={record.launch_date || ''}
-                      onChange={(e) => handleFieldUpdate('launch_date', e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Box>
+                  <MuiTextField
+                    type="date"
+                    size="small"
+                    fullWidth
+                    value={record.launch_date || ''}
+                    onChange={(e) => handleFieldUpdate('launch_date', e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                  />
                 </Grid>
               </Grid>
             </CardContent>
           </Card>
 
-          {/* Epics from Jira Section - Collapsible */}
-          <ProjectEpicsTab projectKey={record.key} />
-
-          {/* Epic Budgets Section with Add Button */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">Epic Budgets</Typography>
-            <MuiButton
-              variant="contained"
-              onClick={() => setBudgetDialogOpen(true)}
-              sx={{ textTransform: 'none' }}
-            >
-              + Add Epic Budget
-            </MuiButton>
+          {/* Epics from Jira Section - Better Visual Integration */}
+          <Box sx={{ mb: 3 }}>
+            <ProjectEpicsTab projectKey={record.key} />
           </Box>
+
+          {/* Budget Tracking Section Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, mt: 4 }}>
+            <Analytics sx={{ color: 'primary.main' }} />
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Budget Tracking
+            </Typography>
+          </Box>
+          <Divider sx={{ mb: 3 }} />
 
           <ProjectBudgetActuals projectKey={record.key} />
         </TabPanel>
@@ -3260,16 +3273,6 @@ const ProjectShowContent = () => {
           projectName={record?.name || record?.key || 'Project'}
         />
 
-      {/* Add Epic Budget Dialog */}
-      <AddEpicBudgetDialog
-        open={budgetDialogOpen}
-        onClose={() => setBudgetDialogOpen(false)}
-        projectKey={record.key}
-        onSuccess={() => {
-          refresh(); // Refresh the project data to reload budget table
-          notify('Epic budget created successfully', { type: 'success' });
-        }}
-      />
     </Box>
   );
 };

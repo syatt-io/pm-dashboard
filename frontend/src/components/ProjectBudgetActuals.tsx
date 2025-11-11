@@ -23,6 +23,7 @@ import {
   FormControl,
   Checkbox,
   Collapse,
+  Snackbar,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -31,6 +32,9 @@ import {
   Delete as DeleteIcon,
   Sync as SyncIcon,
   ExpandMore as ExpandMoreIcon,
+  CloudDownload as ImportIcon,
+  Info as InfoIcon,
+  TrendingUp as TrendingUpIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -70,6 +74,10 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
   const [selectedEpics, setSelectedEpics] = useState<string[]>([]);
   const [bulkCategory, setBulkCategory] = useState<string>('');
   const [expandedCategories, setExpandedCategories] = useState<{ [key: string]: boolean }>({});
+  const [successSnackbar, setSuccessSnackbar] = useState<{open: boolean; message: string}>({
+    open: false,
+    message: ''
+  });
 
   // Group budgets by category
   const groupedBudgets = useMemo(() => {
@@ -116,6 +124,21 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
 
     return categoryOrder;
   }, [groupedBudgets, categories]);
+
+  // Calculate budget totals
+  const budgetSummary = useMemo(() => {
+    const totalBudget = budgets.reduce((sum, b) => sum + b.estimated_hours, 0);
+    const totalActual = budgets.reduce((sum, b) => sum + b.total_actual, 0);
+    const totalRemaining = budgets.reduce((sum, b) => sum + b.remaining, 0);
+    const overallPctComplete = totalBudget > 0 ? (totalActual / totalBudget) * 100 : 0;
+
+    return {
+      totalBudget,
+      totalActual,
+      totalRemaining,
+      overallPctComplete
+    };
+  }, [budgets]);
 
   // Get unique months from all budgets
   const allMonths = Array.from(
@@ -233,9 +256,15 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
 
       // Clear selection
       setSelectedEpics([]);
-      setBulkCategory('');
 
-      alert(`Successfully assigned ${selectedEpics.length} epic(s) to category "${bulkCategory}"`);
+      // Show success snackbar
+      const epicCount = selectedEpics.length;
+      setSuccessSnackbar({
+        open: true,
+        message: `✅ Successfully assigned ${epicCount} epic${epicCount > 1 ? 's' : ''} to "${bulkCategory}"`
+      });
+
+      setBulkCategory('');
     } catch (err: any) {
       console.error('Error bulk assigning categories:', err);
       alert(err.response?.data?.error || 'Failed to bulk assign categories');
@@ -420,9 +449,70 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
 
   if (budgets.length === 0) {
     return (
-      <Alert severity="info" sx={{ mb: 2 }}>
-        No epic budgets configured for this project yet.
-      </Alert>
+      <Card sx={{
+        mb: 2,
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        border: '2px dashed #90caf9'
+      }}>
+        <CardContent sx={{ textAlign: 'center', py: 6 }}>
+          <Box sx={{ mb: 3 }}>
+            <ImportIcon sx={{ fontSize: 64, color: '#1976d2', opacity: 0.8 }} />
+          </Box>
+          <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, color: '#1976d2' }}>
+            No Epic Budgets Yet
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3, maxWidth: 600, mx: 'auto' }}>
+            Get started by importing epics from Jira using the "Import Epics from Jira" section above.
+            Once imported, you can set budget estimates and track actual hours against them.
+          </Typography>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.5,
+            maxWidth: 500,
+            mx: 'auto',
+            textAlign: 'left',
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            p: 2.5,
+            borderRadius: 2,
+            border: '1px solid rgba(25, 118, 210, 0.2)'
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+              <InfoIcon sx={{ color: '#1976d2', mt: 0.5, fontSize: 20 }} />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  Step 1: Import Epics
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Scroll up to find the "Import Epics from Jira" section and click "Refresh Epics"
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+              <InfoIcon sx={{ color: '#1976d2', mt: 0.5, fontSize: 20 }} />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  Step 2: Select & Import
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Choose the epics you want to track and click "Import Selected"
+                </Typography>
+              </Box>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+              <InfoIcon sx={{ color: '#1976d2', mt: 0.5, fontSize: 20 }} />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                  Step 3: Set Budgets & Track
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Set estimated hours for each epic and sync actual hours from Tempo to track progress
+                </Typography>
+              </Box>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -444,6 +534,81 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
               {syncing ? 'Syncing...' : 'Sync Hours from Tempo'}
             </Button>
           </Tooltip>
+        </Box>
+
+        {/* Budget Summary Card */}
+        <Box sx={{
+          mb: 3,
+          p: 3,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          borderRadius: 2,
+          color: 'white',
+          boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <TrendingUpIcon />
+            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+              Budget Summary
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 3, mb: 2 }}>
+            <Box>
+              <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
+                Total Budget
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                {budgetSummary.totalBudget.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
+                Hours Used
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                {budgetSummary.totalActual.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+              </Typography>
+            </Box>
+            <Box>
+              <Typography variant="caption" sx={{ opacity: 0.9, display: 'block', mb: 0.5 }}>
+                Remaining
+              </Typography>
+              <Typography
+                variant="h4"
+                sx={{
+                  fontWeight: 700,
+                  color: budgetSummary.totalRemaining < 0 ? '#ffcdd2' : 'white'
+                }}
+              >
+                {budgetSummary.totalRemaining.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Overall Progress
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {budgetSummary.overallPctComplete.toFixed(1)}%
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={Math.min(budgetSummary.overallPctComplete, 100)}
+              sx={{
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 4,
+                  backgroundColor: budgetSummary.overallPctComplete >= 100 ? '#ff5252' :
+                                  budgetSummary.overallPctComplete >= 80 ? '#ffa726' : '#66bb6a'
+                }
+              }}
+            />
+          </Box>
         </Box>
 
         {/* Bulk Assignment Toolbar */}
@@ -912,6 +1077,22 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
           </Table>
         </TableContainer>
       </CardContent>
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={successSnackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSuccessSnackbar({ open: false, message: '' })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSuccessSnackbar({ open: false, message: '' })}
+          severity="success"
+          sx={{ width: '100%', fontWeight: 600 }}
+        >
+          {successSnackbar.message}
+        </Alert>
+      </Snackbar>
     </Card>
   );
 };
