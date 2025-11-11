@@ -59,6 +59,9 @@ class TempoAPIClient:
         # Cache for account ID to team mappings
         self.team_cache: Dict[str, Optional[str]] = {}
 
+        # Cache for issue key to epic key mappings
+        self.epic_cache: Dict[str, Optional[str]] = {}
+
         # Rate limiting: Track last request time to avoid hitting Jira API limits
         self.last_jira_request_time = 0.0
         self.min_request_interval = 0.1  # 100ms between Jira API calls (max 10 req/sec)
@@ -122,6 +125,10 @@ class TempoAPIClient:
         Returns:
             Epic key (e.g., "SUBS-456") or None if not found
         """
+        # Check cache first
+        if issue_key in self.epic_cache:
+            return self.epic_cache[issue_key]
+
         try:
             # Rate limit to avoid hitting Jira API limits
             self._rate_limit()
@@ -141,6 +148,7 @@ class TempoAPIClient:
                 # Check if it looks like an issue key (contains letters before dash)
                 parts = epic_key.split('-')
                 if len(parts) == 2 and parts[0].isalpha() and parts[1].isdigit():
+                    self.epic_cache[issue_key] = epic_key
                     return epic_key
 
             # Try parent field (modern Jira hierarchy)
@@ -151,12 +159,17 @@ class TempoAPIClient:
                 parent_fields = parent.get("fields", {})
                 parent_issue_type = parent_fields.get("issuetype", {})
                 if parent_issue_type.get("name") == "Epic":
+                    self.epic_cache[issue_key] = parent_key
                     return parent_key
 
+            # Cache None result to avoid re-querying
+            self.epic_cache[issue_key] = None
             return None
 
         except Exception as e:
             logger.debug(f"Error getting epic for issue {issue_key}: {e}")
+            # Cache None for failed lookups to avoid retrying
+            self.epic_cache[issue_key] = None
             return None
 
     @retry_with_backoff(max_retries=3, base_delay=1.0)
