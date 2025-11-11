@@ -109,10 +109,37 @@ def ingest_slack_messages() -> Dict[str, Any]:
         }
 
         logger.info(f"✅ Slack ingestion complete: {total_ingested} messages from {channels_processed} channels")
+
+        # Send Slack notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"✅ *Slack Vector Ingestion Complete*\n\n"
+                f"• Messages ingested: {total_ingested}\n"
+                f"• Channels processed: {channels_processed}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send Slack notification: {slack_err}")
+
         return result
 
     except Exception as e:
         logger.error(f"Slack ingestion task failed: {e}")
+
+        # Send error notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"❌ *Slack Vector Ingestion Failed*\n\n"
+                f"• Error: {str(e)[:200]}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send error notification: {slack_err}")
+
         return {"success": False, "error": str(e)}
 
 
@@ -213,10 +240,37 @@ def ingest_jira_issues() -> Dict[str, Any]:
         }
 
         logger.info(f"✅ Jira ingestion complete: {total_ingested} issues from {len(projects)} projects")
+
+        # Send Slack notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"✅ *Jira Vector Ingestion Complete*\n\n"
+                f"• Issues ingested: {total_ingested}\n"
+                f"• Projects processed: {len(projects)}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send Slack notification: {slack_err}")
+
         return result
 
     except Exception as e:
         logger.error(f"Jira ingestion task failed: {e}")
+
+        # Send error notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"❌ *Jira Vector Ingestion Failed*\n\n"
+                f"• Error: {str(e)[:200]}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send error notification: {slack_err}")
+
         return {"success": False, "error": str(e)}
 
 
@@ -296,10 +350,36 @@ def ingest_fireflies_transcripts() -> Dict[str, Any]:
         }
 
         logger.info(f"✅ Fireflies ingestion complete: {total_ingested} transcripts")
+
+        # Send Slack notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"✅ *Fireflies Vector Ingestion Complete*\n\n"
+                f"• Transcripts ingested: {total_ingested}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send Slack notification: {slack_err}")
+
         return result
 
     except Exception as e:
         logger.error(f"Fireflies ingestion task failed: {e}")
+
+        # Send error notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"❌ *Fireflies Vector Ingestion Failed*\n\n"
+                f"• Error: {str(e)[:200]}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send error notification: {slack_err}")
+
         return {"success": False, "error": str(e)}
 
 
@@ -376,10 +456,36 @@ def ingest_notion_pages() -> Dict[str, Any]:
         }
 
         logger.info(f"✅ Notion ingestion complete: {total_ingested} pages")
+
+        # Send Slack notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"✅ *Notion Vector Ingestion Complete*\n\n"
+                f"• Pages ingested: {total_ingested}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send Slack notification: {slack_err}")
+
         return result
 
     except Exception as e:
         logger.error(f"Notion ingestion task failed: {e}")
+
+        # Send error notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"❌ *Notion Vector Ingestion Failed*\n\n"
+                f"• Error: {str(e)[:200]}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send error notification: {slack_err}")
+
         return {"success": False, "error": str(e)}
 
 
@@ -448,10 +554,37 @@ def ingest_tempo_worklogs() -> Dict[str, Any]:
         }
 
         logger.info(f"✅ Tempo worklogs ingestion complete: {total_ingested} worklogs")
+
+        # Send Slack notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"✅ *Tempo Worklogs Vector Ingestion Complete*\n\n"
+                f"• Worklogs ingested: {total_ingested}\n"
+                f"• Days processed: {days_back}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send Slack notification: {slack_err}")
+
         return result
 
     except Exception as e:
         logger.error(f"Tempo worklogs ingestion task failed: {e}")
+
+        # Send error notification
+        try:
+            from src.managers.notifications import NotificationManager
+            notifier = NotificationManager(settings.notifications)
+            notifier.send_slack_message(
+                f"❌ *Tempo Worklogs Vector Ingestion Failed*\n\n"
+                f"• Error: {str(e)[:200]}\n"
+                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            )
+        except Exception as slack_err:
+            logger.error(f"Failed to send error notification: {slack_err}")
+
         return {"success": False, "error": str(e)}
 
 
