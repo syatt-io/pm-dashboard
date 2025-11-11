@@ -93,31 +93,20 @@ class TodoScheduler:
         # Note: This runs at 9 AM UTC which is 4 AM EST (during DST) or 10 AM UTC for standard time
         schedule.every().day.at("09:00").do(self._run_sync, self.sync_tempo_hours)
 
-        # Phase 1 PM Automation Jobs
-        # Time Tracking Compliance - Every Monday at 10 AM EST
-        schedule.every().monday.at("10:00").do(self._run_sync, self.run_time_tracking_compliance)
+        # ========== MIGRATION COMPLETE ==========
+        # Phase 1 PM Automation Jobs & Proactive Agent Jobs have been migrated to Celery Beat!
+        # See src/tasks/celery_app.py for the new Celery Beat schedule configuration.
+        #
+        # Migrated tasks:
+        # - Time Tracking Compliance (Mondays 10 AM EST)
+        # - Monthly Epic Reconciliation (3rd of month, 9 AM EST)
+        # - Proactive Insights Detection (every 4 hours: 8am, 12pm, 4pm EST)
+        # - Daily Brief Delivery (9 AM EST)
+        # - Auto-Escalation (every 6 hours: 6am, 12pm, 6pm, 12am EST)
+        #
+        # These tasks now run via Celery Beat with better reliability, auto-retry, and monitoring.
 
-        # Monthly Epic Reconciliation - 3rd of every month at 9 AM EST
-        # Note: schedule library doesn't support monthly schedules, so we check date in the function
-        # Runs on 3rd to allow time for hours to be logged after month-end
-        schedule.every().day.at("09:00").do(self._run_sync, self.run_monthly_reconciliation)
-
-        # Proactive insights detection every 4 hours during work hours (8am, 12pm, 4pm EST)
-        schedule.every().day.at("08:00").do(self._run_sync, self.detect_proactive_insights)
-        schedule.every().day.at("12:00").do(self._run_sync, self.detect_proactive_insights)
-        schedule.every().day.at("16:00").do(self._run_sync, self.detect_proactive_insights)
-
-        # Daily brief delivery - check hourly to handle different user timezones
-        # Primary delivery at 9 AM EST
-        schedule.every().day.at("09:00").do(self._run_sync, self.send_proactive_briefs)
-
-        # Auto-escalation checks every 6 hours (6am, 12pm, 6pm, 12am EST)
-        schedule.every().day.at("06:00").do(self._run_sync, self.run_auto_escalation)
-        schedule.every().day.at("12:00").do(self._run_sync, self.run_auto_escalation)
-        schedule.every().day.at("18:00").do(self._run_sync, self.run_auto_escalation)
-        schedule.every().day.at("00:00").do(self._run_sync, self.run_auto_escalation)
-
-        logger.info("Scheduled tasks configured")
+        logger.info("⚠️  Python scheduler is DEPRECATED - all tasks now run via Celery Beat")
 
     def _run_async(self, async_func, *args, **kwargs):
         """Run async function in event loop."""
@@ -729,7 +718,14 @@ class TodoScheduler:
             raise
 
     def run_time_tracking_compliance(self):
-        """Run weekly time tracking compliance check (Phase 1)."""
+        """
+        Run weekly time tracking compliance check (Phase 1).
+
+        ⚠️ DEPRECATED: This method is now scheduled via Celery Beat.
+        See: src.tasks.notification_tasks.run_time_tracking_compliance
+        This method is kept for manual/API-triggered execution only.
+        """
+        logger.warning("⚠️  DEPRECATED: run_time_tracking_compliance should use Celery task instead")
         try:
             logger.info("Starting scheduled Time Tracking Compliance check")
             stats = run_time_tracking_compliance()
@@ -747,7 +743,14 @@ class TodoScheduler:
             logger.error(f"Error running Time Tracking Compliance: {e}")
 
     def run_monthly_reconciliation(self):
-        """Run monthly epic reconciliation with epic association."""
+        """
+        Run monthly epic reconciliation with epic association.
+
+        ⚠️ DEPRECATED: This method is now scheduled via Celery Beat.
+        See: src.tasks.notification_tasks.run_monthly_epic_reconciliation
+        This method is kept for manual/API-triggered execution only.
+        """
+        logger.warning("⚠️  DEPRECATED: run_monthly_reconciliation should use Celery task instead")
         from datetime import datetime
 
         # Only run on the 3rd of the month (allows time for hours to be logged after month-end)
@@ -841,7 +844,14 @@ class TodoScheduler:
             return []
 
     def detect_proactive_insights(self):
-        """Run proactive insight detection for all users."""
+        """
+        Run proactive insight detection for all users.
+
+        ⚠️ DEPRECATED: This method is now scheduled via Celery Beat.
+        See: src.tasks.notification_tasks.detect_proactive_insights
+        This method is kept for manual/API-triggered execution only.
+        """
+        logger.warning("⚠️  DEPRECATED: detect_proactive_insights should use Celery task instead")
         try:
             logger.info("Running proactive insight detection")
             stats = detect_insights_for_all_users()
@@ -870,7 +880,14 @@ class TodoScheduler:
             logger.error(f"Error in proactive insight detection: {e}", exc_info=True)
 
     def send_proactive_briefs(self):
-        """Send daily briefs to all users."""
+        """
+        Send daily briefs to all users.
+
+        ⚠️ DEPRECATED: This method is now scheduled via Celery Beat.
+        See: src.tasks.notification_tasks.send_daily_briefs
+        This method is kept for manual/API-triggered execution only.
+        """
+        logger.warning("⚠️  DEPRECATED: send_proactive_briefs should use Celery task instead")
         try:
             logger.info("Running daily brief delivery")
             stats = send_daily_briefs()
@@ -900,7 +917,14 @@ class TodoScheduler:
             logger.error(f"Error in daily brief delivery: {e}", exc_info=True)
 
     def run_auto_escalation(self):
-        """Run auto-escalation check for stale insights."""
+        """
+        Run auto-escalation check for stale insights.
+
+        ⚠️ DEPRECATED: This method is now scheduled via Celery Beat.
+        See: src.tasks.notification_tasks.run_auto_escalation
+        This method is kept for manual/API-triggered execution only.
+        """
+        logger.warning("⚠️  DEPRECATED: run_auto_escalation should use Celery task instead")
         try:
             logger.info("Running auto-escalation check")
 

@@ -204,6 +204,60 @@ celery_app.conf.beat_schedule = {
         'task': 'src.tasks.notification_tasks.sync_tempo_hours',
         'schedule': crontab(hour=8, minute=0)
     },
+
+    # ========== Proactive Agent Tasks (Migrated from Python Scheduler) ==========
+    # Proactive insight detection every 4 hours during work hours (8am, 12pm, 4pm EST)
+    'proactive-insights-8am': {
+        'task': 'src.tasks.notification_tasks.detect_proactive_insights',
+        'schedule': crontab(hour=12, minute=0)  # 8 AM EST = 12:00 UTC
+    },
+    'proactive-insights-12pm': {
+        'task': 'src.tasks.notification_tasks.detect_proactive_insights',
+        'schedule': crontab(hour=16, minute=0)  # 12 PM EST = 16:00 UTC
+    },
+    'proactive-insights-4pm': {
+        'task': 'src.tasks.notification_tasks.detect_proactive_insights',
+        'schedule': crontab(hour=20, minute=0)  # 4 PM EST = 20:00 UTC
+    },
+
+    # Daily brief delivery - 9 AM EST (13:00 UTC)
+    'daily-briefs': {
+        'task': 'src.tasks.notification_tasks.send_daily_briefs',
+        'schedule': crontab(hour=13, minute=0)
+    },
+
+    # Auto-escalation checks every 6 hours (6am, 12pm, 6pm, 12am EST)
+    'auto-escalation-6am': {
+        'task': 'src.tasks.notification_tasks.run_auto_escalation',
+        'schedule': crontab(hour=10, minute=0)  # 6 AM EST = 10:00 UTC
+    },
+    'auto-escalation-12pm': {
+        'task': 'src.tasks.notification_tasks.run_auto_escalation',
+        'schedule': crontab(hour=16, minute=0)  # 12 PM EST = 16:00 UTC
+    },
+    'auto-escalation-6pm': {
+        'task': 'src.tasks.notification_tasks.run_auto_escalation',
+        'schedule': crontab(hour=22, minute=0)  # 6 PM EST = 22:00 UTC
+    },
+    'auto-escalation-12am': {
+        'task': 'src.tasks.notification_tasks.run_auto_escalation',
+        'schedule': crontab(hour=4, minute=0)  # 12 AM EST = 04:00 UTC
+    },
+
+    # ========== PM Automation Tasks (Migrated from Python Scheduler) ==========
+    # Time Tracking Compliance - Every Monday at 10 AM EST (15:00 UTC during DST, 14:00 UTC standard time)
+    # NOTE: This is scheduled at same time as weekly-hours-reports, but that's OK - they're independent
+    'time-tracking-compliance': {
+        'task': 'src.tasks.notification_tasks.run_time_tracking_compliance',
+        'schedule': crontab(day_of_week=1, hour=14, minute=0)
+    },
+
+    # Monthly Epic Reconciliation - 3rd of every month at 9 AM EST (13:00 UTC)
+    # Task itself checks if it's the 3rd and skips if not
+    'monthly-epic-reconciliation': {
+        'task': 'src.tasks.notification_tasks.run_monthly_epic_reconciliation',
+        'schedule': crontab(hour=13, minute=0, day_of_month='3')
+    },
 }
 
 # Register worker startup signal handler for missed task recovery

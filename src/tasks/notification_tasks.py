@@ -437,3 +437,220 @@ def analyze_meetings(self):
         logger.error(f"❌ Error in meeting analysis task (attempt {self.request.retries + 1}/3): {e}", exc_info=True)
         # Re-raise to trigger auto-retry
         raise
+
+
+# ========== Proactive Agent Tasks (Migrated from Python Scheduler) ==========
+
+@shared_task(name='src.tasks.notification_tasks.detect_proactive_insights')
+def detect_proactive_insights():
+    """
+    Run proactive insight detection for all users (Celery task wrapper).
+    Scheduled to run every 4 hours during work hours (8am, 12pm, 4pm EST).
+
+    Migrated from Python scheduler to Celery Beat for better reliability.
+    """
+    try:
+        logger.info("🔍 Starting proactive insight detection task...")
+        from src.services.insight_detector import detect_insights_for_all_users
+        from src.managers.notifications import NotificationManager
+        from config.settings import settings
+
+        stats = detect_insights_for_all_users()
+        logger.info(f"✅ Insight detection complete: {stats}")
+
+        # Send Slack notification if insights detected
+        if stats['insights_detected'] > 0:
+            try:
+                notifier = NotificationManager(settings.notifications)
+                message = (
+                    f"🔍 *Proactive Insight Detection Complete*\n\n"
+                    f"• Users processed: {stats['users_processed']}\n"
+                    f"• Insights detected: {stats['insights_detected']}\n"
+                    f"• Insights stored: {stats['insights_stored']}\n"
+                )
+                if stats.get('errors'):
+                    message += f"• Errors: {len(stats['errors'])}\n"
+
+                asyncio.run(notifier._send_slack_message(
+                    channel=settings.notifications.slack_channel,
+                    message=message
+                ))
+            except Exception as notif_error:
+                logger.error(f"Error sending insight detection notification: {notif_error}")
+
+        return {'success': True, 'task': 'proactive_insights', **stats}
+
+    except Exception as e:
+        logger.error(f"❌ Error in proactive insight detection task: {e}", exc_info=True)
+        raise
+
+
+@shared_task(name='src.tasks.notification_tasks.send_daily_briefs')
+def send_daily_briefs():
+    """
+    Send daily briefs to all users (Celery task wrapper).
+    Scheduled to run at 9 AM EST (primary delivery).
+
+    Migrated from Python scheduler to Celery Beat for better reliability.
+    """
+    try:
+        logger.info("📬 Starting daily brief delivery task...")
+        from src.services.daily_brief_generator import send_daily_briefs as send_briefs_func
+        from src.managers.notifications import NotificationManager
+        from config.settings import settings
+
+        stats = send_briefs_func()
+        logger.info(f"✅ Daily brief delivery complete: {stats}")
+
+        # Send Slack notification if briefs sent
+        if stats['briefs_sent_slack'] > 0 or stats['briefs_sent_email'] > 0:
+            try:
+                notifier = NotificationManager(settings.notifications)
+                message = (
+                    f"📬 *Daily Brief Delivery Complete*\n\n"
+                    f"• Users processed: {stats['users_processed']}\n"
+                    f"• Briefs sent via Slack: {stats['briefs_sent_slack']}\n"
+                    f"• Briefs sent via Email: {stats['briefs_sent_email']}\n"
+                    f"• Total insights delivered: {stats['total_insights_delivered']}\n"
+                )
+                if stats.get('errors'):
+                    message += f"• Errors: {len(stats['errors'])}\n"
+
+                asyncio.run(notifier._send_slack_message(
+                    channel=settings.notifications.slack_channel,
+                    message=message
+                ))
+            except Exception as notif_error:
+                logger.error(f"Error sending daily brief notification: {notif_error}")
+
+        return {'success': True, 'task': 'daily_briefs', **stats}
+
+    except Exception as e:
+        logger.error(f"❌ Error in daily brief delivery task: {e}", exc_info=True)
+        raise
+
+
+@shared_task(name='src.tasks.notification_tasks.run_auto_escalation')
+def run_auto_escalation():
+    """
+    Run auto-escalation check for stale insights (Celery task wrapper).
+    Scheduled to run every 6 hours (6am, 12pm, 6pm, 12am EST).
+
+    Migrated from Python scheduler to Celery Beat for better reliability.
+    """
+    try:
+        logger.info("🚨 Starting auto-escalation check task...")
+        from src.services.auto_escalation import AutoEscalationService
+        from src.utils.database import session_scope
+        from src.managers.notifications import NotificationManager
+        from config.settings import settings
+
+        with session_scope() as db:
+            escalation_service = AutoEscalationService(db)
+            stats = escalation_service.run_escalation_check()
+
+        logger.info(f"✅ Auto-escalation check complete: {stats}")
+
+        # Send Slack notification if escalations performed
+        if stats['escalations_performed'] > 0:
+            try:
+                notifier = NotificationManager(settings.notifications)
+                message = (
+                    f"🚨 *Auto-Escalation Summary*\n\n"
+                    f"• Insights checked: {stats['total_checked']}\n"
+                    f"• Escalations performed: {stats['escalations_performed']}\n"
+                    f"• DMs sent: {stats['dm_sent']}\n"
+                    f"• Channel posts: {stats['channel_posts']}\n"
+                    f"• GitHub comments: {stats['github_comments']}\n"
+                )
+                if stats.get('errors', 0) > 0:
+                    message += f"• Errors: {stats['errors']}\n"
+
+                asyncio.run(notifier._send_slack_message(
+                    channel=settings.notifications.slack_channel,
+                    message=message
+                ))
+            except Exception as notif_error:
+                logger.error(f"Error sending auto-escalation notification: {notif_error}")
+
+        return {'success': True, 'task': 'auto_escalation', **stats}
+
+    except Exception as e:
+        logger.error(f"❌ Error in auto-escalation check task: {e}", exc_info=True)
+        raise
+
+
+# ========== PM Automation Tasks (Migrated from Python Scheduler) ==========
+
+@shared_task(name='src.tasks.notification_tasks.run_time_tracking_compliance')
+def run_time_tracking_compliance():
+    """
+    Run weekly time tracking compliance check (Celery task wrapper).
+    Scheduled to run on Mondays at 10 AM EST.
+
+    Phase 1 PM Automation - migrated from Python scheduler to Celery Beat.
+    """
+    try:
+        logger.info("📊 Starting time tracking compliance check task...")
+        from src.jobs.time_tracking_compliance import run_time_tracking_compliance as run_compliance_func
+
+        stats = run_compliance_func()
+
+        if stats.get('success'):
+            logger.info(
+                f"✅ Time Tracking Compliance completed: "
+                f"{stats['total_users']} users checked, {stats['compliance_percentage']:.1f}% compliant, "
+                f"{stats['notifications_sent']} notifications sent in {stats['duration_seconds']:.2f}s"
+            )
+            return {'success': True, 'task': 'time_tracking_compliance', **stats}
+        else:
+            error_msg = stats.get('error', 'Unknown error')
+            logger.error(f"❌ Time Tracking Compliance failed: {error_msg}")
+            raise Exception(f"Time tracking compliance failed: {error_msg}")
+
+    except Exception as e:
+        logger.error(f"❌ Error in time tracking compliance task: {e}", exc_info=True)
+        raise
+
+
+@shared_task(name='src.tasks.notification_tasks.run_monthly_epic_reconciliation')
+def run_monthly_epic_reconciliation():
+    """
+    Run monthly epic reconciliation with epic association (Celery task wrapper).
+    Scheduled to run on the 3rd of every month at 9 AM EST.
+
+    Phase 1 PM Automation - migrated from Python scheduler to Celery Beat.
+    Runs on 3rd to allow time for hours to be logged after month-end.
+    """
+    from datetime import datetime
+
+    # Only run on the 3rd of the month
+    if datetime.now().day != 3:
+        logger.info("⏭️  Skipping monthly epic reconciliation (not 3rd of month)")
+        return {'success': True, 'task': 'monthly_epic_reconciliation', 'skipped': True}
+
+    try:
+        logger.info("📈 Starting monthly epic reconciliation task (3rd of month)...")
+        from src.jobs.monthly_epic_reconciliation import run_monthly_epic_reconciliation as run_reconciliation_func
+
+        stats = run_reconciliation_func()
+
+        if stats.get('success'):
+            epic_assoc = stats.get('epic_association', {})
+            logger.info(
+                f"✅ Monthly Epic Reconciliation completed: "
+                f"{stats.get('projects_analyzed', 0)} projects, {stats.get('epics_processed', 0)} epics analyzed, "
+                f"variance: {stats.get('total_variance_pct', 0):.1f}%, "
+                f"epic associations: {epic_assoc.get('matches_found', 0)} matches "
+                f"({epic_assoc.get('updates_applied', 0)} applied) "
+                f"in {stats['duration_seconds']:.2f}s"
+            )
+            return {'success': True, 'task': 'monthly_epic_reconciliation', **stats}
+        else:
+            error_msg = stats.get('error', 'Unknown error')
+            logger.error(f"❌ Monthly Epic Reconciliation failed: {error_msg}")
+            raise Exception(f"Monthly epic reconciliation failed: {error_msg}")
+
+    except Exception as e:
+        logger.error(f"❌ Error in monthly epic reconciliation task: {e}", exc_info=True)
+        raise
