@@ -26,6 +26,7 @@ from .standard_epic_template import StandardEpicTemplate
 from .project_keyword import ProjectKeyword
 from .project_resource_mapping import ProjectResourceMapping
 from .project_monthly_forecast import ProjectMonthlyForecast
+from .job_execution import JobExecution
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -157,6 +158,7 @@ __all__ = [
     'ProjectKeyword',
     'ProjectResourceMapping',
     'ProjectMonthlyForecast',
+    'JobExecution',
     'Base',
     # DTOs
     'ProcessedMeetingDTO',

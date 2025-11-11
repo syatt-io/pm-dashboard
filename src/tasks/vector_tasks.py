@@ -9,583 +9,528 @@ from src.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_slack_messages')
-def ingest_slack_messages() -> Dict[str, Any]:
+@celery_app.task(name='src.tasks.vector_tasks.ingest_slack_messages', bind=True)
+def ingest_slack_messages(self) -> Dict[str, Any]:
     """Periodic task: Ingest new Slack messages from all channels.
 
-    Runs every 15 minutes via Celery Beat.
+    Runs daily at 2:15 AM EST via Celery Beat.
 
     Returns:
         Dict with ingestion stats
     """
     from src.services.vector_ingest import VectorIngestService
+    from src.services.job_execution_tracker import track_celery_task
     from config.settings import settings
+    from src.utils.database import get_db
     from slack_sdk import WebClient
 
     logger.info("🔄 Starting Slack ingestion task...")
 
+    # Get database session
+    db = next(get_db())
+
     try:
-        # Initialize services
-        ingest_service = VectorIngestService()
-        slack_client = WebClient(token=settings.notifications.slack_bot_token)
+        # Track job execution
+        tracker = track_celery_task(self, db, "ingest-slack-daily")
+        with tracker:
+            # Initialize services
+            ingest_service = VectorIngestService()
+            slack_client = WebClient(token=settings.notifications.slack_bot_token)
 
-        # Get last sync time (default to 1 hour ago)
-        last_sync = ingest_service.get_last_sync_timestamp('slack')
-        if not last_sync:
-            last_sync = datetime.now() - timedelta(hours=1)
+            # Get last sync time (default to 1 hour ago)
+            last_sync = ingest_service.get_last_sync_timestamp('slack')
+            if not last_sync:
+                last_sync = datetime.now() - timedelta(hours=1)
 
-        # Calculate oldest timestamp
-        oldest_timestamp = str(int(last_sync.timestamp()))
+            # Calculate oldest timestamp
+            oldest_timestamp = str(int(last_sync.timestamp()))
 
-        # Get all public channels (no groups:read scope needed)
-        channels_response = slack_client.conversations_list(
-            exclude_archived=True,
-            types="public_channel",
-            limit=200
-        )
-
-        if not channels_response.get('ok'):
-            logger.error(f"Failed to list Slack channels: {channels_response.get('error')}")
-            return {"success": False, "error": "Failed to list channels"}
-
-        channels = channels_response.get('channels', [])
-        total_ingested = 0
-        channels_processed = 0
-
-        # Ingest messages from each channel
-        for channel in channels:
-            channel_id = channel['id']
-            channel_name = channel['name']
-            is_private = channel.get('is_private', False)
-
-            try:
-                # Auto-join public channels (requires channels:join scope)
-                if not is_private and not channel.get('is_member', False):
-                    try:
-                        slack_client.conversations_join(channel=channel_id)
-                        logger.info(f"Joined public channel #{channel_name}")
-                    except Exception as e:
-                        logger.warning(f"Could not join #{channel_name}: {e}")
-
-                # Get message history since last sync
-                history = slack_client.conversations_history(
-                    channel=channel_id,
-                    oldest=oldest_timestamp,
-                    limit=100
-                )
-
-                if not history.get('ok'):
-                    logger.warning(f"Could not fetch history for #{channel_name}")
-                    continue
-
-                messages = history.get('messages', [])
-                if not messages:
-                    continue
-
-                # Ingest messages
-                count = ingest_service.ingest_slack_messages(
-                    messages=messages,
-                    channel_id=channel_id,
-                    channel_name=channel_name,
-                    is_private=is_private
-                )
-
-                total_ingested += count
-                channels_processed += 1
-                logger.info(f"✅ Ingested {count} messages from #{channel_name}")
-
-            except Exception as e:
-                logger.error(f"Error ingesting #{channel_name}: {e}")
-                continue
-
-        # Update last sync timestamp
-        ingest_service.update_last_sync_timestamp('slack', datetime.now())
-
-        result = {
-            "success": True,
-            "channels_processed": channels_processed,
-            "total_ingested": total_ingested,
-            "timestamp": datetime.now().isoformat()
-        }
-
-        logger.info(f"✅ Slack ingestion complete: {total_ingested} messages from {channels_processed} channels")
-
-        # Send Slack notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"✅ *Slack Vector Ingestion Complete*\n\n"
-                f"• Messages ingested: {total_ingested}\n"
-                f"• Channels processed: {channels_processed}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
+            # Get all public channels (no groups:read scope needed)
+            channels_response = slack_client.conversations_list(
+                exclude_archived=True,
+                types="public_channel",
+                limit=200
             )
-        except Exception as slack_err:
-            logger.error(f"Failed to send Slack notification: {slack_err}")
 
-        return result
+            if not channels_response.get('ok'):
+                logger.error(f"Failed to list Slack channels: {channels_response.get('error')}")
+                return {"success": False, "error": "Failed to list channels"}
+
+            channels = channels_response.get('channels', [])
+            total_ingested = 0
+            channels_processed = 0
+
+            # Ingest messages from each channel
+            for channel in channels:
+                channel_id = channel['id']
+                channel_name = channel['name']
+                is_private = channel.get('is_private', False)
+
+                try:
+                    # Auto-join public channels (requires channels:join scope)
+                    if not is_private and not channel.get('is_member', False):
+                        try:
+                            slack_client.conversations_join(channel=channel_id)
+                            logger.info(f"Joined public channel #{channel_name}")
+                        except Exception as e:
+                            logger.warning(f"Could not join #{channel_name}: {e}")
+
+                    # Get message history since last sync
+                    history = slack_client.conversations_history(
+                        channel=channel_id,
+                        oldest=oldest_timestamp,
+                        limit=100
+                    )
+
+                    if not history.get('ok'):
+                        logger.warning(f"Could not fetch history for #{channel_name}")
+                        continue
+
+                    messages = history.get('messages', [])
+                    if not messages:
+                        continue
+
+                    # Ingest messages
+                    count = ingest_service.ingest_slack_messages(
+                        messages=messages,
+                        channel_id=channel_id,
+                        channel_name=channel_name,
+                        is_private=is_private
+                    )
+
+                    total_ingested += count
+                    channels_processed += 1
+                    logger.info(f"✅ Ingested {count} messages from #{channel_name}")
+
+                except Exception as e:
+                    logger.error(f"Error ingesting #{channel_name}: {e}")
+                    continue
+
+            # Update last sync timestamp
+            ingest_service.update_last_sync_timestamp('slack', datetime.now())
+
+            result = {
+                "success": True,
+                "channels_processed": channels_processed,
+                "total_ingested": total_ingested,
+                "timestamp": datetime.now().isoformat()
+            }
+
+            # Store result data in tracker
+            tracker.set_result(result)
+
+            logger.info(f"✅ Slack ingestion complete: {total_ingested} messages from {channels_processed} channels")
+
+            return result
 
     except Exception as e:
         logger.error(f"Slack ingestion task failed: {e}")
-
-        # Send error notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"❌ *Slack Vector Ingestion Failed*\n\n"
-                f"• Error: {str(e)[:200]}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send error notification: {slack_err}")
-
-        return {"success": False, "error": str(e)}
+        raise  # Re-raise to let tracker handle failure
+    finally:
+        db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_jira_issues')
-def ingest_jira_issues() -> Dict[str, Any]:
+@celery_app.task(name='src.tasks.vector_tasks.ingest_jira_issues', bind=True)
+def ingest_jira_issues(self) -> Dict[str, Any]:
     """Periodic task: Ingest Jira issues updated since last sync.
 
-    Runs every 30 minutes via Celery Beat.
+    Runs daily at 2:30 AM EST via Celery Beat.
 
     Returns:
         Dict with ingestion stats
     """
     from src.services.vector_ingest import VectorIngestService
+    from src.services.job_execution_tracker import track_celery_task
     from src.integrations.jira_mcp import JiraMCPClient
     from config.settings import settings
+    from src.utils.database import get_db
     import asyncio
 
     logger.info("🔄 Starting Jira ingestion task...")
 
+    # Get database session
+    db = next(get_db())
+
     try:
-        # Initialize services
-        ingest_service = VectorIngestService()
-        jira_client = JiraMCPClient(
-            jira_url=settings.jira.url,
-            username=settings.jira.username,
-            api_token=settings.jira.api_token
-        )
-
-        # Get last sync time (default to 1 hour ago)
-        last_sync = ingest_service.get_last_sync_timestamp('jira')
-        if not last_sync:
-            last_sync = datetime.now() - timedelta(hours=1)
-
-        # Calculate days back (Jira uses relative dates)
-        days_back = (datetime.now() - last_sync).days + 1
-        if days_back < 1:
-            days_back = 1
-
-        # Get all projects (or use configured projects)
-        # For now, we'll ingest from all accessible projects
-        # In production, you might want to configure specific projects
-
-        # Build JQL to get updated issues
-        jql = f"updated >= -{days_back}d ORDER BY updated DESC"
-
-        logger.info(f"Jira JQL: {jql}")
-
-        # Search issues (async)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            issues_result = loop.run_until_complete(
-                jira_client.search_issues(jql, max_results=100, expand_comments=True)
+        # Track job execution
+        tracker = track_celery_task(self, db, "ingest-jira-daily")
+        with tracker:
+            # Initialize services
+            ingest_service = VectorIngestService()
+            jira_client = JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token
             )
-        finally:
-            loop.close()
 
-        issues = issues_result.get('issues', [])
+            # Get last sync time (default to 1 hour ago)
+            last_sync = ingest_service.get_last_sync_timestamp('jira')
+            if not last_sync:
+                last_sync = datetime.now() - timedelta(hours=1)
 
-        if not issues:
-            logger.info("No updated Jira issues found")
-            return {
+            # Calculate days back (Jira uses relative dates)
+            days_back = (datetime.now() - last_sync).days + 1
+            if days_back < 1:
+                days_back = 1
+
+            # Build JQL to get updated issues
+            jql = f"updated >= -{days_back}d ORDER BY updated DESC"
+
+            logger.info(f"Jira JQL: {jql}")
+
+            # Search issues (async)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                issues_result = loop.run_until_complete(
+                    jira_client.search_issues(jql, max_results=100, expand_comments=True)
+                )
+            finally:
+                loop.close()
+
+            issues = issues_result.get('issues', [])
+
+            if not issues:
+                logger.info("No updated Jira issues found")
+                result = {
+                    "success": True,
+                    "total_ingested": 0,
+                    "timestamp": datetime.now().isoformat()
+                }
+                tracker.set_result(result)
+                return result
+
+            # Group issues by project and ingest
+            projects = {}
+            for issue in issues:
+                project_key = issue.get('key', '').split('-')[0] if issue.get('key') else 'UNKNOWN'
+                if project_key not in projects:
+                    projects[project_key] = []
+                projects[project_key].append(issue)
+
+            total_ingested = 0
+            for project_key, project_issues in projects.items():
+                try:
+                    count = ingest_service.ingest_jira_issues(
+                        issues=project_issues,
+                        project_key=project_key
+                    )
+                    total_ingested += count
+                    logger.info(f"✅ Ingested {count} issues from {project_key}")
+
+                except Exception as e:
+                    logger.error(f"Error ingesting {project_key}: {e}")
+                    continue
+
+            # Update last sync timestamp
+            ingest_service.update_last_sync_timestamp('jira', datetime.now())
+
+            result = {
                 "success": True,
-                "total_ingested": 0,
+                "projects_processed": len(projects),
+                "total_ingested": total_ingested,
                 "timestamp": datetime.now().isoformat()
             }
 
-        # Group issues by project and ingest
-        projects = {}
-        for issue in issues:
-            project_key = issue.get('key', '').split('-')[0] if issue.get('key') else 'UNKNOWN'
-            if project_key not in projects:
-                projects[project_key] = []
-            projects[project_key].append(issue)
+            # Store result data in tracker
+            tracker.set_result(result)
 
-        total_ingested = 0
-        for project_key, project_issues in projects.items():
-            try:
-                count = ingest_service.ingest_jira_issues(
-                    issues=project_issues,
-                    project_key=project_key
-                )
-                total_ingested += count
-                logger.info(f"✅ Ingested {count} issues from {project_key}")
+            logger.info(f"✅ Jira ingestion complete: {total_ingested} issues from {len(projects)} projects")
 
-            except Exception as e:
-                logger.error(f"Error ingesting {project_key}: {e}")
-                continue
-
-        # Update last sync timestamp
-        ingest_service.update_last_sync_timestamp('jira', datetime.now())
-
-        result = {
-            "success": True,
-            "projects_processed": len(projects),
-            "total_ingested": total_ingested,
-            "timestamp": datetime.now().isoformat()
-        }
-
-        logger.info(f"✅ Jira ingestion complete: {total_ingested} issues from {len(projects)} projects")
-
-        # Send Slack notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"✅ *Jira Vector Ingestion Complete*\n\n"
-                f"• Issues ingested: {total_ingested}\n"
-                f"• Projects processed: {len(projects)}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send Slack notification: {slack_err}")
-
-        return result
+            return result
 
     except Exception as e:
         logger.error(f"Jira ingestion task failed: {e}")
-
-        # Send error notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"❌ *Jira Vector Ingestion Failed*\n\n"
-                f"• Error: {str(e)[:200]}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send error notification: {slack_err}")
-
-        return {"success": False, "error": str(e)}
+        raise  # Re-raise to let tracker handle failure
+    finally:
+        db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_fireflies_transcripts')
-def ingest_fireflies_transcripts() -> Dict[str, Any]:
+@celery_app.task(name='src.tasks.vector_tasks.ingest_fireflies_transcripts', bind=True)
+def ingest_fireflies_transcripts(self) -> Dict[str, Any]:
     """Periodic task: Ingest Fireflies transcripts from the last day.
 
-    Runs every hour via Celery Beat.
+    Runs daily at 2:45 AM EST via Celery Beat.
 
     Returns:
         Dict with ingestion stats
     """
     from src.services.vector_ingest import VectorIngestService
+    from src.services.job_execution_tracker import track_celery_task
     from src.integrations.fireflies import FirefliesClient
     from config.settings import settings
+    from src.utils.database import get_db
 
     logger.info("🔄 Starting Fireflies ingestion task...")
 
+    # Get database session
+    db = next(get_db())
+
     try:
-        # Initialize services
-        ingest_service = VectorIngestService()
+        # Track job execution
+        tracker = track_celery_task(self, db, "ingest-fireflies-daily")
+        with tracker:
+            # Initialize services
+            ingest_service = VectorIngestService()
 
-        # Get Fireflies API key (global)
-        api_key = settings.fireflies.api_key
-        if not api_key:
-            logger.warning("No Fireflies API key configured - skipping ingestion")
-            return {"success": False, "error": "No API key"}
+            # Get Fireflies API key (global)
+            api_key = settings.fireflies.api_key
+            if not api_key:
+                logger.warning("No Fireflies API key configured - skipping ingestion")
+                result = {"success": False, "error": "No API key"}
+                tracker.set_result(result)
+                return result
 
-        fireflies_client = FirefliesClient(api_key=api_key)
+            fireflies_client = FirefliesClient(api_key=api_key)
 
-        # Get last sync time (default to 1 day ago)
-        last_sync = ingest_service.get_last_sync_timestamp('fireflies')
-        if not last_sync:
-            last_sync = datetime.now() - timedelta(days=1)
+            # Get last sync time (default to 1 day ago)
+            last_sync = ingest_service.get_last_sync_timestamp('fireflies')
+            if not last_sync:
+                last_sync = datetime.now() - timedelta(days=1)
 
-        # Calculate days back
-        days_back = (datetime.now() - last_sync).days + 1
-        if days_back < 1:
-            days_back = 1
+            # Calculate days back
+            days_back = (datetime.now() - last_sync).days + 1
+            if days_back < 1:
+                days_back = 1
 
-        # Get recent meetings
-        meetings = fireflies_client.get_recent_meetings(days_back=days_back)
+            # Get recent meetings
+            meetings = fireflies_client.get_recent_meetings(days_back=days_back)
 
-        if not meetings:
-            logger.info("No new Fireflies meetings found")
-            return {
+            if not meetings:
+                logger.info("No new Fireflies meetings found")
+                result = {
+                    "success": True,
+                    "total_ingested": 0,
+                    "timestamp": datetime.now().isoformat()
+                }
+                tracker.set_result(result)
+                return result
+
+            # Fetch full transcripts
+            transcripts = []
+            for meeting in meetings:
+                try:
+                    transcript = fireflies_client.get_meeting_transcript(meeting['id'])
+                    if transcript:
+                        # get_meeting_transcript now returns dict with proper sharing settings
+                        transcripts.append(transcript)
+
+                except Exception as e:
+                    logger.error(f"Error fetching transcript for meeting {meeting['id']}: {e}")
+                    continue
+
+            # Ingest transcripts
+            total_ingested = ingest_service.ingest_fireflies_transcripts(
+                transcripts=transcripts
+            )
+
+            # Update last sync timestamp
+            ingest_service.update_last_sync_timestamp('fireflies', datetime.now())
+
+            result = {
                 "success": True,
-                "total_ingested": 0,
+                "total_ingested": total_ingested,
                 "timestamp": datetime.now().isoformat()
             }
 
-        # Fetch full transcripts
-        transcripts = []
-        for meeting in meetings:
-            try:
-                transcript = fireflies_client.get_meeting_transcript(meeting['id'])
-                if transcript:
-                    # get_meeting_transcript now returns dict with proper sharing settings
-                    transcripts.append(transcript)
+            # Store result data in tracker
+            tracker.set_result(result)
 
-            except Exception as e:
-                logger.error(f"Error fetching transcript for meeting {meeting['id']}: {e}")
-                continue
+            logger.info(f"✅ Fireflies ingestion complete: {total_ingested} transcripts")
 
-        # Ingest transcripts
-        total_ingested = ingest_service.ingest_fireflies_transcripts(
-            transcripts=transcripts
-        )
-
-        # Update last sync timestamp
-        ingest_service.update_last_sync_timestamp('fireflies', datetime.now())
-
-        result = {
-            "success": True,
-            "total_ingested": total_ingested,
-            "timestamp": datetime.now().isoformat()
-        }
-
-        logger.info(f"✅ Fireflies ingestion complete: {total_ingested} transcripts")
-
-        # Send Slack notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"✅ *Fireflies Vector Ingestion Complete*\n\n"
-                f"• Transcripts ingested: {total_ingested}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send Slack notification: {slack_err}")
-
-        return result
+            return result
 
     except Exception as e:
         logger.error(f"Fireflies ingestion task failed: {e}")
-
-        # Send error notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"❌ *Fireflies Vector Ingestion Failed*\n\n"
-                f"• Error: {str(e)[:200]}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send error notification: {slack_err}")
-
-        return {"success": False, "error": str(e)}
+        raise  # Re-raise to let tracker handle failure
+    finally:
+        db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_notion_pages')
-def ingest_notion_pages() -> Dict[str, Any]:
+@celery_app.task(name='src.tasks.vector_tasks.ingest_notion_pages', bind=True)
+def ingest_notion_pages(self) -> Dict[str, Any]:
     """Periodic task: Ingest Notion pages updated since last sync.
 
-    Runs every hour via Celery Beat.
+    Runs daily at 2:00 AM EST via Celery Beat.
 
     Returns:
         Dict with ingestion stats
     """
     from src.services.vector_ingest import VectorIngestService
+    from src.services.job_execution_tracker import track_celery_task
     from src.integrations.notion_api import NotionAPIClient
     from config.settings import settings
+    from src.utils.database import get_db
 
     logger.info("🔄 Starting Notion ingestion task...")
 
+    # Get database session
+    db = next(get_db())
+
     try:
-        # Check if Notion is configured
-        if not hasattr(settings, 'notion') or not settings.notion.api_key:
-            logger.warning("Notion not configured - skipping ingestion")
-            return {"success": False, "error": "No API key"}
+        # Track job execution
+        tracker = track_celery_task(self, db, "ingest-notion-daily")
+        with tracker:
+            # Check if Notion is configured
+            if not hasattr(settings, 'notion') or not settings.notion.api_key:
+                logger.warning("Notion not configured - skipping ingestion")
+                result = {"success": False, "error": "No API key"}
+                tracker.set_result(result)
+                return result
 
-        # Initialize services
-        ingest_service = VectorIngestService()
-        notion_client = NotionAPIClient(api_key=settings.notion.api_key)
+            # Initialize services
+            ingest_service = VectorIngestService()
+            notion_client = NotionAPIClient(api_key=settings.notion.api_key)
 
-        # Get last sync time (default to 1 day ago)
-        last_sync = ingest_service.get_last_sync_timestamp('notion')
-        if not last_sync:
-            last_sync = datetime.now() - timedelta(days=1)
+            # Get last sync time (default to 1 day ago)
+            last_sync = ingest_service.get_last_sync_timestamp('notion')
+            if not last_sync:
+                last_sync = datetime.now() - timedelta(days=1)
 
-        # Calculate days back
-        days_back = (datetime.now() - last_sync).days + 1
-        if days_back < 1:
-            days_back = 1
+            # Calculate days back
+            days_back = (datetime.now() - last_sync).days + 1
+            if days_back < 1:
+                days_back = 1
 
-        # Get recently updated pages
-        pages = notion_client.get_all_pages(days_back=days_back)
+            # Get recently updated pages
+            pages = notion_client.get_all_pages(days_back=days_back)
 
-        if not pages:
-            logger.info("No updated Notion pages found")
-            return {
+            if not pages:
+                logger.info("No updated Notion pages found")
+                result = {
+                    "success": True,
+                    "total_ingested": 0,
+                    "timestamp": datetime.now().isoformat()
+                }
+                tracker.set_result(result)
+                return result
+
+            # Fetch full content for each page (this can be slow)
+            full_content_map = {}
+            for page in pages:
+                try:
+                    page_id = page['id']
+                    content = notion_client.get_full_page_content(page_id)
+                    full_content_map[page_id] = content
+                except Exception as e:
+                    logger.error(f"Error fetching content for page {page.get('id')}: {e}")
+                    full_content_map[page_id] = ""  # Store empty content
+
+            # Ingest pages
+            total_ingested = ingest_service.ingest_notion_pages(
+                pages=pages,
+                full_content_map=full_content_map
+            )
+
+            # Update last sync timestamp
+            ingest_service.update_last_sync_timestamp('notion', datetime.now())
+
+            result = {
                 "success": True,
-                "total_ingested": 0,
+                "total_ingested": total_ingested,
                 "timestamp": datetime.now().isoformat()
             }
 
-        # Fetch full content for each page (this can be slow)
-        full_content_map = {}
-        for page in pages:
-            try:
-                page_id = page['id']
-                content = notion_client.get_full_page_content(page_id)
-                full_content_map[page_id] = content
-            except Exception as e:
-                logger.error(f"Error fetching content for page {page.get('id')}: {e}")
-                full_content_map[page_id] = ""  # Store empty content
+            # Store result data in tracker
+            tracker.set_result(result)
 
-        # Ingest pages
-        total_ingested = ingest_service.ingest_notion_pages(
-            pages=pages,
-            full_content_map=full_content_map
-        )
+            logger.info(f"✅ Notion ingestion complete: {total_ingested} pages")
 
-        # Update last sync timestamp
-        ingest_service.update_last_sync_timestamp('notion', datetime.now())
-
-        result = {
-            "success": True,
-            "total_ingested": total_ingested,
-            "timestamp": datetime.now().isoformat()
-        }
-
-        logger.info(f"✅ Notion ingestion complete: {total_ingested} pages")
-
-        # Send Slack notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"✅ *Notion Vector Ingestion Complete*\n\n"
-                f"• Pages ingested: {total_ingested}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send Slack notification: {slack_err}")
-
-        return result
+            return result
 
     except Exception as e:
         logger.error(f"Notion ingestion task failed: {e}")
-
-        # Send error notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"❌ *Notion Vector Ingestion Failed*\n\n"
-                f"• Error: {str(e)[:200]}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send error notification: {slack_err}")
-
-        return {"success": False, "error": str(e)}
+        raise  # Re-raise to let tracker handle failure
+    finally:
+        db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_tempo_worklogs')
-def ingest_tempo_worklogs() -> Dict[str, Any]:
+@celery_app.task(name='src.tasks.vector_tasks.ingest_tempo_worklogs', bind=True)
+def ingest_tempo_worklogs(self) -> Dict[str, Any]:
     """Periodic task: Ingest Tempo worklogs updated since last sync.
 
-    Runs daily via Celery Beat. Ingests worklogs from the last 2 days
+    Runs daily at 4:30 AM EST via Celery Beat. Ingests worklogs from the last 2 days
     to catch any recent entries or updates.
 
     Returns:
         Dict with ingestion stats
     """
     from src.services.vector_ingest import VectorIngestService
+    from src.services.job_execution_tracker import track_celery_task
     from src.integrations.tempo import TempoAPIClient
     from config.settings import settings
+    from src.utils.database import get_db
 
     logger.info("🔄 Starting Tempo worklogs ingestion task...")
 
+    # Get database session
+    db = next(get_db())
+
     try:
-        # Initialize services
-        ingest_service = VectorIngestService()
-        tempo_client = TempoAPIClient(api_token=settings.jira.tempo_api_token)
+        # Track job execution
+        tracker = track_celery_task(self, db, "ingest-tempo-daily")
+        with tracker:
+            # Initialize services
+            ingest_service = VectorIngestService()
+            tempo_client = TempoAPIClient(api_token=settings.jira.tempo_api_token)
 
-        # Get last sync time (default to 2 days ago to catch any updates)
-        last_sync = ingest_service.get_last_sync_timestamp('tempo')
-        if not last_sync:
-            last_sync = datetime.now() - timedelta(days=2)
+            # Get last sync time (default to 2 days ago to catch any updates)
+            last_sync = ingest_service.get_last_sync_timestamp('tempo')
+            if not last_sync:
+                last_sync = datetime.now() - timedelta(days=2)
 
-        # Calculate days back (minimum 2 days to catch updates)
-        days_back = max(2, (datetime.now() - last_sync).days + 1)
+            # Calculate days back (minimum 2 days to catch updates)
+            days_back = max(2, (datetime.now() - last_sync).days + 1)
 
-        logger.info(f"Fetching Tempo worklogs from last {days_back} days...")
+            logger.info(f"Fetching Tempo worklogs from last {days_back} days...")
 
-        # Calculate date range
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=days_back)
+            # Calculate date range
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days_back)
 
-        # Fetch worklogs
-        worklogs = tempo_client.get_worklogs(
-            start_date=start_date.strftime("%Y-%m-%d"),
-            end_date=end_date.strftime("%Y-%m-%d")
-        )
+            # Fetch worklogs
+            worklogs = tempo_client.get_worklogs(
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d")
+            )
 
-        if not worklogs:
-            logger.info("No Tempo worklogs found")
-            return {
+            if not worklogs:
+                logger.info("No Tempo worklogs found")
+                result = {
+                    "success": True,
+                    "total_ingested": 0,
+                    "timestamp": datetime.now().isoformat()
+                }
+                tracker.set_result(result)
+                return result
+
+            logger.info(f"Found {len(worklogs)} worklogs to ingest")
+
+            # Ingest worklogs
+            total_ingested = ingest_service.ingest_tempo_worklogs(worklogs=worklogs)
+
+            # Update last sync timestamp
+            ingest_service.update_last_sync_timestamp('tempo', datetime.now())
+
+            result = {
                 "success": True,
-                "total_ingested": 0,
+                "total_ingested": total_ingested,
+                "days_back": days_back,
                 "timestamp": datetime.now().isoformat()
             }
 
-        logger.info(f"Found {len(worklogs)} worklogs to ingest")
+            # Store result data in tracker
+            tracker.set_result(result)
 
-        # Ingest worklogs
-        total_ingested = ingest_service.ingest_tempo_worklogs(worklogs=worklogs)
+            logger.info(f"✅ Tempo worklogs ingestion complete: {total_ingested} worklogs")
 
-        # Update last sync timestamp
-        ingest_service.update_last_sync_timestamp('tempo', datetime.now())
-
-        result = {
-            "success": True,
-            "total_ingested": total_ingested,
-            "days_back": days_back,
-            "timestamp": datetime.now().isoformat()
-        }
-
-        logger.info(f"✅ Tempo worklogs ingestion complete: {total_ingested} worklogs")
-
-        # Send Slack notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"✅ *Tempo Worklogs Vector Ingestion Complete*\n\n"
-                f"• Worklogs ingested: {total_ingested}\n"
-                f"• Days processed: {days_back}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send Slack notification: {slack_err}")
-
-        return result
+            return result
 
     except Exception as e:
         logger.error(f"Tempo worklogs ingestion task failed: {e}")
-
-        # Send error notification
-        try:
-            from src.managers.notifications import NotificationManager
-            notifier = NotificationManager(settings.notifications)
-            notifier.send_slack_message(
-                f"❌ *Tempo Worklogs Vector Ingestion Failed*\n\n"
-                f"• Error: {str(e)[:200]}\n"
-                f"• Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}"
-            )
-        except Exception as slack_err:
-            logger.error(f"Failed to send error notification: {slack_err}")
-
-        return {"success": False, "error": str(e)}
+        raise  # Re-raise to let tracker handle failure
+    finally:
+        db.close()
 
 
 @celery_app.task(name='src.tasks.vector_tasks.backfill_all_sources')
