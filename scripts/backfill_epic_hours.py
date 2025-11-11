@@ -22,8 +22,8 @@ from src.models import EpicHours
 from src.utils.database import get_session
 from sqlalchemy.dialects.postgresql import insert
 
-# All 7 projects we have data for
-PROJECTS = ['BIGO', 'BMBY', 'SRLK', 'COOP', 'CAR', 'BEVS', 'IRIS']
+# Just process RNWL for validation
+PROJECTS = ['RNWL']
 
 
 def backfill_all_projects(tempo, session):

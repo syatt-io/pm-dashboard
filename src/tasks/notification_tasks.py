@@ -217,6 +217,10 @@ def sync_project_epic_hours(self, project_key):
             processed = 0
             skipped = 0
 
+            # Issue key pattern: PROJECT-NUMBER (e.g., RNWL-123)
+            import re
+            issue_pattern = re.compile(r'([A-Z]+-\d+)')
+
             for idx, worklog in enumerate(worklogs):
                 issue = worklog.get('issue', {})
                 issue_id = issue.get('id')
@@ -224,8 +228,18 @@ def sync_project_epic_hours(self, project_key):
                     skipped += 1
                     continue
 
-                # Get issue key
-                issue_key = tempo.get_issue_key_from_jira(issue_id)
+                # Get issue key using FAST PATH first (extract from description)
+                issue_key = None
+                description = worklog.get('description', '')
+
+                # Fast path: Extract from description
+                issue_match = issue_pattern.search(description)
+                if issue_match:
+                    issue_key = issue_match.group(1)
+                else:
+                    # Fallback: Jira API lookup (slow but accurate)
+                    issue_key = tempo.get_issue_key_from_jira(issue_id)
+
                 if not issue_key:
                     skipped += 1
                     continue
