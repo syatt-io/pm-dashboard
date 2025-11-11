@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from src.models import EpicCategoryMapping, EpicCategory
 from src.utils.database import get_session
 from src.routes.admin_settings import admin_required
-from src.middleware.auth import auth_required
+from src.services.auth import auth_required
 from datetime import datetime, timezone
 import logging
 
