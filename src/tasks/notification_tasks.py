@@ -179,6 +179,7 @@ def sync_project_epic_hours(self, project_key):
         from src.models import EpicHours
         from src.utils.database import get_session
         from sqlalchemy.dialects.postgresql import insert
+        from sqlalchemy import text
 
         retry_info = f" (attempt {self.request.retries + 1}/3)" if self.request.retries > 0 else ""
         logger.info(f"⏰ Starting epic hours sync for {project_key}{retry_info}...")
@@ -325,6 +326,16 @@ def sync_project_epic_hours(self, project_key):
                     'message': 'Saving to database...'
                 }
             )
+
+            # Delete all existing epic_hours records for this project before inserting fresh data
+            # This ensures we don't accumulate stale records from renamed epics or changed Tempo data
+            delete_result = session.execute(
+                text("DELETE FROM epic_hours WHERE project_key = :project_key"),
+                {"project_key": project_key}
+            )
+            delete_count = delete_result.rowcount
+            session.commit()
+            logger.info(f"Deleted {delete_count} existing epic_hours records for {project_key}")
 
             # Insert into database
             records_inserted = 0
