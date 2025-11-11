@@ -796,18 +796,8 @@ def sync_project_hours(project_key):
         from src.tasks.notification_tasks import sync_project_epic_hours
         from src.tasks.celery_app import celery_app
 
-        # Check Celery health before queuing task
-        try:
-            inspector = celery_app.control.inspect()
-            active_workers = inspector.active()
-            if not active_workers:
-                return error_response(
-                    'Background worker is offline. Cannot start sync. Please contact support.',
-                    status_code=503
-                )
-        except Exception as health_error:
-            logger.warning(f"Could not verify Celery health: {health_error}. Proceeding anyway...")
-
+        # Note: Health check via inspector.active() doesn't work reliably with GCP Pub/Sub
+        # We'll queue the task and let Celery handle failures gracefully
         logger.info(f"Queueing epic hours sync task for project {project_key}")
 
         # Queue the Celery task
