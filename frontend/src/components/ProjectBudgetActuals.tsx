@@ -154,7 +154,6 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
         if (status.ready) {
           clearInterval(pollInterval);
           setSyncing(false);
-          setSyncTaskId(null);
 
           if (status.successful) {
             setSyncProgress(null);
