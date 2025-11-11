@@ -654,3 +654,31 @@ def run_monthly_epic_reconciliation():
     except Exception as e:
         logger.error(f"❌ Error in monthly epic reconciliation task: {e}", exc_info=True)
         raise
+
+
+# ========== Monitoring & Health Check Tasks ==========
+
+@shared_task(name='src.tasks.notification_tasks.celery_health_check')
+def celery_health_check():
+    """
+    Periodic Celery health check (Celery task wrapper).
+    Scheduled to run every hour.
+
+    Checks Celery worker health and sends alerts if issues detected.
+    """
+    try:
+        logger.info("🏥 Starting Celery health check...")
+        from src.tasks.celery_monitoring import check_queue_health, send_health_check_alert
+
+        health_status = check_queue_health()
+        logger.info(f"✅ Celery health check complete: {health_status}")
+
+        # Send alert if unhealthy
+        if not health_status.get("healthy"):
+            send_health_check_alert(health_status)
+
+        return {'success': True, 'task': 'celery_health_check', **health_status}
+
+    except Exception as e:
+        logger.error(f"❌ Error in Celery health check task: {e}", exc_info=True)
+        raise

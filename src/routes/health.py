@@ -161,3 +161,43 @@ def jira_health_check():
         return jsonify(diagnostics)
     except Exception as e:
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
+@health_bp.route('/health/celery', methods=['GET'])
+def celery_health_check():
+    """
+    Celery worker and queue health check endpoint.
+
+    Returns information about:
+    - Worker availability
+    - Active tasks
+    - Scheduled tasks
+    - Reserved tasks
+    - Queue health metrics
+    """
+    try:
+        from src.tasks.celery_monitoring import check_queue_health
+
+        health_status = check_queue_health()
+
+        # Determine HTTP status code based on health
+        status_code = 200 if health_status.get('healthy') else 503
+
+        # Add additional context
+        if not health_status.get('healthy'):
+            health_status['warning'] = 'Celery workers may be unavailable or not responding'
+
+        return jsonify({
+            'status': 'healthy' if health_status.get('healthy') else 'unhealthy',
+            'timestamp': datetime.now().isoformat(),
+            'celery': health_status
+        }), status_code
+
+    except Exception as e:
+        logger.error(f"Celery health check failed: {e}", exc_info=True)
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'timestamp': datetime.now().isoformat()
+        }), 503

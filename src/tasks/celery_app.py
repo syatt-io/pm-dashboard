@@ -258,6 +258,13 @@ celery_app.conf.beat_schedule = {
         'task': 'src.tasks.notification_tasks.run_monthly_epic_reconciliation',
         'schedule': crontab(hour=13, minute=0, day_of_month='3')
     },
+
+    # ========== Monitoring & Health Check Tasks ==========
+    # Celery health check - Every hour
+    'celery-health-check': {
+        'task': 'src.tasks.notification_tasks.celery_health_check',
+        'schedule': crontab(minute=0)  # Every hour at :00
+    },
 }
 
 # Register worker startup signal handler for missed task recovery
@@ -270,5 +277,16 @@ try:
     print("✓ Worker startup checks registered")
 except Exception as e:
     print(f"⚠️  Could not register worker startup checks: {e}")
+
+# ========== Celery Monitoring & Alerting ==========
+# Import monitoring module to register signal handlers for task failures, retries, etc.
+# This provides automatic Slack alerts when tasks fail after all retries
+try:
+    import src.tasks.celery_monitoring
+    print("✓ Celery monitoring and alerting enabled")
+    print(f"  Alert channel: {src.tasks.celery_monitoring.monitor.alert_channel}")
+    print(f"  Alerts enabled: {src.tasks.celery_monitoring.monitor.enable_alerts}")
+except Exception as e:
+    print(f"⚠️  Could not enable Celery monitoring: {e}")
 
 __all__ = ['celery_app']
