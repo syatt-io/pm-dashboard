@@ -16,6 +16,7 @@ The Agent-PM system runs **40+ automated jobs** using a unified Celery Beat sche
 - **7+ specialized Celery tasks** (on-demand operations)
 
 **🎉 Major Milestone**: All legacy Python scheduler tasks have been successfully migrated to Celery Beat, providing:
+
 - ✅ Better reliability with auto-retry and error handling
 - ✅ Production-grade distributed task queue (GCP Pub/Sub)
 - ✅ Real-time monitoring and state tracking
