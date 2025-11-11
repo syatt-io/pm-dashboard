@@ -281,9 +281,11 @@ def sync_project_epic_hours(self, project_key):
                     skipped += 1
                     continue
 
-                # Set epic to NO_EPIC if we didn't find one earlier
+                # Get epic from Jira if not found in Tempo attributes
                 if not epic_key:
-                    epic_key = 'NO_EPIC'
+                    epic_key = tempo.get_epic_from_jira(issue_key)
+                    if not epic_key:
+                        epic_key = 'NO_EPIC'
 
                 # Get month
                 started = worklog.get('startDate')
