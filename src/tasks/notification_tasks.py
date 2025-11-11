@@ -176,7 +176,7 @@ def sync_project_epic_hours(self, project_key):
         from datetime import datetime, date
         from collections import defaultdict
         from src.integrations.tempo import TempoAPIClient
-        from src.models import EpicHours
+        from src.models import EpicHours, EpicCategoryMapping
         from src.utils.database import get_session
         from sqlalchemy.dialects.postgresql import insert
         from sqlalchemy import text
@@ -186,6 +186,12 @@ def sync_project_epic_hours(self, project_key):
 
         tempo = TempoAPIClient()
         session = get_session()
+
+        # Load epic category mappings for lookup during insertion
+        category_mappings = {}
+        for mapping in session.query(EpicCategoryMapping).all():
+            category_mappings[mapping.epic_key] = mapping.category
+        logger.info(f"Loaded {len(category_mappings)} epic category mappings")
 
         try:
             # Fetch worklogs for last 2+ years
@@ -340,6 +346,9 @@ def sync_project_epic_hours(self, project_key):
             # Insert into database
             records_inserted = 0
             for epic_key, months in epic_month_team_hours.items():
+                # Look up category for this epic (if mapped)
+                epic_category = category_mappings.get(epic_key)
+
                 for month, teams in months.items():
                     for team, hours in teams.items():
                         if hours > 0:
@@ -347,6 +356,7 @@ def sync_project_epic_hours(self, project_key):
                                 project_key=project_key,
                                 epic_key=epic_key,
                                 epic_summary=epic_key,
+                                epic_category=epic_category,  # Populated from mappings (or None)
                                 month=month,
                                 team=team,
                                 hours=round(hours, 2),
@@ -357,6 +367,7 @@ def sync_project_epic_hours(self, project_key):
                                 index_elements=['project_key', 'epic_key', 'month', 'team'],
                                 set_={
                                     'hours': stmt.excluded.hours,
+                                    'epic_category': stmt.excluded.epic_category,  # Update category on conflict
                                     'updated_at': datetime.now()
                                 }
                             )
