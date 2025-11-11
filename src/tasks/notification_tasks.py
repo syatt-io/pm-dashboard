@@ -222,6 +222,18 @@ def sync_project_epic_hours(self, project_key):
             issue_pattern = re.compile(r'([A-Z]+-\d+)')
 
             for idx, worklog in enumerate(worklogs):
+                # Update progress every 50 worklogs (show progress even when skipping)
+                if (idx + 1) % 50 == 0 or (idx + 1) == total_worklogs:
+                    percent = round(((idx + 1) / total_worklogs) * 100, 1)
+                    self.update_state(
+                        state='PROGRESS',
+                        meta={
+                            'current': idx + 1,
+                            'total': total_worklogs,
+                            'message': f'Processing worklogs... {idx + 1}/{total_worklogs} ({percent}%)'
+                        }
+                    )
+
                 issue = worklog.get('issue', {})
                 issue_id = issue.get('id')
                 if not issue_id:
@@ -299,18 +311,6 @@ def sync_project_epic_hours(self, project_key):
                 # Accumulate
                 epic_month_team_hours[epic_key][month][team] += hours
                 processed += 1
-
-                # Update progress every 50 worklogs
-                if (idx + 1) % 50 == 0 or (idx + 1) == total_worklogs:
-                    percent = round(((idx + 1) / total_worklogs) * 100, 1)
-                    self.update_state(
-                        state='PROGRESS',
-                        meta={
-                            'current': idx + 1,
-                            'total': total_worklogs,
-                            'message': f'Processing worklogs... {idx + 1}/{total_worklogs} ({percent}%)'
-                        }
-                    )
 
             logger.info(f"Processed {processed} worklogs for {project_key}, skipped {skipped}")
 
