@@ -16,6 +16,7 @@ from .epic_hours import EpicHours
 from .epic_baselines import EpicBaseline
 from .epic_budget import EpicBudget
 from .epic_category_mapping import EpicCategoryMapping
+from .epic_category import EpicCategory
 from .user_team import UserTeam
 from .forecast import EpicForecast
 from .time_tracking_compliance import TimeTrackingCompliance
@@ -145,6 +146,7 @@ __all__ = [
     'EpicBaseline',
     'EpicBudget',
     'EpicCategoryMapping',
+    'EpicCategory',
     'UserTeam',
     'EpicForecast',
     'TimeTrackingCompliance',

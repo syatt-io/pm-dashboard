@@ -51,10 +51,12 @@ import {
   People as PeopleIcon,
   Notifications as NotificationsIcon,
   TrendingUp as EscalationIcon,
+  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { Loading, Title, useDataProvider, useNotify, useRedirect } from 'react-admin';
 import { getApiUrl } from '../config';
 import UserManagement from './UserManagement';
+import EpicCategoriesManagement from './EpicCategoriesManagement';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
 
 interface Project {
@@ -1050,6 +1052,7 @@ export const Settings = () => {
           <Tab icon={<EscalationIcon />} label="Auto-Escalation" iconPosition="start" />
           {settings.user.role === 'admin' && <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />}
           {settings.user.role === 'admin' && <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />}
+          {settings.user.role === 'admin' && <Tab icon={<CategoryIcon />} label="Epic Categories" iconPosition="start" />}
         </Tabs>
       </Box>
 
@@ -2280,6 +2283,13 @@ export const Settings = () => {
       {settings.user.role === 'admin' && (
         <TabPanel value={tabValue} index={5}>
           <UserManagement />
+        </TabPanel>
+      )}
+
+      {/* Tab 7: Epic Categories (Admin Only) */}
+      {settings.user.role === 'admin' && (
+        <TabPanel value={tabValue} index={6}>
+          <EpicCategoriesManagement />
         </TabPanel>
       )}
 
