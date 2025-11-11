@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -22,6 +22,7 @@ import {
   MenuItem,
   FormControl,
   Checkbox,
+  Collapse,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -29,6 +30,7 @@ import {
   Close as CloseIcon,
   Delete as DeleteIcon,
   Sync as SyncIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 
@@ -67,6 +69,53 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
   const [categoryMappings, setCategoryMappings] = useState<{ [epicKey: string]: string }>({});
   const [selectedEpics, setSelectedEpics] = useState<string[]>([]);
   const [bulkCategory, setBulkCategory] = useState<string>('');
+  const [expandedCategories, setExpandedCategories] = useState<{ [key: string]: boolean }>({});
+
+  // Group budgets by category
+  const groupedBudgets = useMemo(() => {
+    const groups: { [key: string]: EpicBudget[] } = {};
+
+    // Sort budgets by epic_summary/epic_key
+    const sortedBudgets = [...budgets].sort((a, b) =>
+      (a.epic_summary || a.epic_key).localeCompare(b.epic_summary || b.epic_key)
+    );
+
+    sortedBudgets.forEach((budget) => {
+      const category = categoryMappings[budget.epic_key] || budget.epic_category || 'Uncategorized';
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(budget);
+    });
+
+    return groups;
+  }, [budgets, categoryMappings]);
+
+  // Get category order: Uncategorized first, then by display_order from categories array
+  const orderedCategories = useMemo(() => {
+    const categoryOrder: string[] = [];
+
+    // Add Uncategorized first if it exists
+    if (groupedBudgets['Uncategorized']) {
+      categoryOrder.push('Uncategorized');
+    }
+
+    // Add other categories in their display order
+    categories.forEach((cat) => {
+      if (groupedBudgets[cat]) {
+        categoryOrder.push(cat);
+      }
+    });
+
+    // Add any remaining categories not in the categories list (edge case)
+    Object.keys(groupedBudgets).forEach((cat) => {
+      if (!categoryOrder.includes(cat)) {
+        categoryOrder.push(cat);
+      }
+    });
+
+    return categoryOrder;
+  }, [groupedBudgets, categories]);
 
   // Get unique months from all budgets
   const allMonths = Array.from(
@@ -79,6 +128,21 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     loadBudgets();
     loadCategories();
   }, [projectKey]);
+
+  // Initialize all categories as expanded on first load
+  useEffect(() => {
+    if (orderedCategories.length > 0) {
+      const initialExpanded: { [key: string]: boolean } = {};
+      orderedCategories.forEach((cat) => {
+        if (!(cat in expandedCategories)) {
+          initialExpanded[cat] = true;
+        }
+      });
+      if (Object.keys(initialExpanded).length > 0) {
+        setExpandedCategories((prev) => ({ ...prev, ...initialExpanded }));
+      }
+    }
+  }, [orderedCategories]);
 
   const loadBudgets = async () => {
     try {
@@ -298,6 +362,13 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     }
   };
 
+  const handleToggleCategory = (category: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
+
   const handleToggleEpic = (epicKey: string) => {
     setSelectedEpics((prev) =>
       prev.includes(epicKey)
@@ -487,7 +558,181 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
               </TableRow>
             </TableHead>
             <TableBody>
-              {budgets
+              {orderedCategories.map((category) => (
+                <React.Fragment key={category}>
+                  {/* Category Header Row */}
+                  <TableRow
+                    sx={{
+                      backgroundColor: category === 'Uncategorized' ? '#fff3e0' : '#e3f2fd',
+                      cursor: 'pointer',
+                      '&:hover': { backgroundColor: category === 'Uncategorized' ? '#ffe0b2' : '#bbdefb' },
+                    }}
+                    onClick={() => handleToggleCategory(category)}
+                  >
+                    <TableCell colSpan={allMonths.length + 9}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <IconButton size="small" sx={{ transform: expandedCategories[category] ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}>
+                          <ExpandMoreIcon />
+                        </IconButton>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          {category} ({groupedBudgets[category]?.length || 0})
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Epics in this category */}
+                  {groupedBudgets[category]?.map((budget) => (
+                    <TableRow
+                      key={budget.id || budget.epic_key}
+                      hover
+                      sx={{
+                        backgroundColor: !budget.is_budgeted ? 'rgba(255, 152, 0, 0.08)' : 'inherit',
+                        display: expandedCategories[category] ? 'table-row' : 'none',
+                      }}
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={selectedEpics.includes(budget.epic_key)}
+                          onChange={() => handleToggleEpic(budget.epic_key)}
+                          inputProps={{ 'aria-label': `Select ${budget.epic_key}` }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ flex: 1 }}>
+                            <Tooltip title={budget.epic_summary || budget.epic_key}>
+                              <Typography variant="body2" fontWeight="medium" noWrap sx={{ maxWidth: 200 }}>
+                                {budget.epic_summary || budget.epic_key}
+                              </Typography>
+                            </Tooltip>
+                            <Typography variant="caption" color="textSecondary" noWrap sx={{ maxWidth: 200, display: 'block' }}>
+                              {budget.epic_key}
+                            </Typography>
+                          </Box>
+                          {!budget.is_budgeted && (
+                            <Tooltip title="This epic has actual hours but no budget estimate set. Synced from Tempo.">
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  backgroundColor: '#ff9800',
+                                  color: 'white',
+                                  px: 0.75,
+                                  py: 0.25,
+                                  borderRadius: 1,
+                                  fontWeight: 600,
+                                  fontSize: '0.65rem'
+                                }}
+                              >
+                                UNBUDGETED
+                              </Typography>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <FormControl size="small" fullWidth>
+                          <Select
+                            value={categoryMappings[budget.epic_key] || budget.epic_category || ''}
+                            onChange={(e) => handleCategoryChange(budget.epic_key, e.target.value)}
+                            displayEmpty
+                            sx={{ fontSize: '0.875rem' }}
+                          >
+                            <MenuItem value="">
+                              <em>None</em>
+                            </MenuItem>
+                            {categories.map((cat) => (
+                              <MenuItem key={cat} value={cat}>
+                                {cat}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </TableCell>
+                      <TableCell align="right">
+                        {editingId === budget.id ? (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <TextField
+                              size="small"
+                              type="number"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              sx={{ width: 80 }}
+                            />
+                            <IconButton size="small" onClick={() => handleSaveEdit(budget.id)} color="primary">
+                              <CheckIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" onClick={handleCancelEdit}>
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        ) : (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+                            <Typography variant="body2">
+                              {budget.estimated_hours.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                            </Typography>
+                            <Tooltip title="Edit estimate">
+                              <IconButton size="small" onClick={() => handleStartEdit(budget)}>
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        )}
+                      </TableCell>
+                      {allMonths.map((month) => (
+                        <TableCell key={month} align="right">
+                          <Typography variant="body2">
+                            {(budget.actuals_by_month[month] || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                          </Typography>
+                        </TableCell>
+                      ))}
+                      <TableCell align="right">
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {budget.total_actual.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: budget.remaining < 0 ? '#ef5350' : 'text.primary',
+                            fontWeight: budget.remaining < 0 ? 600 : 400
+                          }}
+                        >
+                          {budget.remaining.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography
+                          variant="body2"
+                          sx={{ color: getStatusColor(budget.pct_complete), fontWeight: 600 }}
+                        >
+                          {budget.pct_complete.toFixed(1)}%
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">
+                          {getStatusIcon(budget.pct_complete)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Delete epic budget">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDelete(budget.id, budget.epic_key)}
+                            color="error"
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </React.Fragment>
+              ))}
+
+              {/* Keep the old ungrouped rendering logic for reference - we'll remove this after testing */}
+              {false && budgets
                 .slice()
                 .sort((a, b) => (a.epic_summary || a.epic_key).localeCompare(b.epic_summary || b.epic_key))
                 .map((budget) => (
