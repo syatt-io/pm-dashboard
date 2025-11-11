@@ -78,12 +78,20 @@ This is an Autonomous PM Agent that processes Fireflies.ai meeting transcripts, 
    - MCP server fallback for ticket creation
    - User endpoint: `/rest/api/3/user/search` or `/rest/api/3/user/assignable/multiProjectSearch`
 
-4. **Web Interface** (`src/web_interface.py`)
+4. **Tempo Integration** (`src/integrations/tempo.py`)
+   - Tempo Cloud API v4 for time tracking data
+   - Server-side project filtering using numeric project IDs
+   - Epic hours aggregation with Jira epic lookup
+   - Caching mechanisms for project IDs and epic keys
+   - **CRITICAL**: See [Tempo API v4 Project Filtering Guide](docs/TEMPO_API_V4_PROJECT_FILTERING.md)
+   - **Key Discovery**: Must use `projectId` parameter with numeric ID, NOT `projectKey` with string key
+
+5. **Web Interface** (`src/web_interface.py`)
    - Flask application with SQLAlchemy ORM
    - Analysis caching to avoid redundant API calls
    - TODO list management with CRUD operations
 
-5. **Database** (`src/models.py`)
+6. **Database** (`src/models.py`)
    - SQLite with SQLAlchemy
    - Tables: meetings, action_items, todo_items
    - Caching layer for meeting analysis results
@@ -203,7 +211,8 @@ See **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** for comprehensive tro
 **Quick Reference**:
 - CSRF 400 errors → [CSRF Protection Guide](docs/CSRF_PROTECTION_GUIDE.md)
 - Deployment issues → [Deployment Troubleshooting](docs/DEPLOYMENT_TROUBLESHOOTING_2025-10-31.md)
-- Missing Tempo hours → Use APIs not MCP tools
+- Tempo API v4 project filtering → [Tempo API v4 Project Filtering Guide](docs/TEMPO_API_V4_PROJECT_FILTERING.md)
+- Missing Tempo hours → Use Tempo/Jira APIs (NOT MCP tools - data will be wrong)
 
 ## Project Structure
 ```
