@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from celery import shared_task
 
 logger = logging.getLogger(__name__)
@@ -726,14 +727,34 @@ def send_job_monitoring_digest():
             slack_message = digest_service.format_slack_message(digest)
 
             # Send email if configured
-            if settings.email.sendgrid_api_key:
+            smtp_host = getattr(settings.notifications, 'smtp_host', None)
+            smtp_user = getattr(settings.notifications, 'smtp_user', None)
+            smtp_password = getattr(settings.notifications, 'smtp_password', None)
+
+            if all([smtp_host, smtp_user, smtp_password]):
                 try:
-                    from src.integrations.email import send_email
-                    send_email(
-                        to_email=settings.email.to_email or settings.email.from_email,
-                        subject=f"Job Monitoring Daily Digest - {digest['summary']['period_start'][:10]}",
-                        html_content=email_html
-                    )
+                    import smtplib
+                    from email.mime.multipart import MIMEMultipart
+                    from email.mime.text import MIMEText
+
+                    smtp_port = getattr(settings.notifications, 'smtp_port', 587)
+                    from_email = os.getenv('SMTP_FROM_EMAIL', smtp_user)
+                    from_name = os.getenv('SMTP_FROM_NAME', 'Agent PM')
+
+                    msg = MIMEMultipart('alternative')
+                    msg['Subject'] = f"Job Monitoring Daily Digest - {digest['summary']['period_start'][:10]}"
+                    msg['From'] = f"{from_name} <{from_email}>"
+                    msg['To'] = smtp_user  # Send to SMTP user by default
+
+                    # Attach HTML content
+                    msg.attach(MIMEText(email_html, 'html'))
+
+                    # Send email
+                    with smtplib.SMTP(smtp_host, smtp_port) as server:
+                        server.starttls()
+                        server.login(smtp_user, smtp_password)
+                        server.send_message(msg)
+
                     logger.info("✅ Email digest sent successfully")
                 except Exception as email_err:
                     logger.error(f"Failed to send email digest: {email_err}")
