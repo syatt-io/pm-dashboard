@@ -713,7 +713,7 @@ def import_project_epics(project_key):
 def celery_health_check():
     """Check if Celery and Redis are responsive."""
     try:
-        from src.celery_app import celery_app
+        from src.tasks.celery_app import celery_app
 
         # Try to ping Celery via Redis
         inspector = celery_app.control.inspect()
@@ -747,7 +747,7 @@ def get_task_status(task_id):
     """Get the status of a Celery task by ID."""
     try:
         from celery.result import AsyncResult
-        from src.celery_app import celery_app
+        from src.tasks.celery_app import celery_app
 
         task_result = AsyncResult(task_id, app=celery_app)
 
