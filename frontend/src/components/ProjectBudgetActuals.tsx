@@ -147,6 +147,45 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     )
   ).sort();
 
+  // Calculate category subtotals
+  const categorySubtotals = useMemo(() => {
+    const subtotals: {
+      [category: string]: {
+        estimatedHours: number;
+        monthlyActuals: { [month: string]: number };
+        totalActual: number;
+        remaining: number;
+        pctComplete: number;
+      };
+    } = {};
+
+    Object.keys(groupedBudgets).forEach((category) => {
+      const categoryBudgets = groupedBudgets[category];
+      const estimatedHours = categoryBudgets.reduce((sum, b) => sum + b.estimated_hours, 0);
+      const totalActual = categoryBudgets.reduce((sum, b) => sum + b.total_actual, 0);
+      const remaining = categoryBudgets.reduce((sum, b) => sum + b.remaining, 0);
+      const pctComplete = estimatedHours > 0 ? (totalActual / estimatedHours) * 100 : 0;
+
+      const monthlyActuals: { [month: string]: number } = {};
+      allMonths.forEach((month) => {
+        monthlyActuals[month] = categoryBudgets.reduce(
+          (sum, b) => sum + (b.actuals_by_month[month] || 0),
+          0
+        );
+      });
+
+      subtotals[category] = {
+        estimatedHours,
+        monthlyActuals,
+        totalActual,
+        remaining,
+        pctComplete,
+      };
+    });
+
+    return subtotals;
+  }, [groupedBudgets, allMonths]);
+
   useEffect(() => {
     loadBudgets();
     loadCategories();
@@ -734,7 +773,11 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                     }}
                     onClick={() => handleToggleCategory(category)}
                   >
-                    <TableCell colSpan={allMonths.length + 9}>
+                    {/* Checkbox cell - empty */}
+                    <TableCell padding="checkbox" />
+
+                    {/* Epic cell - with expand icon and category name */}
+                    <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <IconButton size="small" sx={{ transform: expandedCategories[category] ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}>
                           <ExpandMoreIcon />
@@ -744,6 +787,59 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                         </Typography>
                       </Box>
                     </TableCell>
+
+                    {/* Category cell - empty */}
+                    <TableCell />
+
+                    {/* Estimate cell - subtotal */}
+                    <TableCell align="right">
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontStyle: 'italic', color: 'text.secondary' }}>
+                        {categorySubtotals[category]?.estimatedHours.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                      </Typography>
+                    </TableCell>
+
+                    {/* Monthly cells - subtotals */}
+                    {allMonths.map((month) => (
+                      <TableCell key={month} align="right">
+                        <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                          {categorySubtotals[category]?.monthlyActuals[month]?.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) || '0.0'}
+                        </Typography>
+                      </TableCell>
+                    ))}
+
+                    {/* Total Actual cell - subtotal */}
+                    <TableCell align="right">
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontStyle: 'italic', color: 'text.secondary' }}>
+                        {categorySubtotals[category]?.totalActual.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                      </Typography>
+                    </TableCell>
+
+                    {/* Remaining cell - subtotal */}
+                    <TableCell align="right">
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 600,
+                          fontStyle: 'italic',
+                          color: categorySubtotals[category]?.remaining < 0 ? '#ef5350' : 'text.secondary'
+                        }}
+                      >
+                        {categorySubtotals[category]?.remaining.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}h
+                      </Typography>
+                    </TableCell>
+
+                    {/* % Complete cell - subtotal */}
+                    <TableCell align="right">
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontStyle: 'italic', color: 'text.secondary' }}>
+                        {categorySubtotals[category]?.pctComplete.toFixed(1)}%
+                      </Typography>
+                    </TableCell>
+
+                    {/* Status cell - empty */}
+                    <TableCell />
+
+                    {/* Actions cell - empty */}
+                    <TableCell />
                   </TableRow>
 
                   {/* Epics in this category */}
