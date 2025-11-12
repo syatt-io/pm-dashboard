@@ -5,7 +5,7 @@ import { styled } from '@mui/material/styles';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 
 /**
- * Custom Menu that filters resources based on user permissions.
+ * Custom Menu with Syatt design styling
  * - Admins see all menu items including Analytics
  * - Non-admins don't see Analytics menu item
  */
@@ -54,23 +54,16 @@ export const CustomMenu = () => {
         leftIcon={<DashboardIcon />}
         sidebarIsOpen={open}
       />
+
       {Object.keys(resources).map((name) => {
         const resource = resources[name];
+        if (!resource || !resource.hasList) return null;
 
-        // Skip resources without list component (they're not in menu anyway)
-        if (!resource.hasList) {
-          return null;
-        }
+        // Hide analytics from non-admins
+        if (name === 'analytics' && !isAdmin) return null;
 
-        // Filter out analytics for non-admins
-        if (name === 'analytics' && !isAdmin) {
-          return null;
-        }
-
-        // Skip meetings resource (it's hidden from nav)
-        if (name === 'meetings') {
-          return null;
-        }
+        // Hide meetings from navigation
+        if (name === 'meetings') return null;
 
         return (
           <MenuItemLink

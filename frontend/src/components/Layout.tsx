@@ -96,6 +96,30 @@ export const CustomLayout = (props: any) => (
       {...props}
       appBar={MyAppBar}
       sidebar={MySidebar}
+      sx={{
+        // Prevent horizontal scroll on the root layout container
+        '& .RaLayout-appFrame': {
+          overflow: 'hidden',  // Prevent page-level horizontal scroll
+        },
+        // Main content area with sidebar - prevent horizontal scroll here too
+        '& .RaLayout-contentWithSidebar': {
+          overflow: 'hidden',
+        },
+        // Only allow horizontal scroll within the actual content area
+        '& .RaLayout-content': {
+          overflowX: 'auto',  // Horizontal scroll only affects content area
+          overflowY: 'auto',  // Vertical scroll for content
+          position: 'relative',  // Create stacking context
+          zIndex: 1,  // Ensure content stays below sidebar
+        },
+        // Ensure sidebar stays fixed and above content
+        '& .RaSidebar-fixed': {
+          position: 'sticky',  // Sticky positioning instead of fixed
+          top: 0,
+          zIndex: 1200,  // Higher than content to prevent overlap
+          backgroundColor: '#FFFFFF',  // Ensure background is solid
+        },
+      }}
     />
     <OnboardingAlert />
   </>
