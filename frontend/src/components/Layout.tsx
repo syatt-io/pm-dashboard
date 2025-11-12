@@ -9,7 +9,7 @@ import { CustomMenu } from './CustomMenu';
 // Custom AppBar with Syatt branding
 const CustomAppBar = styled(AppBar)(({ theme }) => ({
   position: 'fixed',
-  zIndex: theme.zIndex.appBar,
+  zIndex: 1300,  // Higher than sidebar (1200) to stay on top
   '& .RaAppBar-toolbar': {
     backgroundColor: theme.palette.primary.main,
   },
