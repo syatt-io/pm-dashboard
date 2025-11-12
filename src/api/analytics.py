@@ -534,10 +534,11 @@ def rebuild_forecasting_models(user):
     """
     Trigger a full rebuild of all forecasting models and analytics data.
 
-    Runs all 3 analysis scripts in sequence:
+    Runs all 4 analysis scripts in sequence:
     1. deep_analysis_epic_hours.py - Analyze epic hours data
     2. epic_lifecycle_analysis.py - Analyze epic lifecycle patterns
-    3. build_forecasting_baselines.py - Build forecasting baselines
+    3. build_forecasting_baselines.py - Build forecasting baselines (CSV)
+    4. generate_epic_baselines.py - Generate epic baselines (Database)
 
     This endpoint runs the scripts synchronously, which may take several minutes
     depending on the amount of data. Consider implementing async processing
@@ -550,7 +551,8 @@ def rebuild_forecasting_models(user):
         "results": {
             "deep_analysis": {"success": bool, "output": str, "error": str},
             "lifecycle_analysis": {"success": bool, "output": str, "error": str},
-            "baselines": {"success": bool, "output": str, "error": str}
+            "baselines": {"success": bool, "output": str, "error": str},
+            "epic_baselines_db": {"success": bool, "output": str, "error": str}
         },
         "total_duration_seconds": float
     }
@@ -582,7 +584,12 @@ def rebuild_forecasting_models(user):
             {
                 'name': 'baselines',
                 'path': os.path.join(scripts_dir, 'build_forecasting_baselines.py'),
-                'description': 'Build forecasting baselines'
+                'description': 'Build forecasting baselines (CSV)'
+            },
+            {
+                'name': 'epic_baselines_db',
+                'path': os.path.join(scripts_dir, 'generate_epic_baselines.py'),
+                'description': 'Generate epic baselines (Database)'
             }
         ]
 
