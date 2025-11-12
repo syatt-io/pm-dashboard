@@ -60,7 +60,6 @@ const CustomSidebar = styled(Sidebar)(({ theme }) => ({
     backgroundColor: '#FFFFFF',
     borderRight: '1px solid rgba(101, 96, 131, 0.1)',
     boxShadow: '4px 0 16px rgba(30, 29, 39, 0.06)',
-    paddingTop: '64px',  // Add padding to account for AppBar height
   },
 }));
 
@@ -116,7 +115,7 @@ export const CustomLayout = (props: any) => (
         // Ensure sidebar stays fixed and above content
         '& .RaSidebar-fixed': {
           position: 'sticky',  // Sticky positioning instead of fixed
-          top: 0,
+          top: '64px',  // Start below AppBar (AppBar height is 64px)
           zIndex: 1200,  // Higher than content to prevent overlap
           backgroundColor: '#FFFFFF',  // Ensure background is solid
         },
