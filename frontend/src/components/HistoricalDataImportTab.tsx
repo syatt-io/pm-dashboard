@@ -83,7 +83,13 @@ const HistoricalDataImportTab: React.FC = () => {
   const loadProjects = async () => {
     try {
       setLoadingProjects(true);
-      const response = await axios.get('http://localhost:4000/api/jira/projects');
+      const token = localStorage.getItem('auth_token');
+      const response = await axios.get('/api/jira/projects', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       setProjects(response.data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load projects');
@@ -95,8 +101,15 @@ const HistoricalDataImportTab: React.FC = () => {
 
   const checkTaskStatus = async (id: string) => {
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await axios.get(
-        `http://localhost:4000/api/historical-import/task-status/${id}`
+        `/api/historical-import/task-status/${id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
       );
       const { state, current, total, status, result: taskResult } = response.data;
 
@@ -145,8 +158,9 @@ const HistoricalDataImportTab: React.FC = () => {
     setProgress(null);
 
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await axios.post(
-        'http://localhost:4000/api/historical-import/import-project',
+        '/api/historical-import/import-project',
         {
           project_key: selectedProject,
           start_date: startDate,
@@ -158,6 +172,12 @@ const HistoricalDataImportTab: React.FC = () => {
             ux_research: uxResearch,
             extensive_customizations: extensiveCustomizations,
             project_oversight: projectOversight,
+          },
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
