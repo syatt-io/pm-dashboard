@@ -16,6 +16,8 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import { Upload, CheckCircle } from '@mui/icons-material';
 import axios from 'axios';
@@ -43,6 +45,7 @@ const HistoricalDataImportTab: React.FC = () => {
   const [endDate, setEndDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [includeInForecasting, setIncludeInForecasting] = useState<boolean>(true);
 
   // Project characteristics (1-5 sliders) - same as ProjectForecastTab
   const [beIntegrations, setBeIntegrations] = useState<number>(3);
@@ -167,6 +170,7 @@ const HistoricalDataImportTab: React.FC = () => {
           project_key: selectedProject,
           start_date: startDate,
           end_date: endDate,
+          include_in_forecasting: includeInForecasting,
           characteristics: {
             be_integrations: beIntegrations,
             custom_theme: customTheme,
@@ -267,6 +271,23 @@ const HistoricalDataImportTab: React.FC = () => {
               InputLabelProps={{ shrink: true }}
               disabled={loading}
             />
+
+            {/* Include in Forecasting Checkbox */}
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={includeInForecasting}
+                  onChange={(e) => setIncludeInForecasting(e.target.checked)}
+                  disabled={loading}
+                />
+              }
+              label="Include in forecasting models"
+              sx={{ mt: 2, mb: 1 }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', ml: 4, mb: 2 }}>
+              When checked, this data will be used to train forecasting models.
+              Uncheck for retainer/maintenance phases that shouldn't influence project estimates.
+            </Typography>
 
             {/* Project Characteristics */}
             <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
