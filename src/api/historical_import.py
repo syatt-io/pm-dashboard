@@ -1,7 +1,7 @@
 """Historical data import API endpoints for Analytics & Forecasting."""
 
 from flask import Blueprint, jsonify, request
-from src.services.auth import auth_required, admin_required
+from src.services.auth import admin_required
 from src.tasks.notification_tasks import import_historical_epic_hours
 from src.utils.database import get_session
 from src.models.project import Project
@@ -14,9 +14,8 @@ historical_import_bp = Blueprint('historical_import', __name__, url_prefix='/api
 
 
 @historical_import_bp.route('/import-project', methods=['POST'])
-@auth_required
 @admin_required
-def import_project_data(user):
+def import_project_data(current_user):
     """
     Import historical epic hours data from Tempo/Jira for a project.
 
@@ -143,9 +142,8 @@ def import_project_data(user):
 
 
 @historical_import_bp.route('/task-status/<task_id>', methods=['GET'])
-@auth_required
 @admin_required
-def get_task_status(user, task_id):
+def get_task_status(current_user, task_id):
     """
     Get status of a historical import task.
 
