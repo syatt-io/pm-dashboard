@@ -17,9 +17,11 @@ import statistics
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.models import EpicHours, EpicBaseline
+from src.models import EpicHours, EpicBaseline, ProjectForecastingConfig
 from src.utils.database import get_session
 from src.services.epic_baseline_grouper import EpicBaselineGrouper
+from sqlalchemy import func, extract
+from datetime import datetime
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -60,9 +62,29 @@ def generate_baselines(min_project_count: int = None):
     logger.info("Initialized AI-powered epic baseline grouper")
 
     try:
-        logger.info("Fetching epic hours data...")
-        all_records = session.query(EpicHours).all()
-        logger.info(f"Found {len(all_records)} total epic hour records")
+        logger.info("Fetching epic hours data with forecasting filters...")
+
+        # Query epic_hours filtered by forecasting configuration
+        # Only include projects with forecasting config AND where month is within date range
+        query = (
+            session.query(EpicHours)
+            .join(
+                ProjectForecastingConfig,
+                EpicHours.project_key == ProjectForecastingConfig.project_key
+            )
+            .filter(ProjectForecastingConfig.include_in_forecasting == True)
+            .filter(EpicHours.month >= ProjectForecastingConfig.forecasting_start_date)
+            .filter(EpicHours.month <= ProjectForecastingConfig.forecasting_end_date)
+        )
+
+        all_records = query.all()
+        logger.info(f"Found {len(all_records)} filtered epic hour records (date-bounded forecasting)")
+
+        # Log forecasting configs being used
+        forecasting_configs = session.query(ProjectForecastingConfig).filter_by(include_in_forecasting=True).all()
+        logger.info(f"Using {len(forecasting_configs)} projects for forecasting:")
+        for config in forecasting_configs:
+            logger.info(f"  - {config.project_key}: {config.forecasting_start_date} to {config.forecasting_end_date}")
 
         # Determine unique project count for adaptive threshold
         if min_project_count is None:
