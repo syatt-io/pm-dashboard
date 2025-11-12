@@ -19,38 +19,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models import EpicHours, EpicBaseline
 from src.utils.database import get_session
+from src.services.epic_baseline_grouper import EpicBaselineGrouper
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def normalize_epic_name(epic_summary: str) -> str:
-    """
-    Normalize and consolidate epic names for grouping.
-
-    Combines similar epic names into canonical categories:
-    - Product details, PDP details, PDP image & summary -> product details
-    - Globals & style guide, Globals -> globals & style guide
-    """
-    normalized = epic_summary.strip().lower()
-
-    # Consolidation mappings (order matters - check specific patterns first)
-    consolidations = {
-        # Product detail page variants
-        "pdp details": "product details",
-        "pdp image & summary": "product details",
-        "product detail page": "product details",
-        # Globals variants
-        "globals": "globals & style guide",
-    }
-
-    # Apply consolidation mapping
-    for pattern, canonical in consolidations.items():
-        if normalized == pattern:
-            return canonical
-
-    return normalized
 
 
 def classify_variance(cv: float) -> str:
@@ -81,6 +54,10 @@ def generate_baselines(min_project_count: int = None):
                           - 4+ projects: min = 3 (require 3+ projects for quality)
     """
     session = get_session()
+
+    # Initialize AI-powered epic grouper
+    grouper = EpicBaselineGrouper(session)
+    logger.info("Initialized AI-powered epic baseline grouper")
 
     try:
         logger.info("Fetching epic hours data...")
@@ -114,8 +91,9 @@ def generate_baselines(min_project_count: int = None):
             if not record.epic_summary:
                 continue
 
-            normalized_name = normalize_epic_name(record.epic_summary)
-            project_epic_hours[normalized_name][record.project_key] += record.hours
+            # Use AI-powered grouper to get canonical category
+            canonical_category = grouper.group_epic(record.epic_summary)
+            project_epic_hours[canonical_category][record.project_key] += record.hours
 
         # Now calculate statistics across project totals
         epic_data = defaultdict(
