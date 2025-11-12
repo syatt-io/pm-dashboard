@@ -26,11 +26,13 @@ class NotionAPIClient:
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
-            "Notion-Version": "2022-06-28"
+            "Notion-Version": "2022-06-28",
         }
 
     @retry_with_backoff(max_retries=3, base_delay=1.0)
-    def _make_request(self, method: str, endpoint: str, data: Dict = None) -> Dict[str, Any]:
+    def _make_request(
+        self, method: str, endpoint: str, data: Dict = None
+    ) -> Dict[str, Any]:
         """Make HTTP request to Notion API with automatic retries."""
         url = f"{self.base_url}/{endpoint}"
 
@@ -54,7 +56,7 @@ class NotionAPIClient:
         query: str = "",
         filter_type: str = None,
         page_size: int = 100,
-        start_cursor: str = None
+        start_cursor: str = None,
     ) -> Dict[str, Any]:
         """Search Notion workspace.
 
@@ -67,9 +69,7 @@ class NotionAPIClient:
         Returns:
             Search results with pages/databases
         """
-        data = {
-            "page_size": min(page_size, 100)
-        }
+        data = {"page_size": min(page_size, 100)}
 
         if query:
             data["query"] = query
@@ -96,13 +96,12 @@ class NotionAPIClient:
         start_cursor = None
         # Make cutoff_date timezone-aware to match Notion API timestamps
         from datetime import timezone
+
         cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
         while has_more:
             result = self.search(
-                filter_type="page",
-                page_size=100,
-                start_cursor=start_cursor
+                filter_type="page", page_size=100, start_cursor=start_cursor
             )
 
             pages = result.get("results", [])
@@ -112,7 +111,9 @@ class NotionAPIClient:
                 try:
                     last_edited = page.get("last_edited_time", "")
                     if last_edited:
-                        edited_date = datetime.fromisoformat(last_edited.replace("Z", "+00:00"))
+                        edited_date = datetime.fromisoformat(
+                            last_edited.replace("Z", "+00:00")
+                        )
                         if edited_date >= cutoff_date:
                             all_pages.append(page)
                 except Exception as e:
@@ -122,7 +123,9 @@ class NotionAPIClient:
             has_more = result.get("has_more", False)
             start_cursor = result.get("next_cursor")
 
-        logger.info(f"Found {len(all_pages)} Notion pages updated in last {days_back} days")
+        logger.info(
+            f"Found {len(all_pages)} Notion pages updated in last {days_back} days"
+        )
         return all_pages
 
     def get_page(self, page_id: str) -> Dict[str, Any]:
@@ -130,10 +133,7 @@ class NotionAPIClient:
         return self._make_request("GET", f"pages/{page_id}")
 
     def get_page_blocks(
-        self,
-        page_id: str,
-        page_size: int = 100,
-        start_cursor: str = None
+        self, page_id: str, page_size: int = 100, start_cursor: str = None
     ) -> Dict[str, Any]:
         """Get page content blocks.
 

@@ -57,19 +57,35 @@ logger = logging.getLogger(__name__)
 
 # Whitelists for dynamic query construction
 ALLOWED_SORT_COLUMNS = {
-    'id', 'created_at', 'updated_at', 'name', 'email', 'date', 'title', 'status'
+    "id",
+    "created_at",
+    "updated_at",
+    "name",
+    "email",
+    "date",
+    "title",
+    "status",
 }
 
-ALLOWED_SORT_ORDERS = {'ASC', 'DESC'}
+ALLOWED_SORT_ORDERS = {"ASC", "DESC"}
 
 ALLOWED_TABLE_NAMES = {
-    'users', 'projects', 'processed_meetings', 'project_keywords',
-    'project_monthly_forecast', 'tempo_worklogs', 'user_watched_projects',
-    'learnings', 'todo_items', 'project_digest_cache'
+    "users",
+    "projects",
+    "processed_meetings",
+    "project_keywords",
+    "project_monthly_forecast",
+    "tempo_worklogs",
+    "user_watched_projects",
+    "learnings",
+    "todo_items",
+    "project_digest_cache",
 }
 
 
-def validate_column_name(column: str, allowed_columns: Set[str] = ALLOWED_SORT_COLUMNS) -> bool:
+def validate_column_name(
+    column: str, allowed_columns: Set[str] = ALLOWED_SORT_COLUMNS
+) -> bool:
     """Validate that a column name is in the allowed list.
 
     Use this when accepting column names from user input for sorting, filtering, etc.
@@ -119,7 +135,7 @@ def build_safe_dynamic_query(
     columns: List[str],
     where_params: Dict[str, Any],
     sort_column: str = None,
-    sort_order: str = 'DESC'
+    sort_order: str = "DESC",
 ) -> tuple:
     """Build a safe dynamic query with validated components.
 
@@ -158,7 +174,7 @@ def build_safe_dynamic_query(
             raise ValueError(f"Invalid column name: {col}")
 
     # Build SELECT clause
-    columns_str = ', '.join(columns)
+    columns_str = ", ".join(columns)
     query = f"SELECT {columns_str} FROM {table}"
 
     # Build WHERE clause with parameterized values
@@ -197,10 +213,10 @@ def is_safe_query_pattern(query_string: str) -> bool:
         obvious mistakes during development.
     """
     # Check for parameterized placeholder usage
-    has_params = bool(re.search(r':[a-zA-Z_][a-zA-Z0-9_]*', query_string))
+    has_params = bool(re.search(r":[a-zA-Z_][a-zA-Z0-9_]*", query_string))
 
     # Check for potentially unsafe string formatting
-    has_format_chars = bool(re.search(r'%s|%\([^)]+\)s|\{[^}]*\}', query_string))
+    has_format_chars = bool(re.search(r"%s|%\([^)]+\)s|\{[^}]*\}", query_string))
 
     # Check for string concatenation patterns (very basic heuristic)
     # This won't catch everything, but helps during development
@@ -211,7 +227,13 @@ def is_safe_query_pattern(query_string: str) -> bool:
         return False
 
     # Check for DDL statements (these don't need parameters)
-    ddl_keywords = ['CREATE TABLE', 'CREATE INDEX', 'ALTER TABLE', 'DROP TABLE', 'CREATE VIEW']
+    ddl_keywords = [
+        "CREATE TABLE",
+        "CREATE INDEX",
+        "ALTER TABLE",
+        "DROP TABLE",
+        "CREATE VIEW",
+    ]
     is_ddl = any(keyword in query_string.upper() for keyword in ddl_keywords)
 
     # Safe if: has parameters OR is DDL statement
@@ -225,23 +247,23 @@ def example_safe_queries():
     """Examples of safe query patterns used in this codebase."""
     from sqlalchemy import create_engine
 
-    engine = create_engine('sqlite:///:memory:')
+    engine = create_engine("sqlite:///:memory:")
 
     with engine.connect() as conn:
         # ✅ SAFE: Parameterized query with text()
         result = conn.execute(
             text("SELECT * FROM users WHERE email = :email"),
-            {"email": "user@example.com"}
+            {"email": "user@example.com"},
         )
 
         # ✅ SAFE: Multiple parameters
         result = conn.execute(
             text("SELECT * FROM projects WHERE key = :key AND is_active = :active"),
-            {"key": "PROJ", "active": True}
+            {"key": "PROJ", "active": True},
         )
 
         # ✅ SAFE: Dynamic column selection with validation
-        sort_column = 'created_at'  # From user input
+        sort_column = "created_at"  # From user input
         if validate_column_name(sort_column):
             result = conn.execute(
                 text(f"SELECT * FROM users ORDER BY {sort_column} DESC")
@@ -249,9 +271,9 @@ def example_safe_queries():
 
         # ✅ SAFE: Dynamic query builder with validation
         query, params = build_safe_dynamic_query(
-            table='users',
-            columns=['id', 'name'],
-            where_params={'status': 'active'},
-            sort_column='created_at'
+            table="users",
+            columns=["id", "name"],
+            where_params={"status": "active"},
+            sort_column="created_at",
         )
         result = conn.execute(text(query), params)

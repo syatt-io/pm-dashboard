@@ -27,7 +27,7 @@ def load_epic_hours_from_csv(csv_path: str):
     session = get_session()
 
     try:
-        with open(csv_path, 'r') as f:
+        with open(csv_path, "r") as f:
             reader = csv.DictReader(f)
 
             loaded = 0
@@ -36,23 +36,27 @@ def load_epic_hours_from_csv(csv_path: str):
 
             for row in reader:
                 try:
-                    project_key = row['Project']
-                    epic_key = row['Epic']
-                    team = row['Team']
-                    epic_summary = row['Epic_Summary']
-                    month_str = row['Month']  # e.g., "2025-01"
-                    hours = float(row['Hours'])
+                    project_key = row["Project"]
+                    epic_key = row["Epic"]
+                    team = row["Team"]
+                    epic_summary = row["Epic_Summary"]
+                    month_str = row["Month"]  # e.g., "2025-01"
+                    hours = float(row["Hours"])
 
                     # Parse month as first day of month
                     month_date = datetime.strptime(f"{month_str}-01", "%Y-%m-%d").date()
 
                     # Check if record exists (now includes team in unique constraint)
-                    existing = session.query(EpicHours).filter(
-                        EpicHours.project_key == project_key,
-                        EpicHours.epic_key == epic_key,
-                        EpicHours.month == month_date,
-                        EpicHours.team == team
-                    ).first()
+                    existing = (
+                        session.query(EpicHours)
+                        .filter(
+                            EpicHours.project_key == project_key,
+                            EpicHours.epic_key == epic_key,
+                            EpicHours.month == month_date,
+                            EpicHours.team == team,
+                        )
+                        .first()
+                    )
 
                     if existing:
                         # Update existing record
@@ -68,7 +72,7 @@ def load_epic_hours_from_csv(csv_path: str):
                             epic_summary=epic_summary,
                             month=month_date,
                             team=team,
-                            hours=hours
+                            hours=hours,
                         )
                         session.add(epic_hours)
                         loaded += 1
@@ -81,7 +85,9 @@ def load_epic_hours_from_csv(csv_path: str):
             # Commit all changes
             session.commit()
 
-            logger.info(f"✅ Loaded {loaded} new records, updated {updated} records, skipped {skipped}")
+            logger.info(
+                f"✅ Loaded {loaded} new records, updated {updated} records, skipped {skipped}"
+            )
 
     except Exception as e:
         logger.error(f"Error loading CSV: {e}")

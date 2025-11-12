@@ -13,9 +13,9 @@ from collections import defaultdict
 
 session = get_session()
 
-PROJECTS = ['BIGO', 'BMBY', 'SRLK', 'COOP', 'CAR', 'BEVS', 'IRIS']
+PROJECTS = ["BIGO", "BMBY", "SRLK", "COOP", "CAR", "BEVS", "IRIS"]
 
-print("="* 80)
+print("=" * 80)
 print("EPIC HOURS BY PROJECT")
 print("=" * 80)
 print()

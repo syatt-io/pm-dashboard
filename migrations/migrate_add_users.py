@@ -1,7 +1,17 @@
 """Migration script to add user authentication tables and relationships."""
+
 import os
 import sys
-from sqlalchemy import create_engine, text, Column, Integer, String, DateTime, Enum, Boolean
+from sqlalchemy import (
+    create_engine,
+    text,
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Enum,
+    Boolean,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -12,6 +22,7 @@ Base = declarative_base()
 
 class UserRole(enum.Enum):
     """User role enumeration."""
+
     NO_ACCESS = "no_access"
     MEMBER = "member"
     ADMIN = "admin"
@@ -19,7 +30,8 @@ class UserRole(enum.Enum):
 
 class User(Base):
     """User model for authentication and authorization."""
-    __tablename__ = 'users'
+
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
     email = Column(String(255), unique=True, nullable=False)
@@ -31,7 +43,9 @@ class User(Base):
     last_login = Column(DateTime)
     is_active = Column(Boolean, default=True)
 
+
 DATABASE_URL = "sqlite:///database/pm_agent.db"
+
 
 def migrate():
     """Add user table and update existing tables with user_id."""
@@ -45,15 +59,15 @@ def migrate():
 
     try:
         # Create admin user
-        admin_user = session.query(User).filter_by(email='mike.samimi@syatt.io').first()
+        admin_user = session.query(User).filter_by(email="mike.samimi@syatt.io").first()
         if not admin_user:
             admin_user = User(
-                email='mike.samimi@syatt.io',
-                name='Mike Samimi',
-                google_id='pending_first_login',  # Will be updated on first login
+                email="mike.samimi@syatt.io",
+                name="Mike Samimi",
+                google_id="pending_first_login",  # Will be updated on first login
                 role=UserRole.ADMIN,
                 created_at=datetime.utcnow(),
-                is_active=True
+                is_active=True,
             )
             session.add(admin_user)
             session.commit()
@@ -66,9 +80,12 @@ def migrate():
             # Check and add user_id to todo_items
             result = conn.execute(text("PRAGMA table_info(todo_items)"))
             columns = [row[1] for row in result]
-            if 'user_id' not in columns:
+            if "user_id" not in columns:
                 conn.execute(text("ALTER TABLE todo_items ADD COLUMN user_id INTEGER"))
-                conn.execute(text("UPDATE todo_items SET user_id = :user_id"), {"user_id": admin_user.id})
+                conn.execute(
+                    text("UPDATE todo_items SET user_id = :user_id"),
+                    {"user_id": admin_user.id},
+                )
                 print("Added user_id to todo_items table")
             else:
                 print("user_id already exists in todo_items")
@@ -76,9 +93,14 @@ def migrate():
             # Check and add user_id to processed_meetings
             result = conn.execute(text("PRAGMA table_info(processed_meetings)"))
             columns = [row[1] for row in result]
-            if 'user_id' not in columns:
-                conn.execute(text("ALTER TABLE processed_meetings ADD COLUMN user_id INTEGER"))
-                conn.execute(text("UPDATE processed_meetings SET user_id = :user_id"), {"user_id": admin_user.id})
+            if "user_id" not in columns:
+                conn.execute(
+                    text("ALTER TABLE processed_meetings ADD COLUMN user_id INTEGER")
+                )
+                conn.execute(
+                    text("UPDATE processed_meetings SET user_id = :user_id"),
+                    {"user_id": admin_user.id},
+                )
                 print("Added user_id to processed_meetings table")
             else:
                 print("user_id already exists in processed_meetings")
@@ -86,9 +108,14 @@ def migrate():
             # Check and add user_id to user_preferences
             result = conn.execute(text("PRAGMA table_info(user_preferences)"))
             columns = [row[1] for row in result]
-            if 'user_id' not in columns:
-                conn.execute(text("ALTER TABLE user_preferences ADD COLUMN user_id INTEGER"))
-                conn.execute(text("UPDATE user_preferences SET user_id = :user_id"), {"user_id": admin_user.id})
+            if "user_id" not in columns:
+                conn.execute(
+                    text("ALTER TABLE user_preferences ADD COLUMN user_id INTEGER")
+                )
+                conn.execute(
+                    text("UPDATE user_preferences SET user_id = :user_id"),
+                    {"user_id": admin_user.id},
+                )
                 print("Added user_id to user_preferences table")
             else:
                 print("user_id already exists in user_preferences")

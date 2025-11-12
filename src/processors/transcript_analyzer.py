@@ -24,30 +24,52 @@ logger = logging.getLogger(__name__)
 
 class ActionItem(BaseModel):
     """Structured action item extracted from meeting."""
+
     title: str = Field(description="Brief title of the action item")
-    description: str = Field(description="Detailed description of what needs to be done")
-    assignee: Optional[str] = Field(description="Person responsible for this item", default=None)
-    due_date: Optional[str] = Field(description="Due date if mentioned (ISO format)", default=None)
-    priority: Optional[str] = Field(description="Priority level (optional, rarely accurate)", default=None)
+    description: str = Field(
+        description="Detailed description of what needs to be done"
+    )
+    assignee: Optional[str] = Field(
+        description="Person responsible for this item", default=None
+    )
+    due_date: Optional[str] = Field(
+        description="Due date if mentioned (ISO format)", default=None
+    )
+    priority: Optional[str] = Field(
+        description="Priority level (optional, rarely accurate)", default=None
+    )
     context: str = Field(description="Meeting context where this was discussed")
-    dependencies: Optional[List[str]] = Field(description="Other tasks this depends on", default=None)
+    dependencies: Optional[List[str]] = Field(
+        description="Other tasks this depends on", default=None
+    )
 
 
 class TopicSection(BaseModel):
     """A topic section with title and bullet points."""
-    title: str = Field(description="Clear, specific topic header (e.g., 'Japan Site Launch', 'Database Schema Discussion')")
-    content_items: List[str] = Field(description="List of bullet points for this topic. Each item should be a concise statement. Use nested structure by prefixing sub-items with '  * ' (two spaces + asterisk)")
+
+    title: str = Field(
+        description="Clear, specific topic header (e.g., 'Japan Site Launch', 'Database Schema Discussion')"
+    )
+    content_items: List[str] = Field(
+        description="List of bullet points for this topic. Each item should be a concise statement. Use nested structure by prefixing sub-items with '  * ' (two spaces + asterisk)"
+    )
 
 
 class MeetingAnalysis(BaseModel):
     """Complete analysis of a meeting transcript with topic-based sections."""
-    topics: List[TopicSection] = Field(description="Natural topic sections based on what was discussed. Let the number emerge from content (could be 2, could be 10). Group related discussions under same topic.")
-    action_items: List[ActionItem] = Field(description="What we're doing next (concrete next steps with owner and task)")
+
+    topics: List[TopicSection] = Field(
+        description="Natural topic sections based on what was discussed. Let the number emerge from content (could be 2, could be 10). Group related discussions under same topic."
+    )
+    action_items: List[ActionItem] = Field(
+        description="What we're doing next (concrete next steps with owner and task)"
+    )
 
 
 @dataclass
 class ProcessedMeeting:
     """Processed meeting with extracted information."""
+
     meeting_id: str
     title: str
     date: datetime
@@ -80,36 +102,43 @@ class TranscriptAnalyzer:
         Returns None if AI config is not available.
         """
         from config.settings import Settings
+
         ai_config = Settings.get_fresh_ai_config()
 
         if not ai_config:
-            logger.warning("AI configuration not available - TranscriptAnalyzer will not be functional until AI config is set")
+            logger.warning(
+                "AI configuration not available - TranscriptAnalyzer will not be functional until AI config is set"
+            )
             return None
 
-        logger.info(f"Creating LLM with provider={ai_config.provider}, model={ai_config.model}")
+        logger.info(
+            f"Creating LLM with provider={ai_config.provider}, model={ai_config.model}"
+        )
 
         if ai_config.provider == "openai":
             return ChatOpenAI(
                 model=ai_config.model,
                 temperature=ai_config.temperature,
-                max_tokens=ai_config.max_tokens
+                max_tokens=ai_config.max_tokens,
             )
         elif ai_config.provider == "anthropic":
             return ChatAnthropic(
                 model=ai_config.model,
                 anthropic_api_key=ai_config.api_key,
                 temperature=ai_config.temperature,
-                max_tokens=ai_config.max_tokens
+                max_tokens=ai_config.max_tokens,
             )
         elif ai_config.provider == "google":
             return ChatGoogleGenerativeAI(
                 model=ai_config.model,
                 google_api_key=ai_config.api_key,
                 temperature=ai_config.temperature,
-                max_output_tokens=ai_config.max_tokens
+                max_output_tokens=ai_config.max_tokens,
             )
         else:
-            raise ValueError(f"Unsupported AI provider: {ai_config.provider}. Supported providers: openai, anthropic, google")
+            raise ValueError(
+                f"Unsupported AI provider: {ai_config.provider}. Supported providers: openai, anthropic, google"
+            )
 
     def _invoke_llm_with_retry(self, messages: List, max_retries: int = 3):
         """Invoke LLM with retry logic for handling transient failures.
@@ -126,14 +155,16 @@ class TranscriptAnalyzer:
         Returns:
             LLM response object
         """
+
         @retry_with_backoff(max_retries=max_retries, base_delay=1.0)
         def invoke():
             return self.llm.invoke(messages)
 
         return invoke()
 
-    def analyze_transcript(self, transcript: str, meeting_title: str = None,
-                          meeting_date: datetime = None) -> MeetingAnalysis:
+    def analyze_transcript(
+        self, transcript: str, meeting_title: str = None, meeting_date: datetime = None
+    ) -> MeetingAnalysis:
         """Analyze a meeting transcript to extract structured information.
 
         Automatically refreshes LLM configuration to pick up any changes from database.
@@ -144,15 +175,13 @@ class TranscriptAnalyzer:
         # Check if LLM is available
         if not self.llm:
             logger.error("Cannot analyze transcript: AI configuration not available")
-            return MeetingAnalysis(
-                topics=[],
-                action_items=[]
-            )
+            return MeetingAnalysis(topics=[], action_items=[])
 
         # Get prompts from configuration
         system_prompt_base = self.prompt_manager.get_prompt(
-            'meeting_analysis', 'system_prompt',
-            default="""You are an expert meeting analyst. Extract key information from meeting transcripts."""
+            "meeting_analysis",
+            "system_prompt",
+            default="""You are an expert meeting analyst. Extract key information from meeting transcripts.""",
         )
 
         # Add format instructions to the system prompt
@@ -160,25 +189,28 @@ class TranscriptAnalyzer:
 
         # Get the human prompt template
         human_prompt_template = self.prompt_manager.get_prompt(
-            'meeting_analysis', 'human_prompt_template',
-            default="""Meeting: {meeting_title}\nDate: {meeting_date}\n\nTranscript:\n{transcript}\n\nPlease analyze this meeting transcript and extract structured information."""
+            "meeting_analysis",
+            "human_prompt_template",
+            default="""Meeting: {meeting_title}\nDate: {meeting_date}\n\nTranscript:\n{transcript}\n\nPlease analyze this meeting transcript and extract structured information.""",
         )
 
         # Get transcript max chars from settings
-        max_chars = self.prompt_manager.get_setting('transcript_max_chars', 8000)
+        max_chars = self.prompt_manager.get_setting("transcript_max_chars", 8000)
 
         # Format the human prompt
         human_prompt = human_prompt_template.format(
-            meeting_title=meeting_title or 'Team Meeting',
-            meeting_date=meeting_date.strftime('%Y-%m-%d') if meeting_date else 'Today',
-            transcript=transcript[:max_chars]  # Limit to avoid token limits
+            meeting_title=meeting_title or "Team Meeting",
+            meeting_date=meeting_date.strftime("%Y-%m-%d") if meeting_date else "Today",
+            transcript=transcript[:max_chars],  # Limit to avoid token limits
         )
 
         messages = [
-            SystemMessage(content=system_prompt.format(
-                format_instructions=self.parser.get_format_instructions()
-            )),
-            HumanMessage(content=human_prompt)
+            SystemMessage(
+                content=system_prompt.format(
+                    format_instructions=self.parser.get_format_instructions()
+                )
+            ),
+            HumanMessage(content=human_prompt),
         ]
 
         try:
@@ -195,10 +227,7 @@ class TranscriptAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing transcript: {e}")
             # Return minimal analysis on error
-            return MeetingAnalysis(
-                topics=[],
-                action_items=[]
-            )
+            return MeetingAnalysis(topics=[], action_items=[])
 
     def extract_action_items(self, transcript: str) -> List[ActionItem]:
         """Extract just action items from a transcript."""
@@ -209,14 +238,15 @@ class TranscriptAnalyzer:
 
         # Get action items prompt from configuration
         prompt = self.prompt_manager.get_prompt(
-            'meeting_analysis', 'action_items_prompt',
+            "meeting_analysis",
+            "action_items_prompt",
             default="""Extract all action items from this meeting transcript.
-            Return as a JSON array of action items with title, description, assignee, due_date, and priority."""
+            Return as a JSON array of action items with title, description, assignee, due_date, and priority.""",
         )
 
         messages = [
             SystemMessage(content=prompt),
-            HumanMessage(content=transcript[:5000])
+            HumanMessage(content=transcript[:5000]),
         ]
 
         try:
@@ -239,8 +269,8 @@ class TranscriptAnalyzer:
             items,
             key=lambda x: (
                 -priority_weights.get(x.priority, 2),  # Higher priority first
-                x.due_date or "9999-12-31"  # Earlier dates first
-            )
+                x.due_date or "9999-12-31",  # Earlier dates first
+            ),
         )
 
         return sorted_items
@@ -254,14 +284,15 @@ class TranscriptAnalyzer:
 
         # Get blockers prompt from configuration
         prompt = self.prompt_manager.get_prompt(
-            'meeting_analysis', 'blockers_prompt',
+            "meeting_analysis",
+            "blockers_prompt",
             default="""Identify any blockers, risks, or concerns mentioned in this meeting.
-            Return as a JSON array of strings describing each blocker/risk."""
+            Return as a JSON array of strings describing each blocker/risk.""",
         )
 
         messages = [
             SystemMessage(content=prompt),
-            HumanMessage(content=transcript[:3000])
+            HumanMessage(content=transcript[:3000]),
         ]
 
         try:
@@ -280,13 +311,12 @@ class TranscriptAnalyzer:
 
         # Get summary prompt from configuration and format it
         prompt = self.prompt_manager.format_prompt(
-            'meeting_analysis', 'summary_prompt',
-            max_length=max_length
+            "meeting_analysis", "summary_prompt", max_length=max_length
         )
 
         messages = [
             SystemMessage(content=prompt),
-            HumanMessage(content=transcript[:4000])
+            HumanMessage(content=transcript[:4000]),
         ]
 
         try:
@@ -310,7 +340,7 @@ class TranscriptAnalyzer:
             r"next week": reference + timedelta(weeks=1),
             r"next month": reference + timedelta(days=30),
             r"end of week": reference + timedelta(days=(4 - reference.weekday())),
-            r"end of month": reference.replace(day=1) + timedelta(days=32)
+            r"end of month": reference.replace(day=1) + timedelta(days=32),
         }
 
         date_str_lower = date_str.lower()
@@ -321,6 +351,7 @@ class TranscriptAnalyzer:
         # Try to parse as-is
         try:
             from dateutil import parser
+
             parsed_date = parser.parse(date_str)
             return parsed_date.strftime("%Y-%m-%d")
         except:

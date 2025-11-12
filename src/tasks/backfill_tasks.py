@@ -18,15 +18,15 @@ logger = logging.getLogger(__name__)
 
 @celery_app.task(
     bind=True,
-    name='backfill.jira',
+    name="backfill.jira",
     time_limit=3600,  # 1 hour max
-    soft_time_limit=3300  # 55 minutes soft limit
+    soft_time_limit=3300,  # 55 minutes soft limit
 )
 def backfill_jira_task(
     self,
     days_back: int = 1,
     active_only: bool = True,
-    project_filter: Optional[List[str]] = None
+    project_filter: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Backfill Jira issues into Pinecone.
@@ -41,25 +41,32 @@ def backfill_jira_task(
     Returns:
         Dict with success status, counts, and metadata
     """
-    logger.info(f"🔄 Starting Jira backfill: days={days_back}, active_only={active_only}")
+    logger.info(
+        f"🔄 Starting Jira backfill: days={days_back}, active_only={active_only}"
+    )
 
     try:
         # Import backfill function
         import sys
-        sys.path.insert(0, '.')
+
+        sys.path.insert(0, ".")
 
         # Import the backfill logic
         from scripts.backfill_jira_standalone_v2 import backfill_jira_issues
 
         # Run the async backfill
-        result = asyncio.run(backfill_jira_issues(
-            days_back=days_back,
-            resume=True,  # Always use resume mode
-            project_filter=project_filter,
-            active_only=active_only
-        ))
+        result = asyncio.run(
+            backfill_jira_issues(
+                days_back=days_back,
+                resume=True,  # Always use resume mode
+                project_filter=project_filter,
+                active_only=active_only,
+            )
+        )
 
-        logger.info(f"✅ Jira backfill completed: {result.get('issues_ingested', 0)} issues")
+        logger.info(
+            f"✅ Jira backfill completed: {result.get('issues_ingested', 0)} issues"
+        )
         return result
 
     except Exception as e:
@@ -69,14 +76,12 @@ def backfill_jira_task(
 
 @celery_app.task(
     bind=True,
-    name='backfill.slack',
+    name="backfill.slack",
     time_limit=1800,  # 30 minutes max
-    soft_time_limit=1650  # 27.5 minutes soft limit
+    soft_time_limit=1650,  # 27.5 minutes soft limit
 )
 def backfill_slack_task(
-    self,
-    days_back: int = 1,
-    channel_filter: Optional[List[str]] = None
+    self, days_back: int = 1, channel_filter: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Backfill Slack messages into Pinecone.
@@ -99,7 +104,9 @@ def backfill_slack_task(
         # Call the existing backfill function
         result = backfill_slack(days_back=days_back)
 
-        logger.info(f"✅ Slack backfill completed: {result.get('messages_ingested', 0)} messages from {result.get('channels_processed', 0)} channels")
+        logger.info(
+            f"✅ Slack backfill completed: {result.get('messages_ingested', 0)} messages from {result.get('channels_processed', 0)} channels"
+        )
         return result
 
     except Exception as e:
@@ -108,15 +115,9 @@ def backfill_slack_task(
 
 
 @celery_app.task(
-    bind=True,
-    name='backfill.notion',
-    time_limit=1800,
-    soft_time_limit=1650
+    bind=True, name="backfill.notion", time_limit=1800, soft_time_limit=1650
 )
-def backfill_notion_task(
-    self,
-    days_back: int = 1
-) -> Dict[str, Any]:
+def backfill_notion_task(self, days_back: int = 1) -> Dict[str, Any]:
     """
     Backfill Notion pages into Pinecone.
 
@@ -137,7 +138,9 @@ def backfill_notion_task(
         # Call the existing backfill function
         result = backfill_notion(days_back=days_back)
 
-        logger.info(f"✅ Notion backfill completed: {result.get('pages_ingested', 0)} pages ingested from {result.get('pages_found', 0)} found")
+        logger.info(
+            f"✅ Notion backfill completed: {result.get('pages_ingested', 0)} pages ingested from {result.get('pages_found', 0)} found"
+        )
         return result
 
     except Exception as e:
@@ -146,15 +149,10 @@ def backfill_notion_task(
 
 
 @celery_app.task(
-    bind=True,
-    name='backfill.fireflies',
-    time_limit=1800,
-    soft_time_limit=1650
+    bind=True, name="backfill.fireflies", time_limit=1800, soft_time_limit=1650
 )
 def backfill_fireflies_task(
-    self,
-    days_back: int = 1,
-    limit: int = 100
+    self, days_back: int = 1, limit: int = 100
 ) -> Dict[str, Any]:
     """
     Backfill Fireflies transcripts into Pinecone.
@@ -179,8 +177,7 @@ def backfill_fireflies_task(
 
         # Fetch recent meetings (use get_recent_meetings which exists)
         meetings = fireflies_client.get_recent_meetings(
-            days_back=days_back,
-            limit=limit
+            days_back=days_back, limit=limit
         )
 
         logger.info(f"📥 Fetched {len(meetings)} Fireflies meetings")
@@ -189,11 +186,11 @@ def backfill_fireflies_task(
         count = ingest_service.ingest_fireflies_transcripts(meetings)
 
         result = {
-            'success': True,
-            'transcripts_found': len(meetings),
-            'transcripts_ingested': count,
-            'days_back': days_back,
-            'timestamp': datetime.now().isoformat()
+            "success": True,
+            "transcripts_found": len(meetings),
+            "transcripts_ingested": count,
+            "days_back": days_back,
+            "timestamp": datetime.now().isoformat(),
         }
 
         logger.info(f"✅ Fireflies backfill completed: {count} transcripts ingested")
@@ -205,15 +202,10 @@ def backfill_fireflies_task(
 
 
 @celery_app.task(
-    bind=True,
-    name='backfill.github',
-    time_limit=1800,
-    soft_time_limit=1650
+    bind=True, name="backfill.github", time_limit=1800, soft_time_limit=1650
 )
 def backfill_github_task(
-    self,
-    days_back: int = 1,
-    repo_filter: Optional[List[str]] = None
+    self, days_back: int = 1, repo_filter: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Backfill GitHub data (PRs, issues, commits) into Pinecone.
@@ -232,11 +224,11 @@ def backfill_github_task(
         from src.integrations.github_client import GitHubClient
 
         # Check for GitHub credentials (token or app credentials)
-        github_token = os.getenv('GITHUB_API_TOKEN', '')
-        github_app_id = os.getenv('GITHUB_APP_ID', '')
-        github_private_key = os.getenv('GITHUB_APP_PRIVATE_KEY', '')
-        github_installation_id = os.getenv('GITHUB_APP_INSTALLATION_ID', '')
-        github_org = os.getenv('GITHUB_ORGANIZATION', '')
+        github_token = os.getenv("GITHUB_API_TOKEN", "")
+        github_app_id = os.getenv("GITHUB_APP_ID", "")
+        github_private_key = os.getenv("GITHUB_APP_PRIVATE_KEY", "")
+        github_installation_id = os.getenv("GITHUB_APP_INSTALLATION_ID", "")
+        github_org = os.getenv("GITHUB_ORGANIZATION", "")
 
         # Initialize GitHub client with available credentials
         if github_token:
@@ -246,17 +238,19 @@ def backfill_github_task(
                 app_id=github_app_id,
                 private_key=github_private_key,
                 installation_id=github_installation_id,
-                organization=github_org
+                organization=github_org,
             )
         else:
-            logger.warning("⚠️  No GitHub credentials configured - returning success with 0 items")
+            logger.warning(
+                "⚠️  No GitHub credentials configured - returning success with 0 items"
+            )
             return {
-                'success': True,
-                'items_found': 0,
-                'items_ingested': 0,
-                'days_back': days_back,
-                'timestamp': datetime.now().isoformat(),
-                'note': 'GitHub backfill skipped (no credentials configured)'
+                "success": True,
+                "items_found": 0,
+                "items_ingested": 0,
+                "days_back": days_back,
+                "timestamp": datetime.now().isoformat(),
+                "note": "GitHub backfill skipped (no credentials configured)",
             }
 
         ingest_service = VectorIngestService()
@@ -265,10 +259,7 @@ def backfill_github_task(
         start_time = datetime.now() - timedelta(days=days_back)
 
         # Fetch GitHub data
-        items = github_client.get_updated_items(
-            since=start_time,
-            repos=repo_filter
-        )
+        items = github_client.get_updated_items(since=start_time, repos=repo_filter)
 
         logger.info(f"📥 Fetched {len(items)} GitHub items")
 
@@ -276,11 +267,11 @@ def backfill_github_task(
         count = ingest_service.ingest_github_items(items)
 
         result = {
-            'success': True,
-            'items_found': len(items),
-            'items_ingested': count,
-            'days_back': days_back,
-            'timestamp': datetime.now().isoformat()
+            "success": True,
+            "items_found": len(items),
+            "items_ingested": count,
+            "days_back": days_back,
+            "timestamp": datetime.now().isoformat(),
         }
 
         logger.info(f"✅ GitHub backfill completed: {count} items ingested")
@@ -292,15 +283,9 @@ def backfill_github_task(
 
 
 @celery_app.task(
-    bind=True,
-    name='backfill.tempo',
-    time_limit=1800,
-    soft_time_limit=1650
+    bind=True, name="backfill.tempo", time_limit=1800, soft_time_limit=1650
 )
-def backfill_tempo_task(
-    self,
-    days_back: int = 1
-) -> Dict[str, Any]:
+def backfill_tempo_task(self, days_back: int = 1) -> Dict[str, Any]:
     """
     Backfill Tempo worklogs into Pinecone.
 
@@ -326,8 +311,8 @@ def backfill_tempo_task(
 
         # Fetch worklogs (use from_date/to_date parameters)
         worklogs = tempo_client.get_worklogs(
-            from_date=start_date.strftime('%Y-%m-%d'),
-            to_date=end_date.strftime('%Y-%m-%d')
+            from_date=start_date.strftime("%Y-%m-%d"),
+            to_date=end_date.strftime("%Y-%m-%d"),
         )
 
         logger.info(f"📥 Fetched {len(worklogs)} Tempo worklogs")
@@ -336,11 +321,11 @@ def backfill_tempo_task(
         count = ingest_service.ingest_tempo_worklogs(worklogs, tempo_client)
 
         result = {
-            'success': True,
-            'worklogs_found': len(worklogs),
-            'worklogs_ingested': count,
-            'days_back': days_back,
-            'timestamp': datetime.now().isoformat()
+            "success": True,
+            "worklogs_found": len(worklogs),
+            "worklogs_ingested": count,
+            "days_back": days_back,
+            "timestamp": datetime.now().isoformat(),
         }
 
         logger.info(f"✅ Tempo backfill completed: {count} worklogs ingested")

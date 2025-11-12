@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SearchResult:
     """A single search result from any source."""
+
     source: str  # 'slack', 'fireflies', 'jira', 'notion', 'github'
     title: str
     content: str
@@ -35,6 +36,7 @@ class SearchResult:
 @dataclass
 class ContextSearchResults:
     """Aggregated search results across all sources."""
+
     query: str
     results: List[SearchResult]
     summary: Optional[str] = None
@@ -56,13 +58,16 @@ class ContextSearchService:
         self.logger = logging.getLogger(__name__)
         self._project_keywords_cache = None
         self._project_keywords_cache_time = None
-        self._embedding_cache = {}  # Cache embeddings: hash(text) -> (embedding, timestamp)
+        self._embedding_cache = (
+            {}
+        )  # Cache embeddings: hash(text) -> (embedding, timestamp)
         self._embedding_cache_ttl = 3600  # 1 hour cache TTL
         self._slack_user_cache = {}  # Cache Slack user IDs: user_id -> display_name
         self._slack_user_cache_time = None
 
         # Initialize query expander for synonym/term expansion
         from src.services.query_expander import QueryExpander
+
         self.query_expander = QueryExpander()
 
         # Auto-sync Jira project keywords on first use (runs in background)
@@ -84,10 +89,14 @@ class ContextSearchService:
                 result = loop.run_until_complete(sync_service.sync_if_needed())
                 loop.close()
 
-                if result.get('success') and not result.get('skipped'):
-                    self.logger.info(f"✅ Synced {result.get('keywords_created', 0)} keywords from {result.get('projects_synced', 0)} Jira projects")
-                elif result.get('skipped'):
-                    self.logger.info("⏭️ Skipped project keyword sync (already synced recently)")
+                if result.get("success") and not result.get("skipped"):
+                    self.logger.info(
+                        f"✅ Synced {result.get('keywords_created', 0)} keywords from {result.get('projects_synced', 0)} Jira projects"
+                    )
+                elif result.get("skipped"):
+                    self.logger.info(
+                        "⏭️ Skipped project keyword sync (already synced recently)"
+                    )
             except Exception as e:
                 self.logger.error(f"Error syncing project keywords: {e}")
 
@@ -128,7 +137,10 @@ class ContextSearchService:
             Display name if found, otherwise returns the user ID
         """
         # Check cache first (cache for 1 hour)
-        if self._slack_user_cache_time and (datetime.now() - self._slack_user_cache_time).total_seconds() < 3600:
+        if (
+            self._slack_user_cache_time
+            and (datetime.now() - self._slack_user_cache_time).total_seconds() < 3600
+        ):
             if user_id in self._slack_user_cache:
                 return self._slack_user_cache[user_id]
 
@@ -140,9 +152,13 @@ class ContextSearchService:
             client = WebClient(token=settings.notifications.slack_bot_token)
             response = client.users_info(user=user_id)
 
-            if response.get('ok'):
-                user_info = response.get('user', {})
-                display_name = user_info.get('profile', {}).get('display_name') or user_info.get('real_name') or user_id
+            if response.get("ok"):
+                user_info = response.get("user", {})
+                display_name = (
+                    user_info.get("profile", {}).get("display_name")
+                    or user_info.get("real_name")
+                    or user_id
+                )
 
                 # Cache the result
                 self._slack_user_cache[user_id] = display_name
@@ -168,7 +184,7 @@ class ContextSearchService:
         import re
 
         # Find all Slack user ID mentions <@USERID>
-        pattern = r'<@([A-Z0-9]+)>'
+        pattern = r"<@([A-Z0-9]+)>"
 
         def replace_mention(match):
             user_id = match.group(1)
@@ -184,8 +200,12 @@ class ContextSearchService:
             Dict mapping project_key to list of keywords
         """
         # Cache for 5 minutes
-        if (self._project_keywords_cache and self._project_keywords_cache_time and
-            (datetime.now() - self._project_keywords_cache_time).total_seconds() < 300):
+        if (
+            self._project_keywords_cache
+            and self._project_keywords_cache_time
+            and (datetime.now() - self._project_keywords_cache_time).total_seconds()
+            < 300
+        ):
             return self._project_keywords_cache
 
         try:
@@ -196,7 +216,9 @@ class ContextSearchService:
             project_keywords = {}
 
             with engine.connect() as conn:
-                result = conn.execute(text("SELECT project_key, keyword FROM project_keywords"))
+                result = conn.execute(
+                    text("SELECT project_key, keyword FROM project_keywords")
+                )
                 for row in result:
                     project_key = row[0]
                     keyword = row[1]
@@ -213,7 +235,9 @@ class ContextSearchService:
             self.logger.error(f"Error loading project keywords: {e}")
             return {}
 
-    def _detect_project_and_expand_query(self, query: str) -> Tuple[Optional[str], Set[str], Set[str]]:
+    def _detect_project_and_expand_query(
+        self, query: str
+    ) -> Tuple[Optional[str], Set[str], Set[str]]:
         """Detect project key in query and expand with related keywords.
 
         Args:
@@ -225,7 +249,7 @@ class ContextSearchService:
         project_keywords_map = self._get_project_keywords()
 
         # Extract potential project keys (uppercase words 2-5 chars like "BC", "SUBS")
-        potential_keys = re.findall(r'\b[A-Z]{2,5}\b', query.upper())
+        potential_keys = re.findall(r"\b[A-Z]{2,5}\b", query.upper())
 
         detected_project = None
         project_keywords = set()
@@ -237,13 +261,15 @@ class ContextSearchService:
                 # Add project key and all related keywords
                 project_keywords.add(key.lower())
                 project_keywords.update(project_keywords_map[key])
-                self.logger.info(f"Detected project {key} with {len(project_keywords_map[key])} related keywords")
+                self.logger.info(
+                    f"Detected project {key} with {len(project_keywords_map[key])} related keywords"
+                )
                 break
 
         # If no project key found yet, try matching query words against keyword mappings
         # This handles queries like "beauchamp's cart" where "beauchamp" maps to BC project
         if not detected_project:
-            query_words = re.findall(r'\b\w{3,}\b', query.lower())
+            query_words = re.findall(r"\b\w{3,}\b", query.lower())
 
             # Check each word against all project keyword mappings
             for project_key, keywords in project_keywords_map.items():
@@ -252,24 +278,41 @@ class ContextSearchService:
                         detected_project = project_key
                         project_keywords.add(project_key.lower())
                         project_keywords.update(keywords)
-                        self.logger.info(f"Detected project {project_key} via keyword '{word}' (from {len(keywords)} keywords)")
+                        self.logger.info(
+                            f"Detected project {project_key} via keyword '{word}' (from {len(keywords)} keywords)"
+                        )
                         break
                 if detected_project:
                     break
 
         # Tokenize the query into topic keywords (min 3 chars, exclude common words and project terms)
-        query_words = re.findall(r'\b\w{3,}\b', query.lower())
-        stop_words = {'the', 'and', 'for', 'from', 'with', 'about', 'that', 'this', 'have', 'has'}
+        query_words = re.findall(r"\b\w{3,}\b", query.lower())
+        stop_words = {
+            "the",
+            "and",
+            "for",
+            "from",
+            "with",
+            "about",
+            "that",
+            "this",
+            "have",
+            "has",
+        }
 
         # Topic keywords are query words that are NOT project keywords
-        topic_keywords = {w for w in query_words if w not in stop_words and w not in project_keywords}
+        topic_keywords = {
+            w for w in query_words if w not in stop_words and w not in project_keywords
+        }
 
-        self.logger.info(f"Query '{query}' → Project keywords: {list(project_keywords)[:5]}, Topic keywords: {list(topic_keywords)}")
+        self.logger.info(
+            f"Query '{query}' → Project keywords: {list(project_keywords)[:5]}, Topic keywords: {list(topic_keywords)}"
+        )
         return detected_project, project_keywords, topic_keywords
 
     def _get_text_hash(self, text: str) -> str:
         """Generate a hash for text to use as cache key."""
-        return hashlib.md5(text.encode('utf-8')).hexdigest()
+        return hashlib.md5(text.encode("utf-8")).hexdigest()
 
     def _get_embedding(self, text: str) -> Optional[List[float]]:
         """Get embedding for text with caching.
@@ -291,7 +334,9 @@ class ContextSearchService:
         if text_hash in self._embedding_cache:
             cached_embedding, cached_time = self._embedding_cache[text_hash]
             # Check if cache is still valid
-            if (datetime.now() - cached_time).total_seconds() < self._embedding_cache_ttl:
+            if (
+                datetime.now() - cached_time
+            ).total_seconds() < self._embedding_cache_ttl:
                 return cached_embedding
             else:
                 # Remove stale cache entry
@@ -304,8 +349,7 @@ class ContextSearchService:
             client = OpenAI(api_key=settings.ai.api_key)
 
             response = client.embeddings.create(
-                model="text-embedding-3-small",  # Fast, cheap, good quality
-                input=text
+                model="text-embedding-3-small", input=text  # Fast, cheap, good quality
             )
 
             embedding = response.data[0].embedding
@@ -356,8 +400,9 @@ class ContextSearchService:
             List of lowercase tokens (words with length > 2)
         """
         import re
+
         # Lowercase and split on non-alphanumeric characters, filter short words
-        return [word for word in re.findall(r'\b\w+\b', text.lower()) if len(word) > 2]
+        return [word for word in re.findall(r"\b\w+\b", text.lower()) if len(word) > 2]
 
     def _bm25_score(
         self,
@@ -367,7 +412,7 @@ class ContextSearchService:
         total_docs: int,
         term_doc_freq: Dict[str, int],
         k1: float = 1.5,
-        b: float = 0.75
+        b: float = 0.75,
     ) -> float:
         """Calculate BM25 score for a document given a query.
 
@@ -417,9 +462,7 @@ class ContextSearchService:
         return score
 
     def _reciprocal_rank_fusion(
-        self,
-        rankings: List[List[Tuple[Any, float]]],
-        k: int = 60
+        self, rankings: List[List[Tuple[Any, float]]], k: int = 60
     ) -> List[Tuple[Any, float]]:
         """Combine multiple ranking lists using Reciprocal Rank Fusion (RRF).
 
@@ -483,10 +526,7 @@ class ContextSearchService:
         return matches, relevance_score
 
     def _score_text_match_two_tier(
-        self,
-        text: str,
-        project_keywords: Set[str],
-        topic_keywords: Set[str]
+        self, text: str, project_keywords: Set[str], topic_keywords: Set[str]
     ) -> Tuple[int, int, float, bool]:
         """Score text with separate project and topic keyword matching.
 
@@ -512,7 +552,9 @@ class ContextSearchService:
         # Weighted scoring: topic keywords are 3x more important
         total_keywords = len(project_keywords) + len(topic_keywords) * 3
         weighted_matches = project_matches + (topic_matches * 3)
-        relevance_score = weighted_matches / total_keywords if total_keywords > 0 else 0.0
+        relevance_score = (
+            weighted_matches / total_keywords if total_keywords > 0 else 0.0
+        )
 
         # Passes threshold if score >= 30% AND has both project + topic matches
         passes_threshold = relevance_score >= 0.3
@@ -525,7 +567,7 @@ class ContextSearchService:
         query: str,
         project_keywords: Set[str],
         topic_keywords: Set[str],
-        debug: bool = False
+        debug: bool = False,
     ) -> Tuple[int, float, float, bool]:
         """Hybrid scoring: keyword matching for project, semantic similarity for topic.
 
@@ -549,7 +591,7 @@ class ContextSearchService:
         # Build semantic query from BOTH project and topic keywords
         # This ensures keywords like "beauchamp" are used for semantic search even if detected as project
         all_keywords = project_keywords | topic_keywords
-        semantic_query = ' '.join(all_keywords) if all_keywords else query
+        semantic_query = " ".join(all_keywords) if all_keywords else query
 
         # Get embeddings
         query_embedding = self._get_embedding(semantic_query)
@@ -569,8 +611,12 @@ class ContextSearchService:
             # Keyword-based scoring as fallback
             total_keywords = len(project_keywords) + len(topic_keywords) * 3
             weighted_matches = project_matches + (topic_matches * 3)
-            relevance_score = weighted_matches / total_keywords if total_keywords > 0 else 0.0
-            passes_threshold = relevance_score >= 0.15  # Lowered from 0.25 - more forgiving
+            relevance_score = (
+                weighted_matches / total_keywords if total_keywords > 0 else 0.0
+            )
+            passes_threshold = (
+                relevance_score >= 0.15
+            )  # Lowered from 0.25 - more forgiving
 
             if debug:
                 self.logger.info(
@@ -605,7 +651,7 @@ class ContextSearchService:
             doc_tokens=doc_tokens,
             avg_doc_length=avg_doc_length,
             total_docs=total_docs,
-            term_doc_freq=term_doc_freq
+            term_doc_freq=term_doc_freq,
         )
 
         # Normalize BM25 score to 0-1 range (typical BM25 scores are 0-10+)
@@ -625,9 +671,12 @@ class ContextSearchService:
         # VERY LOW THRESHOLDS: Passes if semantic >= 0.15 OR BM25 >= 0.15 OR (project match AND semantic >= 0.10)
         # This allows semantic matching to work even without project keywords
         passes_threshold = (
-            semantic_similarity >= 0.15 or  # Lowered from 0.20 - allows more semantic matches
-            bm25_score >= 0.15 or  # Lowered from 0.20 - allows more keyword matches
-            (project_matches > 0 and semantic_similarity >= 0.10)  # Project bonus with lower threshold
+            semantic_similarity
+            >= 0.15  # Lowered from 0.20 - allows more semantic matches
+            or bm25_score >= 0.15  # Lowered from 0.20 - allows more keyword matches
+            or (
+                project_matches > 0 and semantic_similarity >= 0.10
+            )  # Project bonus with lower threshold
         )
 
         if debug:
@@ -647,7 +696,7 @@ class ContextSearchService:
         debug: bool = True,  # Enable debug logging by default for now
         detail_level: str = "normal",
         project: Optional[str] = None,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
     ) -> ContextSearchResults:
         """Search for context across all sources using vector database.
 
@@ -667,25 +716,27 @@ class ContextSearchService:
         from src.services.vector_search import VectorSearchService
 
         if sources is None:
-            sources = ['slack', 'fireflies', 'jira', 'github', 'notion']
+            sources = ["slack", "fireflies", "jira", "github", "notion"]
 
         # Log project filter if specified
         project_msg = f" [project: {project}]" if project else ""
-        self.logger.info(f"🔍 Vector search for: '{query}'{project_msg} (sources: {sources}, days: {days_back})")
+        self.logger.info(
+            f"🔍 Vector search for: '{query}'{project_msg} (sources: {sources}, days: {days_back})"
+        )
 
         # Expand query with synonyms and related terms
         expanded_terms, expansion_map = self.query_expander.expand_query(
-            query=query,
-            project_key=project,
-            max_expansions=5
+            query=query, project_key=project, max_expansions=5
         )
 
         # Build expanded query string for vector search
-        expanded_query = ' '.join(expanded_terms)
+        expanded_query = " ".join(expanded_terms)
 
         # Log expansions if any were added
         if expansion_map:
-            self.logger.info(f"📝 Query expansion: '{query}' → {len(expanded_terms)} terms (added {len(expanded_terms) - len(query.split())} expansions)")
+            self.logger.info(
+                f"📝 Query expansion: '{query}' → {len(expanded_terms)} terms (added {len(expanded_terms) - len(query.split())} expansions)"
+            )
             self.logger.debug(f"   Expansion map: {expansion_map}")
         else:
             # No expansions found, use original query
@@ -696,33 +747,44 @@ class ContextSearchService:
         if user_id:
             user_email = self._get_user_email_from_id(user_id)
             if user_email:
-                self.logger.info(f"✅ User ID {user_id} → Email: {user_email} (for Fireflies permissions)")
+                self.logger.info(
+                    f"✅ User ID {user_id} → Email: {user_email} (for Fireflies permissions)"
+                )
             else:
-                self.logger.warning(f"⚠️  User ID {user_id} found but NO email - Fireflies will only show PUBLIC meetings")
+                self.logger.warning(
+                    f"⚠️  User ID {user_id} found but NO email - Fireflies will only show PUBLIC meetings"
+                )
         else:
-            self.logger.warning(f"⚠️  NO user_id provided - Fireflies will only show PUBLIC meetings")
+            self.logger.warning(
+                f"⚠️  NO user_id provided - Fireflies will only show PUBLIC meetings"
+            )
 
         # Detect if query is asking for tickets in a specific epic
         # Patterns: "tickets in EPIC-123", "belong to EPIC-123", "part of EPIC-123 epic"
         import re
+
         epic_key_filter = None
-        epic_pattern = r'(?:in|belong(?:s|ing)?\s+to|part\s+of|under|from)\s+(?:the\s+)?([A-Z]+-\d+)(?:\s+epic)?'
+        epic_pattern = r"(?:in|belong(?:s|ing)?\s+to|part\s+of|under|from)\s+(?:the\s+)?([A-Z]+-\d+)(?:\s+epic)?"
         match = re.search(epic_pattern, query, re.IGNORECASE)
         if match:
             epic_key_filter = match.group(1).upper()
-            self.logger.info(f"🎯 Detected epic query - filtering by epic_key={epic_key_filter}")
+            self.logger.info(
+                f"🎯 Detected epic query - filtering by epic_key={epic_key_filter}"
+            )
 
         # Initialize vector search service
         vector_search = VectorSearchService()
 
         # Check if vector search is available
         if not vector_search.is_available():
-            self.logger.warning("⚠️ Vector search not available - Pinecone not configured")
+            self.logger.warning(
+                "⚠️ Vector search not available - Pinecone not configured"
+            )
             return ContextSearchResults(
                 query=query,
                 results=[],
                 summary="Vector search is not available. Please configure Pinecone.",
-                confidence="low"
+                confidence="low",
             )
 
         # Perform semantic vector search with project filter and expanded query
@@ -733,18 +795,20 @@ class ContextSearchService:
             sources=sources,
             user_email=user_email,  # For Fireflies access filtering
             project_key=project,  # Filter by project key
-            epic_key=epic_key_filter  # Filter by epic key if detected
+            epic_key=epic_key_filter,  # Filter by epic key if detected
         )
 
         self.logger.info(f"✅ Vector search returned {len(all_results)} results")
 
         # Add direct GitHub API search (GitHub data is not indexed in Pinecone)
         # This ensures we always get fresh GitHub results via API
-        if 'github' in sources:
+        if "github" in sources:
             self.logger.info("🔍 Adding direct GitHub API search...")
             try:
                 # Detect project keywords for GitHub filtering
-                detected_project, project_keywords, topic_keywords = self._detect_project_and_expand_query(query)
+                detected_project, project_keywords, topic_keywords = (
+                    self._detect_project_and_expand_query(query)
+                )
 
                 # Use explicit project parameter if provided, otherwise use detected project
                 github_project = project or detected_project
@@ -756,38 +820,46 @@ class ContextSearchService:
                     project_key=github_project,
                     project_keywords=project_keywords,
                     topic_keywords=topic_keywords,
-                    debug=debug
+                    debug=debug,
                 )
 
                 if github_results:
-                    self.logger.info(f"✅ Direct GitHub API returned {len(github_results)} results")
+                    self.logger.info(
+                        f"✅ Direct GitHub API returned {len(github_results)} results"
+                    )
                     # Remove any GitHub results from vector search (avoid duplicates)
-                    all_results = [r for r in all_results if r.source != 'github']
+                    all_results = [r for r in all_results if r.source != "github"]
                     # Add fresh GitHub results from API
                     all_results.extend(github_results)
                     # Re-sort by relevance score
                     all_results.sort(key=lambda r: r.relevance_score, reverse=True)
-                    self.logger.info(f"✅ Combined results: {len(all_results)} total (with GitHub API)")
+                    self.logger.info(
+                        f"✅ Combined results: {len(all_results)} total (with GitHub API)"
+                    )
             except Exception as e:
                 self.logger.error(f"Error in direct GitHub search: {e}")
                 # Continue with vector search results only
 
         # Pre-process results: replace Slack user IDs with display names
         for result in all_results:
-            if result.source == 'slack':
+            if result.source == "slack":
                 result.content = self._replace_slack_user_ids_in_text(result.content)
                 result.title = self._replace_slack_user_ids_in_text(result.title)
-                if result.author and result.author.startswith('U'):
+                if result.author and result.author.startswith("U"):
                     result.author = self._resolve_slack_user_id(result.author)
 
         # Extract entity links for cross-referencing
         entity_links = self._extract_and_link_entities(all_results)
 
         # Log entity links for debugging
-        jira_count = len([k for k, v in entity_links['jira_tickets'].items() if len(v) > 1])
-        pr_count = len([k for k, v in entity_links['github_prs'].items() if len(v) > 1])
+        jira_count = len(
+            [k for k, v in entity_links["jira_tickets"].items() if len(v) > 1]
+        )
+        pr_count = len([k for k, v in entity_links["github_prs"].items() if len(v) > 1])
         if jira_count > 0 or pr_count > 0:
-            self.logger.info(f"🔗 Found {jira_count} cross-referenced Jira tickets, {pr_count} cross-referenced PRs")
+            self.logger.info(
+                f"🔗 Found {jira_count} cross-referenced Jira tickets, {pr_count} cross-referenced PRs"
+            )
 
         # LLM Re-ranking: Use AI to re-order results by actual relevance
         # Takes top 50 from vector search, returns top 20 most relevant
@@ -795,19 +867,33 @@ class ContextSearchService:
             reranked_results = await self._rerank_with_llm(
                 query=query,
                 results=all_results[:50],  # Top 50 from vector search
-                entity_links=entity_links
+                entity_links=entity_links,
             )
-            self.logger.info(f"🔄 Re-ranked {len(all_results[:50])} results → Using top {len(reranked_results)}")
-            all_results = reranked_results + all_results[50:]  # Reranked top + remaining results
+            self.logger.info(
+                f"🔄 Re-ranked {len(all_results[:50])} results → Using top {len(reranked_results)}"
+            )
+            all_results = (
+                reranked_results + all_results[50:]
+            )  # Reranked top + remaining results
 
         # Progress Analysis: Extract progress signals from results
         # Analyze Jira status, GitHub activity, blockers, stale work, timeline
         progress_analysis = await self._analyze_progress(all_results, entity_links)
         if progress_analysis:
-            self.logger.info(f"📊 Progress analysis: {progress_analysis.progress_summary}")
+            self.logger.info(
+                f"📊 Progress analysis: {progress_analysis.progress_summary}"
+            )
 
         # Generate AI summary and insights with detail level, entity links, progress analysis, and conversation history
-        summarized = await self._generate_insights(query, all_results, None, detail_level, entity_links, progress_analysis, conversation_history)
+        summarized = await self._generate_insights(
+            query,
+            all_results,
+            None,
+            detail_level,
+            entity_links,
+            progress_analysis,
+            conversation_history,
+        )
 
         return ContextSearchResults(
             query=query,
@@ -820,7 +906,7 @@ class ContextSearchService:
             open_questions=summarized.open_questions if summarized else [],
             action_items=summarized.action_items if summarized else [],
             citations=summarized.citations if summarized else [],
-            confidence=summarized.confidence if summarized else "low"
+            confidence=summarized.confidence if summarized else "low",
         )
 
     async def _search_slack(
@@ -829,8 +915,9 @@ class ContextSearchService:
         days_back: int,
         user_id: Optional[int] = None,
         project_keywords: Set[str] = None,
-        topic_keywords: Set[str] = None
-    , debug: bool = False) -> List[SearchResult]:
+        topic_keywords: Set[str] = None,
+        debug: bool = False,
+    ) -> List[SearchResult]:
         """Search Slack messages across channels with two-tier keyword matching.
 
         If user has OAuth token, use search.messages API for better results.
@@ -851,16 +938,26 @@ class ContextSearchService:
                     user = db_session.query(User).filter_by(id=user_id).first()
                     if user and user.has_slack_user_token():
                         token_data = user.get_slack_user_token()
-                        user_token = token_data.get('access_token')
+                        user_token = token_data.get("access_token")
 
                         if user_token:
                             # Use search.messages API with user token
-                            return await self._search_slack_with_user_token(query, days_back, user_token, project_keywords, topic_keywords)
+                            return await self._search_slack_with_user_token(
+                                query,
+                                days_back,
+                                user_token,
+                                project_keywords,
+                                topic_keywords,
+                            )
             except Exception as e:
-                self.logger.warning(f"Failed to use user Slack token, falling back to bot token: {e}")
+                self.logger.warning(
+                    f"Failed to use user Slack token, falling back to bot token: {e}"
+                )
 
         # Fall back to bot token with conversations.history
-        return await self._search_slack_with_bot_token(query, days_back, project_keywords, topic_keywords)
+        return await self._search_slack_with_bot_token(
+            query, days_back, project_keywords, topic_keywords
+        )
 
     async def _search_slack_with_user_token(
         self,
@@ -868,8 +965,9 @@ class ContextSearchService:
         days_back: int,
         user_token: str,
         project_keywords: Set[str],
-        topic_keywords: Set[str]
-    , debug: bool = False) -> List[SearchResult]:
+        topic_keywords: Set[str],
+        debug: bool = False,
+    ) -> List[SearchResult]:
         """Search Slack using user token and search.messages API with two-tier matching."""
         try:
             from slack_sdk import WebClient
@@ -885,23 +983,20 @@ class ContextSearchService:
             all_keywords = list(project_keywords | topic_keywords)
             if all_keywords:
                 # Use OR logic: match any keyword
-                keyword_query = ' OR '.join(all_keywords[:10])  # Limit to 10 keywords
+                keyword_query = " OR ".join(all_keywords[:10])  # Limit to 10 keywords
             else:
                 keyword_query = query
 
             # Use Slack's search API (user token only)
             response = client.search_messages(
-                query=keyword_query,
-                sort='timestamp',
-                sort_dir='desc',
-                count=100
+                query=keyword_query, sort="timestamp", sort_dir="desc", count=100
             )
 
             results = []
-            if response.get('messages'):
-                for match in response['messages']['matches']:
+            if response.get("messages"):
+                for match in response["messages"]["matches"]:
                     # Parse timestamp
-                    ts = float(match.get('ts', 0))
+                    ts = float(match.get("ts", 0))
                     message_date = datetime.fromtimestamp(ts)
 
                     # Skip if too old
@@ -909,30 +1004,39 @@ class ContextSearchService:
                         continue
 
                     # Get channel name
-                    channel_name = match.get('channel', {}).get('name', 'unknown')
-                    message_text = match.get('text', '')
+                    channel_name = match.get("channel", {}).get("name", "unknown")
+                    message_text = match.get("text", "")
 
                     # Score message with hybrid semantic matching
-                    proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(message_text, query, project_keywords, topic_keywords, debug)
+                    proj_matches, semantic_sim, relevance_score, passes = (
+                        self._score_text_match_semantic(
+                            message_text, query, project_keywords, topic_keywords, debug
+                        )
+                    )
 
                     # Skip messages that don't pass threshold
                     if not passes:
                         continue
 
                     # Build permalink
-                    permalink = match.get('permalink', '')
+                    permalink = match.get("permalink", "")
 
-                    results.append(SearchResult(
-                        source='slack',
-                        title=f"#{channel_name}",
-                        content=message_text,
-                        date=message_date,
-                        url=permalink,
-                        author=match.get('username', 'Unknown'),
-                        relevance_score=relevance_score + 0.1  # Boost for OAuth search
-                    ))
+                    results.append(
+                        SearchResult(
+                            source="slack",
+                            title=f"#{channel_name}",
+                            content=message_text,
+                            date=message_date,
+                            url=permalink,
+                            author=match.get("username", "Unknown"),
+                            relevance_score=relevance_score
+                            + 0.1,  # Boost for OAuth search
+                        )
+                    )
 
-            self.logger.info(f"Found {len(results)} Slack messages via user token (semantic match)")
+            self.logger.info(
+                f"Found {len(results)} Slack messages via user token (semantic match)"
+            )
             return results
 
         except Exception as e:
@@ -944,8 +1048,9 @@ class ContextSearchService:
         query: str,
         days_back: int,
         project_keywords: Set[str],
-        topic_keywords: Set[str]
-    , debug: bool = False) -> List[SearchResult]:
+        topic_keywords: Set[str],
+        debug: bool = False,
+    ) -> List[SearchResult]:
         """Search Slack using bot token and conversations.history with two-tier matching.
 
         Note: Bot tokens cannot use search.messages API, so we use conversations.history
@@ -967,77 +1072,96 @@ class ContextSearchService:
             channels_response = client.conversations_list(
                 exclude_archived=True,
                 types="public_channel,private_channel",
-                limit=200  # Increased from 100 to get more coverage
+                limit=200,  # Increased from 100 to get more coverage
             )
 
-            if not channels_response.get('ok'):
-                self.logger.error(f"Failed to list Slack channels: {channels_response.get('error')}")
+            if not channels_response.get("ok"):
+                self.logger.error(
+                    f"Failed to list Slack channels: {channels_response.get('error')}"
+                )
                 return []
 
-            channels = channels_response.get('channels', [])
-            self.logger.info(f"Searching {len(channels)} Slack channels with two-tier matching")
+            channels = channels_response.get("channels", [])
+            self.logger.info(
+                f"Searching {len(channels)} Slack channels with two-tier matching"
+            )
 
             # Search through ALL channels the bot has access to (removed 20 channel limit)
             for channel in channels:
-                channel_id = channel['id']
-                channel_name = channel['name']
+                channel_id = channel["id"]
+                channel_name = channel["name"]
 
                 try:
                     # Get message history
                     history = client.conversations_history(
                         channel=channel_id,
                         oldest=oldest_timestamp,
-                        limit=100  # Limit messages per channel
+                        limit=100,  # Limit messages per channel
                     )
 
-                    if not history.get('ok'):
+                    if not history.get("ok"):
                         continue
 
-                    messages = history.get('messages', [])
+                    messages = history.get("messages", [])
 
                     # Filter messages by two-tier keyword matching
                     for message in messages:
-                        message_text = message.get('text', '')
+                        message_text = message.get("text", "")
 
                         # Score message with hybrid semantic matching
-                        proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(message_text, query, project_keywords, topic_keywords, debug)
+                        proj_matches, semantic_sim, relevance_score, passes = (
+                            self._score_text_match_semantic(
+                                message_text,
+                                query,
+                                project_keywords,
+                                topic_keywords,
+                                debug,
+                            )
+                        )
 
                         # Skip messages that don't pass threshold
                         if not passes:
                             continue
 
                         # Parse timestamp
-                        ts = float(message.get('ts', 0))
+                        ts = float(message.get("ts", 0))
                         message_date = datetime.fromtimestamp(ts)
 
                         # Get user info
-                        user_id = message.get('user', 'Unknown')
+                        user_id = message.get("user", "Unknown")
 
                         # Build permalink
                         try:
                             permalink_response = client.chat_getPermalink(
-                                channel=channel_id,
-                                message_ts=message.get('ts')
+                                channel=channel_id, message_ts=message.get("ts")
                             )
-                            permalink = permalink_response.get('permalink', '') if permalink_response.get('ok') else ''
+                            permalink = (
+                                permalink_response.get("permalink", "")
+                                if permalink_response.get("ok")
+                                else ""
+                            )
                         except Exception:
-                            permalink = ''
+                            permalink = ""
 
-                        results.append(SearchResult(
-                            source='slack',
-                            title=f"#{channel_name}",
-                            content=message_text,
-                            date=message_date,
-                            url=permalink,
-                            author=user_id,
-                            relevance_score=relevance_score
-                        ))
+                        results.append(
+                            SearchResult(
+                                source="slack",
+                                title=f"#{channel_name}",
+                                content=message_text,
+                                date=message_date,
+                                url=permalink,
+                                author=user_id,
+                                relevance_score=relevance_score,
+                            )
+                        )
 
                 except Exception as e:
                     self.logger.warning(f"Error searching channel {channel_name}: {e}")
                     continue
 
-            self.logger.info(f"Found {len(results)} Slack messages with semantic matching")
+            self.logger.info(
+                f"Found {len(results)} Slack messages with semantic matching"
+            )
             return results
 
         except Exception as e:
@@ -1050,8 +1174,9 @@ class ContextSearchService:
         days_back: int,
         user_id: Optional[int] = None,
         project_keywords: Set[str] = None,
-        topic_keywords: Set[str] = None
-    , debug: bool = False) -> List[SearchResult]:
+        topic_keywords: Set[str] = None,
+        debug: bool = False,
+    ) -> List[SearchResult]:
         """Search Fireflies meeting transcripts with two-tier matching."""
         if project_keywords is None:
             project_keywords = set()
@@ -1089,18 +1214,20 @@ class ContextSearchService:
             results = []
 
             for meeting in meetings:
-                meeting_title = meeting.get('title', '').lower()
+                meeting_title = meeting.get("title", "").lower()
 
                 # PRE-FILTER: Only process meetings where title contains project keywords
                 # This dramatically speeds up search by avoiding unnecessary semantic analysis
                 if project_keywords:
                     # Check if meeting title contains any project keyword
-                    has_project_match = any(keyword.lower() in meeting_title for keyword in project_keywords)
+                    has_project_match = any(
+                        keyword.lower() in meeting_title for keyword in project_keywords
+                    )
                     if not has_project_match:
                         continue  # Skip this meeting entirely
 
                 # Get full transcript (only for meetings that passed pre-filter)
-                transcript = client.get_meeting_transcript(meeting['id'])
+                transcript = client.get_meeting_transcript(meeting["id"])
                 if not transcript:
                     continue
 
@@ -1108,26 +1235,45 @@ class ContextSearchService:
                 combined_text = f"{meeting.get('title', '')} {transcript.transcript}"
 
                 # Score with hybrid semantic matching (keywords for project, embeddings for topic)
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(combined_text, query, project_keywords, topic_keywords, debug)
+                proj_matches, semantic_sim, relevance_score, passes = (
+                    self._score_text_match_semantic(
+                        combined_text, query, project_keywords, topic_keywords, debug
+                    )
+                )
 
                 # Skip meetings that don't pass threshold
                 if not passes:
                     continue
 
                 # Extract relevant snippet around topic keywords (more important)
-                snippet_query = ' '.join(topic_keywords) if topic_keywords else ' '.join(project_keywords)
-                snippet = self._extract_snippet(transcript.transcript, snippet_query, max_length=800)  # Balanced: enough context without exceeding AI limits
+                snippet_query = (
+                    " ".join(topic_keywords)
+                    if topic_keywords
+                    else " ".join(project_keywords)
+                )
+                snippet = self._extract_snippet(
+                    transcript.transcript, snippet_query, max_length=800
+                )  # Balanced: enough context without exceeding AI limits
 
-                results.append(SearchResult(
-                    source='fireflies',
-                    title=meeting_title or 'Untitled Meeting',
-                    content=snippet,
-                    date=transcript.date,
-                    author=', '.join(transcript.attendees[:3]) if transcript.attendees else None,
-                    relevance_score=relevance_score + 0.1  # Meeting transcripts are valuable
-                ))
+                results.append(
+                    SearchResult(
+                        source="fireflies",
+                        title=meeting_title or "Untitled Meeting",
+                        content=snippet,
+                        date=transcript.date,
+                        author=(
+                            ", ".join(transcript.attendees[:3])
+                            if transcript.attendees
+                            else None
+                        ),
+                        relevance_score=relevance_score
+                        + 0.1,  # Meeting transcripts are valuable
+                    )
+                )
 
-            self.logger.info(f"Found {len(results)} Fireflies meetings with semantic matching")
+            self.logger.info(
+                f"Found {len(results)} Fireflies meetings with semantic matching"
+            )
             return results
 
         except Exception as e:
@@ -1140,8 +1286,9 @@ class ContextSearchService:
         days_back: int,
         project_key: Optional[str] = None,
         project_keywords: Set[str] = None,
-        topic_keywords: Set[str] = None
-    , debug: bool = False) -> List[SearchResult]:
+        topic_keywords: Set[str] = None,
+        debug: bool = False,
+    ) -> List[SearchResult]:
         """Search Jira issues and comments with project filtering and two-tier matching."""
         if project_keywords is None:
             project_keywords = set()
@@ -1155,7 +1302,7 @@ class ContextSearchService:
             jira_client = JiraMCPClient(
                 jira_url=settings.jira.url,
                 username=settings.jira.username,
-                api_token=settings.jira.api_token
+                api_token=settings.jira.api_token,
             )
 
             # Build JQL query - SIMPLE project filter only
@@ -1166,54 +1313,72 @@ class ContextSearchService:
             # Use -Xd format for date (Jira relative date syntax) instead of absolute dates
             # This matches what the digest feature uses successfully
             if project_key:
-                jql = f'project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC'
+                jql = f"project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC"
             else:
                 # No project detected - search all projects (semantic matching will filter)
                 # This ensures we don't miss results when keyword mapping hasn't populated yet
-                jql = f'updated >= -{days_back}d ORDER BY updated DESC'
-                self.logger.info("Searching all Jira projects - no specific project detected")
+                jql = f"updated >= -{days_back}d ORDER BY updated DESC"
+                self.logger.info(
+                    "Searching all Jira projects - no specific project detected"
+                )
 
             self.logger.info(f"Jira search JQL: {jql}")
 
             # Search issues with comments expanded
-            issues = await jira_client.search_issues(jql, max_results=50, expand_comments=True)
+            issues = await jira_client.search_issues(
+                jql, max_results=50, expand_comments=True
+            )
 
             results = []
-            for issue in issues.get('issues', []):
-                fields = issue.get('fields', {})
+            for issue in issues.get("issues", []):
+                fields = issue.get("fields", {})
 
                 # Parse updated date
-                updated_str = fields.get('updated', '')
-                updated_date = datetime.fromisoformat(updated_str.replace('Z', '+00:00')) if updated_str else datetime.now()
+                updated_str = fields.get("updated", "")
+                updated_date = (
+                    datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
+                    if updated_str
+                    else datetime.now()
+                )
 
                 # Extract key metadata
-                summary = fields.get('summary', '')
-                status = fields.get('status', {}).get('name', 'Unknown')
-                assignee_data = fields.get('assignee', {})
-                assignee = assignee_data.get('displayName', 'Unassigned') if assignee_data else 'Unassigned'
-                priority_data = fields.get('priority', {})
-                priority = priority_data.get('name', 'None') if priority_data else 'None'
-                issue_type = fields.get('issuetype', {}).get('name', 'Task')
+                summary = fields.get("summary", "")
+                status = fields.get("status", {}).get("name", "Unknown")
+                assignee_data = fields.get("assignee", {})
+                assignee = (
+                    assignee_data.get("displayName", "Unassigned")
+                    if assignee_data
+                    else "Unassigned"
+                )
+                priority_data = fields.get("priority", {})
+                priority = (
+                    priority_data.get("name", "None") if priority_data else "None"
+                )
+                issue_type = fields.get("issuetype", {}).get("name", "Task")
 
                 # Extract labels
-                labels = fields.get('labels', [])
-                labels_str = ', '.join(labels[:5]) if labels else ''  # Limit to 5 labels
+                labels = fields.get("labels", [])
+                labels_str = (
+                    ", ".join(labels[:5]) if labels else ""
+                )  # Limit to 5 labels
 
                 # Description
-                description_raw = fields.get('description', '')
+                description_raw = fields.get("description", "")
                 # Handle ADF format for description
                 if isinstance(description_raw, dict):
                     description = self._extract_text_from_adf(description_raw)
                 else:
-                    description = description_raw or ''
+                    description = description_raw or ""
 
                 # Extract and combine comment bodies
-                comments = fields.get('comments', [])
+                comments = fields.get("comments", [])
                 comment_text = ""
                 if comments:
                     comment_bodies = []
-                    for comment in comments[:10]:  # Limit to 10 most recent comments to avoid token explosion
-                        body = comment.get('body', '')
+                    for comment in comments[
+                        :10
+                    ]:  # Limit to 10 most recent comments to avoid token explosion
+                        body = comment.get("body", "")
                         if isinstance(body, dict):
                             # Handle ADF (Atlassian Document Format) - extract text content
                             body = self._extract_text_from_adf(body)
@@ -1224,7 +1389,11 @@ class ContextSearchService:
                 combined_text = f"{summary} {description} {comment_text} Status: {status} Assignee: {assignee}"
 
                 # Score with hybrid semantic matching
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(combined_text, query, project_keywords, topic_keywords, debug)
+                proj_matches, semantic_sim, relevance_score, passes = (
+                    self._score_text_match_semantic(
+                        combined_text, query, project_keywords, topic_keywords, debug
+                    )
+                )
 
                 # Skip issues that don't pass threshold
                 if not passes:
@@ -1232,25 +1401,33 @@ class ContextSearchService:
 
                 # Build rich snippet with metadata
                 metadata_line = f"[{status}] [{issue_type}] Assignee: {assignee}"
-                if priority != 'None':
+                if priority != "None":
                     metadata_line += f" | Priority: {priority}"
                 if labels_str:
                     metadata_line += f" | Labels: {labels_str}"
 
-                snippet = f"{metadata_line}\n{summary}\n{description[:200]}..." if description else f"{metadata_line}\n{summary}"
+                snippet = (
+                    f"{metadata_line}\n{summary}\n{description[:200]}..."
+                    if description
+                    else f"{metadata_line}\n{summary}"
+                )
 
-                results.append(SearchResult(
-                    source='jira',
-                    title=f"{issue['key']}: {summary}",
-                    content=snippet,
-                    date=updated_date,
-                    url=f"{settings.jira.url}/browse/{issue['key']}",
-                    author=fields.get('reporter', {}).get('displayName', 'Unknown'),
-                    relevance_score=relevance_score
-                ))
+                results.append(
+                    SearchResult(
+                        source="jira",
+                        title=f"{issue['key']}: {summary}",
+                        content=snippet,
+                        date=updated_date,
+                        url=f"{settings.jira.url}/browse/{issue['key']}",
+                        author=fields.get("reporter", {}).get("displayName", "Unknown"),
+                        relevance_score=relevance_score,
+                    )
+                )
 
             project_msg = f" in project {project_key}" if project_key else ""
-            self.logger.info(f"Found {len(results)} Jira issues{project_msg} with semantic matching")
+            self.logger.info(
+                f"Found {len(results)} Jira issues{project_msg} with semantic matching"
+            )
             return results
 
         except Exception as e:
@@ -1264,7 +1441,7 @@ class ContextSearchService:
         project_key: Optional[str] = None,
         project_keywords: Set[str] = None,
         topic_keywords: Set[str] = None,
-        debug: bool = False
+        debug: bool = False,
     ) -> List[SearchResult]:
         """Search GitHub PRs and commits with semantic matching."""
         if project_keywords is None:
@@ -1278,23 +1455,35 @@ class ContextSearchService:
 
             # Check if GitHub is configured (either token or app)
             has_token = bool(settings.github.api_token)
-            has_app = all([
-                settings.github.app_id,
-                settings.github.private_key,
-                settings.github.installation_id
-            ])
+            has_app = all(
+                [
+                    settings.github.app_id,
+                    settings.github.private_key,
+                    settings.github.installation_id,
+                ]
+            )
 
             # Debug logging to diagnose GitHub auth issue
             self.logger.info(f"🔍 GitHub auth check:")
-            self.logger.info(f"  api_token: {'SET' if settings.github.api_token else 'NOT SET'} (len={len(settings.github.api_token) if settings.github.api_token else 0})")
+            self.logger.info(
+                f"  api_token: {'SET' if settings.github.api_token else 'NOT SET'} (len={len(settings.github.api_token) if settings.github.api_token else 0})"
+            )
             self.logger.info(f"  app_id: {settings.github.app_id or 'NOT SET'}")
-            self.logger.info(f"  private_key: {'SET' if settings.github.private_key else 'NOT SET'} (len={len(settings.github.private_key) if settings.github.private_key else 0})")
-            self.logger.info(f"  installation_id: {settings.github.installation_id or 'NOT SET'}")
-            self.logger.info(f"  organization: {settings.github.organization or 'NOT SET'}")
+            self.logger.info(
+                f"  private_key: {'SET' if settings.github.private_key else 'NOT SET'} (len={len(settings.github.private_key) if settings.github.private_key else 0})"
+            )
+            self.logger.info(
+                f"  installation_id: {settings.github.installation_id or 'NOT SET'}"
+            )
+            self.logger.info(
+                f"  organization: {settings.github.organization or 'NOT SET'}"
+            )
             self.logger.info(f"  has_token={has_token}, has_app={has_app}")
 
             if not (has_token or has_app):
-                self.logger.info("GitHub authentication not configured - skipping GitHub search")
+                self.logger.info(
+                    "GitHub authentication not configured - skipping GitHub search"
+                )
                 return []
 
             github_client = GitHubClient(
@@ -1302,7 +1491,7 @@ class ContextSearchService:
                 organization=settings.github.organization,
                 app_id=settings.github.app_id,
                 private_key=settings.github.private_key,
-                installation_id=settings.github.installation_id
+                installation_id=settings.github.installation_id,
             )
 
             # List accessible repos and auto-detect best match
@@ -1311,12 +1500,16 @@ class ContextSearchService:
             repo_name = None
             if project_key and project_keywords and accessible_repos:
                 # Get candidates from detection logic
-                detected_name = github_client.detect_repo_name(project_key, list(project_keywords))
+                detected_name = github_client.detect_repo_name(
+                    project_key, list(project_keywords)
+                )
 
                 # Check if detected name is in accessible repos
                 if detected_name in accessible_repos:
                     repo_name = detected_name
-                    self.logger.info(f"✅ Detected GitHub repo: {repo_name} (verified accessible)")
+                    self.logger.info(
+                        f"✅ Detected GitHub repo: {repo_name} (verified accessible)"
+                    )
                 else:
                     # Try to find best match from accessible repos using fuzzy matching
                     project_key_lower = project_key.lower()
@@ -1325,7 +1518,9 @@ class ContextSearchService:
                     # First priority: exact project key match
                     for repo in accessible_repos:
                         repo_lower = repo.lower()
-                        if repo_lower == project_key_lower or repo_lower.startswith(f"{project_key_lower}-"):
+                        if repo_lower == project_key_lower or repo_lower.startswith(
+                            f"{project_key_lower}-"
+                        ):
                             matches.append((repo, 1000))  # Highest priority
                             break
 
@@ -1341,17 +1536,23 @@ class ContextSearchService:
                         for repo in accessible_repos:
                             repo_lower = repo.lower()
                             for kw in project_keywords:
-                                if kw and len(kw) >= 5 and kw in repo_lower:  # Increased from 3 to 5 chars
+                                if (
+                                    kw and len(kw) >= 5 and kw in repo_lower
+                                ):  # Increased from 3 to 5 chars
                                     matches.append((repo, len(kw)))
                                     break
 
                     if matches:
                         # Pick the match with highest priority/longest keyword
                         repo_name = max(matches, key=lambda x: x[1])[0]
-                        self.logger.info(f"✅ Matched GitHub repo: {repo_name} (fuzzy match from project keywords)")
+                        self.logger.info(
+                            f"✅ Matched GitHub repo: {repo_name} (fuzzy match from project keywords)"
+                        )
                     else:
-                        self.logger.warning(f"⚠️ No matching repo found for project {project_key}. "
-                                          f"Detected: '{detected_name}', Available: {accessible_repos[:10]}")
+                        self.logger.warning(
+                            f"⚠️ No matching repo found for project {project_key}. "
+                            f"Detected: '{detected_name}', Available: {accessible_repos[:10]}"
+                        )
             elif not accessible_repos:
                 self.logger.warning("No accessible repositories found for GitHub App")
 
@@ -1361,9 +1562,7 @@ class ContextSearchService:
             # Sort by length descending to prioritize longer, more specific keywords
             all_keywords.sort(key=len, reverse=True)
             github_data = await github_client.search_prs_and_commits(
-                query_keywords=all_keywords,
-                repo_name=repo_name,
-                days_back=days_back
+                query_keywords=all_keywords, repo_name=repo_name, days_back=days_back
             )
 
             results = []
@@ -1371,15 +1570,19 @@ class ContextSearchService:
             # Process PRs
             for pr in github_data.get("prs", []):
                 # Skip PRs with missing required fields
-                if not pr.get('title') or not pr.get('number'):
+                if not pr.get("title") or not pr.get("number"):
                     continue
 
                 # Extract Jira ticket ID from PR title or branch
-                pr_title = pr.get('title', 'Untitled PR')
-                pr_branch = pr.get('head', {}).get('ref', '') if isinstance(pr.get('head'), dict) else ''
+                pr_title = pr.get("title", "Untitled PR")
+                pr_branch = (
+                    pr.get("head", {}).get("ref", "")
+                    if isinstance(pr.get("head"), dict)
+                    else ""
+                )
 
                 # Match patterns like ECAT-13, SUBS-608, etc.
-                jira_ticket_pattern = r'\b([A-Z]{2,6}-\d+)\b'
+                jira_ticket_pattern = r"\b([A-Z]{2,6}-\d+)\b"
                 jira_ticket = None
 
                 # Try title first
@@ -1396,8 +1599,10 @@ class ContextSearchService:
                 combined_text = f"{pr_title} {pr.get('body', '')}"
 
                 # Score with semantic matching
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
-                    combined_text, query, project_keywords, topic_keywords, debug
+                proj_matches, semantic_sim, relevance_score, passes = (
+                    self._score_text_match_semantic(
+                        combined_text, query, project_keywords, topic_keywords, debug
+                    )
                 )
 
                 if not passes:
@@ -1406,32 +1611,38 @@ class ContextSearchService:
                 # Parse date
                 created_at = pr.get("created_at", "")
                 try:
-                    pr_date = datetime.fromisoformat(created_at.replace('Z', '+00:00')) if created_at else datetime.now()
+                    pr_date = (
+                        datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                        if created_at
+                        else datetime.now()
+                    )
                 except:
                     pr_date = datetime.now()
 
                 # Get PR state (open/closed/merged)
-                pr_state = pr.get('state', 'unknown')
-                pr_merged = pr.get('merged', False)
-                state_str = 'Merged' if pr_merged else pr_state.capitalize()
+                pr_state = pr.get("state", "unknown")
+                pr_merged = pr.get("merged", False)
+                state_str = "Merged" if pr_merged else pr_state.capitalize()
 
                 # Create snippet with metadata
-                pr_repo = pr.get('repo', 'unknown')
+                pr_repo = pr.get("repo", "unknown")
                 metadata_line = f"[{state_str}] PR #{pr['number']}"
                 if jira_ticket:
                     metadata_line += f" | Linked: {jira_ticket}"
 
                 snippet = f"{metadata_line}\n{pr_title}\n{pr.get('body', '')[:300]}..."
 
-                results.append(SearchResult(
-                    source='github',
-                    title=f"PR #{pr['number']}: {pr_title} [{pr_repo}]",
-                    content=snippet,
-                    date=pr_date,
-                    url=pr.get('url'),
-                    author=pr.get('user'),
-                    relevance_score=relevance_score
-                ))
+                results.append(
+                    SearchResult(
+                        source="github",
+                        title=f"PR #{pr['number']}: {pr_title} [{pr_repo}]",
+                        content=snippet,
+                        date=pr_date,
+                        url=pr.get("url"),
+                        author=pr.get("user"),
+                        relevance_score=relevance_score,
+                    )
+                )
 
             # Process commits
             for commit in github_data.get("commits", []):
@@ -1441,14 +1652,16 @@ class ContextSearchService:
                     continue
 
                 # Extract Jira ticket ID from commit message
-                jira_ticket_pattern = r'\b([A-Z]{2,6}-\d+)\b'
+                jira_ticket_pattern = r"\b([A-Z]{2,6}-\d+)\b"
                 jira_ticket = None
                 ticket_match = re.search(jira_ticket_pattern, commit_message)
                 if ticket_match:
                     jira_ticket = ticket_match.group(1)
 
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(
-                    commit_message, query, project_keywords, topic_keywords, debug
+                proj_matches, semantic_sim, relevance_score, passes = (
+                    self._score_text_match_semantic(
+                        commit_message, query, project_keywords, topic_keywords, debug
+                    )
                 )
 
                 if not passes:
@@ -1457,14 +1670,24 @@ class ContextSearchService:
                 # Parse date
                 commit_date_str = commit.get("date", "")
                 try:
-                    commit_date = datetime.fromisoformat(commit_date_str.replace('Z', '+00:00')) if commit_date_str else datetime.now()
+                    commit_date = (
+                        datetime.fromisoformat(commit_date_str.replace("Z", "+00:00"))
+                        if commit_date_str
+                        else datetime.now()
+                    )
                 except:
                     commit_date = datetime.now()
 
                 # Create snippet from commit message with metadata
-                first_line = commit_message.split('\n')[0][:100] if commit_message else "No message"
-                commit_repo = commit.get('repo', 'unknown')
-                commit_sha = commit.get('sha', '')[:7] if commit.get('sha') else 'unknown'  # Short SHA
+                first_line = (
+                    commit_message.split("\n")[0][:100]
+                    if commit_message
+                    else "No message"
+                )
+                commit_repo = commit.get("repo", "unknown")
+                commit_sha = (
+                    commit.get("sha", "")[:7] if commit.get("sha") else "unknown"
+                )  # Short SHA
 
                 metadata_line = f"[Commit {commit_sha}]"
                 if jira_ticket:
@@ -1472,17 +1695,21 @@ class ContextSearchService:
 
                 snippet = f"{metadata_line}\n{first_line}\n{commit_message[:300]}..."
 
-                results.append(SearchResult(
-                    source='github',
-                    title=f"Commit: {first_line} [{commit_repo}]",
-                    content=snippet,
-                    date=commit_date,
-                    url=commit.get('url'),
-                    author=commit.get('author'),
-                    relevance_score=relevance_score
-                ))
+                results.append(
+                    SearchResult(
+                        source="github",
+                        title=f"Commit: {first_line} [{commit_repo}]",
+                        content=snippet,
+                        date=commit_date,
+                        url=commit.get("url"),
+                        author=commit.get("author"),
+                        relevance_score=relevance_score,
+                    )
+                )
 
-            self.logger.info(f"Found {len(results)} GitHub PRs/commits with semantic matching")
+            self.logger.info(
+                f"Found {len(results)} GitHub PRs/commits with semantic matching"
+            )
             return results
 
         except Exception as e:
@@ -1495,8 +1722,9 @@ class ContextSearchService:
         days_back: int,
         user_id: Optional[int] = None,
         project_keywords: Set[str] = None,
-        topic_keywords: Set[str] = None
-    , debug: bool = False) -> List[SearchResult]:
+        topic_keywords: Set[str] = None,
+        debug: bool = False,
+    ) -> List[SearchResult]:
         """Search Notion pages and databases using the Notion API with two-tier matching."""
         if project_keywords is None:
             project_keywords = set()
@@ -1506,7 +1734,9 @@ class ContextSearchService:
         try:
             # Get user's Notion API key
             if not user_id:
-                self.logger.info("🔍 Notion: No user_id provided, skipping Notion search")
+                self.logger.info(
+                    "🔍 Notion: No user_id provided, skipping Notion search"
+                )
                 return []
 
             from src.models.user import User
@@ -1515,15 +1745,21 @@ class ContextSearchService:
             api_key = None
             with session_scope() as db_session:
                 user = db_session.query(User).filter_by(id=user_id).first()
-                self.logger.info(f"🔍 Notion: User lookup for user_id={user_id}, found={user is not None}")
+                self.logger.info(
+                    f"🔍 Notion: User lookup for user_id={user_id}, found={user is not None}"
+                )
                 if user and user.has_notion_api_key():
                     api_key = user.get_notion_api_key()
                     self.logger.info("🔍 Notion: User has Notion API key configured")
                 elif user:
-                    self.logger.info("🔍 Notion: User found but no Notion API key configured")
+                    self.logger.info(
+                        "🔍 Notion: User found but no Notion API key configured"
+                    )
 
             if not api_key:
-                self.logger.info("🔍 Notion: No Notion API key available, skipping Notion search")
+                self.logger.info(
+                    "🔍 Notion: No Notion API key available, skipping Notion search"
+                )
                 return []
 
             # Use Notion API to search
@@ -1532,48 +1768,49 @@ class ContextSearchService:
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Notion-Version": "2022-06-28",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
 
             # Calculate date filter (timezone-aware for Notion API)
             from datetime import timezone
+
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
             # Search Notion with query
             search_payload = {
                 "query": query,
-                "filter": {
-                    "value": "page",
-                    "property": "object"
-                },
-                "sort": {
-                    "direction": "descending",
-                    "timestamp": "last_edited_time"
-                }
+                "filter": {"value": "page", "property": "object"},
+                "sort": {"direction": "descending", "timestamp": "last_edited_time"},
             }
 
-            self.logger.info(f"🔍 Notion: Searching with query='{query}', days_back={days_back}")
+            self.logger.info(
+                f"🔍 Notion: Searching with query='{query}', days_back={days_back}"
+            )
             response = requests.post(
                 "https://api.notion.com/v1/search",
                 headers=headers,
                 json=search_payload,
-                timeout=10
+                timeout=10,
             )
 
             if not response.ok:
-                self.logger.error(f"🔍 Notion API error: {response.status_code} - {response.text}")
+                self.logger.error(
+                    f"🔍 Notion API error: {response.status_code} - {response.text}"
+                )
                 return []
 
             data = response.json()
-            total_pages = len(data.get('results', []))
+            total_pages = len(data.get("results", []))
             self.logger.info(f"🔍 Notion: API returned {total_pages} pages total")
             results = []
 
-            for page in data.get('results', []):
+            for page in data.get("results", []):
                 # Get last edited time
-                last_edited = page.get('last_edited_time', '')
+                last_edited = page.get("last_edited_time", "")
                 if last_edited:
-                    page_date = datetime.fromisoformat(last_edited.replace('Z', '+00:00'))
+                    page_date = datetime.fromisoformat(
+                        last_edited.replace("Z", "+00:00")
+                    )
 
                     # Skip if too old
                     if page_date < cutoff_date:
@@ -1582,32 +1819,44 @@ class ContextSearchService:
                     page_date = datetime.now()
 
                 # Get page title
-                title_property = page.get('properties', {}).get('title', {})
-                title_content = title_property.get('title', [])
-                title = title_content[0].get('plain_text', 'Untitled') if title_content else 'Untitled'
+                title_property = page.get("properties", {}).get("title", {})
+                title_content = title_property.get("title", [])
+                title = (
+                    title_content[0].get("plain_text", "Untitled")
+                    if title_content
+                    else "Untitled"
+                )
 
                 # Get page URL
-                url = page.get('url', '')
+                url = page.get("url", "")
 
                 # Score with hybrid semantic matching
                 # For now, just use title since fetching full content requires separate API call
-                proj_matches, semantic_sim, relevance_score, passes = self._score_text_match_semantic(title, query, project_keywords, topic_keywords, debug)
+                proj_matches, semantic_sim, relevance_score, passes = (
+                    self._score_text_match_semantic(
+                        title, query, project_keywords, topic_keywords, debug
+                    )
+                )
 
                 # Skip pages that don't pass threshold
                 if not passes:
                     continue
 
-                results.append(SearchResult(
-                    source='notion',
-                    title=title,
-                    content=f"Notion page: {title}",
-                    date=page_date,
-                    url=url,
-                    author=None,
-                    relevance_score=relevance_score
-                ))
+                results.append(
+                    SearchResult(
+                        source="notion",
+                        title=title,
+                        content=f"Notion page: {title}",
+                        date=page_date,
+                        url=url,
+                        author=None,
+                        relevance_score=relevance_score,
+                    )
+                )
 
-            self.logger.info(f"Found {len(results)} Notion pages with semantic matching")
+            self.logger.info(
+                f"Found {len(results)} Notion pages with semantic matching"
+            )
             return results
 
         except Exception as e:
@@ -1623,7 +1872,7 @@ class ContextSearchService:
         pos = text_lower.find(query_lower)
         if pos == -1:
             # Query not found, return beginning
-            return text[:max_length] + ('...' if len(text) > max_length else '')
+            return text[:max_length] + ("..." if len(text) > max_length else "")
 
         # Extract context around query
         start = max(0, pos - max_length // 2)
@@ -1631,9 +1880,9 @@ class ContextSearchService:
 
         snippet = text[start:end]
         if start > 0:
-            snippet = '...' + snippet
+            snippet = "..." + snippet
         if end < len(text):
-            snippet = snippet + '...'
+            snippet = snippet + "..."
 
         return snippet
 
@@ -1654,14 +1903,14 @@ class ContextSearchService:
         import re
 
         entity_links = {
-            'jira_tickets': {},  # ticket_key -> [result indices]
-            'github_prs': {},    # pr_number -> [result_indices]
-            'people': {}         # person_name -> [result indices]
+            "jira_tickets": {},  # ticket_key -> [result indices]
+            "github_prs": {},  # pr_number -> [result_indices]
+            "people": {},  # person_name -> [result indices]
         }
 
         # Regex patterns
-        jira_pattern = r'\b([A-Z]{2,6}-\d+)\b'
-        pr_pattern = r'(?:PR\s*#?|#)(\d+)'
+        jira_pattern = r"\b([A-Z]{2,6}-\d+)\b"
+        pr_pattern = r"(?:PR\s*#?|#)(\d+)"
 
         for idx, result in enumerate(results):
             combined_text = f"{result.title} {result.content}"
@@ -1669,31 +1918,28 @@ class ContextSearchService:
             # Extract Jira tickets
             jira_tickets = re.findall(jira_pattern, combined_text)
             for ticket in set(jira_tickets):
-                if ticket not in entity_links['jira_tickets']:
-                    entity_links['jira_tickets'][ticket] = []
-                entity_links['jira_tickets'][ticket].append(idx)
+                if ticket not in entity_links["jira_tickets"]:
+                    entity_links["jira_tickets"][ticket] = []
+                entity_links["jira_tickets"][ticket].append(idx)
 
             # Extract GitHub PRs
             prs = re.findall(pr_pattern, combined_text, re.IGNORECASE)
             for pr in set(prs):
                 pr_key = f"#{pr}"
-                if pr_key not in entity_links['github_prs']:
-                    entity_links['github_prs'][pr_key] = []
-                entity_links['github_prs'][pr_key].append(idx)
+                if pr_key not in entity_links["github_prs"]:
+                    entity_links["github_prs"][pr_key] = []
+                entity_links["github_prs"][pr_key].append(idx)
 
             # Extract author as person entity (skip generic names)
-            if result.author and result.author not in ['Unknown', 'Unassigned', 'None']:
-                if result.author not in entity_links['people']:
-                    entity_links['people'][result.author] = []
-                entity_links['people'][result.author].append(idx)
+            if result.author and result.author not in ["Unknown", "Unassigned", "None"]:
+                if result.author not in entity_links["people"]:
+                    entity_links["people"][result.author] = []
+                entity_links["people"][result.author].append(idx)
 
         return entity_links
 
     async def _rerank_with_llm(
-        self,
-        query: str,
-        results: List[SearchResult],
-        entity_links: Dict[str, Any]
+        self, query: str, results: List[SearchResult], entity_links: Dict[str, Any]
     ) -> List[SearchResult]:
         """Re-rank search results using LLM for better relevance ordering.
 
@@ -1720,12 +1966,12 @@ class ContextSearchService:
             for i, result in enumerate(results):
                 # Check if result is cross-referenced
                 is_cross_referenced = False
-                for ticket_indices in entity_links.get('jira_tickets', {}).values():
+                for ticket_indices in entity_links.get("jira_tickets", {}).values():
                     if i in ticket_indices and len(ticket_indices) > 1:
                         is_cross_referenced = True
                         break
                 if not is_cross_referenced:
-                    for pr_indices in entity_links.get('github_prs', {}).values():
+                    for pr_indices in entity_links.get("github_prs", {}).values():
                         if i in pr_indices and len(pr_indices) > 1:
                             is_cross_referenced = True
                             break
@@ -1733,17 +1979,19 @@ class ContextSearchService:
                 # Calculate recency (days ago)
                 days_ago = (datetime.now() - result.date).days
 
-                result_summaries.append({
-                    'index': i,
-                    'source': result.source,
-                    'title': result.title[:150],  # Truncate long titles
-                    'snippet': result.content[:300],  # Brief snippet
-                    'date': result.date.strftime('%Y-%m-%d'),
-                    'days_ago': days_ago,
-                    'author': result.author or 'Unknown',
-                    'vector_score': round(result.relevance_score, 3),
-                    'cross_referenced': is_cross_referenced
-                })
+                result_summaries.append(
+                    {
+                        "index": i,
+                        "source": result.source,
+                        "title": result.title[:150],  # Truncate long titles
+                        "snippet": result.content[:300],  # Brief snippet
+                        "date": result.date.strftime("%Y-%m-%d"),
+                        "days_ago": days_ago,
+                        "author": result.author or "Unknown",
+                        "vector_score": round(result.relevance_score, 3),
+                        "cross_referenced": is_cross_referenced,
+                    }
+                )
 
             # Create re-ranking prompt
             rerank_prompt = f"""You are a relevance ranking expert. Re-rank these search results for the query: "{query}"
@@ -1774,18 +2022,21 @@ IMPORTANT:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a search relevance expert. Analyze results and return only a JSON array of indices."
+                        "content": "You are a search relevance expert. Analyze results and return only a JSON array of indices.",
                     },
-                    {
-                        "role": "user",
-                        "content": rerank_prompt
-                    }
+                    {"role": "user", "content": rerank_prompt},
                 ],
-                "response_format": {"type": "json_object"} if not settings.ai.model.startswith('o1') else None
+                "response_format": (
+                    {"type": "json_object"}
+                    if not settings.ai.model.startswith("o1")
+                    else None
+                ),
             }
 
             # Only add temperature for non-reasoning models
-            if not settings.ai.model.startswith('o1') and not settings.ai.model.startswith('gpt-5'):
+            if not settings.ai.model.startswith(
+                "o1"
+            ) and not settings.ai.model.startswith("gpt-5"):
                 api_params["temperature"] = 0.3
 
             response = await client.chat.completions.create(**api_params)
@@ -1797,21 +2048,29 @@ IMPORTANT:
                 parsed = json.loads(llm_response)
                 if isinstance(parsed, dict):
                     # Extract indices from object
-                    ranked_indices = parsed.get('indices', parsed.get('rankings', []))
+                    ranked_indices = parsed.get("indices", parsed.get("rankings", []))
                 else:
                     ranked_indices = parsed
 
                 # Validate indices
-                ranked_indices = [idx for idx in ranked_indices if isinstance(idx, int) and 0 <= idx < len(results)]
+                ranked_indices = [
+                    idx
+                    for idx in ranked_indices
+                    if isinstance(idx, int) and 0 <= idx < len(results)
+                ]
 
                 if not ranked_indices:
-                    self.logger.warning("LLM re-ranking returned no valid indices, using original order")
+                    self.logger.warning(
+                        "LLM re-ranking returned no valid indices, using original order"
+                    )
                     return results[:20]
 
                 # Re-order results
                 reranked = [results[idx] for idx in ranked_indices[:20]]
 
-                self.logger.info(f"✅ LLM re-ranked {len(results)} → {len(reranked)} results")
+                self.logger.info(
+                    f"✅ LLM re-ranked {len(results)} → {len(reranked)} results"
+                )
                 self.logger.info(f"   Top 3 indices: {ranked_indices[:3]}")
 
                 return reranked
@@ -1841,25 +2100,23 @@ IMPORTANT:
         text_parts = []
 
         # Handle different ADF node types
-        node_type = adf_content.get('type', '')
+        node_type = adf_content.get("type", "")
 
         # Direct text nodes
-        if node_type == 'text':
-            text_parts.append(adf_content.get('text', ''))
+        if node_type == "text":
+            text_parts.append(adf_content.get("text", ""))
 
         # Recurse into content array
-        if 'content' in adf_content and isinstance(adf_content['content'], list):
-            for child in adf_content['content']:
+        if "content" in adf_content and isinstance(adf_content["content"], list):
+            for child in adf_content["content"]:
                 text_parts.append(self._extract_text_from_adf(child))
 
         # Join with spaces and clean up
-        text = ' '.join(filter(None, text_parts))
+        text = " ".join(filter(None, text_parts))
         return text.strip()
 
     async def _analyze_progress(
-        self,
-        results: List[SearchResult],
-        entity_links: Dict[str, Any]
+        self, results: List[SearchResult], entity_links: Dict[str, Any]
     ):
         """Analyze progress signals from search results.
 
@@ -1893,7 +2150,7 @@ IMPORTANT:
         detail_level: str = "normal",
         entity_links: Optional[Dict[str, Any]] = None,
         progress_analysis: Optional[Any] = None,
-        conversation_history: Optional[List[Dict[str, str]]] = None
+        conversation_history: Optional[List[Dict[str, str]]] = None,
     ):
         """Generate AI-powered insights from search results using ContextSummarizer.
 
@@ -1910,7 +2167,10 @@ IMPORTANT:
             SummarizedContext object with all fields, or None if no results
         """
         try:
-            from src.services.context_summarizer import ContextSummarizer, SummarizedContext
+            from src.services.context_summarizer import (
+                ContextSummarizer,
+                SummarizedContext,
+            )
 
             if not results:
                 return None
@@ -1926,16 +2186,22 @@ IMPORTANT:
                 detail_level=detail_level,
                 entity_links=entity_links,
                 progress_analysis=progress_analysis,
-                conversation_history=conversation_history
+                conversation_history=conversation_history,
             )
 
             # Convert timeline format to match expected format
-            summarized.timeline = [
-                {"date": item["date"], "event": item["event"]}
-                for item in summarized.timeline
-            ] if summarized.timeline else []
+            summarized.timeline = (
+                [
+                    {"date": item["date"], "event": item["event"]}
+                    for item in summarized.timeline
+                ]
+                if summarized.timeline
+                else []
+            )
 
-            self.logger.info(f"✅ Generated AI summary with {len(summarized.citations)} citations")
+            self.logger.info(
+                f"✅ Generated AI summary with {len(summarized.citations)} citations"
+            )
 
             return summarized
 
@@ -1945,9 +2211,7 @@ IMPORTANT:
             return None
 
     async def _generate_insights_old(
-        self,
-        query: str,
-        results: List[SearchResult]
+        self, query: str, results: List[SearchResult]
     ) -> tuple[Optional[str], List[str], List[Dict[str, Any]]]:
         """OLD METHOD - Generate AI-powered insights from search results."""
         try:
@@ -1971,35 +2235,36 @@ IMPORTANT:
 
             # Generate summary with fresh AI config
             from config.settings import Settings
+
             ai_config = Settings.get_fresh_ai_config()
 
             if ai_config.provider == "openai":
                 from langchain_openai import ChatOpenAI
+
                 llm = ChatOpenAI(
-                    model=ai_config.model,
-                    temperature=0.3,
-                    api_key=ai_config.api_key
+                    model=ai_config.model, temperature=0.3, api_key=ai_config.api_key
                 )
             elif ai_config.provider == "anthropic":
                 from langchain_anthropic import ChatAnthropic
+
                 llm = ChatAnthropic(
                     model=ai_config.model,
                     anthropic_api_key=ai_config.api_key,
-                    temperature=0.3
+                    temperature=0.3,
                 )
             elif ai_config.provider == "google":
                 from langchain_google_genai import ChatGoogleGenerativeAI
+
                 llm = ChatGoogleGenerativeAI(
                     model=ai_config.model,
                     google_api_key=ai_config.api_key,
-                    temperature=0.3
+                    temperature=0.3,
                 )
             else:
                 from langchain_openai import ChatOpenAI
+
                 llm = ChatOpenAI(
-                    model=ai_config.model,
-                    temperature=0.3,
-                    api_key=ai_config.api_key
+                    model=ai_config.model, temperature=0.3, api_key=ai_config.api_key
                 )
 
             prompt = f"""Based on the following search results for "{query}", provide:
@@ -2020,35 +2285,41 @@ TIMELINE:
 """
 
             response = llm.invoke(prompt)
-            response_text = response.content if hasattr(response, 'content') else str(response)
+            response_text = (
+                response.content if hasattr(response, "content") else str(response)
+            )
 
             # Parse response
             summary = None
             key_people = []
             timeline = []
 
-            lines = response_text.strip().split('\n')
+            lines = response_text.strip().split("\n")
             current_section = None
 
             for line in lines:
                 line = line.strip()
-                if line.startswith('SUMMARY:'):
-                    summary = line.replace('SUMMARY:', '').strip()
-                    current_section = 'summary'
-                elif line.startswith('PEOPLE:'):
-                    people_str = line.replace('PEOPLE:', '').strip()
-                    key_people = [p.strip() for p in people_str.split(',') if p.strip()]
-                    current_section = 'people'
-                elif line.startswith('TIMELINE:'):
-                    current_section = 'timeline'
-                elif current_section == 'timeline' and line.startswith('-'):
+                if line.startswith("SUMMARY:"):
+                    summary = line.replace("SUMMARY:", "").strip()
+                    current_section = "summary"
+                elif line.startswith("PEOPLE:"):
+                    people_str = line.replace("PEOPLE:", "").strip()
+                    key_people = [p.strip() for p in people_str.split(",") if p.strip()]
+                    current_section = "people"
+                elif line.startswith("TIMELINE:"):
+                    current_section = "timeline"
+                elif current_section == "timeline" and line.startswith("-"):
                     # Parse timeline entry
-                    parts = line[1:].split(':', 1)
+                    parts = line[1:].split(":", 1)
                     if len(parts) == 2:
                         date_str, event = parts[0].strip(), parts[1].strip()
-                        timeline.append({'date': date_str, 'event': event})
-                elif current_section == 'summary' and line and not line.startswith('PEOPLE:'):
-                    summary = (summary + ' ' + line) if summary else line
+                        timeline.append({"date": date_str, "event": event})
+                elif (
+                    current_section == "summary"
+                    and line
+                    and not line.startswith("PEOPLE:")
+                ):
+                    summary = (summary + " " + line) if summary else line
 
             return summary, key_people[:5], timeline[:5]  # Limit to top 5
 

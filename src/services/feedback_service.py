@@ -27,7 +27,7 @@ class FeedbackService:
         detail_level: Optional[str] = None,
         project_key: Optional[str] = None,
         response_time_ms: Optional[int] = None,
-        summary_length: Optional[int] = None
+        summary_length: Optional[int] = None,
     ) -> int:
         """Record user feedback on search results.
 
@@ -65,7 +65,7 @@ class FeedbackService:
                     detail_level=detail_level,
                     project_key=project_key,
                     response_time_ms=response_time_ms,
-                    summary_length=summary_length
+                    summary_length=summary_length,
                 )
 
                 session.add(feedback)
@@ -85,9 +85,7 @@ class FeedbackService:
             return -1
 
     async def get_feedback_stats(
-        self,
-        days_back: int = 30,
-        project_key: Optional[str] = None
+        self, days_back: int = 30, project_key: Optional[str] = None
     ) -> Dict[str, Any]:
         """Get feedback statistics.
 
@@ -122,49 +120,58 @@ class FeedbackService:
                 negative_count = query.filter(SearchFeedback.rating == 1).count()
 
                 # Average rating
-                avg_rating = session.query(func.avg(SearchFeedback.rating)).filter(
-                    SearchFeedback.created_at >= cutoff
-                ).scalar() or 0
+                avg_rating = (
+                    session.query(func.avg(SearchFeedback.rating))
+                    .filter(SearchFeedback.created_at >= cutoff)
+                    .scalar()
+                    or 0
+                )
 
                 # Top queries with negative feedback
-                negative_queries = session.query(
-                    SearchFeedback.query,
-                    func.count(SearchFeedback.id).label('count')
-                ).filter(
-                    SearchFeedback.created_at >= cutoff,
-                    SearchFeedback.rating == 1
-                ).group_by(SearchFeedback.query).order_by(
-                    func.count(SearchFeedback.id).desc()
-                ).limit(10).all()
+                negative_queries = (
+                    session.query(
+                        SearchFeedback.query,
+                        func.count(SearchFeedback.id).label("count"),
+                    )
+                    .filter(
+                        SearchFeedback.created_at >= cutoff, SearchFeedback.rating == 1
+                    )
+                    .group_by(SearchFeedback.query)
+                    .order_by(func.count(SearchFeedback.id).desc())
+                    .limit(10)
+                    .all()
+                )
 
                 # Source performance (which sources get best feedback)
-                source_stats = session.query(
-                    SearchFeedback.top_result_source,
-                    func.avg(SearchFeedback.rating).label('avg_rating'),
-                    func.count(SearchFeedback.id).label('count')
-                ).filter(
-                    SearchFeedback.created_at >= cutoff,
-                    SearchFeedback.top_result_source.isnot(None)
-                ).group_by(SearchFeedback.top_result_source).all()
+                source_stats = (
+                    session.query(
+                        SearchFeedback.top_result_source,
+                        func.avg(SearchFeedback.rating).label("avg_rating"),
+                        func.count(SearchFeedback.id).label("count"),
+                    )
+                    .filter(
+                        SearchFeedback.created_at >= cutoff,
+                        SearchFeedback.top_result_source.isnot(None),
+                    )
+                    .group_by(SearchFeedback.top_result_source)
+                    .all()
+                )
 
                 return {
-                    'total_count': total_count,
-                    'positive_count': positive_count,
-                    'negative_count': negative_count,
-                    'positive_rate': positive_count / total_count if total_count > 0 else 0,
-                    'avg_rating': float(avg_rating),
-                    'problematic_queries': [
-                        {'query': q, 'negative_count': c}
-                        for q, c in negative_queries
+                    "total_count": total_count,
+                    "positive_count": positive_count,
+                    "negative_count": negative_count,
+                    "positive_rate": (
+                        positive_count / total_count if total_count > 0 else 0
+                    ),
+                    "avg_rating": float(avg_rating),
+                    "problematic_queries": [
+                        {"query": q, "negative_count": c} for q, c in negative_queries
                     ],
-                    'source_performance': [
-                        {
-                            'source': source,
-                            'avg_rating': float(avg),
-                            'count': count
-                        }
+                    "source_performance": [
+                        {"source": source, "avg_rating": float(avg), "count": count}
                         for source, avg, count in source_stats
-                    ]
+                    ],
                 }
 
         except Exception as e:
@@ -172,9 +179,7 @@ class FeedbackService:
             return {}
 
     async def get_query_performance(
-        self,
-        query: str,
-        days_back: int = 90
+        self, query: str, days_back: int = 90
     ) -> Optional[Dict[str, Any]]:
         """Get historical performance for a specific query.
 
@@ -194,10 +199,14 @@ class FeedbackService:
                 cutoff = datetime.now() - timedelta(days=days_back)
 
                 # Get feedback for this query
-                feedback_list = session.query(SearchFeedback).filter(
-                    SearchFeedback.query == query,
-                    SearchFeedback.created_at >= cutoff
-                ).all()
+                feedback_list = (
+                    session.query(SearchFeedback)
+                    .filter(
+                        SearchFeedback.query == query,
+                        SearchFeedback.created_at >= cutoff,
+                    )
+                    .all()
+                )
 
                 if not feedback_list:
                     return None
@@ -207,29 +216,36 @@ class FeedbackService:
                 positive = sum(1 for f in feedback_list if f.rating == 2)
                 negative = sum(1 for f in feedback_list if f.rating == 1)
 
-                avg_result_count = sum(f.result_count for f in feedback_list if f.result_count) / total if total > 0 else 0
-                avg_response_time = sum(f.response_time_ms for f in feedback_list if f.response_time_ms) / total if total > 0 else 0
+                avg_result_count = (
+                    sum(f.result_count for f in feedback_list if f.result_count) / total
+                    if total > 0
+                    else 0
+                )
+                avg_response_time = (
+                    sum(f.response_time_ms for f in feedback_list if f.response_time_ms)
+                    / total
+                    if total > 0
+                    else 0
+                )
 
                 return {
-                    'query': query,
-                    'total_searches': total,
-                    'positive_feedback': positive,
-                    'negative_feedback': negative,
-                    'positive_rate': positive / total if total > 0 else 0,
-                    'avg_result_count': avg_result_count,
-                    'avg_response_time_ms': avg_response_time,
-                    'last_searched': max(f.created_at for f in feedback_list).isoformat()
+                    "query": query,
+                    "total_searches": total,
+                    "positive_feedback": positive,
+                    "negative_feedback": negative,
+                    "positive_rate": positive / total if total > 0 else 0,
+                    "avg_result_count": avg_result_count,
+                    "avg_response_time_ms": avg_response_time,
+                    "last_searched": max(
+                        f.created_at for f in feedback_list
+                    ).isoformat(),
                 }
 
         except Exception as e:
             self.logger.error(f"Error getting query performance: {e}")
             return None
 
-    async def should_adjust_ranking(
-        self,
-        query: str,
-        source: str
-    ) -> float:
+    async def should_adjust_ranking(self, query: str, source: str) -> float:
         """Check if source ranking should be adjusted based on feedback.
 
         Args:
@@ -249,11 +265,15 @@ class FeedbackService:
                 cutoff = datetime.now() - timedelta(days=30)
 
                 # Get average rating when this source was top result
-                avg_rating = session.query(func.avg(SearchFeedback.rating)).filter(
-                    SearchFeedback.query.like(f'%{query[:20]}%'),  # Similar queries
-                    SearchFeedback.top_result_source == source,
-                    SearchFeedback.created_at >= cutoff
-                ).scalar()
+                avg_rating = (
+                    session.query(func.avg(SearchFeedback.rating))
+                    .filter(
+                        SearchFeedback.query.like(f"%{query[:20]}%"),  # Similar queries
+                        SearchFeedback.top_result_source == source,
+                        SearchFeedback.created_at >= cutoff,
+                    )
+                    .scalar()
+                )
 
                 if avg_rating is None:
                     return 1.0  # No data, no adjustment

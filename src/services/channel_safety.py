@@ -4,6 +4,7 @@ This module provides the ChannelSafetyValidator class which ensures that
 escalation notifications are only posted to internal channels, never to
 channels that include clients.
 """
+
 import logging
 from typing import Optional, List, Set
 from sqlalchemy.orm import Session
@@ -29,7 +30,9 @@ class ChannelSafetyValidator:
         self.db = db
         self._internal_channels_cache: Optional[Set[str]] = None
 
-    def is_channel_safe(self, channel_id: str, project_key: Optional[str] = None) -> bool:
+    def is_channel_safe(
+        self, channel_id: str, project_key: Optional[str] = None
+    ) -> bool:
         """Check if a channel is safe for posting escalation notifications.
 
         A channel is considered safe if:
@@ -69,7 +72,9 @@ class ChannelSafetyValidator:
             return is_safe
 
         except Exception as e:
-            logger.error(f"Error checking channel safety for {channel_id}: {e}", exc_info=True)
+            logger.error(
+                f"Error checking channel safety for {channel_id}: {e}", exc_info=True
+            )
             # Fail safe - reject channel if we can't verify it
             return False
 
@@ -86,7 +91,10 @@ class ChannelSafetyValidator:
             internal_channels = self._get_internal_channels(project_key)
             return list(internal_channels) if internal_channels else []
         except Exception as e:
-            logger.error(f"Error getting safe channels for project {project_key}: {e}", exc_info=True)
+            logger.error(
+                f"Error getting safe channels for project {project_key}: {e}",
+                exc_info=True,
+            )
             return []
 
     def _get_internal_channels(self, project_key: Optional[str] = None) -> Set[str]:
@@ -101,17 +109,21 @@ class ChannelSafetyValidator:
         try:
             if project_key:
                 # Get internal channels for specific project
-                query = text("""
+                query = text(
+                    """
                     SELECT internal_slack_channels
                     FROM project_resource_mappings
                     WHERE project_key = :project_key
                     AND internal_slack_channels IS NOT NULL
-                """)
+                """
+                )
                 result = self.db.execute(query, {"project_key": project_key}).fetchone()
 
                 if result and result.internal_slack_channels:
                     # Parse comma-separated channel IDs
-                    channels = [ch.strip() for ch in result.internal_slack_channels.split(",")]
+                    channels = [
+                        ch.strip() for ch in result.internal_slack_channels.split(",")
+                    ]
                     return set(ch for ch in channels if ch)  # Filter empty strings
 
                 return set()
@@ -120,24 +132,30 @@ class ChannelSafetyValidator:
                 if self._internal_channels_cache is not None:
                     return self._internal_channels_cache
 
-                query = text("""
+                query = text(
+                    """
                     SELECT internal_slack_channels
                     FROM project_resource_mappings
                     WHERE internal_slack_channels IS NOT NULL
-                """)
+                """
+                )
                 results = self.db.execute(query).fetchall()
 
                 all_channels = set()
                 for row in results:
                     if row.internal_slack_channels:
-                        channels = [ch.strip() for ch in row.internal_slack_channels.split(",")]
+                        channels = [
+                            ch.strip() for ch in row.internal_slack_channels.split(",")
+                        ]
                         all_channels.update(ch for ch in channels if ch)
 
                 self._internal_channels_cache = all_channels
                 return all_channels
 
         except Exception as e:
-            logger.error(f"Error fetching internal channels from database: {e}", exc_info=True)
+            logger.error(
+                f"Error fetching internal channels from database: {e}", exc_info=True
+            )
             return set()
 
     def clear_cache(self):
@@ -150,9 +168,7 @@ class ChannelSafetyValidator:
         logger.info("Internal channels cache cleared")
 
     def validate_and_filter_channels(
-        self,
-        channel_ids: List[str],
-        project_key: Optional[str] = None
+        self, channel_ids: List[str], project_key: Optional[str] = None
     ) -> List[str]:
         """Filter a list of channels to only include safe internal channels.
 
@@ -189,14 +205,15 @@ class ChannelSafetyValidator:
         """
         try:
             # Check all projects for this channel
-            query = text("""
+            query = text(
+                """
                 SELECT project_key, internal_slack_channels
                 FROM project_resource_mappings
                 WHERE internal_slack_channels LIKE :channel_pattern
-            """)
+            """
+            )
             results = self.db.execute(
-                query,
-                {"channel_pattern": f"%{channel_id}%"}
+                query, {"channel_pattern": f"%{channel_id}%"}
             ).fetchall()
 
             projects_with_channel = []
@@ -216,14 +233,16 @@ class ChannelSafetyValidator:
                     f"Channel is marked as internal for projects: {', '.join(projects_with_channel)}"
                     if is_safe
                     else "Channel is NOT marked as internal for any project. Do not send escalation notifications."
-                )
+                ),
             }
 
         except Exception as e:
-            logger.error(f"Error generating safety report for {channel_id}: {e}", exc_info=True)
+            logger.error(
+                f"Error generating safety report for {channel_id}: {e}", exc_info=True
+            )
             return {
                 "channel_id": channel_id,
                 "is_safe": False,
                 "error": str(e),
-                "status": "error"
+                "status": "error",
             }

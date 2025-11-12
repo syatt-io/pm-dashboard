@@ -6,7 +6,7 @@ from src.utils.encryption import encrypt_api_key, decrypt_api_key
 
 def test_encrypt_api_key():
     """Test encrypting an API key."""
-    api_key = 'test-api-key-12345'
+    api_key = "test-api-key-12345"
 
     encrypted = encrypt_api_key(api_key)
 
@@ -17,7 +17,7 @@ def test_encrypt_api_key():
 
 def test_decrypt_api_key():
     """Test decrypting an API key."""
-    api_key = 'test-api-key-12345'
+    api_key = "test-api-key-12345"
 
     encrypted = encrypt_api_key(api_key)
     decrypted = decrypt_api_key(encrypted)
@@ -28,10 +28,10 @@ def test_decrypt_api_key():
 def test_encrypt_decrypt_roundtrip():
     """Test that encryption/decryption roundtrip works correctly."""
     original_keys = [
-        'short',
-        'medium-length-key-123',
-        'very-long-api-key-with-special-chars-!@#$%^&*()',
-        '12345-67890-ABCDE-FGHIJ'
+        "short",
+        "medium-length-key-123",
+        "very-long-api-key-with-special-chars-!@#$%^&*()",
+        "12345-67890-ABCDE-FGHIJ",
     ]
 
     for original in original_keys:
@@ -42,21 +42,21 @@ def test_encrypt_decrypt_roundtrip():
 
 def test_encrypt_empty_string():
     """Test encrypting empty string."""
-    encrypted = encrypt_api_key('')
+    encrypted = encrypt_api_key("")
     decrypted = decrypt_api_key(encrypted)
 
-    assert decrypted == ''
+    assert decrypted == ""
 
 
 def test_decrypt_invalid_data():
     """Test decrypting invalid data raises error."""
     with pytest.raises(Exception):
-        decrypt_api_key('invalid-encrypted-data')
+        decrypt_api_key("invalid-encrypted-data")
 
 
 def test_encryption_produces_different_outputs():
     """Test that encrypting the same key twice produces different outputs (due to IV)."""
-    api_key = 'test-api-key'
+    api_key = "test-api-key"
 
     encrypted1 = encrypt_api_key(api_key)
     encrypted2 = encrypt_api_key(api_key)

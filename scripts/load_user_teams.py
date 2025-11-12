@@ -17,6 +17,7 @@ from typing import List, Dict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from sqlalchemy import create_engine
@@ -24,7 +25,7 @@ from sqlalchemy.orm import sessionmaker
 from src.models import UserTeam
 
 # Valid team values
-VALID_TEAMS = ['PMs', 'Design', 'UX', 'FE Devs', 'BE Devs', 'Data', 'Unassigned']
+VALID_TEAMS = ["PMs", "Design", "UX", "FE Devs", "BE Devs", "Data", "Unassigned"]
 
 
 def validate_csv_file(file_path: str) -> List[Dict[str, str]]:
@@ -48,21 +49,23 @@ def validate_csv_file(file_path: str) -> List[Dict[str, str]]:
     errors = []
 
     try:
-        with open(file_path, 'r') as csvfile:
+        with open(file_path, "r") as csvfile:
             reader = csv.DictReader(csvfile)
 
             # Validate header
-            required_fields = ['account_id', 'display_name', 'team']
+            required_fields = ["account_id", "display_name", "team"]
             if not all(field in reader.fieldnames for field in required_fields):
                 print(f"❌ Error: CSV must have columns: {', '.join(required_fields)}")
                 print(f"   Found columns: {', '.join(reader.fieldnames)}")
                 sys.exit(1)
 
             # Validate records
-            for line_num, row in enumerate(reader, start=2):  # Start at 2 (after header)
-                account_id = row.get('account_id', '').strip()
-                display_name = row.get('display_name', '').strip()
-                team = row.get('team', '').strip()
+            for line_num, row in enumerate(
+                reader, start=2
+            ):  # Start at 2 (after header)
+                account_id = row.get("account_id", "").strip()
+                display_name = row.get("display_name", "").strip()
+                team = row.get("team", "").strip()
 
                 # Validate account_id
                 if not account_id:
@@ -71,19 +74,25 @@ def validate_csv_file(file_path: str) -> List[Dict[str, str]]:
 
                 # Validate team
                 if not team:
-                    errors.append(f"Line {line_num}: Missing team for {display_name or account_id}")
+                    errors.append(
+                        f"Line {line_num}: Missing team for {display_name or account_id}"
+                    )
                     continue
 
                 if team not in VALID_TEAMS:
-                    errors.append(f"Line {line_num}: Invalid team '{team}' for {display_name or account_id}")
+                    errors.append(
+                        f"Line {line_num}: Invalid team '{team}' for {display_name or account_id}"
+                    )
                     errors.append(f"             Valid teams: {', '.join(VALID_TEAMS)}")
                     continue
 
-                records.append({
-                    'account_id': account_id,
-                    'display_name': display_name or None,
-                    'team': team
-                })
+                records.append(
+                    {
+                        "account_id": account_id,
+                        "display_name": display_name or None,
+                        "team": team,
+                    }
+                )
 
         if errors:
             print("❌ Validation errors found:")
@@ -106,7 +115,7 @@ def load_user_teams(records: List[Dict[str, str]]):
         records: List of validated user team records
     """
     # Get database URL
-    database_url = os.getenv('DATABASE_URL')
+    database_url = os.getenv("DATABASE_URL")
     if not database_url:
         print("❌ Error: DATABASE_URL environment variable not set")
         sys.exit(1)
@@ -122,21 +131,23 @@ def load_user_teams(records: List[Dict[str, str]]):
 
         for record in records:
             # Check if user already exists
-            existing = session.query(UserTeam).filter_by(
-                account_id=record['account_id']
-            ).first()
+            existing = (
+                session.query(UserTeam)
+                .filter_by(account_id=record["account_id"])
+                .first()
+            )
 
             if existing:
                 # Update existing record
-                existing.display_name = record['display_name']
-                existing.team = record['team']
+                existing.display_name = record["display_name"]
+                existing.team = record["team"]
                 updated += 1
             else:
                 # Create new record
                 user_team = UserTeam(
-                    account_id=record['account_id'],
-                    display_name=record['display_name'],
-                    team=record['team']
+                    account_id=record["account_id"],
+                    display_name=record["display_name"],
+                    team=record["team"],
                 )
                 session.add(user_team)
                 created += 1
@@ -152,7 +163,7 @@ def load_user_teams(records: List[Dict[str, str]]):
         print(f"\n📊 Team distribution:")
         team_counts = {}
         for record in records:
-            team = record['team']
+            team = record["team"]
             team_counts[team] = team_counts.get(team, 0) + 1
 
         for team in sorted(team_counts.keys()):
@@ -199,5 +210,5 @@ def main():
     print("=" * 80)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

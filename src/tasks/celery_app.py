@@ -13,21 +13,21 @@ load_dotenv()
 
 # Set up GCP credentials from environment variable
 # The credentials JSON is stored as GOOGLE_APPLICATION_CREDENTIALS_JSON
-gcp_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+gcp_creds_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 if gcp_creds_json:
     # SECURITY FIX: Use secure temporary file with proper permissions and cleanup
     # Create secure temporary file with restrictive permissions (0o600 = owner read/write only)
-    fd, creds_path = tempfile.mkstemp(suffix='.json', prefix='gcp-creds-')
+    fd, creds_path = tempfile.mkstemp(suffix=".json", prefix="gcp-creds-")
 
     # Set restrictive file permissions (owner read/write only)
     os.chmod(creds_path, 0o600)
 
     # Write credentials using the file descriptor
-    with os.fdopen(fd, 'w') as f:
+    with os.fdopen(fd, "w") as f:
         f.write(gcp_creds_json)
 
     # Set environment variable for google-cloud-pubsub
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = creds_path
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = creds_path
 
     # Register cleanup function to delete credentials on exit
     def cleanup_gcp_credentials():
@@ -44,42 +44,46 @@ else:
 
 # GCP Pub/Sub broker configuration
 # Format: gcpubsub://projects/PROJECT_ID
-gcp_project_id = os.getenv('GCP_PROJECT_ID', 'syatt-io')
-gcp_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+gcp_project_id = os.getenv("GCP_PROJECT_ID", "syatt-io")
+gcp_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 
 # Fall back to Redis for local development if GCP credentials not available
 if gcp_creds:
-    broker_url = f'gcpubsub://projects/{gcp_project_id}'
+    broker_url = f"gcpubsub://projects/{gcp_project_id}"
     print(f"Celery broker: GCP Pub/Sub (project: {gcp_project_id})")
 else:
     # Use Redis for local development
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/1")
     broker_url = redis_url
     print(f"Celery broker: Redis (local development) - {redis_url}")
 
 # Use PostgreSQL for result backend (storing task results)
 # Default to pm_agent_local for local development to match Flask app
-database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/pm_agent_local')
-if database_url.startswith('postgresql://'):
-    result_backend_url = 'db+' + database_url
-elif database_url.startswith('postgres://'):
-    result_backend_url = 'db+postgresql://' + database_url.split('://', 1)[1]
+database_url = os.getenv("DATABASE_URL", "postgresql://localhost/pm_agent_local")
+if database_url.startswith("postgresql://"):
+    result_backend_url = "db+" + database_url
+elif database_url.startswith("postgres://"):
+    result_backend_url = "db+postgresql://" + database_url.split("://", 1)[1]
 else:
-    result_backend_url = 'db+' + database_url
+    result_backend_url = "db+" + database_url
 
-backend_display = result_backend_url.split('@')[0] + '@***' if '@' in result_backend_url else result_backend_url
+backend_display = (
+    result_backend_url.split("@")[0] + "@***"
+    if "@" in result_backend_url
+    else result_backend_url
+)
 print(f"Celery result backend: {backend_display}")
 
 # Create Celery app WITHOUT broker/backend parameters to avoid import-time evaluation
 # The broker will be set in conf.update() below
 celery_app = Celery(
-    'agent_pm',
+    "agent_pm",
     include=[
-        'src.tasks.vector_tasks',
-        'src.tasks.notification_tasks',
-        'src.tasks.backfill_tasks',  # Include backfill tasks for data synchronization
-        'src.webhooks.fireflies_webhook'  # Include webhook task for Fireflies meeting processing
-    ]
+        "src.tasks.vector_tasks",
+        "src.tasks.notification_tasks",
+        "src.tasks.backfill_tasks",  # Include backfill tasks for data synchronization
+        "src.webhooks.fireflies_webhook",  # Include webhook task for Fireflies meeting processing
+    ],
 )
 
 # Configure Celery with GCP Pub/Sub broker and PostgreSQL result backend
@@ -88,20 +92,22 @@ celery_app.conf.update(
     # Result Backend: PostgreSQL for storing task results
     broker_url=broker_url,
     result_backend=result_backend_url,
-    task_serializer='json',
-    accept_content=['json'],
-    result_serializer='json',
-    timezone='UTC',
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=120 * 60,  # 120 minutes (2 hours) max per task (for large backfills with 20k+ items)
-    task_soft_time_limit=110 * 60,  # 110 minutes soft limit (gives 10 min to cleanup before hard kill)
+    task_time_limit=120
+    * 60,  # 120 minutes (2 hours) max per task (for large backfills with 20k+ items)
+    task_soft_time_limit=110
+    * 60,  # 110 minutes soft limit (gives 10 min to cleanup before hard kill)
     worker_max_tasks_per_child=50,  # Restart worker after 50 tasks to prevent memory leaks
     # Broker connection retry settings
     broker_connection_retry_on_startup=True,
     broker_connection_max_retries=10,
     # Use database table prefix to isolate from other apps
-    result_backend_table_prefix='celery_',
+    result_backend_table_prefix="celery_",
     # ✅ FIXED: Clean up task results after 1 hour to prevent database bloat
     result_expires=3600,  # 1 hour in seconds
     result_backend_max_connections=10,  # Limit connections to result backend
@@ -113,13 +119,13 @@ celery_app.conf.update(
     # ✅ GCP Pub/Sub message retention and acknowledgment settings
     # Increase acknowledgment deadline to prevent message loss during worker restarts
     broker_transport_options={
-        'ack_deadline': 600,  # 10 minutes for worker to acknowledge (default is 60s)
-        'retry_policy': {
-            'minimum_backoff': 10,  # Minimum backoff of 10 seconds
-            'maximum_backoff': 600,  # Maximum backoff of 10 minutes
+        "ack_deadline": 600,  # 10 minutes for worker to acknowledge (default is 60s)
+        "retry_policy": {
+            "minimum_backoff": 10,  # Minimum backoff of 10 seconds
+            "maximum_backoff": 600,  # Maximum backoff of 10 minutes
         },
         # Message retention: keep unacked messages for up to 7 days
-        'message_retention_duration': 604800,  # 7 days in seconds
+        "message_retention_duration": 604800,  # 7 days in seconds
     },
 )
 
@@ -128,155 +134,145 @@ celery_app.conf.beat_schedule = {
     # ========== Vector Database Ingestion Tasks ==========
     # All ingestion tasks run daily between 2-5 AM EST (6-9 UTC) to minimize resource usage
     # Staggered by 15 minutes to avoid overwhelming services
-
     # Ingest Notion pages daily at 2:00 AM EST (6:00 UTC)
-    'ingest-notion-daily': {
-        'task': 'src.tasks.vector_tasks.ingest_notion_pages',
-        'schedule': crontab(hour=6, minute=0)
+    "ingest-notion-daily": {
+        "task": "src.tasks.vector_tasks.ingest_notion_pages",
+        "schedule": crontab(hour=6, minute=0),
     },
     # Ingest Slack messages daily at 2:15 AM EST (6:15 UTC)
-    'ingest-slack-daily': {
-        'task': 'src.tasks.vector_tasks.ingest_slack_messages',
-        'schedule': crontab(hour=6, minute=15)
+    "ingest-slack-daily": {
+        "task": "src.tasks.vector_tasks.ingest_slack_messages",
+        "schedule": crontab(hour=6, minute=15),
     },
     # Ingest Jira issues daily at 2:30 AM EST (6:30 UTC)
-    'ingest-jira-daily': {
-        'task': 'src.tasks.vector_tasks.ingest_jira_issues',
-        'schedule': crontab(hour=6, minute=30)
+    "ingest-jira-daily": {
+        "task": "src.tasks.vector_tasks.ingest_jira_issues",
+        "schedule": crontab(hour=6, minute=30),
     },
     # Ingest Fireflies transcripts daily at 2:45 AM EST (6:45 UTC)
-    'ingest-fireflies-daily': {
-        'task': 'src.tasks.vector_tasks.ingest_fireflies_transcripts',
-        'schedule': crontab(hour=6, minute=45)
+    "ingest-fireflies-daily": {
+        "task": "src.tasks.vector_tasks.ingest_fireflies_transcripts",
+        "schedule": crontab(hour=6, minute=45),
     },
     # Ingest Tempo worklogs daily at 4:30 AM EST (8:30 UTC) - after tempo-sync-daily
-    'ingest-tempo-daily': {
-        'task': 'src.tasks.vector_tasks.ingest_tempo_worklogs',
-        'schedule': crontab(hour=8, minute=30)
+    "ingest-tempo-daily": {
+        "task": "src.tasks.vector_tasks.ingest_tempo_worklogs",
+        "schedule": crontab(hour=8, minute=30),
     },
-
     # ========== Notification & Digest Tasks ==========
     # Daily digest at 9 AM EST (13:00 UTC)
-    'daily-todo-digest': {
-        'task': 'src.tasks.notification_tasks.send_daily_digest',
-        'schedule': crontab(hour=13, minute=0)
+    "daily-todo-digest": {
+        "task": "src.tasks.notification_tasks.send_daily_digest",
+        "schedule": crontab(hour=13, minute=0),
     },
     # Job monitoring digest at 9:05 AM EST (13:05 UTC) - runs after TODO digest
-    'job-monitoring-digest': {
-        'task': 'src.tasks.notification_tasks.send_job_monitoring_digest',
-        'schedule': crontab(hour=13, minute=5)
+    "job-monitoring-digest": {
+        "task": "src.tasks.notification_tasks.send_job_monitoring_digest",
+        "schedule": crontab(hour=13, minute=5),
     },
     # Due today reminders at 9:30 AM EST (14:30 UTC during DST)
-    'due-today-reminders': {
-        'task': 'src.tasks.notification_tasks.send_due_today_reminders',
-        'schedule': crontab(hour=13, minute=30)
+    "due-today-reminders": {
+        "task": "src.tasks.notification_tasks.send_due_today_reminders",
+        "schedule": crontab(hour=13, minute=30),
     },
     # Overdue reminders at 10 AM EST (15:00 UTC during DST)
-    'overdue-reminders-morning': {
-        'task': 'src.tasks.notification_tasks.send_overdue_reminders',
-        'schedule': crontab(hour=14, minute=0)
+    "overdue-reminders-morning": {
+        "task": "src.tasks.notification_tasks.send_overdue_reminders",
+        "schedule": crontab(hour=14, minute=0),
     },
     # Overdue reminders at 2 PM EST (19:00 UTC during DST)
-    'overdue-reminders-afternoon': {
-        'task': 'src.tasks.notification_tasks.send_overdue_reminders',
-        'schedule': crontab(hour=18, minute=0)
+    "overdue-reminders-afternoon": {
+        "task": "src.tasks.notification_tasks.send_overdue_reminders",
+        "schedule": crontab(hour=18, minute=0),
     },
     # Check urgent items every 2 hours during work hours (9 AM, 11 AM, 1 PM, 3 PM, 5 PM EST)
-    'urgent-items-9am': {
-        'task': 'src.tasks.notification_tasks.check_urgent_items',
-        'schedule': crontab(hour=13, minute=0)
+    "urgent-items-9am": {
+        "task": "src.tasks.notification_tasks.check_urgent_items",
+        "schedule": crontab(hour=13, minute=0),
     },
-    'urgent-items-11am': {
-        'task': 'src.tasks.notification_tasks.check_urgent_items',
-        'schedule': crontab(hour=15, minute=0)
+    "urgent-items-11am": {
+        "task": "src.tasks.notification_tasks.check_urgent_items",
+        "schedule": crontab(hour=15, minute=0),
     },
-    'urgent-items-1pm': {
-        'task': 'src.tasks.notification_tasks.check_urgent_items',
-        'schedule': crontab(hour=17, minute=0)
+    "urgent-items-1pm": {
+        "task": "src.tasks.notification_tasks.check_urgent_items",
+        "schedule": crontab(hour=17, minute=0),
     },
-    'urgent-items-3pm': {
-        'task': 'src.tasks.notification_tasks.check_urgent_items',
-        'schedule': crontab(hour=19, minute=0)
+    "urgent-items-3pm": {
+        "task": "src.tasks.notification_tasks.check_urgent_items",
+        "schedule": crontab(hour=19, minute=0),
     },
-    'urgent-items-5pm': {
-        'task': 'src.tasks.notification_tasks.check_urgent_items',
-        'schedule': crontab(hour=21, minute=0)
+    "urgent-items-5pm": {
+        "task": "src.tasks.notification_tasks.check_urgent_items",
+        "schedule": crontab(hour=21, minute=0),
     },
-
     # ========== Weekly Tasks ==========
     # Weekly summary on Mondays at 9 AM EST (14:00 UTC during DST)
-    'weekly-summary': {
-        'task': 'src.tasks.notification_tasks.send_weekly_summary',
-        'schedule': crontab(day_of_week=1, hour=13, minute=0)
+    "weekly-summary": {
+        "task": "src.tasks.notification_tasks.send_weekly_summary",
+        "schedule": crontab(day_of_week=1, hour=13, minute=0),
     },
     # Weekly hours reports on Mondays at 10 AM EST (15:00 UTC during DST)
-    'weekly-hours-reports': {
-        'task': 'src.tasks.notification_tasks.send_weekly_hours_reports',
-        'schedule': crontab(day_of_week=1, hour=14, minute=0)
+    "weekly-hours-reports": {
+        "task": "src.tasks.notification_tasks.send_weekly_hours_reports",
+        "schedule": crontab(day_of_week=1, hour=14, minute=0),
     },
-
     # ========== Daily Sync Tasks ==========
     # Tempo hours sync at 4 AM EST (9:00 UTC during DST, 8:00 UTC standard time)
     # Using 8:00 UTC to work for both DST and standard time
-    'tempo-sync-daily': {
-        'task': 'src.tasks.notification_tasks.sync_tempo_hours',
-        'schedule': crontab(hour=8, minute=0)
+    "tempo-sync-daily": {
+        "task": "src.tasks.notification_tasks.sync_tempo_hours",
+        "schedule": crontab(hour=8, minute=0),
     },
-
     # ========== Proactive Agent Tasks (Migrated from Python Scheduler) ==========
     # Proactive insight detection every 4 hours during work hours (8am, 12pm, 4pm EST)
-    'proactive-insights-8am': {
-        'task': 'src.tasks.notification_tasks.detect_proactive_insights',
-        'schedule': crontab(hour=12, minute=0)  # 8 AM EST = 12:00 UTC
+    "proactive-insights-8am": {
+        "task": "src.tasks.notification_tasks.detect_proactive_insights",
+        "schedule": crontab(hour=12, minute=0),  # 8 AM EST = 12:00 UTC
     },
-    'proactive-insights-12pm': {
-        'task': 'src.tasks.notification_tasks.detect_proactive_insights',
-        'schedule': crontab(hour=16, minute=0)  # 12 PM EST = 16:00 UTC
+    "proactive-insights-12pm": {
+        "task": "src.tasks.notification_tasks.detect_proactive_insights",
+        "schedule": crontab(hour=16, minute=0),  # 12 PM EST = 16:00 UTC
     },
-    'proactive-insights-4pm': {
-        'task': 'src.tasks.notification_tasks.detect_proactive_insights',
-        'schedule': crontab(hour=20, minute=0)  # 4 PM EST = 20:00 UTC
+    "proactive-insights-4pm": {
+        "task": "src.tasks.notification_tasks.detect_proactive_insights",
+        "schedule": crontab(hour=20, minute=0),  # 4 PM EST = 20:00 UTC
     },
-
     # Daily brief delivery - 9 AM EST (13:00 UTC)
-    'daily-briefs': {
-        'task': 'src.tasks.notification_tasks.send_daily_briefs',
-        'schedule': crontab(hour=13, minute=0)
+    "daily-briefs": {
+        "task": "src.tasks.notification_tasks.send_daily_briefs",
+        "schedule": crontab(hour=13, minute=0),
     },
-
     # Auto-escalation checks every 6 hours (6am, 12pm, 6pm, 12am EST)
-    'auto-escalation-6am': {
-        'task': 'src.tasks.notification_tasks.run_auto_escalation',
-        'schedule': crontab(hour=10, minute=0)  # 6 AM EST = 10:00 UTC
+    "auto-escalation-6am": {
+        "task": "src.tasks.notification_tasks.run_auto_escalation",
+        "schedule": crontab(hour=10, minute=0),  # 6 AM EST = 10:00 UTC
     },
-    'auto-escalation-12pm': {
-        'task': 'src.tasks.notification_tasks.run_auto_escalation',
-        'schedule': crontab(hour=16, minute=0)  # 12 PM EST = 16:00 UTC
+    "auto-escalation-12pm": {
+        "task": "src.tasks.notification_tasks.run_auto_escalation",
+        "schedule": crontab(hour=16, minute=0),  # 12 PM EST = 16:00 UTC
     },
-    'auto-escalation-6pm': {
-        'task': 'src.tasks.notification_tasks.run_auto_escalation',
-        'schedule': crontab(hour=22, minute=0)  # 6 PM EST = 22:00 UTC
+    "auto-escalation-6pm": {
+        "task": "src.tasks.notification_tasks.run_auto_escalation",
+        "schedule": crontab(hour=22, minute=0),  # 6 PM EST = 22:00 UTC
     },
-    'auto-escalation-12am': {
-        'task': 'src.tasks.notification_tasks.run_auto_escalation',
-        'schedule': crontab(hour=4, minute=0)  # 12 AM EST = 04:00 UTC
+    "auto-escalation-12am": {
+        "task": "src.tasks.notification_tasks.run_auto_escalation",
+        "schedule": crontab(hour=4, minute=0),  # 12 AM EST = 04:00 UTC
     },
-
     # ========== PM Automation Tasks (Migrated from Python Scheduler) ==========
     # Time Tracking Compliance - Every Monday at 10 AM EST (15:00 UTC during DST, 14:00 UTC standard time)
     # NOTE: This is scheduled at same time as weekly-hours-reports, but that's OK - they're independent
-    'time-tracking-compliance': {
-        'task': 'src.tasks.notification_tasks.run_time_tracking_compliance',
-        'schedule': crontab(day_of_week=1, hour=14, minute=0)
+    "time-tracking-compliance": {
+        "task": "src.tasks.notification_tasks.run_time_tracking_compliance",
+        "schedule": crontab(day_of_week=1, hour=14, minute=0),
     },
-
     # Monthly Epic Reconciliation - 3rd of every month at 9 AM EST (13:00 UTC)
     # Task itself checks if it's the 3rd and skips if not
-    'monthly-epic-reconciliation': {
-        'task': 'src.tasks.notification_tasks.run_monthly_epic_reconciliation',
-        'schedule': crontab(hour=13, minute=0, day_of_month='3')
+    "monthly-epic-reconciliation": {
+        "task": "src.tasks.notification_tasks.run_monthly_epic_reconciliation",
+        "schedule": crontab(hour=13, minute=0, day_of_month="3"),
     },
-
     # ========== Monitoring & Health Check Tasks ==========
     # Celery health check - DISABLED (replaced by daily job monitoring digest)
     # 'celery-health-check': {
@@ -301,10 +297,11 @@ except Exception as e:
 # This provides automatic Slack alerts when tasks fail after all retries
 try:
     import src.tasks.celery_monitoring
+
     print("✓ Celery monitoring and alerting enabled")
     print(f"  Alert channel: {src.tasks.celery_monitoring.monitor.alert_channel}")
     print(f"  Alerts enabled: {src.tasks.celery_monitoring.monitor.enable_alerts}")
 except Exception as e:
     print(f"⚠️  Could not enable Celery monitoring: {e}")
 
-__all__ = ['celery_app']
+__all__ = ["celery_app"]

@@ -35,7 +35,7 @@ class ProjectKeywordSync:
             jira_client = JiraMCPClient(
                 jira_url=settings.jira.url,
                 username=settings.jira.username,
-                api_token=settings.jira.api_token
+                api_token=settings.jira.api_token,
             )
 
             # Fetch all projects
@@ -44,7 +44,7 @@ class ProjectKeywordSync:
 
             # Handle both dict and list responses
             if isinstance(projects_response, dict):
-                projects = projects_response.get('projects', [])
+                projects = projects_response.get("projects", [])
             elif isinstance(projects_response, list):
                 projects = projects_response
             else:
@@ -60,8 +60,8 @@ class ProjectKeywordSync:
             keywords_to_insert = []
 
             for project in projects:
-                project_key = project.get('key', '')
-                project_name = project.get('name', '')
+                project_key = project.get("key", "")
+                project_name = project.get("name", "")
 
                 if not project_key:
                     continue
@@ -75,13 +75,17 @@ class ProjectKeywordSync:
 
                 # Add each keyword
                 for keyword in keywords:
-                    keywords_to_insert.append({
-                        'project_key': project_key,
-                        'keyword': keyword.lower(),
-                        'source': 'jira'
-                    })
+                    keywords_to_insert.append(
+                        {
+                            "project_key": project_key,
+                            "keyword": keyword.lower(),
+                            "source": "jira",
+                        }
+                    )
 
-            logger.info(f"Extracted {len(keywords_to_insert)} keyword mappings from {len(projects)} projects")
+            logger.info(
+                f"Extracted {len(keywords_to_insert)} keyword mappings from {len(projects)} projects"
+            )
 
             # Insert into database
             engine = get_engine()
@@ -93,33 +97,39 @@ class ProjectKeywordSync:
                 for kw_data in keywords_to_insert:
                     try:
                         conn.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT OR IGNORE INTO project_keywords (project_key, keyword, source)
                                 VALUES (:project_key, :keyword, :source)
-                            """),
-                            kw_data
+                            """
+                            ),
+                            kw_data,
                         )
                     except Exception as e:
                         logger.error(f"Error inserting keyword {kw_data}: {e}")
 
                 # Update sync timestamp
                 conn.execute(
-                    text("""
+                    text(
+                        """
                         INSERT OR REPLACE INTO project_keywords_sync (id, last_synced)
                         VALUES (1, :timestamp)
-                    """),
-                    {"timestamp": datetime.now().isoformat()}
+                    """
+                    ),
+                    {"timestamp": datetime.now().isoformat()},
                 )
 
                 conn.commit()
 
-            logger.info(f"✅ Successfully synced {len(keywords_to_insert)} keywords from {len(projects)} Jira projects")
+            logger.info(
+                f"✅ Successfully synced {len(keywords_to_insert)} keywords from {len(projects)} Jira projects"
+            )
 
             return {
                 "success": True,
                 "projects_synced": len(projects),
                 "keywords_created": len(keywords_to_insert),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
         except Exception as e:
@@ -144,16 +154,33 @@ class ProjectKeywordSync:
 
         # Filter out common words
         stop_words = {
-            'the', 'and', 'or', 'for', 'from', 'with', 'about', 'at', 'by',
-            'in', 'on', 'to', 'of', 'a', 'an', 'as', 'is', 'was', 'are',
-            'project', 'app', 'application', 'system'
+            "the",
+            "and",
+            "or",
+            "for",
+            "from",
+            "with",
+            "about",
+            "at",
+            "by",
+            "in",
+            "on",
+            "to",
+            "of",
+            "a",
+            "an",
+            "as",
+            "is",
+            "was",
+            "are",
+            "project",
+            "app",
+            "application",
+            "system",
         }
 
         # Keep words that are at least 3 chars and not stop words
-        keywords = {
-            word for word in words
-            if len(word) >= 3 and word not in stop_words
-        }
+        keywords = {word for word in words if len(word) >= 3 and word not in stop_words}
 
         return keywords
 
@@ -182,10 +209,14 @@ class ProjectKeywordSync:
                 age = datetime.now() - last_synced
 
                 if age > timedelta(hours=24):
-                    logger.info(f"Last sync was {age.total_seconds() / 3600:.1f} hours ago - sync needed")
+                    logger.info(
+                        f"Last sync was {age.total_seconds() / 3600:.1f} hours ago - sync needed"
+                    )
                     return True
 
-                logger.info(f"Last sync was {age.total_seconds() / 3600:.1f} hours ago - no sync needed")
+                logger.info(
+                    f"Last sync was {age.total_seconds() / 3600:.1f} hours ago - no sync needed"
+                )
                 return False
 
         except Exception as e:
@@ -204,5 +235,5 @@ class ProjectKeywordSync:
             return {
                 "success": True,
                 "skipped": True,
-                "reason": "Already synced within 24 hours"
+                "reason": "Already synced within 24 hours",
             }

@@ -14,47 +14,70 @@ import json
 # ✅ SECURITY: Comprehensive patterns for sensitive data
 SENSITIVE_PATTERNS = {
     # API Keys and Tokens
-    'api_key': re.compile(r'(api[_-]?key["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE),
-    'api_token': re.compile(r'(api[_-]?token["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE),
-    'access_token': re.compile(r'(access[_-]?token["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-\.]+)(["\']?)', re.IGNORECASE),
-    'refresh_token': re.compile(r'(refresh[_-]?token["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-\.]+)(["\']?)', re.IGNORECASE),
-
+    "api_key": re.compile(
+        r'(api[_-]?key["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE
+    ),
+    "api_token": re.compile(
+        r'(api[_-]?token["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE
+    ),
+    "access_token": re.compile(
+        r'(access[_-]?token["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-\.]+)(["\']?)',
+        re.IGNORECASE,
+    ),
+    "refresh_token": re.compile(
+        r'(refresh[_-]?token["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-\.]+)(["\']?)',
+        re.IGNORECASE,
+    ),
     # Authorization headers
-    'bearer_token': re.compile(r'(Bearer\s+)([a-zA-Z0-9_\-\.]+)', re.IGNORECASE),
-    'basic_auth': re.compile(r'(Basic\s+)([a-zA-Z0-9+/=]+)', re.IGNORECASE),
-    'authorization': re.compile(r'(Authorization["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE),
-
+    "bearer_token": re.compile(r"(Bearer\s+)([a-zA-Z0-9_\-\.]+)", re.IGNORECASE),
+    "basic_auth": re.compile(r"(Basic\s+)([a-zA-Z0-9+/=]+)", re.IGNORECASE),
+    "authorization": re.compile(
+        r'(Authorization["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE
+    ),
     # JWT tokens
-    'jwt': re.compile(r'(eyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]*)'),
-
+    "jwt": re.compile(r"(eyJ[a-zA-Z0-9_\-]*\.eyJ[a-zA-Z0-9_\-]*\.[a-zA-Z0-9_\-]*)"),
     # Passwords and Secrets
-    'password': re.compile(r'(password["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE),
-    'secret': re.compile(r'(secret["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE),
-    'secret_key': re.compile(r'(secret[_-]?key["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE),
-
+    "password": re.compile(
+        r'(password["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE
+    ),
+    "secret": re.compile(
+        r'(secret["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE
+    ),
+    "secret_key": re.compile(
+        r'(secret[_-]?key["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)',
+        re.IGNORECASE,
+    ),
     # OAuth and Google credentials
-    'oauth_token': re.compile(r'(oauth[_-]?token["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE),
-    'client_secret': re.compile(r'(client[_-]?secret["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)', re.IGNORECASE),
-
+    "oauth_token": re.compile(
+        r'(oauth[_-]?token["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE
+    ),
+    "client_secret": re.compile(
+        r'(client[_-]?secret["\']?\s*[:=]\s*["\']?)([a-zA-Z0-9_\-]+)(["\']?)',
+        re.IGNORECASE,
+    ),
     # Database and connection strings
-    'connection_string': re.compile(r'(postgresql|mysql|mongodb)://[^:]+:([^@]+)@', re.IGNORECASE),
-    'database_url': re.compile(r'(DATABASE_URL["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE),
-
+    "connection_string": re.compile(
+        r"(postgresql|mysql|mongodb)://[^:]+:([^@]+)@", re.IGNORECASE
+    ),
+    "database_url": re.compile(
+        r'(DATABASE_URL["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE
+    ),
     # Slack tokens
-    'slack_token': re.compile(r'(xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]+)'),
-
+    "slack_token": re.compile(r"(xox[baprs]-[0-9]{10,13}-[0-9]{10,13}-[a-zA-Z0-9]+)"),
     # GitHub tokens
-    'github_token': re.compile(r'(gh[pousr]_[a-zA-Z0-9]{36,})'),
-
+    "github_token": re.compile(r"(gh[pousr]_[a-zA-Z0-9]{36,})"),
     # Email credentials
-    'smtp_password': re.compile(r'(smtp[_-]?password["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE),
-
+    "smtp_password": re.compile(
+        r'(smtp[_-]?password["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)', re.IGNORECASE
+    ),
     # Generic patterns for environment variables
-    'env_key': re.compile(r'([A-Z_]+_(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)'),
+    "env_key": re.compile(
+        r'([A-Z_]+_(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)["\']?\s*[:=]\s*["\']?)([^"\']+)(["\']?)'
+    ),
 }
 
 # ✅ SECURITY: Redaction format options
-REDACTION_FORMAT = '[REDACTED]'
+REDACTION_FORMAT = "[REDACTED]"
 PARTIAL_REDACTION_PREFIX_LEN = 4  # Show first 4 characters
 PARTIAL_REDACTION_SUFFIX_LEN = 4  # Show last 4 characters
 
@@ -78,41 +101,54 @@ def redact_sensitive_data(message: str, partial: bool = False) -> str:
     sanitized = message
 
     for pattern_name, pattern in SENSITIVE_PATTERNS.items():
-        if pattern_name == 'jwt':
+        if pattern_name == "jwt":
             # JWT: Show algorithm hint only
-            sanitized = pattern.sub(r'[REDACTED-JWT]', sanitized)
-        elif pattern_name in ('bearer_token', 'basic_auth'):
+            sanitized = pattern.sub(r"[REDACTED-JWT]", sanitized)
+        elif pattern_name in ("bearer_token", "basic_auth"):
             # Authorization headers: Keep the auth type, redact the value
             if partial:
+
                 def partial_redact_auth(match):
                     prefix = match.group(1)
                     token = match.group(2)
-                    if len(token) > (PARTIAL_REDACTION_PREFIX_LEN + PARTIAL_REDACTION_SUFFIX_LEN):
+                    if len(token) > (
+                        PARTIAL_REDACTION_PREFIX_LEN + PARTIAL_REDACTION_SUFFIX_LEN
+                    ):
                         return f"{prefix}{token[:PARTIAL_REDACTION_PREFIX_LEN]}...[REDACTED]...{token[-PARTIAL_REDACTION_SUFFIX_LEN:]}"
                     return f"{prefix}[REDACTED]"
+
                 sanitized = pattern.sub(partial_redact_auth, sanitized)
             else:
-                sanitized = pattern.sub(r'\1[REDACTED]', sanitized)
-        elif pattern_name == 'connection_string':
+                sanitized = pattern.sub(r"\1[REDACTED]", sanitized)
+        elif pattern_name == "connection_string":
             # Database URLs: Redact password only
-            sanitized = pattern.sub(r'\1://[REDACTED-USER]:[REDACTED-PASSWORD]@', sanitized)
-        elif pattern_name in ('slack_token', 'github_token'):
+            sanitized = pattern.sub(
+                r"\1://[REDACTED-USER]:[REDACTED-PASSWORD]@", sanitized
+            )
+        elif pattern_name in ("slack_token", "github_token"):
             # Slack/GitHub tokens: Redact entirely
-            sanitized = pattern.sub(r'[REDACTED-\1]', sanitized)
+            sanitized = pattern.sub(r"[REDACTED-\1]", sanitized)
         else:
             # Generic key=value patterns
             if partial:
+
                 def partial_redact_value(match):
                     prefix = match.group(1)
                     value = match.group(2)
-                    suffix = match.group(3) if len(match.groups()) >= 3 else ''
-                    if len(value) > (PARTIAL_REDACTION_PREFIX_LEN + PARTIAL_REDACTION_SUFFIX_LEN):
+                    suffix = match.group(3) if len(match.groups()) >= 3 else ""
+                    if len(value) > (
+                        PARTIAL_REDACTION_PREFIX_LEN + PARTIAL_REDACTION_SUFFIX_LEN
+                    ):
                         return f"{prefix}{value[:PARTIAL_REDACTION_PREFIX_LEN]}...[REDACTED]...{value[-PARTIAL_REDACTION_SUFFIX_LEN:]}{suffix}"
                     return f"{prefix}[REDACTED]{suffix}"
+
                 sanitized = pattern.sub(partial_redact_value, sanitized)
             else:
                 # Redact the value completely
-                sanitized = pattern.sub(lambda m: f"{m.group(1)}[REDACTED]{m.group(3) if len(m.groups()) >= 3 else ''}", sanitized)
+                sanitized = pattern.sub(
+                    lambda m: f"{m.group(1)}[REDACTED]{m.group(3) if len(m.groups()) >= 3 else ''}",
+                    sanitized,
+                )
 
     return sanitized
 
@@ -136,24 +172,49 @@ def redact_dict(data: Dict[str, Any], partial: bool = False) -> Dict[str, Any]:
 
     sanitized = {}
     sensitive_keys = {
-        'api_key', 'api_token', 'access_token', 'refresh_token',
-        'password', 'secret', 'secret_key', 'auth', 'authorization',
-        'bearer', 'oauth_token', 'client_secret', 'private_key',
-        'slack_token', 'github_token', 'jwt', 'jwt_secret',
-        'database_url', 'connection_string', 'smtp_password',
-        'fireflies_api_key', 'jira_api_token', 'tempo_api_token',
-        'openai_api_key', 'google_client_secret', 'encryption_key',
-        'admin_api_key', 'pinecone_api_key', 'anthropic_api_key',
+        "api_key",
+        "api_token",
+        "access_token",
+        "refresh_token",
+        "password",
+        "secret",
+        "secret_key",
+        "auth",
+        "authorization",
+        "bearer",
+        "oauth_token",
+        "client_secret",
+        "private_key",
+        "slack_token",
+        "github_token",
+        "jwt",
+        "jwt_secret",
+        "database_url",
+        "connection_string",
+        "smtp_password",
+        "fireflies_api_key",
+        "jira_api_token",
+        "tempo_api_token",
+        "openai_api_key",
+        "google_client_secret",
+        "encryption_key",
+        "admin_api_key",
+        "pinecone_api_key",
+        "anthropic_api_key",
     }
 
     for key, value in data.items():
         # Check if key contains sensitive pattern
-        key_lower = key.lower().replace('_', '').replace('-', '')
+        key_lower = key.lower().replace("_", "").replace("-", "")
         is_sensitive = any(pattern in key_lower for pattern in sensitive_keys)
 
         if is_sensitive and isinstance(value, str):
-            if partial and len(value) > (PARTIAL_REDACTION_PREFIX_LEN + PARTIAL_REDACTION_SUFFIX_LEN):
-                sanitized[key] = f"{value[:PARTIAL_REDACTION_PREFIX_LEN]}...[REDACTED]...{value[-PARTIAL_REDACTION_SUFFIX_LEN:]}"
+            if partial and len(value) > (
+                PARTIAL_REDACTION_PREFIX_LEN + PARTIAL_REDACTION_SUFFIX_LEN
+            ):
+                sanitized[key] = (
+                    f"{value[:PARTIAL_REDACTION_PREFIX_LEN]}...[REDACTED]...{value[-PARTIAL_REDACTION_SUFFIX_LEN:]}"
+                )
             else:
                 sanitized[key] = REDACTION_FORMAT
         elif isinstance(value, dict):
@@ -216,7 +277,9 @@ class SensitiveDataFilter(logging.Filter):
                 sanitized_args = []
                 for arg in record.args:
                     if isinstance(arg, str):
-                        sanitized_args.append(redact_sensitive_data(arg, partial=self.partial))
+                        sanitized_args.append(
+                            redact_sensitive_data(arg, partial=self.partial)
+                        )
                     elif isinstance(arg, dict):
                         sanitized_args.append(redact_dict(arg, partial=self.partial))
                     else:

@@ -68,15 +68,21 @@ class MonthlyEpicReconciliationJob:
         """
         session = self.Session()
         try:
-            result = session.execute(text("""
+            result = session.execute(
+                text(
+                    """
                 SELECT key
                 FROM projects
                 WHERE is_active = true
                 AND project_work_type = 'project-based'
                 ORDER BY key
-            """))
+            """
+                )
+            )
             project_keys = [row[0] for row in result.fetchall()]
-            logger.info(f"Found {len(project_keys)} active project-based projects: {project_keys}")
+            logger.info(
+                f"Found {len(project_keys)} active project-based projects: {project_keys}"
+            )
             return project_keys
         finally:
             session.close()
@@ -106,13 +112,19 @@ class MonthlyEpicReconciliationJob:
             month_date = datetime.strptime(month, "%Y-%m").date()
 
             # Query EpicHours for actual hours, filtered by project type
-            actual_hours = session.query(EpicHours).filter(
-                EpicHours.month == month_date,
-                EpicHours.project_key.in_(project_keys)
-            ).all()
+            actual_hours = (
+                session.query(EpicHours)
+                .filter(
+                    EpicHours.month == month_date,
+                    EpicHours.project_key.in_(project_keys),
+                )
+                .all()
+            )
 
-            logger.info(f"Found {len(actual_hours)} epic hour records for {month} "
-                       f"(filtered to {len(project_keys)} project-based projects)")
+            logger.info(
+                f"Found {len(actual_hours)} epic hour records for {month} "
+                f"(filtered to {len(project_keys)} project-based projects)"
+            )
 
             # Build epic data with forecast integration
             epic_data = []
@@ -123,10 +135,14 @@ class MonthlyEpicReconciliationJob:
                 forecast_hours = 0.0
 
                 # Try to find matching forecast
-                forecast = session.query(EpicForecast).filter(
-                    EpicForecast.project_key == hours.project_key,
-                    EpicForecast.epic_name == hours.epic_summary
-                ).first()
+                forecast = (
+                    session.query(EpicForecast)
+                    .filter(
+                        EpicForecast.project_key == hours.project_key,
+                        EpicForecast.epic_name == hours.epic_summary,
+                    )
+                    .first()
+                )
 
                 if forecast and forecast.forecast_data:
                     # Extract forecast hours for this month from forecast_data JSON
@@ -134,34 +150,44 @@ class MonthlyEpicReconciliationJob:
                     try:
                         forecast_data = forecast.forecast_data
                         team_forecast = forecast_data.get(hours.team, {})
-                        monthly_breakdown = team_forecast.get('monthly_breakdown', [])
+                        monthly_breakdown = team_forecast.get("monthly_breakdown", [])
 
                         # Find matching month (month field in forecast_data is integer, need to match to calendar month)
                         # This is simplified - actual implementation would need proper month mapping
                         for month_entry in monthly_breakdown:
                             # Sum all months for now as simplified approach
-                            forecast_hours += month_entry.get('hours', 0.0)
+                            forecast_hours += month_entry.get("hours", 0.0)
 
                     except Exception as e:
-                        logger.warning(f"Error extracting forecast for {hours.epic_key}: {e}")
+                        logger.warning(
+                            f"Error extracting forecast for {hours.epic_key}: {e}"
+                        )
                         forecast_hours = 0.0
 
                 # Calculate variance
                 variance_hours = hours.hours - forecast_hours
-                variance_pct = (variance_hours / forecast_hours * 100) if forecast_hours > 0 else 0.0
+                variance_pct = (
+                    (variance_hours / forecast_hours * 100)
+                    if forecast_hours > 0
+                    else 0.0
+                )
 
-                epic_data.append({
-                    "project_key": hours.project_key,
-                    "epic_key": hours.epic_key,
-                    "epic_name": hours.epic_summary or "Unknown",
-                    "team": hours.team or "All",
-                    "forecast_hours": forecast_hours,
-                    "actual_hours": hours.hours,
-                    "variance_hours": variance_hours,
-                    "variance_pct": variance_pct
-                })
+                epic_data.append(
+                    {
+                        "project_key": hours.project_key,
+                        "epic_key": hours.epic_key,
+                        "epic_name": hours.epic_summary or "Unknown",
+                        "team": hours.team or "All",
+                        "forecast_hours": forecast_hours,
+                        "actual_hours": hours.hours,
+                        "variance_hours": variance_hours,
+                        "variance_pct": variance_pct,
+                    }
+                )
 
-            logger.info(f"Processed data for {len(epic_data)} epics across project-based projects")
+            logger.info(
+                f"Processed data for {len(epic_data)} epics across project-based projects"
+            )
             return epic_data
 
         finally:
@@ -185,7 +211,7 @@ class MonthlyEpicReconciliationJob:
                 "total_actual_hours": 0.0,
                 "total_variance_pct": 0.0,
                 "epics_over_budget": 0,
-                "epics_under_budget": 0
+                "epics_under_budget": 0,
             }
 
         # Count unique projects
@@ -195,7 +221,9 @@ class MonthlyEpicReconciliationJob:
         total_forecast = sum(e["forecast_hours"] for e in epic_data)
         total_actual = sum(e["actual_hours"] for e in epic_data)
         total_variance = total_actual - total_forecast
-        total_variance_pct = (total_variance / total_forecast * 100) if total_forecast > 0 else 0
+        total_variance_pct = (
+            (total_variance / total_forecast * 100) if total_forecast > 0 else 0
+        )
 
         # Count over/under budget epics
         epics_over = sum(1 for e in epic_data if e["variance_pct"] > 10)
@@ -208,15 +236,19 @@ class MonthlyEpicReconciliationJob:
             "total_actual_hours": total_actual,
             "total_variance_pct": total_variance_pct,
             "epics_over_budget": epics_over,
-            "epics_under_budget": epics_under
+            "epics_under_budget": epics_under,
         }
 
-        logger.info(f"Summary: {len(unique_projects)} projects, {len(epic_data)} epics, "
-                    f"{total_variance_pct:.1f}% variance")
+        logger.info(
+            f"Summary: {len(unique_projects)} projects, {len(epic_data)} epics, "
+            f"{total_variance_pct:.1f}% variance"
+        )
 
         return summary
 
-    def generate_report(self, month: str, epic_data: List[Dict], summary: Dict) -> bytes:
+    def generate_report(
+        self, month: str, epic_data: List[Dict], summary: Dict
+    ) -> bytes:
         """
         Generate Excel report.
 
@@ -231,9 +263,7 @@ class MonthlyEpicReconciliationJob:
         logger.info(f"Generating Excel report for {month}")
 
         excel_buffer = self.report_generator.generate_epic_reconciliation_report(
-            month=month,
-            epic_data=epic_data,
-            project_summary=summary
+            month=month, epic_data=epic_data, project_summary=summary
         )
 
         return excel_buffer.read()
@@ -268,7 +298,11 @@ class MonthlyEpicReconciliationJob:
         session = self.Session()
         try:
             # Check if report already exists
-            existing = session.query(MonthlyReconciliationReport).filter_by(month=month).first()
+            existing = (
+                session.query(MonthlyReconciliationReport)
+                .filter_by(month=month)
+                .first()
+            )
 
             if existing:
                 existing.file_path = file_path
@@ -282,7 +316,7 @@ class MonthlyEpicReconciliationJob:
                     file_path=file_path,
                     total_projects=summary["total_projects"],
                     total_epics=summary["total_epics"],
-                    total_variance_pct=summary["total_variance_pct"]
+                    total_variance_pct=summary["total_variance_pct"],
                 )
                 session.add(report_record)
 
@@ -298,7 +332,9 @@ class MonthlyEpicReconciliationJob:
 
         return file_path
 
-    async def send_notifications(self, month: str, file_path: str, summary: Dict) -> None:
+    async def send_notifications(
+        self, month: str, file_path: str, summary: Dict
+    ) -> None:
         """
         Send report via email to PMs.
 
@@ -370,7 +406,11 @@ class MonthlyEpicReconciliationJob:
             # Attach Excel file
             with open(file_path, "rb") as f:
                 attachment = MIMEApplication(f.read(), _subtype="xlsx")
-                attachment.add_header("Content-Disposition", "attachment", filename=os.path.basename(file_path))
+                attachment.add_header(
+                    "Content-Disposition",
+                    "attachment",
+                    filename=os.path.basename(file_path),
+                )
                 msg.attach(attachment)
 
             # Send email
@@ -384,7 +424,11 @@ class MonthlyEpicReconciliationJob:
             # Update database record with recipients
             session = self.Session()
             try:
-                report = session.query(MonthlyReconciliationReport).filter_by(month=month).first()
+                report = (
+                    session.query(MonthlyReconciliationReport)
+                    .filter_by(month=month)
+                    .first()
+                )
                 if report:
                     report.sent_to = pm_emails
                     session.commit()
@@ -405,9 +449,9 @@ class MonthlyEpicReconciliationJob:
             Dictionary with job execution statistics
         """
         start_time = datetime.now()
-        logger.info("="*80)
+        logger.info("=" * 80)
         logger.info(f"Starting Monthly Epic Reconciliation job at {start_time}")
-        logger.info("="*80)
+        logger.info("=" * 80)
 
         try:
             # PHASE 1: Epic Association Analysis
@@ -417,13 +461,23 @@ class MonthlyEpicReconciliationJob:
             association_results = asyncio.run(run_epic_association_analysis())
 
             logger.info("\nEpic Association Complete:")
-            logger.info(f"  - Projects analyzed: {association_results.get('total_projects', 0)}")
-            logger.info(f"  - Tickets analyzed: {association_results.get('total_tickets_analyzed', 0)}")
-            logger.info(f"  - Matches found: {association_results.get('total_matches_found', 0)}")
+            logger.info(
+                f"  - Projects analyzed: {association_results.get('total_projects', 0)}"
+            )
+            logger.info(
+                f"  - Tickets analyzed: {association_results.get('total_tickets_analyzed', 0)}"
+            )
+            logger.info(
+                f"  - Matches found: {association_results.get('total_matches_found', 0)}"
+            )
 
-            if association_results.get('auto_update_enabled'):
-                logger.info(f"  - Updates applied: {association_results.get('updates_applied', 0)}")
-                logger.info(f"  - Failures: {association_results.get('update_failures', 0)}")
+            if association_results.get("auto_update_enabled"):
+                logger.info(
+                    f"  - Updates applied: {association_results.get('updates_applied', 0)}"
+                )
+                logger.info(
+                    f"  - Failures: {association_results.get('update_failures', 0)}"
+                )
 
             # PHASE 2: Epic Hours Reconciliation
             logger.info("\n📊 PHASE 2: Epic Hours Reconciliation")
@@ -443,7 +497,7 @@ class MonthlyEpicReconciliationJob:
                     "end_time": datetime.now().isoformat(),
                     "month": month,
                     "epics_processed": 0,
-                    "message": "No data to process"
+                    "message": "No data to process",
                 }
 
             # Calculate summary
@@ -473,16 +527,22 @@ class MonthlyEpicReconciliationJob:
                 "report_file": file_path,
                 # Epic association results
                 "epic_association": {
-                    "tickets_analyzed": association_results.get('total_tickets_analyzed', 0),
-                    "matches_found": association_results.get('total_matches_found', 0),
-                    "updates_applied": association_results.get('updates_applied', 0),
-                    "auto_update_enabled": association_results.get('auto_update_enabled', False)
-                }
+                    "tickets_analyzed": association_results.get(
+                        "total_tickets_analyzed", 0
+                    ),
+                    "matches_found": association_results.get("total_matches_found", 0),
+                    "updates_applied": association_results.get("updates_applied", 0),
+                    "auto_update_enabled": association_results.get(
+                        "auto_update_enabled", False
+                    ),
+                },
             }
 
-            logger.info("="*80)
-            logger.info(f"✅ Monthly Epic Reconciliation job completed successfully in {duration:.2f}s")
-            logger.info("="*80)
+            logger.info("=" * 80)
+            logger.info(
+                f"✅ Monthly Epic Reconciliation job completed successfully in {duration:.2f}s"
+            )
+            logger.info("=" * 80)
             logger.info(f"Final Stats: {stats}")
 
             return stats
@@ -491,14 +551,17 @@ class MonthlyEpicReconciliationJob:
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
 
-            logger.error(f"Monthly Epic Reconciliation job failed after {duration:.2f}s: {e}", exc_info=True)
+            logger.error(
+                f"Monthly Epic Reconciliation job failed after {duration:.2f}s: {e}",
+                exc_info=True,
+            )
 
             return {
                 "success": False,
                 "start_time": start_time.isoformat(),
                 "end_time": end_time.isoformat(),
                 "duration_seconds": duration,
-                "error": str(e)
+                "error": str(e),
             }
 
 
@@ -511,13 +574,16 @@ def run_monthly_epic_reconciliation():
         job = MonthlyEpicReconciliationJob()
         return job.run()
     except Exception as e:
-        logger.error(f"Failed to initialize or run Monthly Epic Reconciliation job: {e}", exc_info=True)
+        logger.error(
+            f"Failed to initialize or run Monthly Epic Reconciliation job: {e}",
+            exc_info=True,
+        )
         return {
             "success": False,
             "error": str(e),
             "start_time": datetime.now().isoformat(),
             "end_time": datetime.now().isoformat(),
-            "duration_seconds": 0
+            "duration_seconds": 0,
         }
 
 
@@ -525,7 +591,7 @@ if __name__ == "__main__":
     # Allow running job manually for testing
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     print("Running Monthly Epic Reconciliation job manually...")

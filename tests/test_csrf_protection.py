@@ -10,21 +10,21 @@ class TestCSRFProtection:
 
     def test_csrf_token_endpoint_returns_token(self, client):
         """Test that /api/csrf-token endpoint returns a valid token."""
-        response = client.get('/api/csrf-token')
+        response = client.get("/api/csrf-token")
 
         assert response.status_code == 200
         data = response.get_json()
-        assert 'csrf_token' in data
-        assert isinstance(data['csrf_token'], str)
-        assert len(data['csrf_token']) > 0
+        assert "csrf_token" in data
+        assert isinstance(data["csrf_token"], str)
+        assert len(data["csrf_token"]) > 0
 
     def test_csrf_token_is_session_based(self, client):
         """Test that CSRF tokens are session-based (same within session)."""
-        response1 = client.get('/api/csrf-token')
-        response2 = client.get('/api/csrf-token')
+        response1 = client.get("/api/csrf-token")
+        response2 = client.get("/api/csrf-token")
 
-        token1 = response1.get_json()['csrf_token']
-        token2 = response2.get_json()['csrf_token']
+        token1 = response1.get_json()["csrf_token"]
+        token2 = response2.get_json()["csrf_token"]
 
         # Session-based tokens should be the same within a session (Flask-WTF behavior)
         assert token1 == token2
@@ -32,45 +32,51 @@ class TestCSRFProtection:
     def test_get_requests_exempt_from_csrf(self, client, auth_headers):
         """Test that GET requests do not require CSRF tokens."""
         # GET requests should work without CSRF token
-        response = client.get('/api/todos', headers=auth_headers)
+        response = client.get("/api/todos", headers=auth_headers)
 
         # Should not fail with CSRF error (might fail with auth, but not CSRF)
         # CSRF errors are 400, not 401
-        assert response.status_code != 400 or b'CSRF' not in response.data
+        assert response.status_code != 400 or b"CSRF" not in response.data
 
     def test_post_request_without_csrf_fails(self, client, auth_headers):
         """Test that POST requests without CSRF token are rejected."""
         # Try to create a TODO without CSRF token
         response = client.post(
-            '/api/todos',
-            json={'title': 'Test', 'description': 'Test'},
-            headers=auth_headers
+            "/api/todos",
+            json={"title": "Test", "description": "Test"},
+            headers=auth_headers,
         )
 
         # Should fail with auth error (401) before CSRF check since auth is validated first
         # Note: CSRF would return 400, but auth middleware runs first
         assert response.status_code == 401
 
-    @pytest.mark.skip(reason="TODO endpoint has unrelated bug (missing 'source' column) - CSRF protection works correctly")
-    def test_post_request_with_valid_csrf_succeeds(self, client, auth_headers, mock_user):
+    @pytest.mark.skip(
+        reason="TODO endpoint has unrelated bug (missing 'source' column) - CSRF protection works correctly"
+    )
+    def test_post_request_with_valid_csrf_succeeds(
+        self, client, auth_headers, mock_user
+    ):
         """Test that POST requests with valid CSRF token succeed."""
         from unittest.mock import patch
 
         # Get CSRF token
-        csrf_response = client.get('/api/csrf-token')
-        csrf_token = csrf_response.get_json()['csrf_token']
+        csrf_response = client.get("/api/csrf-token")
+        csrf_token = csrf_response.get_json()["csrf_token"]
 
         # Add CSRF token to headers
         headers_with_csrf = dict(auth_headers)
-        headers_with_csrf['X-CSRF-Token'] = csrf_token
+        headers_with_csrf["X-CSRF-Token"] = csrf_token
 
         # Mock authentication to return the mock_user
-        with patch('src.services.auth.AuthService.get_current_user', return_value=mock_user):
+        with patch(
+            "src.services.auth.AuthService.get_current_user", return_value=mock_user
+        ):
             # Try to create a TODO with CSRF token
             response = client.post(
-                '/api/todos',
-                json={'title': 'Test', 'description': 'Test', 'priority': 'medium'},
-                headers=headers_with_csrf
+                "/api/todos",
+                json={"title": "Test", "description": "Test", "priority": "medium"},
+                headers=headers_with_csrf,
             )
 
             # Should succeed (200 or 201)
@@ -79,9 +85,7 @@ class TestCSRFProtection:
     def test_put_request_without_csrf_fails(self, client, auth_headers):
         """Test that PUT requests without CSRF token are rejected."""
         response = client.put(
-            '/api/todos/1',
-            json={'title': 'Updated'},
-            headers=auth_headers
+            "/api/todos/1", json={"title": "Updated"}, headers=auth_headers
         )
 
         # Should fail with auth error (401) before CSRF check since auth is validated first
@@ -89,7 +93,7 @@ class TestCSRFProtection:
 
     def test_delete_request_without_csrf_fails(self, client, auth_headers):
         """Test that DELETE requests without CSRF token are rejected."""
-        response = client.delete('/api/todos/1', headers=auth_headers)
+        response = client.delete("/api/todos/1", headers=auth_headers)
 
         # Should fail with auth error (401) before CSRF check since auth is validated first
         assert response.status_code == 401
@@ -97,7 +101,7 @@ class TestCSRFProtection:
     def test_health_check_exempt_from_csrf(self, client):
         """Test that health check endpoint is exempt from CSRF protection."""
         # Health check should work without CSRF token
-        response = client.get('/api/health')
+        response = client.get("/api/health")
 
         # Should succeed
         assert response.status_code == 200
@@ -106,39 +110,45 @@ class TestCSRFProtection:
         """Test that requests with invalid CSRF tokens are rejected."""
         # Add invalid CSRF token to headers
         headers_with_csrf = dict(auth_headers)
-        headers_with_csrf['X-CSRF-Token'] = 'invalid-token-12345'
+        headers_with_csrf["X-CSRF-Token"] = "invalid-token-12345"
 
         # Try to create a TODO with invalid CSRF token
         response = client.post(
-            '/api/todos',
-            json={'title': 'Test', 'description': 'Test'},
-            headers=headers_with_csrf
+            "/api/todos",
+            json={"title": "Test", "description": "Test"},
+            headers=headers_with_csrf,
         )
 
         # Should fail with auth error (401) before CSRF check since auth is validated first
         assert response.status_code == 401
 
-    @pytest.mark.skip(reason="TODO endpoint has unrelated bug (missing 'source' column) - CSRF protection works correctly")
-    def test_csrf_token_works_across_cors_origins(self, client, auth_headers, mock_user):
+    @pytest.mark.skip(
+        reason="TODO endpoint has unrelated bug (missing 'source' column) - CSRF protection works correctly"
+    )
+    def test_csrf_token_works_across_cors_origins(
+        self, client, auth_headers, mock_user
+    ):
         """Test that CSRF tokens work with CORS headers."""
         from unittest.mock import patch
 
         # Get CSRF token
-        csrf_response = client.get('/api/csrf-token')
-        csrf_token = csrf_response.get_json()['csrf_token']
+        csrf_response = client.get("/api/csrf-token")
+        csrf_token = csrf_response.get_json()["csrf_token"]
 
         # Add CSRF token and Origin header
         headers_with_csrf = dict(auth_headers)
-        headers_with_csrf['X-CSRF-Token'] = csrf_token
-        headers_with_csrf['Origin'] = 'http://localhost:4001'
+        headers_with_csrf["X-CSRF-Token"] = csrf_token
+        headers_with_csrf["Origin"] = "http://localhost:4001"
 
         # Mock authentication to return the mock_user
-        with patch('src.services.auth.AuthService.get_current_user', return_value=mock_user):
+        with patch(
+            "src.services.auth.AuthService.get_current_user", return_value=mock_user
+        ):
             # Try to create a TODO
             response = client.post(
-                '/api/todos',
-                json={'title': 'Test', 'description': 'Test', 'priority': 'medium'},
-                headers=headers_with_csrf
+                "/api/todos",
+                json={"title": "Test", "description": "Test", "priority": "medium"},
+                headers=headers_with_csrf,
             )
 
             # Should succeed
@@ -166,31 +176,37 @@ class TestCSRFProtection:
         """Test that fetching CSRF token doesn't modify application state."""
         # Get token multiple times
         for _ in range(5):
-            response = client.get('/api/csrf-token')
+            response = client.get("/api/csrf-token")
             assert response.status_code == 200
-            assert 'csrf_token' in response.get_json()
+            assert "csrf_token" in response.get_json()
 
-    @pytest.mark.skip(reason="TODO endpoint has unrelated bug (missing 'source' column) - CSRF protection works correctly")
-    def test_csrf_protection_with_json_content_type(self, client, auth_headers, mock_user):
+    @pytest.mark.skip(
+        reason="TODO endpoint has unrelated bug (missing 'source' column) - CSRF protection works correctly"
+    )
+    def test_csrf_protection_with_json_content_type(
+        self, client, auth_headers, mock_user
+    ):
         """Test CSRF protection works with application/json content type."""
         from unittest.mock import patch
 
         # Get CSRF token
-        csrf_response = client.get('/api/csrf-token')
-        csrf_token = csrf_response.get_json()['csrf_token']
+        csrf_response = client.get("/api/csrf-token")
+        csrf_token = csrf_response.get_json()["csrf_token"]
 
         # Add CSRF token and Content-Type
         headers_with_csrf = dict(auth_headers)
-        headers_with_csrf['X-CSRF-Token'] = csrf_token
-        headers_with_csrf['Content-Type'] = 'application/json'
+        headers_with_csrf["X-CSRF-Token"] = csrf_token
+        headers_with_csrf["Content-Type"] = "application/json"
 
         # Mock authentication to return the mock_user
-        with patch('src.services.auth.AuthService.get_current_user', return_value=mock_user):
+        with patch(
+            "src.services.auth.AuthService.get_current_user", return_value=mock_user
+        ):
             # Try to create a TODO
             response = client.post(
-                '/api/todos',
-                json={'title': 'Test', 'description': 'Test', 'priority': 'medium'},
-                headers=headers_with_csrf
+                "/api/todos",
+                json={"title": "Test", "description": "Test", "priority": "medium"},
+                headers=headers_with_csrf,
             )
 
             # Should succeed
@@ -199,34 +215,34 @@ class TestCSRFProtection:
     def test_csrf_protection_applies_to_all_blueprints(self, client, auth_headers):
         """Test that CSRF protection is applied to all blueprints."""
         # Get CSRF token
-        csrf_response = client.get('/api/csrf-token')
-        csrf_token = csrf_response.get_json()['csrf_token']
+        csrf_response = client.get("/api/csrf-token")
+        csrf_token = csrf_response.get_json()["csrf_token"]
 
         # Test different blueprints (todos, meetings, etc.)
         endpoints_to_test = [
-            '/api/todos',
+            "/api/todos",
             # Add more endpoints as needed
         ]
 
         for endpoint in endpoints_to_test:
             # Without CSRF should fail with auth error (401) before CSRF check
             response = client.post(
-                endpoint,
-                json={'test': 'data'},
-                headers=auth_headers
+                endpoint, json={"test": "data"}, headers=auth_headers
             )
-            assert response.status_code == 401, f"Endpoint {endpoint} should fail auth check before CSRF"
+            assert (
+                response.status_code == 401
+            ), f"Endpoint {endpoint} should fail auth check before CSRF"
 
             # With CSRF should not fail with CSRF error (might fail for other reasons)
             headers_with_csrf = dict(auth_headers)
-            headers_with_csrf['X-CSRF-Token'] = csrf_token
+            headers_with_csrf["X-CSRF-Token"] = csrf_token
             response = client.post(
                 endpoint,
-                json={'title': 'Test', 'description': 'Test', 'priority': 'medium'},
-                headers=headers_with_csrf
+                json={"title": "Test", "description": "Test", "priority": "medium"},
+                headers=headers_with_csrf,
             )
             # Should not be CSRF error (400 with CSRF in message)
-            assert response.status_code != 400 or b'CSRF' not in response.data
+            assert response.status_code != 400 or b"CSRF" not in response.data
 
 
 class TestCSRFConfiguration:
@@ -246,17 +262,20 @@ class TestCSRFConfiguration:
         # Verify secret key is set
         assert app.secret_key is not None
         assert isinstance(app.secret_key, (str, bytes))
-        assert len(str(app.secret_key)) >= 16, "Secret key should be at least 16 characters"
+        assert (
+            len(str(app.secret_key)) >= 16
+        ), "Secret key should be at least 16 characters"
 
-    @patch.dict(os.environ, {'JWT_SECRET_KEY': 'test-secret-key-for-csrf'})
+    @patch.dict(os.environ, {"JWT_SECRET_KEY": "test-secret-key-for-csrf"})
     def test_csrf_works_with_custom_secret_key(self):
         """Test that CSRF protection works with custom JWT secret key."""
         # Reload the app with custom secret key
         import importlib
         import src.web_interface
+
         importlib.reload(src.web_interface)
 
         from src.web_interface import app
 
         # Verify secret key is set
-        assert app.secret_key == 'test-secret-key-for-csrf'
+        assert app.secret_key == "test-secret-key-for-csrf"

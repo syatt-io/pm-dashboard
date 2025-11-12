@@ -3,6 +3,7 @@
 Provides decorators and utilities for caching API responses with configurable TTL
 and smart invalidation strategies.
 """
+
 import json
 import logging
 import os
@@ -25,7 +26,7 @@ class CacheManager:
         Args:
             redis_url: Redis connection URL (defaults to REDIS_URL env var)
         """
-        self.redis_url = redis_url or os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self._client = None
         self._enabled = True
 
@@ -39,10 +40,10 @@ class CacheManager:
 
     def _mask_url(self, url: str) -> str:
         """Mask password in Redis URL for logging."""
-        if '@' in url and '://' in url:
-            protocol, rest = url.split('://', 1)
-            if '@' in rest:
-                auth, host = rest.rsplit('@', 1)
+        if "@" in url and "://" in url:
+            protocol, rest = url.split("://", 1)
+            if "@" in rest:
+                auth, host = rest.rsplit("@", 1)
                 return f"{protocol}://***:***@{host}"
         return url
 
@@ -55,7 +56,7 @@ class CacheManager:
                 socket_connect_timeout=5,
                 socket_timeout=5,
                 retry_on_timeout=True,
-                health_check_interval=30
+                health_check_interval=30,
             )
             # Test connection
             self._client.ping()
@@ -85,7 +86,9 @@ class CacheManager:
 
         return ":".join(key_parts)
 
-    def get(self, prefix: str, user_id: Optional[int] = None, **kwargs) -> Optional[Dict[str, Any]]:
+    def get(
+        self, prefix: str, user_id: Optional[int] = None, **kwargs
+    ) -> Optional[Dict[str, Any]]:
         """Retrieve cached data.
 
         Args:
@@ -117,7 +120,14 @@ class CacheManager:
             logger.error(f"Error retrieving from cache: {e}")
             return None
 
-    def set(self, data: Dict[str, Any], prefix: str, ttl: int, user_id: Optional[int] = None, **kwargs) -> bool:
+    def set(
+        self,
+        data: Dict[str, Any],
+        prefix: str,
+        ttl: int,
+        user_id: Optional[int] = None,
+        **kwargs,
+    ) -> bool:
         """Store data in cache.
 
         Args:
@@ -141,9 +151,9 @@ class CacheManager:
 
             # Add cache metadata
             cached_data = {
-                'data': data,
-                'cached_at': datetime.utcnow().isoformat(),
-                'ttl': ttl
+                "data": data,
+                "cached_at": datetime.utcnow().isoformat(),
+                "ttl": ttl,
             }
 
             serialized = json.dumps(cached_data)
@@ -188,7 +198,7 @@ class CacheManager:
         Returns:
             True if successful, False otherwise
         """
-        return self.invalidate('api_cache:*') >= 0
+        return self.invalidate("api_cache:*") >= 0
 
 
 # Singleton instance
@@ -212,7 +222,9 @@ def get_cache_manager(redis_url: Optional[str] = None) -> CacheManager:
     return _cache_manager
 
 
-def cached_endpoint(prefix: str, ttl: int, user_specific: bool = True, exclude_params: list = None):
+def cached_endpoint(
+    prefix: str, ttl: int, user_specific: bool = True, exclude_params: list = None
+):
     """Decorator for caching endpoint responses.
 
     Args:
@@ -234,6 +246,7 @@ def cached_endpoint(prefix: str, ttl: int, user_specific: bool = True, exclude_p
         def get_meetings(user):
             # This caches the full dataset, pagination happens in-memory
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -243,42 +256,47 @@ def cached_endpoint(prefix: str, ttl: int, user_specific: bool = True, exclude_p
             user_id = None
             if user_specific:
                 # Try to get user from kwargs (passed by auth_required decorator)
-                user = kwargs.get('user')
-                if user and hasattr(user, 'id'):
+                user = kwargs.get("user")
+                if user and hasattr(user, "id"):
                     user_id = user.id
 
             # Build cache key parameters from request, excluding specified params
             cache_params = {}
             if request.args:
                 excluded = set(exclude_params or [])
-                cache_params = {k: v for k, v in request.args.items() if k not in excluded}
+                cache_params = {
+                    k: v for k, v in request.args.items() if k not in excluded
+                }
 
             # Try to get from cache
             cached_data = cache.get(prefix, user_id=user_id, **cache_params)
             if cached_data is not None:
                 # Return cached response with cache metadata headers
-                response = jsonify(cached_data['data'])
-                response.headers['X-Cache'] = 'HIT'
-                response.headers['X-Cache-Time'] = cached_data.get('cached_at', '')
+                response = jsonify(cached_data["data"])
+                response.headers["X-Cache"] = "HIT"
+                response.headers["X-Cache-Time"] = cached_data.get("cached_at", "")
                 return response
 
             # Call original function
             result = func(*args, **kwargs)
 
             # Cache the response if it's successful
-            if result and hasattr(result, 'json') and hasattr(result, 'status_code'):
+            if result and hasattr(result, "json") and hasattr(result, "status_code"):
                 if 200 <= result.status_code < 300:
                     try:
                         response_data = result.get_json()
-                        cache.set(response_data, prefix, ttl, user_id=user_id, **cache_params)
+                        cache.set(
+                            response_data, prefix, ttl, user_id=user_id, **cache_params
+                        )
                         # Add cache miss header
-                        result.headers['X-Cache'] = 'MISS'
+                        result.headers["X-Cache"] = "MISS"
                     except Exception as e:
                         logger.warning(f"Failed to cache response: {e}")
 
             return result
 
         return wrapper
+
     return decorator
 
 

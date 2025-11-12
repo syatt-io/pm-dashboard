@@ -2,6 +2,7 @@
 
 This ensures sessions work across multiple Gunicorn workers using the existing database.
 """
+
 import json
 import logging
 import pickle
@@ -19,7 +20,8 @@ Base = declarative_base()
 
 class SlackSession(Base):
     """Database model for Slack interactive sessions."""
-    __tablename__ = 'slack_sessions'
+
+    __tablename__ = "slack_sessions"
 
     session_id = Column(String(32), primary_key=True)
     data = Column(LargeBinary, nullable=False)  # Pickled session data
@@ -50,6 +52,7 @@ class DatabaseSessionManager:
         """Establish database connection and create tables."""
         if self._engine is None:
             from src.utils.database import get_engine
+
             self._engine = get_engine()
 
             # Create sessions table if it doesn't exist
@@ -81,7 +84,9 @@ class DatabaseSessionManager:
             session = self._SessionFactory()
             try:
                 # Check if session exists
-                existing = session.query(SlackSession).filter_by(session_id=session_id).first()
+                existing = (
+                    session.query(SlackSession).filter_by(session_id=session_id).first()
+                )
 
                 if existing:
                     # Update existing
@@ -90,14 +95,14 @@ class DatabaseSessionManager:
                 else:
                     # Create new
                     new_session = SlackSession(
-                        session_id=session_id,
-                        data=serialized,
-                        expires_at=expires_at
+                        session_id=session_id, data=serialized, expires_at=expires_at
                     )
                     session.add(new_session)
 
                 session.commit()
-                logger.debug(f"Stored session {session_id} in database (TTL: {self.ttl}s)")
+                logger.debug(
+                    f"Stored session {session_id} in database (TTL: {self.ttl}s)"
+                )
                 return True
 
             finally:
@@ -122,7 +127,9 @@ class DatabaseSessionManager:
 
             session = self._SessionFactory()
             try:
-                slack_session = session.query(SlackSession).filter_by(session_id=session_id).first()
+                slack_session = (
+                    session.query(SlackSession).filter_by(session_id=session_id).first()
+                )
 
                 if slack_session is None:
                     logger.debug(f"Session {session_id} not found in database")
@@ -162,7 +169,9 @@ class DatabaseSessionManager:
 
             session = self._SessionFactory()
             try:
-                slack_session = session.query(SlackSession).filter_by(session_id=session_id).first()
+                slack_session = (
+                    session.query(SlackSession).filter_by(session_id=session_id).first()
+                )
 
                 if slack_session:
                     session.delete(slack_session)
@@ -195,7 +204,9 @@ class DatabaseSessionManager:
 
             session = self._SessionFactory()
             try:
-                slack_session = session.query(SlackSession).filter_by(session_id=session_id).first()
+                slack_session = (
+                    session.query(SlackSession).filter_by(session_id=session_id).first()
+                )
 
                 if slack_session is None:
                     return False
@@ -226,9 +237,11 @@ class DatabaseSessionManager:
             session = self._SessionFactory()
             try:
                 # Delete all expired sessions
-                deleted = session.query(SlackSession).filter(
-                    SlackSession.expires_at < datetime.utcnow()
-                ).delete()
+                deleted = (
+                    session.query(SlackSession)
+                    .filter(SlackSession.expires_at < datetime.utcnow())
+                    .delete()
+                )
 
                 session.commit()
 
@@ -258,6 +271,7 @@ class DatabaseSessionManager:
             try:
                 # Simple query to test connection
                 from sqlalchemy import text
+
                 session.execute(text("SELECT 1"))
                 return True
             finally:

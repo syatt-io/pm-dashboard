@@ -32,15 +32,13 @@ class NotionClient:
                 "notion": {
                     "command": "npx",
                     "args": ["-y", "@modelcontextprotocol/server-notion"],
-                    "env": {
-                        "NOTION_API_KEY": self.api_key
-                    }
+                    "env": {"NOTION_API_KEY": self.api_key},
                 }
             }
         }
 
         # Create temp file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             json.dump(config, f)
             return f.name
 
@@ -62,21 +60,20 @@ class NotionClient:
             # Note: This is a simplified example. In production, you'd use the MCP SDK
             # to properly interact with the MCP server
             cmd = [
-                'npx',
-                '-y',
-                '@modelcontextprotocol/inspector',
-                '--config', config_file,
-                '--server', 'notion',
-                '--tool', tool_name,
-                '--params', json.dumps(params)
+                "npx",
+                "-y",
+                "@modelcontextprotocol/inspector",
+                "--config",
+                config_file,
+                "--server",
+                "notion",
+                "--tool",
+                tool_name,
+                "--params",
+                json.dumps(params),
             ]
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
             if result.returncode != 0:
                 logger.error(f"MCP tool call failed: {result.stderr}")
@@ -101,14 +98,11 @@ class NotionClient:
         Returns:
             List of matching pages
         """
-        params = {
-            'query': query,
-            'limit': limit
-        }
+        params = {"query": query, "limit": limit}
 
         try:
-            result = self._call_mcp_tool('search_pages', params)
-            return result.get('results', [])
+            result = self._call_mcp_tool("search_pages", params)
+            return result.get("results", [])
         except Exception as e:
             logger.error(f"Failed to search pages: {e}")
             raise
@@ -123,22 +117,17 @@ class NotionClient:
         Returns:
             Page content and metadata
         """
-        params = {
-            'page_id': page_id
-        }
+        params = {"page_id": page_id}
 
         try:
-            result = self._call_mcp_tool('get_page', params)
+            result = self._call_mcp_tool("get_page", params)
             return result
         except Exception as e:
             logger.error(f"Failed to get page {page_id}: {e}")
             raise
 
     def create_page(
-        self,
-        parent_id: str,
-        title: str,
-        content: List[Dict[str, Any]] = None
+        self, parent_id: str, title: str, content: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Create a new Notion page.
@@ -151,26 +140,20 @@ class NotionClient:
         Returns:
             Created page metadata
         """
-        params = {
-            'parent_id': parent_id,
-            'title': title
-        }
+        params = {"parent_id": parent_id, "title": title}
 
         if content:
-            params['content'] = content
+            params["content"] = content
 
         try:
-            result = self._call_mcp_tool('create_page', params)
+            result = self._call_mcp_tool("create_page", params)
             return result
         except Exception as e:
             logger.error(f"Failed to create page: {e}")
             raise
 
     def update_page(
-        self,
-        page_id: str,
-        title: str = None,
-        content: List[Dict[str, Any]] = None
+        self, page_id: str, title: str = None, content: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Update a Notion page.
@@ -183,17 +166,15 @@ class NotionClient:
         Returns:
             Updated page metadata
         """
-        params = {
-            'page_id': page_id
-        }
+        params = {"page_id": page_id}
 
         if title:
-            params['title'] = title
+            params["title"] = title
         if content:
-            params['content'] = content
+            params["content"] = content
 
         try:
-            result = self._call_mcp_tool('update_page', params)
+            result = self._call_mcp_tool("update_page", params)
             return result
         except Exception as e:
             logger.error(f"Failed to update page {page_id}: {e}")
@@ -209,22 +190,17 @@ class NotionClient:
         Returns:
             List of database metadata
         """
-        params = {
-            'limit': limit
-        }
+        params = {"limit": limit}
 
         try:
-            result = self._call_mcp_tool('list_databases', params)
-            return result.get('results', [])
+            result = self._call_mcp_tool("list_databases", params)
+            return result.get("results", [])
         except Exception as e:
             logger.error(f"Failed to list databases: {e}")
             raise
 
     def query_database(
-        self,
-        database_id: str,
-        filter_params: Dict[str, Any] = None,
-        limit: int = 100
+        self, database_id: str, filter_params: Dict[str, Any] = None, limit: int = 100
     ) -> List[Dict[str, Any]]:
         """
         Query a Notion database.
@@ -237,25 +213,20 @@ class NotionClient:
         Returns:
             List of database entries
         """
-        params = {
-            'database_id': database_id,
-            'limit': limit
-        }
+        params = {"database_id": database_id, "limit": limit}
 
         if filter_params:
-            params['filter'] = filter_params
+            params["filter"] = filter_params
 
         try:
-            result = self._call_mcp_tool('query_database', params)
-            return result.get('results', [])
+            result = self._call_mcp_tool("query_database", params)
+            return result.get("results", [])
         except Exception as e:
             logger.error(f"Failed to query database {database_id}: {e}")
             raise
 
     def create_database_entry(
-        self,
-        database_id: str,
-        properties: Dict[str, Any]
+        self, database_id: str, properties: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Create a new entry in a Notion database.
@@ -267,22 +238,17 @@ class NotionClient:
         Returns:
             Created entry metadata
         """
-        params = {
-            'database_id': database_id,
-            'properties': properties
-        }
+        params = {"database_id": database_id, "properties": properties}
 
         try:
-            result = self._call_mcp_tool('create_database_entry', params)
+            result = self._call_mcp_tool("create_database_entry", params)
             return result
         except Exception as e:
             logger.error(f"Failed to create database entry: {e}")
             raise
 
     def update_database_entry(
-        self,
-        page_id: str,
-        properties: Dict[str, Any]
+        self, page_id: str, properties: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Update an entry in a Notion database.
@@ -294,22 +260,17 @@ class NotionClient:
         Returns:
             Updated entry metadata
         """
-        params = {
-            'page_id': page_id,
-            'properties': properties
-        }
+        params = {"page_id": page_id, "properties": properties}
 
         try:
-            result = self._call_mcp_tool('update_database_entry', params)
+            result = self._call_mcp_tool("update_database_entry", params)
             return result
         except Exception as e:
             logger.error(f"Failed to update database entry {page_id}: {e}")
             raise
 
     def append_block_children(
-        self,
-        block_id: str,
-        children: List[Dict[str, Any]]
+        self, block_id: str, children: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
         Append blocks to a page or block.
@@ -321,13 +282,10 @@ class NotionClient:
         Returns:
             Response with appended blocks
         """
-        params = {
-            'block_id': block_id,
-            'children': children
-        }
+        params = {"block_id": block_id, "children": children}
 
         try:
-            result = self._call_mcp_tool('append_block_children', params)
+            result = self._call_mcp_tool("append_block_children", params)
             return result
         except Exception as e:
             logger.error(f"Failed to append blocks to {block_id}: {e}")

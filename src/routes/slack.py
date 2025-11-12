@@ -1,4 +1,5 @@
 """Slack bot integration routes."""
+
 from flask import Blueprint, jsonify, request
 import asyncio
 import logging
@@ -6,7 +7,7 @@ import threading
 
 logger = logging.getLogger(__name__)
 
-slack_bp = Blueprint('slack', __name__)
+slack_bp = Blueprint("slack", __name__)
 
 # Lazy initialization of Slack bot
 _slack_bot = None
@@ -22,10 +23,7 @@ def init_slack_routes(bot_token, signing_secret):
         signing_secret: Slack signing secret
     """
     global _slack_config
-    _slack_config = {
-        'bot_token': bot_token,
-        'signing_secret': signing_secret
-    }
+    _slack_config = {"bot_token": bot_token, "signing_secret": signing_secret}
 
 
 def get_slack_bot():
@@ -41,7 +39,7 @@ def get_slack_bot():
         return _slack_bot
 
     # Not configured at all
-    if not _slack_config or not _slack_config.get('bot_token'):
+    if not _slack_config or not _slack_config.get("bot_token"):
         return None
 
     # Slow path: initialize with thread safety (double-check locking)
@@ -50,9 +48,10 @@ def get_slack_bot():
         if _slack_bot is None:
             try:
                 from src.managers.slack_bot import SlackTodoBot
+
                 _slack_bot = SlackTodoBot(
-                    bot_token=_slack_config['bot_token'],
-                    signing_secret=_slack_config['signing_secret']
+                    bot_token=_slack_config["bot_token"],
+                    signing_secret=_slack_config["signing_secret"],
                 )
                 logger.info("Slack bot initialized successfully (lazy)")
             except Exception as e:
@@ -67,8 +66,12 @@ def get_slack_bot():
 def slack_events():
     """Handle Slack events and commands."""
     # Handle URL verification challenge from Slack
-    if request.is_json and request.json and request.json.get('type') == 'url_verification':
-        return jsonify({'challenge': request.json.get('challenge')}), 200
+    if (
+        request.is_json
+        and request.json
+        and request.json.get("type") == "url_verification"
+    ):
+        return jsonify({"challenge": request.json.get("challenge")}), 200
 
     slack_bot = get_slack_bot()
     if not slack_bot:
@@ -106,7 +109,7 @@ def send_slack_digest():
         return jsonify({"error": "Slack bot not configured"}), 503
 
     try:
-        channel = request.json.get('channel') if request.json else None
+        channel = request.json.get("channel") if request.json else None
         asyncio.run(slack_bot.send_daily_digest(channel))
         return jsonify({"success": True})
     except Exception as e:

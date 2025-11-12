@@ -32,27 +32,35 @@ from .job_execution import JobExecution
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
 from datetime import datetime, timezone
 
+
 class TodoItem(Base):
     """Simple TODO item model."""
-    __tablename__ = 'todo_items'
+
+    __tablename__ = "todo_items"
 
     id = Column(String(36), primary_key=True)
     title = Column(String(255), nullable=False)
     description = Column(Text)
     assignee = Column(String(255))
-    priority = Column(String(50), default='Medium')
-    status = Column(String(50), default='pending')
+    priority = Column(String(50), default="Medium")
+    status = Column(String(50), default="pending")
     project_key = Column(String(50))
     user_id = Column(Integer)
     ticket_key = Column(String(50))  # Jira ticket key
     source_meeting_id = Column(String(36))  # Reference to processed_meetings
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
     due_date = Column(DateTime)
+
 
 class ProcessedMeeting(Base):
     """Simple processed meeting model."""
-    __tablename__ = 'processed_meetings'
+
+    __tablename__ = "processed_meetings"
 
     id = Column(String(36), primary_key=True)
     title = Column(String(255), nullable=False)
@@ -60,11 +68,15 @@ class ProcessedMeeting(Base):
     date = Column(DateTime)
     duration = Column(Integer)
     # Topic-based structure (NEW)
-    topics = Column(Text)  # JSON string - list of topic sections with titles and content
+    topics = Column(
+        Text
+    )  # JSON string - list of topic sections with titles and content
     # Action items (shared between old and new structure)
     action_items = Column(Text)  # JSON string - unchanged
     # AI model tracking (for diagnostics and auditing)
-    ai_provider = Column(String(50))  # AI provider used: "openai", "anthropic", "google"
+    ai_provider = Column(
+        String(50)
+    )  # AI provider used: "openai", "anthropic", "google"
     ai_model = Column(String(100))  # Specific model: "gpt-4", "claude-3-5-sonnet", etc.
     # Legacy structure fields (DEPRECATED - for backward compatibility)
     executive_summary = Column(Text)  # Renamed from summary
@@ -82,38 +94,60 @@ class ProcessedMeeting(Base):
     todos_created = Column(Text)  # JSON string
     success = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
 
 class FeedbackItem(Base):
     """Feedback item model for storing user feedback."""
-    __tablename__ = 'feedback_items'
+
+    __tablename__ = "feedback_items"
 
     id = Column(String(36), primary_key=True)
     user_id = Column(Integer, nullable=False)  # User who created the feedback
     recipient = Column(String(255))  # Slack handle or name (optional)
     content = Column(Text, nullable=False)  # Feedback details
-    status = Column(String(50), default='draft')  # draft or given
+    status = Column(String(50), default="draft")  # draft or given
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
 
 class ProjectDigestCache(Base):
     """Cache for project digest results to avoid redundant AI calls."""
-    __tablename__ = 'project_digest_cache'
+
+    __tablename__ = "project_digest_cache"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_key = Column(String(50), nullable=False, index=True)
     days = Column(Integer, nullable=False)  # Number of days back (7 or 30)
-    include_context = Column(Boolean, nullable=False, default=False)  # Whether Pinecone context was included
+    include_context = Column(
+        Boolean, nullable=False, default=False
+    )  # Whether Pinecone context was included
     digest_data = Column(Text, nullable=False)  # JSON string of full digest result
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True
+    )
 
     def is_expired(self, ttl_hours: int = 6) -> bool:
         """Check if cache entry is expired (default 6 hours)."""
         from datetime import timedelta
+
         # Ensure created_at is timezone-aware for comparison
-        created_at_aware = self.created_at.replace(tzinfo=timezone.utc) if self.created_at.tzinfo is None else self.created_at
+        created_at_aware = (
+            self.created_at.replace(tzinfo=timezone.utc)
+            if self.created_at.tzinfo is None
+            else self.created_at
+        )
         expiry_time = created_at_aware + timedelta(hours=ttl_hours)
         return datetime.now(timezone.utc) > expiry_time
+
 
 # Import DTOs
 from .dtos import (
@@ -122,49 +156,49 @@ from .dtos import (
     UserDTO,
     UserWatchedProjectDTO,
     LearningDTO,
-    convert_list_to_dtos
+    convert_list_to_dtos,
 )
 
 # Export all models and DTOs
 __all__ = [
     # ORM Models
-    'User',
-    'UserRole',
-    'UserWatchedProject',
-    'Learning',
-    'TodoItem',
-    'ProcessedMeeting',
-    'FeedbackItem',
-    'ProjectDigestCache',
-    'BackfillProgress',
-    'SystemSettings',
-    'ProactiveInsight',
-    'UserNotificationPreferences',
-    'MeetingMetadata',
-    'EscalationHistory',
-    'EscalationPreferences',
-    'EpicHours',
-    'EpicBaseline',
-    'EpicBudget',
-    'EpicCategoryMapping',
-    'EpicCategory',
-    'UserTeam',
-    'EpicForecast',
-    'TimeTrackingCompliance',
-    'MonthlyReconciliationReport',
-    'Project',
-    'ProjectCharacteristics',
-    'StandardEpicTemplate',
-    'ProjectKeyword',
-    'ProjectResourceMapping',
-    'ProjectMonthlyForecast',
-    'JobExecution',
-    'Base',
+    "User",
+    "UserRole",
+    "UserWatchedProject",
+    "Learning",
+    "TodoItem",
+    "ProcessedMeeting",
+    "FeedbackItem",
+    "ProjectDigestCache",
+    "BackfillProgress",
+    "SystemSettings",
+    "ProactiveInsight",
+    "UserNotificationPreferences",
+    "MeetingMetadata",
+    "EscalationHistory",
+    "EscalationPreferences",
+    "EpicHours",
+    "EpicBaseline",
+    "EpicBudget",
+    "EpicCategoryMapping",
+    "EpicCategory",
+    "UserTeam",
+    "EpicForecast",
+    "TimeTrackingCompliance",
+    "MonthlyReconciliationReport",
+    "Project",
+    "ProjectCharacteristics",
+    "StandardEpicTemplate",
+    "ProjectKeyword",
+    "ProjectResourceMapping",
+    "ProjectMonthlyForecast",
+    "JobExecution",
+    "Base",
     # DTOs
-    'ProcessedMeetingDTO',
-    'TodoItemDTO',
-    'UserDTO',
-    'UserWatchedProjectDTO',
-    'LearningDTO',
-    'convert_list_to_dtos'
+    "ProcessedMeetingDTO",
+    "TodoItemDTO",
+    "UserDTO",
+    "UserWatchedProjectDTO",
+    "LearningDTO",
+    "convert_list_to_dtos",
 ]

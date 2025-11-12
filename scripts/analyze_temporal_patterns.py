@@ -37,18 +37,17 @@ class TemporalPatternAnalyzer:
 
     def get_project_timeline(self, project_key: str) -> Dict:
         """Get project timeline and month-by-month breakdown."""
-        results = self.session.query(
-            EpicHours.month,
-            EpicHours.epic_summary,
-            func.sum(EpicHours.hours).label('hours')
-        ).filter(
-            EpicHours.project_key == project_key
-        ).group_by(
-            EpicHours.month,
-            EpicHours.epic_summary
-        ).order_by(
-            EpicHours.month
-        ).all()
+        results = (
+            self.session.query(
+                EpicHours.month,
+                EpicHours.epic_summary,
+                func.sum(EpicHours.hours).label("hours"),
+            )
+            .filter(EpicHours.project_key == project_key)
+            .group_by(EpicHours.month, EpicHours.epic_summary)
+            .order_by(EpicHours.month)
+            .all()
+        )
 
         if not results:
             return None
@@ -63,7 +62,11 @@ class TemporalPatternAnalyzer:
 
         month_data = []
         monthly_hours = defaultdict(float)
-        phase_data = {'early': defaultdict(float), 'mid': defaultdict(float), 'late': defaultdict(float)}
+        phase_data = {
+            "early": defaultdict(float),
+            "mid": defaultdict(float),
+            "late": defaultdict(float),
+        }
 
         for month_idx, month in enumerate(months, 1):
             month_epics = [r for r in results if r.month == month]
@@ -72,28 +75,34 @@ class TemporalPatternAnalyzer:
 
             # Determine phase
             if month_idx <= early_cutoff:
-                phase = 'early'
+                phase = "early"
             elif month_idx <= late_cutoff:
-                phase = 'mid'
+                phase = "mid"
             else:
-                phase = 'late'
+                phase = "late"
 
             # Track epic hours by phase
             for epic_result in month_epics:
                 if epic_result.epic_summary:
                     phase_data[phase][epic_result.epic_summary] += epic_result.hours
 
-            month_data.append({
-                'month': month.strftime('%Y-%m'),
-                'month_num': month_idx,
-                'hours': round(month_total, 1),
-                'phase': phase,
-                'top_epics': sorted(
-                    [(r.epic_summary, r.hours) for r in month_epics if r.epic_summary],
-                    key=lambda x: x[1],
-                    reverse=True
-                )[:3]
-            })
+            month_data.append(
+                {
+                    "month": month.strftime("%Y-%m"),
+                    "month_num": month_idx,
+                    "hours": round(month_total, 1),
+                    "phase": phase,
+                    "top_epics": sorted(
+                        [
+                            (r.epic_summary, r.hours)
+                            for r in month_epics
+                            if r.epic_summary
+                        ],
+                        key=lambda x: x[1],
+                        reverse=True,
+                    )[:3],
+                }
+            )
 
         # Calculate statistics
         total_hours = sum(monthly_hours.values())
@@ -103,28 +112,36 @@ class TemporalPatternAnalyzer:
         phase_summaries = {}
         for phase, epics in phase_data.items():
             phase_hours = sum(epics.values())
-            phase_percentage = (phase_hours / total_hours * 100) if total_hours > 0 else 0
+            phase_percentage = (
+                (phase_hours / total_hours * 100) if total_hours > 0 else 0
+            )
 
             top_epics = sorted(epics.items(), key=lambda x: x[1], reverse=True)[:5]
 
             phase_summaries[phase] = {
-                'hours': round(phase_hours, 1),
-                'percentage': round(phase_percentage, 1),
-                'top_epics': [(epic, round(hours, 1), round(hours/phase_hours*100, 1) if phase_hours > 0 else 0)
-                             for epic, hours in top_epics]
+                "hours": round(phase_hours, 1),
+                "percentage": round(phase_percentage, 1),
+                "top_epics": [
+                    (
+                        epic,
+                        round(hours, 1),
+                        round(hours / phase_hours * 100, 1) if phase_hours > 0 else 0,
+                    )
+                    for epic, hours in top_epics
+                ],
             }
 
         return {
-            'project_key': project_key,
-            'start_month': months[0].strftime('%Y-%m'),
-            'end_month': months[-1].strftime('%Y-%m'),
-            'total_months': total_months,
-            'total_hours': round(total_hours, 1),
-            'avg_burn_rate': round(avg_burn_rate, 1),
-            'min_month_hours': round(min(monthly_hours.values()), 1),
-            'max_month_hours': round(max(monthly_hours.values()), 1),
-            'month_data': month_data,
-            'phase_summaries': phase_summaries
+            "project_key": project_key,
+            "start_month": months[0].strftime("%Y-%m"),
+            "end_month": months[-1].strftime("%Y-%m"),
+            "total_months": total_months,
+            "total_hours": round(total_hours, 1),
+            "avg_burn_rate": round(avg_burn_rate, 1),
+            "min_month_hours": round(min(monthly_hours.values()), 1),
+            "max_month_hours": round(max(monthly_hours.values()), 1),
+            "month_data": month_data,
+            "phase_summaries": phase_summaries,
         }
 
     def analyze_all_projects(self) -> List[Dict]:
@@ -137,7 +154,7 @@ class TemporalPatternAnalyzer:
             if timeline:
                 results.append(timeline)
 
-        return sorted(results, key=lambda x: x['total_hours'], reverse=True)
+        return sorted(results, key=lambda x: x["total_hours"], reverse=True)
 
     def classify_project_pattern(self, timeline: Dict) -> str:
         """
@@ -146,20 +163,20 @@ class TemporalPatternAnalyzer:
         - back-loaded: >40% hours in late phase
         - balanced: hours distributed evenly
         """
-        early_pct = timeline['phase_summaries']['early']['percentage']
-        late_pct = timeline['phase_summaries']['late']['percentage']
+        early_pct = timeline["phase_summaries"]["early"]["percentage"]
+        late_pct = timeline["phase_summaries"]["late"]["percentage"]
 
         if early_pct > 40:
-            return 'front-loaded'
+            return "front-loaded"
         elif late_pct > 40:
-            return 'back-loaded'
+            return "back-loaded"
         else:
-            return 'balanced'
+            return "balanced"
 
     def print_analysis(self, analysis: List[Dict], project_filter: str = None):
         """Pretty print temporal analysis."""
         if project_filter:
-            analysis = [a for a in analysis if a['project_key'] == project_filter]
+            analysis = [a for a in analysis if a["project_key"] == project_filter]
 
         print("\n" + "=" * 100)
         print("TEMPORAL PATTERNS ANALYSIS")
@@ -167,8 +184,16 @@ class TemporalPatternAnalyzer:
 
         # Overall summary
         total_projects = len(analysis)
-        avg_duration = sum(a['total_months'] for a in analysis) / total_projects if total_projects > 0 else 0
-        avg_burn = sum(a['avg_burn_rate'] for a in analysis) / total_projects if total_projects > 0 else 0
+        avg_duration = (
+            sum(a["total_months"] for a in analysis) / total_projects
+            if total_projects > 0
+            else 0
+        )
+        avg_burn = (
+            sum(a["avg_burn_rate"] for a in analysis) / total_projects
+            if total_projects > 0
+            else 0
+        )
 
         pattern_counts = defaultdict(int)
         for a in analysis:
@@ -191,40 +216,54 @@ class TemporalPatternAnalyzer:
             print(f"\n{'=' * 100}")
             print(f"PROJECT: {timeline['project_key']} (Pattern: {pattern.upper()})")
             print(f"{'=' * 100}")
-            print(f"{'Timeline:':<40} {timeline['start_month']} to {timeline['end_month']} ({timeline['total_months']} months)")
+            print(
+                f"{'Timeline:':<40} {timeline['start_month']} to {timeline['end_month']} ({timeline['total_months']} months)"
+            )
             print(f"{'Total Hours:':<40} {timeline['total_hours']:.1f}h")
             print(f"{'Average Burn Rate:':<40} {timeline['avg_burn_rate']:.1f}h/month")
             print(f"{'Peak Month:':<40} {timeline['max_month_hours']:.1f}h")
             print(f"{'Slowest Month:':<40} {timeline['min_month_hours']:.1f}h")
 
             # Phase breakdown
-            print(f"\n{'PHASE BREAKDOWN':<15} {'Hours':<15} {'% of Total':<15} {'Top Epics'}")
+            print(
+                f"\n{'PHASE BREAKDOWN':<15} {'Hours':<15} {'% of Total':<15} {'Top Epics'}"
+            )
             print("-" * 100)
 
-            for phase in ['early', 'mid', 'late']:
-                phase_info = timeline['phase_summaries'][phase]
+            for phase in ["early", "mid", "late"]:
+                phase_info = timeline["phase_summaries"][phase]
                 phase_label = f"{phase.upper()} ({timeline['total_months']//3 if phase != 'mid' else timeline['total_months'] - 2*(timeline['total_months']//3)} months)"
 
-                print(f"{phase_label:<15} {phase_info['hours']:<15.1f} {phase_info['percentage']:<15.1f}%")
+                print(
+                    f"{phase_label:<15} {phase_info['hours']:<15.1f} {phase_info['percentage']:<15.1f}%"
+                )
 
-                for epic, hours, pct in phase_info['top_epics'][:3]:
+                for epic, hours, pct in phase_info["top_epics"][:3]:
                     print(f"{'':15} {'':<15} {'':<15} {epic[:50]} ({pct:.1f}%)")
 
             # Monthly timeline
-            print(f"\n{'MONTHLY TIMELINE':<12} {'Hours':<10} {'Phase':<10} {'Top Epics'}")
+            print(
+                f"\n{'MONTHLY TIMELINE':<12} {'Hours':<10} {'Phase':<10} {'Top Epics'}"
+            )
             print("-" * 100)
 
-            for month in timeline['month_data']:
-                top_epic = month['top_epics'][0][0][:40] if month['top_epics'] else 'N/A'
-                print(f"{month['month']:<12} {month['hours']:<10.1f} {month['phase']:<10} {top_epic}")
+            for month in timeline["month_data"]:
+                top_epic = (
+                    month["top_epics"][0][0][:40] if month["top_epics"] else "N/A"
+                )
+                print(
+                    f"{month['month']:<12} {month['hours']:<10.1f} {month['phase']:<10} {top_epic}"
+                )
 
         print("=" * 100 + "\n")
 
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description='Analyze temporal patterns in project work')
-    parser.add_argument('--project', type=str, help='Filter to specific project')
+    parser = argparse.ArgumentParser(
+        description="Analyze temporal patterns in project work"
+    )
+    parser.add_argument("--project", type=str, help="Filter to specific project")
 
     args = parser.parse_args()
 

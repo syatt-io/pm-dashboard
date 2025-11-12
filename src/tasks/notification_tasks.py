@@ -9,7 +9,7 @@ from src.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name='src.tasks.notification_tasks.send_daily_digest')
+@shared_task(name="src.tasks.notification_tasks.send_daily_digest")
 def send_daily_digest():
     """
     Send daily TODO digest (Celery task wrapper).
@@ -18,16 +18,17 @@ def send_daily_digest():
     try:
         logger.info("📧 Starting daily digest task...")
         from src.services.scheduler import TodoScheduler
+
         scheduler = TodoScheduler()
         asyncio.run(scheduler.send_daily_digest())
         logger.info("✅ Daily digest completed")
-        return {'success': True, 'task': 'daily_digest'}
+        return {"success": True, "task": "daily_digest"}
     except Exception as e:
         logger.error(f"❌ Error in daily digest task: {e}", exc_info=True)
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.send_overdue_reminders')
+@shared_task(name="src.tasks.notification_tasks.send_overdue_reminders")
 def send_overdue_reminders():
     """
     Send overdue TODO reminders (Celery task wrapper).
@@ -36,16 +37,17 @@ def send_overdue_reminders():
     try:
         logger.info("⚠️  Starting overdue reminders task...")
         from src.services.scheduler import TodoScheduler
+
         scheduler = TodoScheduler()
         asyncio.run(scheduler.send_overdue_reminders())
         logger.info("✅ Overdue reminders completed")
-        return {'success': True, 'task': 'overdue_reminders'}
+        return {"success": True, "task": "overdue_reminders"}
     except Exception as e:
         logger.error(f"❌ Error in overdue reminders task: {e}", exc_info=True)
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.send_due_today_reminders')
+@shared_task(name="src.tasks.notification_tasks.send_due_today_reminders")
 def send_due_today_reminders():
     """
     Send reminders for TODOs due today (Celery task wrapper).
@@ -54,16 +56,17 @@ def send_due_today_reminders():
     try:
         logger.info("📅 Starting due today reminders task...")
         from src.services.scheduler import TodoScheduler
+
         scheduler = TodoScheduler()
         asyncio.run(scheduler.send_due_today_reminders())
         logger.info("✅ Due today reminders completed")
-        return {'success': True, 'task': 'due_today_reminders'}
+        return {"success": True, "task": "due_today_reminders"}
     except Exception as e:
         logger.error(f"❌ Error in due today reminders task: {e}", exc_info=True)
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.send_weekly_summary')
+@shared_task(name="src.tasks.notification_tasks.send_weekly_summary")
 def send_weekly_summary():
     """
     Send weekly TODO summary (Celery task wrapper).
@@ -72,16 +75,17 @@ def send_weekly_summary():
     try:
         logger.info("📊 Starting weekly summary task...")
         from src.services.scheduler import TodoScheduler
+
         scheduler = TodoScheduler()
         asyncio.run(scheduler.send_weekly_summary())
         logger.info("✅ Weekly summary completed")
-        return {'success': True, 'task': 'weekly_summary'}
+        return {"success": True, "task": "weekly_summary"}
     except Exception as e:
         logger.error(f"❌ Error in weekly summary task: {e}", exc_info=True)
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.send_weekly_hours_reports')
+@shared_task(name="src.tasks.notification_tasks.send_weekly_hours_reports")
 def send_weekly_hours_reports():
     """
     Send weekly hours tracking reports (Celery task wrapper).
@@ -90,16 +94,17 @@ def send_weekly_hours_reports():
     try:
         logger.info("📈 Starting weekly hours reports task...")
         from src.services.scheduler import TodoScheduler
+
         scheduler = TodoScheduler()
         asyncio.run(scheduler.send_weekly_hours_reports())
         logger.info("✅ Weekly hours reports completed")
-        return {'success': True, 'task': 'weekly_hours_reports'}
+        return {"success": True, "task": "weekly_hours_reports"}
     except Exception as e:
         logger.error(f"❌ Error in weekly hours reports task: {e}", exc_info=True)
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.check_urgent_items')
+@shared_task(name="src.tasks.notification_tasks.check_urgent_items")
 def check_urgent_items():
     """
     Check for urgent items needing immediate attention (Celery task wrapper).
@@ -108,23 +113,27 @@ def check_urgent_items():
     try:
         logger.info("🚨 Starting urgent items check...")
         from src.services.scheduler import TodoScheduler
+
         scheduler = TodoScheduler()
         asyncio.run(scheduler.check_urgent_items())
         logger.info("✅ Urgent items check completed")
-        return {'success': True, 'task': 'urgent_items_check'}
+        return {"success": True, "task": "urgent_items_check"}
     except Exception as e:
         logger.error(f"❌ Error in urgent items check: {e}", exc_info=True)
         raise
 
 
 @shared_task(
-    name='src.tasks.notification_tasks.sync_tempo_hours',
+    name="src.tasks.notification_tasks.sync_tempo_hours",
     bind=True,  # Bind task instance to get retry info
     autoretry_for=(Exception,),  # Auto-retry on any exception
-    retry_kwargs={'max_retries': 3, 'countdown': 300},  # Retry 3 times, wait 5 min between retries
+    retry_kwargs={
+        "max_retries": 3,
+        "countdown": 300,
+    },  # Retry 3 times, wait 5 min between retries
     retry_backoff=True,  # Exponential backoff
     retry_backoff_max=1800,  # Max 30 min backoff
-    retry_jitter=True  # Add jitter to prevent thundering herd
+    retry_jitter=True,  # Add jitter to prevent thundering herd
 )
 def sync_tempo_hours(self):
     """
@@ -137,27 +146,38 @@ def sync_tempo_hours(self):
     - Jitter to prevent simultaneous retries
     """
     try:
-        retry_info = f" (attempt {self.request.retries + 1}/4)" if self.request.retries > 0 else ""
+        retry_info = (
+            f" (attempt {self.request.retries + 1}/4)"
+            if self.request.retries > 0
+            else ""
+        )
         logger.info(f"⏰ Starting Tempo hours sync task{retry_info}...")
         from src.services.scheduler import TodoScheduler
+
         scheduler = TodoScheduler()
         scheduler.sync_tempo_hours()
         logger.info("✅ Tempo hours sync completed")
-        return {'success': True, 'task': 'tempo_sync', 'retries': self.request.retries}
+        return {"success": True, "task": "tempo_sync", "retries": self.request.retries}
     except Exception as e:
-        logger.error(f"❌ Error in Tempo sync task (attempt {self.request.retries + 1}/4): {e}", exc_info=True)
+        logger.error(
+            f"❌ Error in Tempo sync task (attempt {self.request.retries + 1}/4): {e}",
+            exc_info=True,
+        )
         # Re-raise to trigger auto-retry
         raise
 
 
 @shared_task(
-    name='src.tasks.notification_tasks.sync_project_epic_hours',
+    name="src.tasks.notification_tasks.sync_project_epic_hours",
     bind=True,  # Bind task instance to get retry info
     autoretry_for=(Exception,),  # Auto-retry on any exception
-    retry_kwargs={'max_retries': 2, 'countdown': 180},  # Retry 2 times, wait 3 min between retries
+    retry_kwargs={
+        "max_retries": 2,
+        "countdown": 180,
+    },  # Retry 2 times, wait 3 min between retries
     retry_backoff=True,  # Exponential backoff
     retry_backoff_max=900,  # Max 15 min backoff
-    retry_jitter=True  # Add jitter to prevent thundering herd
+    retry_jitter=True,  # Add jitter to prevent thundering herd
 )
 def sync_project_epic_hours(self, project_key):
     """
@@ -183,7 +203,11 @@ def sync_project_epic_hours(self, project_key):
         from sqlalchemy.dialects.postgresql import insert
         from sqlalchemy import text
 
-        retry_info = f" (attempt {self.request.retries + 1}/3)" if self.request.retries > 0 else ""
+        retry_info = (
+            f" (attempt {self.request.retries + 1}/3)"
+            if self.request.retries > 0
+            else ""
+        )
         logger.info(f"⏰ Starting epic hours sync for {project_key}{retry_info}...")
 
         tempo = TempoAPIClient()
@@ -197,71 +221,83 @@ def sync_project_epic_hours(self, project_key):
 
         try:
             # Fetch worklogs for last 2+ years
-            start_date = '2023-01-01'
-            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = "2023-01-01"
+            end_date = datetime.now().strftime("%Y-%m-%d")
 
-            logger.info(f"Fetching worklogs for {project_key} from {start_date} to {end_date}")
-            worklogs = tempo.get_worklogs(from_date=start_date, to_date=end_date, project_key=project_key)
+            logger.info(
+                f"Fetching worklogs for {project_key} from {start_date} to {end_date}"
+            )
+            worklogs = tempo.get_worklogs(
+                from_date=start_date, to_date=end_date, project_key=project_key
+            )
 
             if not worklogs:
                 logger.warning(f"No worklogs found for {project_key}")
                 session.close()
-                return {'success': True, 'project_key': project_key, 'records': 0, 'message': 'No worklogs found'}
+                return {
+                    "success": True,
+                    "project_key": project_key,
+                    "records": 0,
+                    "message": "No worklogs found",
+                }
 
             total_worklogs = len(worklogs)
             logger.info(f"Found {total_worklogs} worklogs for {project_key}")
 
             # Update progress: fetching complete
             self.update_state(
-                state='PROGRESS',
+                state="PROGRESS",
                 meta={
-                    'current': 0,
-                    'total': total_worklogs,
-                    'message': f'Fetched {total_worklogs} worklogs, starting to process...'
-                }
+                    "current": 0,
+                    "total": total_worklogs,
+                    "message": f"Fetched {total_worklogs} worklogs, starting to process...",
+                },
             )
 
             # Group by epic → month → team
-            epic_month_team_hours = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+            epic_month_team_hours = defaultdict(
+                lambda: defaultdict(lambda: defaultdict(float))
+            )
             processed = 0
             skipped = 0
 
             # Issue key pattern: PROJECT-NUMBER (e.g., RNWL-123)
             import re
-            issue_pattern = re.compile(r'([A-Z]+-\d+)')
+
+            issue_pattern = re.compile(r"([A-Z]+-\d+)")
 
             for idx, worklog in enumerate(worklogs):
                 # Update progress every 50 worklogs (show progress even when skipping)
                 if (idx + 1) % 50 == 0 or (idx + 1) == total_worklogs:
                     percent = round(((idx + 1) / total_worklogs) * 100, 1)
                     self.update_state(
-                        state='PROGRESS',
+                        state="PROGRESS",
                         meta={
-                            'current': idx + 1,
-                            'total': total_worklogs,
-                            'message': f'Processing worklogs... {idx + 1}/{total_worklogs} ({percent}%)'
-                        }
+                            "current": idx + 1,
+                            "total": total_worklogs,
+                            "message": f"Processing worklogs... {idx + 1}/{total_worklogs} ({percent}%)",
+                        },
                     )
 
-                issue = worklog.get('issue', {})
-                issue_id = issue.get('id')
+                issue = worklog.get("issue", {})
+                issue_id = issue.get("id")
                 if not issue_id:
                     skipped += 1
                     continue
 
                 # OPTIMIZATION: Get epic FIRST to filter by project early (avoids API calls)
                 epic_key = None
-                attributes = worklog.get('attributes', {})
+                attributes = worklog.get("attributes", {})
                 if attributes:
-                    values = attributes.get('values', [])
+                    values = attributes.get("values", [])
                     for attr in values:
-                        if attr.get('key') == '_Epic_':
-                            epic_key = attr.get('value')
+                        if attr.get("key") == "_Epic_":
+                            epic_key = attr.get("value")
                             break
 
                 # Early filtering: If epic has project info and doesn't match, skip without API call
-                if epic_key and epic_key != 'NO_EPIC' and '-' in epic_key:
-                    epic_project = epic_key.split('-')[0]
+                if epic_key and epic_key != "NO_EPIC" and "-" in epic_key:
+                    epic_project = epic_key.split("-")[0]
                     if epic_project != project_key:
                         # Not our project, skip this worklog entirely (saves Jira API call!)
                         skipped += 1
@@ -269,7 +305,7 @@ def sync_project_epic_hours(self, project_key):
 
                 # Get issue key (needed for worklogs without epic or to double-check project)
                 issue_key = None
-                description = worklog.get('description', '')
+                description = worklog.get("description", "")
 
                 # Fast path: Extract from description
                 issue_match = issue_pattern.search(description)
@@ -284,7 +320,7 @@ def sync_project_epic_hours(self, project_key):
                     continue
 
                 # Validate project from issue_key (for worklogs without epic or with NO_EPIC)
-                project_from_key = issue_key.split('-')[0] if '-' in issue_key else None
+                project_from_key = issue_key.split("-")[0] if "-" in issue_key else None
                 if project_from_key != project_key:
                     # Not our project after all
                     skipped += 1
@@ -294,56 +330,60 @@ def sync_project_epic_hours(self, project_key):
                 if not epic_key:
                     epic_key = tempo.get_epic_from_jira(issue_key)
                     if not epic_key:
-                        epic_key = 'NO_EPIC'
+                        epic_key = "NO_EPIC"
 
                 # Get month
-                started = worklog.get('startDate')
+                started = worklog.get("startDate")
                 if not started:
                     skipped += 1
                     continue
 
-                worklog_date = datetime.strptime(started[:10], '%Y-%m-%d').date()
+                worklog_date = datetime.strptime(started[:10], "%Y-%m-%d").date()
                 month = date(worklog_date.year, worklog_date.month, 1)
 
                 # Get hours
-                time_spent_seconds = worklog.get('timeSpentSeconds', 0)
+                time_spent_seconds = worklog.get("timeSpentSeconds", 0)
                 hours = time_spent_seconds / 3600.0
 
                 # Get team
-                author = worklog.get('author', {})
-                account_id = author.get('accountId')
+                author = worklog.get("author", {})
+                account_id = author.get("accountId")
                 if account_id:
                     team = tempo.get_user_team(account_id)
-                    if not team or team == 'Unassigned':
-                        team = 'Other'
+                    if not team or team == "Unassigned":
+                        team = "Other"
                 else:
-                    team = 'Other'
+                    team = "Other"
 
                 # Accumulate
                 epic_month_team_hours[epic_key][month][team] += hours
                 processed += 1
 
-            logger.info(f"Processed {processed} worklogs for {project_key}, skipped {skipped}")
+            logger.info(
+                f"Processed {processed} worklogs for {project_key}, skipped {skipped}"
+            )
 
             # Update progress: processing complete, now saving to database
             self.update_state(
-                state='PROGRESS',
+                state="PROGRESS",
                 meta={
-                    'current': total_worklogs,
-                    'total': total_worklogs,
-                    'message': 'Saving to database...'
-                }
+                    "current": total_worklogs,
+                    "total": total_worklogs,
+                    "message": "Saving to database...",
+                },
             )
 
             # Delete all existing epic_hours records for this project before inserting fresh data
             # This ensures we don't accumulate stale records from renamed epics or changed Tempo data
             delete_result = session.execute(
                 text("DELETE FROM epic_hours WHERE project_key = :project_key"),
-                {"project_key": project_key}
+                {"project_key": project_key},
             )
             delete_count = delete_result.rowcount
             session.commit()
-            logger.info(f"Deleted {delete_count} existing epic_hours records for {project_key}")
+            logger.info(
+                f"Deleted {delete_count} existing epic_hours records for {project_key}"
+            )
 
             # Insert into database
             records_inserted = 0
@@ -363,50 +403,65 @@ def sync_project_epic_hours(self, project_key):
                                 team=team,
                                 hours=round(hours, 2),
                                 created_at=datetime.now(),
-                                updated_at=datetime.now()
+                                updated_at=datetime.now(),
                             )
                             stmt = stmt.on_conflict_do_update(
-                                index_elements=['project_key', 'epic_key', 'month', 'team'],
+                                index_elements=[
+                                    "project_key",
+                                    "epic_key",
+                                    "month",
+                                    "team",
+                                ],
                                 set_={
-                                    'hours': stmt.excluded.hours,
-                                    'epic_category': stmt.excluded.epic_category,  # Update category on conflict
-                                    'updated_at': datetime.now()
-                                }
+                                    "hours": stmt.excluded.hours,
+                                    "epic_category": stmt.excluded.epic_category,  # Update category on conflict
+                                    "updated_at": datetime.now(),
+                                },
                             )
                             session.execute(stmt)
                             records_inserted += 1
 
             session.commit()
-            logger.info(f"✅ Successfully synced {records_inserted} epic hours records for {project_key}")
+            logger.info(
+                f"✅ Successfully synced {records_inserted} epic hours records for {project_key}"
+            )
 
             return {
-                'success': True,
-                'project_key': project_key,
-                'records': records_inserted,
-                'processed': processed,
-                'skipped': skipped,
-                'retries': self.request.retries
+                "success": True,
+                "project_key": project_key,
+                "records": records_inserted,
+                "processed": processed,
+                "skipped": skipped,
+                "retries": self.request.retries,
             }
 
         finally:
             session.close()
 
     except Exception as e:
-        logger.error(f"❌ Error in epic hours sync for {project_key} (attempt {self.request.retries + 1}/3): {e}", exc_info=True)
+        logger.error(
+            f"❌ Error in epic hours sync for {project_key} (attempt {self.request.retries + 1}/3): {e}",
+            exc_info=True,
+        )
         # Re-raise to trigger auto-retry
         raise
 
 
 @celery_app.task(
-    name='src.tasks.notification_tasks.import_historical_epic_hours',
+    name="src.tasks.notification_tasks.import_historical_epic_hours",
     bind=True,  # Bind task instance to get retry info
     autoretry_for=(Exception,),  # Auto-retry on any exception
-    retry_kwargs={'max_retries': 2, 'countdown': 300},  # Retry 2 times, wait 5 min between retries
+    retry_kwargs={
+        "max_retries": 2,
+        "countdown": 300,
+    },  # Retry 2 times, wait 5 min between retries
     retry_backoff=True,  # Exponential backoff
     retry_backoff_max=1800,  # Max 30 min backoff
-    retry_jitter=True  # Add jitter to prevent thundering herd
+    retry_jitter=True,  # Add jitter to prevent thundering herd
 )
-def import_historical_epic_hours(self, project_key, start_date, end_date, characteristics):
+def import_historical_epic_hours(
+    self, project_key, start_date, end_date, characteristics
+):
     """
     Import historical epic hours for a project from Tempo (Celery task).
 
@@ -445,8 +500,14 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
         from sqlalchemy.dialects.postgresql import insert
         from sqlalchemy import text
 
-        retry_info = f" (attempt {self.request.retries + 1}/3)" if self.request.retries > 0 else ""
-        logger.info(f"🔄 Starting historical epic hours import for {project_key} ({start_date} to {end_date}){retry_info}...")
+        retry_info = (
+            f" (attempt {self.request.retries + 1}/3)"
+            if self.request.retries > 0
+            else ""
+        )
+        logger.info(
+            f"🔄 Starting historical epic hours import for {project_key} ({start_date} to {end_date}){retry_info}..."
+        )
 
         tempo = TempoAPIClient()
         session = get_session()
@@ -456,18 +517,24 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
             categorizer = EpicCategorizer(session)
 
             # Fetch worklogs for specified date range
-            logger.info(f"Fetching worklogs for {project_key} from {start_date} to {end_date}")
-            worklogs = tempo.get_worklogs(from_date=start_date, to_date=end_date, project_key=project_key)
+            logger.info(
+                f"Fetching worklogs for {project_key} from {start_date} to {end_date}"
+            )
+            worklogs = tempo.get_worklogs(
+                from_date=start_date, to_date=end_date, project_key=project_key
+            )
 
             if not worklogs:
-                logger.warning(f"No worklogs found for {project_key} in the specified date range")
+                logger.warning(
+                    f"No worklogs found for {project_key} in the specified date range"
+                )
                 session.close()
                 return {
-                    'success': True,
-                    'project_key': project_key,
-                    'epic_count': 0,
-                    'records': 0,
-                    'message': 'No worklogs found in date range'
+                    "success": True,
+                    "project_key": project_key,
+                    "epic_count": 0,
+                    "records": 0,
+                    "message": "No worklogs found in date range",
                 }
 
             total_worklogs = len(worklogs)
@@ -475,63 +542,66 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
 
             # Update progress: fetching complete
             self.update_state(
-                state='PROGRESS',
+                state="PROGRESS",
                 meta={
-                    'current': 0,
-                    'total': total_worklogs,
-                    'message': f'Fetched {total_worklogs} worklogs, starting to process...'
-                }
+                    "current": 0,
+                    "total": total_worklogs,
+                    "message": f"Fetched {total_worklogs} worklogs, starting to process...",
+                },
             )
 
             # Group by epic → month → team
-            epic_month_team_hours = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+            epic_month_team_hours = defaultdict(
+                lambda: defaultdict(lambda: defaultdict(float))
+            )
             epic_summaries = {}  # Store epic summaries for AI categorization
             processed = 0
             skipped = 0
 
             # Issue key pattern: PROJECT-NUMBER (e.g., RNWL-123)
             import re
-            issue_pattern = re.compile(r'([A-Z]+-\d+)')
+
+            issue_pattern = re.compile(r"([A-Z]+-\d+)")
 
             for idx, worklog in enumerate(worklogs):
                 # Update progress every 50 worklogs
                 if (idx + 1) % 50 == 0 or (idx + 1) == total_worklogs:
                     percent = round(((idx + 1) / total_worklogs) * 100, 1)
                     self.update_state(
-                        state='PROGRESS',
+                        state="PROGRESS",
                         meta={
-                            'current': idx + 1,
-                            'total': total_worklogs,
-                            'message': f'Processing worklogs... {idx + 1}/{total_worklogs} ({percent}%)'
-                        }
+                            "current": idx + 1,
+                            "total": total_worklogs,
+                            "message": f"Processing worklogs... {idx + 1}/{total_worklogs} ({percent}%)",
+                        },
                     )
 
-                issue = worklog.get('issue', {})
-                issue_id = issue.get('id')
+                issue = worklog.get("issue", {})
+                issue_id = issue.get("id")
                 if not issue_id:
                     skipped += 1
                     continue
 
                 # Get epic key from Tempo attributes
                 epic_key = None
-                attributes = worklog.get('attributes', {})
+                attributes = worklog.get("attributes", {})
                 if attributes:
-                    values = attributes.get('values', [])
+                    values = attributes.get("values", [])
                     for attr in values:
-                        if attr.get('key') == '_Epic_':
-                            epic_key = attr.get('value')
+                        if attr.get("key") == "_Epic_":
+                            epic_key = attr.get("value")
                             break
 
                 # Early filtering: If epic has project info and doesn't match, skip
-                if epic_key and epic_key != 'NO_EPIC' and '-' in epic_key:
-                    epic_project = epic_key.split('-')[0]
+                if epic_key and epic_key != "NO_EPIC" and "-" in epic_key:
+                    epic_project = epic_key.split("-")[0]
                     if epic_project != project_key:
                         skipped += 1
                         continue
 
                 # Get issue key
                 issue_key = None
-                description = worklog.get('description', '')
+                description = worklog.get("description", "")
 
                 # Fast path: Extract from description
                 issue_match = issue_pattern.search(description)
@@ -546,7 +616,7 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
                     continue
 
                 # Validate project from issue_key
-                project_from_key = issue_key.split('-')[0] if '-' in issue_key else None
+                project_from_key = issue_key.split("-")[0] if "-" in issue_key else None
                 if project_from_key != project_key:
                     skipped += 1
                     continue
@@ -555,62 +625,64 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
                 if not epic_key:
                     epic_key = tempo.get_epic_from_jira(issue_key)
                     if not epic_key:
-                        epic_key = 'NO_EPIC'
+                        epic_key = "NO_EPIC"
 
                 # Get epic summary for AI categorization (fetch once per epic)
-                if epic_key not in epic_summaries and epic_key != 'NO_EPIC':
+                if epic_key not in epic_summaries and epic_key != "NO_EPIC":
                     epic_data = tempo.get_epic_details_from_jira(epic_key)
                     if epic_data:
-                        epic_summaries[epic_key] = epic_data.get('summary', epic_key)
+                        epic_summaries[epic_key] = epic_data.get("summary", epic_key)
                     else:
                         epic_summaries[epic_key] = epic_key
 
                 # Get month
-                started = worklog.get('startDate')
+                started = worklog.get("startDate")
                 if not started:
                     skipped += 1
                     continue
 
-                worklog_date = datetime.strptime(started[:10], '%Y-%m-%d').date()
+                worklog_date = datetime.strptime(started[:10], "%Y-%m-%d").date()
                 month = date(worklog_date.year, worklog_date.month, 1)
 
                 # Get hours
-                time_spent_seconds = worklog.get('timeSpentSeconds', 0)
+                time_spent_seconds = worklog.get("timeSpentSeconds", 0)
                 hours = time_spent_seconds / 3600.0
 
                 # Get team
-                author = worklog.get('author', {})
-                account_id = author.get('accountId')
+                author = worklog.get("author", {})
+                account_id = author.get("accountId")
                 if account_id:
                     team = tempo.get_user_team(account_id)
-                    if not team or team == 'Unassigned':
-                        team = 'Other'
+                    if not team or team == "Unassigned":
+                        team = "Other"
                 else:
-                    team = 'Other'
+                    team = "Other"
 
                 # Accumulate
                 epic_month_team_hours[epic_key][month][team] += hours
                 processed += 1
 
-            logger.info(f"Processed {processed} worklogs for {project_key}, skipped {skipped}")
+            logger.info(
+                f"Processed {processed} worklogs for {project_key}, skipped {skipped}"
+            )
 
             # Update progress: AI categorization phase
             epic_count = len(epic_month_team_hours)
             self.update_state(
-                state='PROGRESS',
+                state="PROGRESS",
                 meta={
-                    'current': total_worklogs,
-                    'total': total_worklogs,
-                    'message': f'Categorizing {epic_count} epics with AI...'
-                }
+                    "current": total_worklogs,
+                    "total": total_worklogs,
+                    "message": f"Categorizing {epic_count} epics with AI...",
+                },
             )
 
             # Categorize epics with AI
             logger.info(f"Categorizing {epic_count} epics with AI")
             epic_categories = {}
             for epic_key in epic_month_team_hours.keys():
-                if epic_key == 'NO_EPIC':
-                    epic_categories[epic_key] = 'Uncategorized'
+                if epic_key == "NO_EPIC":
+                    epic_categories[epic_key] = "Uncategorized"
                 else:
                     epic_summary = epic_summaries.get(epic_key, epic_key)
                     category = categorizer.categorize_epic(epic_key, epic_summary)
@@ -619,12 +691,12 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
 
             # Update progress: saving to database
             self.update_state(
-                state='PROGRESS',
+                state="PROGRESS",
                 meta={
-                    'current': total_worklogs,
-                    'total': total_worklogs,
-                    'message': 'Saving epic hours to database...'
-                }
+                    "current": total_worklogs,
+                    "total": total_worklogs,
+                    "message": "Saving epic hours to database...",
+                },
             )
 
             # Insert into database (append, don't delete existing)
@@ -645,31 +717,39 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
                                 team=team,
                                 hours=round(hours, 2),
                                 created_at=datetime.now(),
-                                updated_at=datetime.now()
+                                updated_at=datetime.now(),
                             )
                             stmt = stmt.on_conflict_do_update(
-                                index_elements=['project_key', 'epic_key', 'month', 'team'],
+                                index_elements=[
+                                    "project_key",
+                                    "epic_key",
+                                    "month",
+                                    "team",
+                                ],
                                 set_={
-                                    'hours': stmt.excluded.hours,
-                                    'epic_summary': stmt.excluded.epic_summary,
-                                    'epic_category': stmt.excluded.epic_category,
-                                    'updated_at': datetime.now()
-                                }
+                                    "hours": stmt.excluded.hours,
+                                    "epic_summary": stmt.excluded.epic_summary,
+                                    "epic_category": stmt.excluded.epic_category,
+                                    "updated_at": datetime.now(),
+                                },
                             )
                             session.execute(stmt)
                             records_inserted += 1
 
             session.commit()
-            logger.info(f"Inserted/updated {records_inserted} epic hours records for {project_key}")
+            logger.info(
+                f"Inserted/updated {records_inserted} epic hours records for {project_key}"
+            )
 
             # Ensure project exists in projects table before saving characteristics
             from src.models.project import Project
+
             project = session.query(Project).filter_by(key=project_key).first()
             if not project:
                 # Create project record if it doesn't exist
                 project = Project(
                     key=project_key,
-                    name=project_key  # Will be updated when full project sync runs
+                    name=project_key,  # Will be updated when full project sync runs
                 )
                 session.add(project)
                 session.commit()
@@ -677,39 +757,45 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
 
             # Save project characteristics
             self.update_state(
-                state='PROGRESS',
+                state="PROGRESS",
                 meta={
-                    'current': total_worklogs,
-                    'total': total_worklogs,
-                    'message': 'Saving project characteristics...'
-                }
+                    "current": total_worklogs,
+                    "total": total_worklogs,
+                    "message": "Saving project characteristics...",
+                },
             )
 
             # Check if project characteristics already exist
-            existing_chars = session.query(ProjectCharacteristics).filter_by(
-                project_key=project_key
-            ).first()
+            existing_chars = (
+                session.query(ProjectCharacteristics)
+                .filter_by(project_key=project_key)
+                .first()
+            )
 
             if existing_chars:
                 # Update existing
-                existing_chars.be_integrations = characteristics['be_integrations']
-                existing_chars.custom_theme = characteristics['custom_theme']
-                existing_chars.custom_designs = characteristics['custom_designs']
-                existing_chars.ux_research = characteristics['ux_research']
-                existing_chars.extensive_customizations = characteristics['extensive_customizations']
-                existing_chars.project_oversight = characteristics['project_oversight']
+                existing_chars.be_integrations = characteristics["be_integrations"]
+                existing_chars.custom_theme = characteristics["custom_theme"]
+                existing_chars.custom_designs = characteristics["custom_designs"]
+                existing_chars.ux_research = characteristics["ux_research"]
+                existing_chars.extensive_customizations = characteristics[
+                    "extensive_customizations"
+                ]
+                existing_chars.project_oversight = characteristics["project_oversight"]
                 existing_chars.updated_at = datetime.now()
                 logger.info(f"Updated project characteristics for {project_key}")
             else:
                 # Create new
                 new_chars = ProjectCharacteristics(
                     project_key=project_key,
-                    be_integrations=characteristics['be_integrations'],
-                    custom_theme=characteristics['custom_theme'],
-                    custom_designs=characteristics['custom_designs'],
-                    ux_research=characteristics['ux_research'],
-                    extensive_customizations=characteristics['extensive_customizations'],
-                    project_oversight=characteristics['project_oversight']
+                    be_integrations=characteristics["be_integrations"],
+                    custom_theme=characteristics["custom_theme"],
+                    custom_designs=characteristics["custom_designs"],
+                    ux_research=characteristics["ux_research"],
+                    extensive_customizations=characteristics[
+                        "extensive_customizations"
+                    ],
+                    project_oversight=characteristics["project_oversight"],
                 )
                 session.add(new_chars)
                 logger.info(f"Created project characteristics for {project_key}")
@@ -719,33 +805,39 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
             logger.info(f"✅ Successfully imported historical data for {project_key}")
 
             return {
-                'success': True,
-                'project_key': project_key,
-                'date_range': f'{start_date} to {end_date}',
-                'epic_count': epic_count,
-                'records': records_inserted,
-                'processed': processed,
-                'skipped': skipped,
-                'retries': self.request.retries
+                "success": True,
+                "project_key": project_key,
+                "date_range": f"{start_date} to {end_date}",
+                "epic_count": epic_count,
+                "records": records_inserted,
+                "processed": processed,
+                "skipped": skipped,
+                "retries": self.request.retries,
             }
 
         finally:
             session.close()
 
     except Exception as e:
-        logger.error(f"❌ Error in historical import for {project_key} (attempt {self.request.retries + 1}/3): {e}", exc_info=True)
+        logger.error(
+            f"❌ Error in historical import for {project_key} (attempt {self.request.retries + 1}/3): {e}",
+            exc_info=True,
+        )
         # Re-raise to trigger auto-retry
         raise
 
 
 @shared_task(
-    name='src.tasks.notification_tasks.analyze_meetings',
+    name="src.tasks.notification_tasks.analyze_meetings",
     bind=True,  # Bind task instance to get retry info
     autoretry_for=(Exception,),  # Auto-retry on any exception
-    retry_kwargs={'max_retries': 2, 'countdown': 600},  # Retry 2 times, wait 10 min between retries
+    retry_kwargs={
+        "max_retries": 2,
+        "countdown": 600,
+    },  # Retry 2 times, wait 10 min between retries
     retry_backoff=True,  # Exponential backoff
     retry_backoff_max=3600,  # Max 60 min backoff
-    retry_jitter=True  # Add jitter to prevent thundering herd
+    retry_jitter=True,  # Add jitter to prevent thundering herd
 )
 def analyze_meetings(self):
     """
@@ -758,33 +850,44 @@ def analyze_meetings(self):
     - Jitter to prevent simultaneous retries
     """
     try:
-        retry_info = f" (attempt {self.request.retries + 1}/3)" if self.request.retries > 0 else ""
+        retry_info = (
+            f" (attempt {self.request.retries + 1}/3)"
+            if self.request.retries > 0
+            else ""
+        )
         logger.info(f"🔍 Starting meeting analysis sync task{retry_info}...")
         from src.jobs.meeting_analysis_sync import run_meeting_analysis_sync
+
         stats = run_meeting_analysis_sync()
 
-        if stats.get('success'):
-            logger.info(f"✅ Meeting analysis completed: {stats.get('meetings_analyzed', 0)} meetings analyzed")
+        if stats.get("success"):
+            logger.info(
+                f"✅ Meeting analysis completed: {stats.get('meetings_analyzed', 0)} meetings analyzed"
+            )
             return {
-                'success': True,
-                'task': 'meeting_analysis',
-                'retries': self.request.retries,
-                **stats
+                "success": True,
+                "task": "meeting_analysis",
+                "retries": self.request.retries,
+                **stats,
             }
         else:
-            error_msg = stats.get('error', 'Unknown error')
+            error_msg = stats.get("error", "Unknown error")
             logger.error(f"❌ Meeting analysis failed: {error_msg}")
             raise Exception(f"Meeting analysis failed: {error_msg}")
 
     except Exception as e:
-        logger.error(f"❌ Error in meeting analysis task (attempt {self.request.retries + 1}/3): {e}", exc_info=True)
+        logger.error(
+            f"❌ Error in meeting analysis task (attempt {self.request.retries + 1}/3): {e}",
+            exc_info=True,
+        )
         # Re-raise to trigger auto-retry
         raise
 
 
 # ========== Proactive Agent Tasks (Migrated from Python Scheduler) ==========
 
-@shared_task(name='src.tasks.notification_tasks.detect_proactive_insights')
+
+@shared_task(name="src.tasks.notification_tasks.detect_proactive_insights")
 def detect_proactive_insights():
     """
     Run proactive insight detection for all users (Celery task wrapper).
@@ -802,7 +905,7 @@ def detect_proactive_insights():
         logger.info(f"✅ Insight detection complete: {stats}")
 
         # Send Slack notification if insights detected
-        if stats['insights_detected'] > 0:
+        if stats["insights_detected"] > 0:
             try:
                 notifier = NotificationManager(settings.notifications)
                 message = (
@@ -811,24 +914,29 @@ def detect_proactive_insights():
                     f"• Insights detected: {stats['insights_detected']}\n"
                     f"• Insights stored: {stats['insights_stored']}\n"
                 )
-                if stats.get('errors'):
+                if stats.get("errors"):
                     message += f"• Errors: {len(stats['errors'])}\n"
 
-                asyncio.run(notifier._send_slack_message(
-                    channel=settings.notifications.slack_channel,
-                    message=message
-                ))
+                asyncio.run(
+                    notifier._send_slack_message(
+                        channel=settings.notifications.slack_channel, message=message
+                    )
+                )
             except Exception as notif_error:
-                logger.error(f"Error sending insight detection notification: {notif_error}")
+                logger.error(
+                    f"Error sending insight detection notification: {notif_error}"
+                )
 
-        return {'success': True, 'task': 'proactive_insights', **stats}
+        return {"success": True, "task": "proactive_insights", **stats}
 
     except Exception as e:
-        logger.error(f"❌ Error in proactive insight detection task: {e}", exc_info=True)
+        logger.error(
+            f"❌ Error in proactive insight detection task: {e}", exc_info=True
+        )
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.send_daily_briefs')
+@shared_task(name="src.tasks.notification_tasks.send_daily_briefs")
 def send_daily_briefs():
     """
     Send daily briefs to all users (Celery task wrapper).
@@ -838,7 +946,9 @@ def send_daily_briefs():
     """
     try:
         logger.info("📬 Starting daily brief delivery task...")
-        from src.services.daily_brief_generator import send_daily_briefs as send_briefs_func
+        from src.services.daily_brief_generator import (
+            send_daily_briefs as send_briefs_func,
+        )
         from src.managers.notifications import NotificationManager
         from config.settings import settings
 
@@ -846,7 +956,7 @@ def send_daily_briefs():
         logger.info(f"✅ Daily brief delivery complete: {stats}")
 
         # Send Slack notification if briefs sent
-        if stats['briefs_sent_slack'] > 0 or stats['briefs_sent_email'] > 0:
+        if stats["briefs_sent_slack"] > 0 or stats["briefs_sent_email"] > 0:
             try:
                 notifier = NotificationManager(settings.notifications)
                 message = (
@@ -856,24 +966,25 @@ def send_daily_briefs():
                     f"• Briefs sent via Email: {stats['briefs_sent_email']}\n"
                     f"• Total insights delivered: {stats['total_insights_delivered']}\n"
                 )
-                if stats.get('errors'):
+                if stats.get("errors"):
                     message += f"• Errors: {len(stats['errors'])}\n"
 
-                asyncio.run(notifier._send_slack_message(
-                    channel=settings.notifications.slack_channel,
-                    message=message
-                ))
+                asyncio.run(
+                    notifier._send_slack_message(
+                        channel=settings.notifications.slack_channel, message=message
+                    )
+                )
             except Exception as notif_error:
                 logger.error(f"Error sending daily brief notification: {notif_error}")
 
-        return {'success': True, 'task': 'daily_briefs', **stats}
+        return {"success": True, "task": "daily_briefs", **stats}
 
     except Exception as e:
         logger.error(f"❌ Error in daily brief delivery task: {e}", exc_info=True)
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.run_auto_escalation')
+@shared_task(name="src.tasks.notification_tasks.run_auto_escalation")
 def run_auto_escalation():
     """
     Run auto-escalation check for stale insights (Celery task wrapper).
@@ -895,7 +1006,7 @@ def run_auto_escalation():
         logger.info(f"✅ Auto-escalation check complete: {stats}")
 
         # Send Slack notification if escalations performed
-        if stats['escalations_performed'] > 0:
+        if stats["escalations_performed"] > 0:
             try:
                 notifier = NotificationManager(settings.notifications)
                 message = (
@@ -906,17 +1017,20 @@ def run_auto_escalation():
                     f"• Channel posts: {stats['channel_posts']}\n"
                     f"• GitHub comments: {stats['github_comments']}\n"
                 )
-                if stats.get('errors', 0) > 0:
+                if stats.get("errors", 0) > 0:
                     message += f"• Errors: {stats['errors']}\n"
 
-                asyncio.run(notifier._send_slack_message(
-                    channel=settings.notifications.slack_channel,
-                    message=message
-                ))
+                asyncio.run(
+                    notifier._send_slack_message(
+                        channel=settings.notifications.slack_channel, message=message
+                    )
+                )
             except Exception as notif_error:
-                logger.error(f"Error sending auto-escalation notification: {notif_error}")
+                logger.error(
+                    f"Error sending auto-escalation notification: {notif_error}"
+                )
 
-        return {'success': True, 'task': 'auto_escalation', **stats}
+        return {"success": True, "task": "auto_escalation", **stats}
 
     except Exception as e:
         logger.error(f"❌ Error in auto-escalation check task: {e}", exc_info=True)
@@ -925,7 +1039,8 @@ def run_auto_escalation():
 
 # ========== PM Automation Tasks (Migrated from Python Scheduler) ==========
 
-@shared_task(name='src.tasks.notification_tasks.run_time_tracking_compliance')
+
+@shared_task(name="src.tasks.notification_tasks.run_time_tracking_compliance")
 def run_time_tracking_compliance():
     """
     Run weekly time tracking compliance check (Celery task wrapper).
@@ -935,19 +1050,21 @@ def run_time_tracking_compliance():
     """
     try:
         logger.info("📊 Starting time tracking compliance check task...")
-        from src.jobs.time_tracking_compliance import run_time_tracking_compliance as run_compliance_func
+        from src.jobs.time_tracking_compliance import (
+            run_time_tracking_compliance as run_compliance_func,
+        )
 
         stats = run_compliance_func()
 
-        if stats.get('success'):
+        if stats.get("success"):
             logger.info(
                 f"✅ Time Tracking Compliance completed: "
                 f"{stats['total_users']} users checked, {stats['compliance_percentage']:.1f}% compliant, "
                 f"{stats['notifications_sent']} notifications sent in {stats['duration_seconds']:.2f}s"
             )
-            return {'success': True, 'task': 'time_tracking_compliance', **stats}
+            return {"success": True, "task": "time_tracking_compliance", **stats}
         else:
-            error_msg = stats.get('error', 'Unknown error')
+            error_msg = stats.get("error", "Unknown error")
             logger.error(f"❌ Time Tracking Compliance failed: {error_msg}")
             raise Exception(f"Time tracking compliance failed: {error_msg}")
 
@@ -956,7 +1073,7 @@ def run_time_tracking_compliance():
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.run_monthly_epic_reconciliation')
+@shared_task(name="src.tasks.notification_tasks.run_monthly_epic_reconciliation")
 def run_monthly_epic_reconciliation():
     """
     Run monthly epic reconciliation with epic association (Celery task wrapper).
@@ -970,16 +1087,18 @@ def run_monthly_epic_reconciliation():
     # Only run on the 3rd of the month
     if datetime.now().day != 3:
         logger.info("⏭️  Skipping monthly epic reconciliation (not 3rd of month)")
-        return {'success': True, 'task': 'monthly_epic_reconciliation', 'skipped': True}
+        return {"success": True, "task": "monthly_epic_reconciliation", "skipped": True}
 
     try:
         logger.info("📈 Starting monthly epic reconciliation task (3rd of month)...")
-        from src.jobs.monthly_epic_reconciliation import run_monthly_epic_reconciliation as run_reconciliation_func
+        from src.jobs.monthly_epic_reconciliation import (
+            run_monthly_epic_reconciliation as run_reconciliation_func,
+        )
 
         stats = run_reconciliation_func()
 
-        if stats.get('success'):
-            epic_assoc = stats.get('epic_association', {})
+        if stats.get("success"):
+            epic_assoc = stats.get("epic_association", {})
             logger.info(
                 f"✅ Monthly Epic Reconciliation completed: "
                 f"{stats.get('projects_analyzed', 0)} projects, {stats.get('epics_processed', 0)} epics analyzed, "
@@ -988,20 +1107,23 @@ def run_monthly_epic_reconciliation():
                 f"({epic_assoc.get('updates_applied', 0)} applied) "
                 f"in {stats['duration_seconds']:.2f}s"
             )
-            return {'success': True, 'task': 'monthly_epic_reconciliation', **stats}
+            return {"success": True, "task": "monthly_epic_reconciliation", **stats}
         else:
-            error_msg = stats.get('error', 'Unknown error')
+            error_msg = stats.get("error", "Unknown error")
             logger.error(f"❌ Monthly Epic Reconciliation failed: {error_msg}")
             raise Exception(f"Monthly epic reconciliation failed: {error_msg}")
 
     except Exception as e:
-        logger.error(f"❌ Error in monthly epic reconciliation task: {e}", exc_info=True)
+        logger.error(
+            f"❌ Error in monthly epic reconciliation task: {e}", exc_info=True
+        )
         raise
 
 
 # ========== Monitoring & Health Check Tasks ==========
 
-@shared_task(name='src.tasks.notification_tasks.celery_health_check')
+
+@shared_task(name="src.tasks.notification_tasks.celery_health_check")
 def celery_health_check():
     """
     Periodic Celery health check (Celery task wrapper).
@@ -1011,7 +1133,10 @@ def celery_health_check():
     """
     try:
         logger.info("🏥 Starting Celery health check...")
-        from src.tasks.celery_monitoring import check_queue_health, send_health_check_alert
+        from src.tasks.celery_monitoring import (
+            check_queue_health,
+            send_health_check_alert,
+        )
 
         health_status = check_queue_health()
         logger.info(f"✅ Celery health check complete: {health_status}")
@@ -1020,14 +1145,14 @@ def celery_health_check():
         if not health_status.get("healthy"):
             send_health_check_alert(health_status)
 
-        return {'success': True, 'task': 'celery_health_check', **health_status}
+        return {"success": True, "task": "celery_health_check", **health_status}
 
     except Exception as e:
         logger.error(f"❌ Error in Celery health check task: {e}", exc_info=True)
         raise
 
 
-@shared_task(name='src.tasks.notification_tasks.send_job_monitoring_digest')
+@shared_task(name="src.tasks.notification_tasks.send_job_monitoring_digest")
 def send_job_monitoring_digest():
     """
     Send daily job monitoring digest via email and Slack (Celery task wrapper).
@@ -1069,9 +1194,9 @@ def send_job_monitoring_digest():
             slack_message = digest_service.format_slack_message(digest)
 
             # Send email if configured
-            smtp_host = getattr(settings.notifications, 'smtp_host', None)
-            smtp_user = getattr(settings.notifications, 'smtp_user', None)
-            smtp_password = getattr(settings.notifications, 'smtp_password', None)
+            smtp_host = getattr(settings.notifications, "smtp_host", None)
+            smtp_user = getattr(settings.notifications, "smtp_user", None)
+            smtp_password = getattr(settings.notifications, "smtp_password", None)
 
             if all([smtp_host, smtp_user, smtp_password]):
                 try:
@@ -1079,17 +1204,19 @@ def send_job_monitoring_digest():
                     from email.mime.multipart import MIMEMultipart
                     from email.mime.text import MIMEText
 
-                    smtp_port = getattr(settings.notifications, 'smtp_port', 587)
-                    from_email = os.getenv('SMTP_FROM_EMAIL', smtp_user)
-                    from_name = os.getenv('SMTP_FROM_NAME', 'Agent PM')
+                    smtp_port = getattr(settings.notifications, "smtp_port", 587)
+                    from_email = os.getenv("SMTP_FROM_EMAIL", smtp_user)
+                    from_name = os.getenv("SMTP_FROM_NAME", "Agent PM")
 
-                    msg = MIMEMultipart('alternative')
-                    msg['Subject'] = f"Job Monitoring Daily Digest - {digest['summary']['period_start'][:10]}"
-                    msg['From'] = f"{from_name} <{from_email}>"
-                    msg['To'] = smtp_user  # Send to SMTP user by default
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = (
+                        f"Job Monitoring Daily Digest - {digest['summary']['period_start'][:10]}"
+                    )
+                    msg["From"] = f"{from_name} <{from_email}>"
+                    msg["To"] = smtp_user  # Send to SMTP user by default
 
                     # Attach HTML content
-                    msg.attach(MIMEText(email_html, 'html'))
+                    msg.attach(MIMEText(email_html, "html"))
 
                     # Send email
                     with smtplib.SMTP(smtp_host, smtp_port) as server:
@@ -1106,7 +1233,10 @@ def send_job_monitoring_digest():
                 try:
                     notifier = NotificationManager(settings.notifications)
                     # Send to PM channel if configured, otherwise default channel
-                    channel = getattr(settings.notifications, 'slack_pm_channel', None) or settings.notifications.slack_channel
+                    channel = (
+                        getattr(settings.notifications, "slack_pm_channel", None)
+                        or settings.notifications.slack_channel
+                    )
                     notifier.send_slack_message(slack_message, channel=channel)
                     logger.info("✅ Slack digest sent successfully")
                 except Exception as slack_err:
@@ -1115,12 +1245,12 @@ def send_job_monitoring_digest():
             logger.info("✅ Job monitoring digest completed")
 
             return {
-                'success': True,
-                'task': 'job_monitoring_digest',
-                'executions_analyzed': digest['summary']['total_executions'],
-                'success_rate': digest['summary']['success_rate'],
-                'failures': len(digest['failures']),
-                'slow_jobs': len(digest['slow_jobs'])
+                "success": True,
+                "task": "job_monitoring_digest",
+                "executions_analyzed": digest["summary"]["total_executions"],
+                "success_rate": digest["summary"]["success_rate"],
+                "failures": len(digest["failures"]),
+                "slow_jobs": len(digest["slow_jobs"]),
             }
 
         finally:

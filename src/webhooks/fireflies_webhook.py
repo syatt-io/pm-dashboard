@@ -26,7 +26,9 @@ import asyncio
 logger = logging.getLogger(__name__)
 
 
-def verify_fireflies_signature(payload_body: bytes, signature_header: str, webhook_secret: str) -> bool:
+def verify_fireflies_signature(
+    payload_body: bytes, signature_header: str, webhook_secret: str
+) -> bool:
     """
     Verify the HMAC SHA-256 signature from Fireflies webhook.
 
@@ -38,7 +40,7 @@ def verify_fireflies_signature(payload_body: bytes, signature_header: str, webho
     Returns:
         True if signature is valid, False otherwise
     """
-    if not signature_header or not signature_header.startswith('sha256='):
+    if not signature_header or not signature_header.startswith("sha256="):
         logger.warning("Invalid signature header format")
         return False
 
@@ -47,9 +49,7 @@ def verify_fireflies_signature(payload_body: bytes, signature_header: str, webho
 
     # Compute HMAC SHA-256
     computed_hmac = hmac.new(
-        webhook_secret.encode('utf-8'),
-        payload_body,
-        hashlib.sha256
+        webhook_secret.encode("utf-8"), payload_body, hashlib.sha256
     )
     computed_signature = computed_hmac.hexdigest()
 
@@ -66,17 +66,19 @@ def handle_fireflies_webhook():
     """
     try:
         # Get webhook secret from environment
-        webhook_secret = os.getenv('FIREFLIES_WEBHOOK_SECRET')
+        webhook_secret = os.getenv("FIREFLIES_WEBHOOK_SECRET")
         if not webhook_secret:
             logger.error("FIREFLIES_WEBHOOK_SECRET not configured")
             return jsonify({"error": "Webhook not configured"}), 500
 
         # Get raw request body for signature verification
         payload_body = request.get_data()
-        signature_header = request.headers.get('x-hub-signature', '')
+        signature_header = request.headers.get("x-hub-signature", "")
 
         # Verify HMAC signature
-        if not verify_fireflies_signature(payload_body, signature_header, webhook_secret):
+        if not verify_fireflies_signature(
+            payload_body, signature_header, webhook_secret
+        ):
             logger.warning(f"Invalid webhook signature from IP: {request.remote_addr}")
             return jsonify({"error": "Invalid signature"}), 401
 
@@ -88,16 +90,19 @@ def handle_fireflies_webhook():
             return jsonify({"error": "Invalid JSON"}), 400
 
         # Extract meeting ID and event type
-        meeting_id = payload.get('meetingId')
-        event_type = payload.get('event')
+        meeting_id = payload.get("meetingId")
+        event_type = payload.get("event")
 
         if not meeting_id:
             logger.error(f"Webhook payload missing meetingId: {payload}")
             return jsonify({"error": "Missing meetingId"}), 400
 
-        if event_type != 'transcript.completed':
+        if event_type != "transcript.completed":
             logger.info(f"Ignoring non-completion event: {event_type}")
-            return jsonify({"status": "ignored", "reason": "not a completion event"}), 200
+            return (
+                jsonify({"status": "ignored", "reason": "not a completion event"}),
+                200,
+            )
 
         logger.info(f"Received webhook for meeting {meeting_id}, event: {event_type}")
 
@@ -113,17 +118,21 @@ def handle_fireflies_webhook():
 
         try:
             result = session.execute(
-                text("SELECT id FROM processed_meetings WHERE fireflies_id = :fireflies_id"),
-                {"fireflies_id": meeting_id}
+                text(
+                    "SELECT id FROM processed_meetings WHERE fireflies_id = :fireflies_id"
+                ),
+                {"fireflies_id": meeting_id},
             )
             existing_meeting = result.fetchone()
 
             if existing_meeting:
-                logger.info(f"Meeting {meeting_id} already processed (idempotency check), skipping")
-                return jsonify({
-                    "status": "already_processed",
-                    "meeting_id": meeting_id
-                }), 200
+                logger.info(
+                    f"Meeting {meeting_id} already processed (idempotency check), skipping"
+                )
+                return (
+                    jsonify({"status": "already_processed", "meeting_id": meeting_id}),
+                    200,
+                )
         finally:
             session.close()
 
@@ -133,17 +142,14 @@ def handle_fireflies_webhook():
 
         logger.info(f"Enqueued Celery task for meeting {meeting_id}")
 
-        return jsonify({
-            "status": "enqueued",
-            "meeting_id": meeting_id
-        }), 200
+        return jsonify({"status": "enqueued", "meeting_id": meeting_id}), 200
 
     except Exception as e:
         logger.error(f"Error handling Fireflies webhook: {e}", exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
-@celery_app.task(name='webhooks.process_fireflies_meeting', bind=True, max_retries=3)
+@celery_app.task(name="webhooks.process_fireflies_meeting", bind=True, max_retries=3)
 def process_fireflies_meeting(self, meeting_id: str):
     """
     Celery task to process a single meeting from Fireflies webhook.
@@ -158,7 +164,9 @@ def process_fireflies_meeting(self, meeting_id: str):
 
     try:
         # Initialize clients
-        fireflies_api_key = os.getenv("FIREFLIES_SYSTEM_API_KEY") or os.getenv("FIREFLIES_API_KEY")
+        fireflies_api_key = os.getenv("FIREFLIES_SYSTEM_API_KEY") or os.getenv(
+            "FIREFLIES_API_KEY"
+        )
         if not fireflies_api_key:
             raise ValueError("FIREFLIES_API_KEY not configured")
 
@@ -185,11 +193,15 @@ def process_fireflies_meeting(self, meeting_id: str):
         try:
             # Double-check idempotency in case of race condition
             result = session.execute(
-                text("SELECT id FROM processed_meetings WHERE fireflies_id = :fireflies_id"),
-                {"fireflies_id": meeting_id}
+                text(
+                    "SELECT id FROM processed_meetings WHERE fireflies_id = :fireflies_id"
+                ),
+                {"fireflies_id": meeting_id},
             )
             if result.fetchone():
-                logger.info(f"Meeting {meeting_id} already processed (race condition check), skipping")
+                logger.info(
+                    f"Meeting {meeting_id} already processed (race condition check), skipping"
+                )
                 return {"status": "already_processed", "meeting_id": meeting_id}
 
             # Fetch full transcript from Fireflies
@@ -204,8 +216,14 @@ def process_fireflies_meeting(self, meeting_id: str):
             meeting_title = transcript_data.get("title", "Untitled Meeting")
 
             if not transcript_text or len(transcript_text) < 100:
-                logger.warning(f"Transcript too short or empty for meeting {meeting_id}, skipping")
-                return {"status": "skipped", "reason": "transcript too short", "meeting_id": meeting_id}
+                logger.warning(
+                    f"Transcript too short or empty for meeting {meeting_id}, skipping"
+                )
+                return {
+                    "status": "skipped",
+                    "reason": "transcript too short",
+                    "meeting_id": meeting_id,
+                }
 
             # Convert date from milliseconds to datetime
             date_ms = transcript_data.get("date")
@@ -225,13 +243,19 @@ def process_fireflies_meeting(self, meeting_id: str):
 
             if not projects:
                 logger.warning("No active projects found, skipping meeting")
-                return {"status": "skipped", "reason": "no active projects", "meeting_id": meeting_id}
+                return {
+                    "status": "skipped",
+                    "reason": "no active projects",
+                    "meeting_id": meeting_id,
+                }
 
             # Get keywords for each project
             for project in projects:
                 keyword_result = session.execute(
-                    text("SELECT keyword FROM project_keywords WHERE project_key = :project_key"),
-                    {"project_key": project["key"]}
+                    text(
+                        "SELECT keyword FROM project_keywords WHERE project_key = :project_key"
+                    ),
+                    {"project_key": project["key"]},
                 )
                 project["keywords"] = [row[0].lower() for row in keyword_result]
 
@@ -240,7 +264,7 @@ def process_fireflies_meeting(self, meeting_id: str):
             import re
 
             # Blacklist of common company terms that should be ignored for project matching
-            KEYWORD_BLACKLIST = {'syatt'}
+            KEYWORD_BLACKLIST = {"syatt"}
 
             matched_project = None
             title_lower = meeting_title.lower()
@@ -252,7 +276,8 @@ def process_fireflies_meeting(self, meeting_id: str):
 
                 # Filter out blacklisted keywords
                 filtered_keywords = [
-                    kw for kw in project["keywords"]
+                    kw
+                    for kw in project["keywords"]
                     if kw.lower() not in KEYWORD_BLACKLIST
                 ]
 
@@ -262,12 +287,14 @@ def process_fireflies_meeting(self, meeting_id: str):
                 # Use word boundary regex matching to prevent false positives
                 def matches_keyword(text, keyword):
                     escaped_keyword = re.escape(keyword)
-                    pattern = r'\b' + escaped_keyword + r'\b'
+                    pattern = r"\b" + escaped_keyword + r"\b"
                     return bool(re.search(pattern, text, re.IGNORECASE))
 
                 # Check if any keyword appears in title or summary
                 for keyword in filtered_keywords:
-                    if matches_keyword(title_lower, keyword) or matches_keyword(summary_lower, keyword):
+                    if matches_keyword(title_lower, keyword) or matches_keyword(
+                        summary_lower, keyword
+                    ):
                         matched_project = project
                         logger.info(
                             f"Matched meeting '{meeting_title}' to project {project['key']} "
@@ -279,50 +306,61 @@ def process_fireflies_meeting(self, meeting_id: str):
                     break
 
             if not matched_project:
-                logger.info(f"Meeting '{meeting_title}' does not match any active project keywords, skipping")
-                return {"status": "skipped", "reason": "no project match", "meeting_id": meeting_id}
+                logger.info(
+                    f"Meeting '{meeting_title}' does not match any active project keywords, skipping"
+                )
+                return {
+                    "status": "skipped",
+                    "reason": "no project match",
+                    "meeting_id": meeting_id,
+                }
 
             # Get AI config to track which model is being used
             from config.settings import Settings
+
             ai_config = Settings.get_fresh_ai_config()
             ai_provider = ai_config.provider if ai_config else "unknown"
             ai_model = ai_config.model if ai_config else "unknown"
 
             # Run AI analysis
-            logger.info(f"Running AI analysis for meeting {meeting_id} using {ai_provider}/{ai_model}")
+            logger.info(
+                f"Running AI analysis for meeting {meeting_id} using {ai_provider}/{ai_model}"
+            )
             analysis = analyzer.analyze_transcript(
                 transcript=transcript_text,
                 meeting_title=meeting_title,
-                meeting_date=meeting_date
+                meeting_date=meeting_date,
             )
 
             # Prepare action items for storage
             action_items_data = []
             for item in analysis.action_items:
-                action_items_data.append({
-                    "title": item.title,
-                    "description": item.description,
-                    "assignee": item.assignee,
-                    "due_date": item.due_date,
-                    "priority": item.priority,
-                    "context": item.context,
-                    "dependencies": item.dependencies or []
-                })
+                action_items_data.append(
+                    {
+                        "title": item.title,
+                        "description": item.description,
+                        "assignee": item.assignee,
+                        "due_date": item.due_date,
+                        "priority": item.priority,
+                        "context": item.context,
+                        "dependencies": item.dependencies or [],
+                    }
+                )
 
             # Prepare topics for storage
             topics_data = []
             for topic in analysis.topics:
-                topics_data.append({
-                    "title": topic.title,
-                    "content_items": topic.content_items
-                })
+                topics_data.append(
+                    {"title": topic.title, "content_items": topic.content_items}
+                )
 
             # Store in database
             meeting_uuid = str(uuid.uuid4())
             now = datetime.now(timezone.utc)
 
             session.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO processed_meetings (
                         id, fireflies_id, title, date, duration,
                         topics, action_items,
@@ -334,7 +372,8 @@ def process_fireflies_meeting(self, meeting_id: str):
                         :ai_provider, :ai_model,
                         :analyzed_at, :created_at, :updated_at
                     )
-                """),
+                """
+                ),
                 {
                     "id": meeting_uuid,
                     "fireflies_id": meeting_id,
@@ -347,8 +386,8 @@ def process_fireflies_meeting(self, meeting_id: str):
                     "ai_model": ai_model,
                     "analyzed_at": now,
                     "created_at": now,
-                    "updated_at": now
-                }
+                    "updated_at": now,
+                },
             )
 
             session.commit()
@@ -363,7 +402,7 @@ def process_fireflies_meeting(self, meeting_id: str):
             try:
                 result = session.execute(
                     text("SELECT send_meeting_emails FROM projects WHERE key = :key"),
-                    {"key": matched_project["key"]}
+                    {"key": matched_project["key"]},
                 )
                 row = result.fetchone()
                 send_emails = row[0] if row else False
@@ -378,7 +417,9 @@ def process_fireflies_meeting(self, meeting_id: str):
                     ]
 
                     # ⚠️ SAFETY: Default to test mode unless explicitly set to production
-                    test_mode = os.getenv("MEETING_EMAIL_TEST_MODE", "true").lower() == "true"
+                    test_mode = (
+                        os.getenv("MEETING_EMAIL_TEST_MODE", "true").lower() == "true"
+                    )
                     test_recipient = os.getenv("MEETING_EMAIL_TEST_RECIPIENT")
 
                     if test_mode:
@@ -414,32 +455,46 @@ def process_fireflies_meeting(self, meeting_id: str):
                                 topics=topics_data,
                                 action_items=action_items_data,
                                 ai_provider=ai_provider,
-                                ai_model=ai_model
+                                ai_model=ai_model,
                             )
                         )
 
                         if email_result.get("success"):
                             logger.info(f"✅ Meeting analysis email sent successfully")
                         else:
-                            logger.error(f"Failed to send meeting analysis email: {email_result.get('error')}")
+                            logger.error(
+                                f"Failed to send meeting analysis email: {email_result.get('error')}"
+                            )
                     else:
-                        logger.warning(f"No participant emails found for meeting {meeting_id}")
+                        logger.warning(
+                            f"No participant emails found for meeting {meeting_id}"
+                        )
                 elif not send_emails:
-                    logger.debug(f"Email notifications disabled for project {matched_project['key']}")
+                    logger.debug(
+                        f"Email notifications disabled for project {matched_project['key']}"
+                    )
                 elif not notification_manager:
                     logger.warning("Notification manager not available for emails")
 
             except Exception as email_error:
-                logger.error(f"Error sending meeting analysis email: {email_error}", exc_info=True)
+                logger.error(
+                    f"Error sending meeting analysis email: {email_error}",
+                    exc_info=True,
+                )
                 # Don't fail the whole task if email fails
 
             # Send Slack DM notifications to project followers
             try:
                 if notification_manager:
-                    logger.info(f"Sending Slack DM notifications to project followers for {matched_project['key']}")
+                    logger.info(
+                        f"Sending Slack DM notifications to project followers for {matched_project['key']}"
+                    )
 
                     # Get Fireflies recording URL
-                    fireflies_url = transcript_data.get("recording_url") or f"https://app.fireflies.ai/view/{meeting_id}"
+                    fireflies_url = (
+                        transcript_data.get("recording_url")
+                        or f"https://app.fireflies.ai/view/{meeting_id}"
+                    )
 
                     slack_dm_result = asyncio.run(
                         notification_manager.send_meeting_analysis_slack_dms(
@@ -450,20 +505,27 @@ def process_fireflies_meeting(self, meeting_id: str):
                             action_items=action_items_data,
                             meeting_url=fireflies_url,
                             ai_provider=ai_provider,
-                            ai_model=ai_model
+                            ai_model=ai_model,
                         )
                     )
 
                     if slack_dm_result.get("success"):
                         sent_count = slack_dm_result.get("sent_count", 0)
-                        logger.info(f"✅ Meeting analysis Slack DMs sent to {sent_count} followers")
+                        logger.info(
+                            f"✅ Meeting analysis Slack DMs sent to {sent_count} followers"
+                        )
                     else:
-                        logger.error(f"Failed to send meeting analysis Slack DMs: {slack_dm_result.get('error')}")
+                        logger.error(
+                            f"Failed to send meeting analysis Slack DMs: {slack_dm_result.get('error')}"
+                        )
                 else:
                     logger.warning("Notification manager not available for Slack DMs")
 
             except Exception as slack_error:
-                logger.error(f"Error sending meeting analysis Slack DMs: {slack_error}", exc_info=True)
+                logger.error(
+                    f"Error sending meeting analysis Slack DMs: {slack_error}",
+                    exc_info=True,
+                )
                 # Don't fail the whole task if Slack DMs fail
 
             return {
@@ -472,7 +534,7 @@ def process_fireflies_meeting(self, meeting_id: str):
                 "meeting_title": meeting_title,
                 "project_key": matched_project["key"],
                 "topics_count": len(analysis.topics),
-                "action_items_count": len(analysis.action_items)
+                "action_items_count": len(analysis.action_items),
             }
 
         except Exception as e:
@@ -486,4 +548,4 @@ def process_fireflies_meeting(self, meeting_id: str):
         logger.error(f"Celery task failed for meeting {meeting_id}: {e}", exc_info=True)
 
         # Retry with exponential backoff (3 attempts total)
-        raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
+        raise self.retry(exc=e, countdown=60 * (2**self.request.retries))

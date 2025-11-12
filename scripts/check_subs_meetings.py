@@ -3,6 +3,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.services.vector_search import VectorSearchService
@@ -10,6 +11,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def check_subs_meetings():
     """Check for Fireflies meetings tagged with SUBS."""
@@ -31,10 +33,10 @@ def check_subs_meetings():
         top_k=50,
         days_back=365,
         user_email="mike.samimi@syatt.io",
-        project_key="SUBS"
+        project_key="SUBS",
     )
 
-    fireflies_results = [r for r in results if r.source == 'fireflies']
+    fireflies_results = [r for r in results if r.source == "fireflies"]
 
     print(f"✅ Total results: {len(results)}")
     print(f"📧 Fireflies results: {len(fireflies_results)}")
@@ -46,9 +48,14 @@ def check_subs_meetings():
     else:
         print("\n⚠️  No Fireflies meetings found with SUBS project tag")
         print("\nPossible reasons:")
-        print("  1. No Fireflies meetings in the last year have SUBS keywords in titles")
+        print(
+            "  1. No Fireflies meetings in the last year have SUBS keywords in titles"
+        )
         print("  2. Keywords might be too specific - try adding more variations")
-        print(f"\nCurrent SUBS keywords: {['bugz', 'sb', 'snuggle', 'snuggle bugz', 'snugglebugz', 'subs', 'subscription', 'sbug', 'snugz']}")
+        print(
+            f"\nCurrent SUBS keywords: {['bugz', 'sb', 'snuggle', 'snuggle bugz', 'snugglebugz', 'subs', 'subscription', 'sbug', 'snugz']}"
+        )
+
 
 if __name__ == "__main__":
     check_subs_meetings()

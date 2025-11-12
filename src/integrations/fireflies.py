@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MeetingTranscript:
     """Structured meeting transcript data."""
+
     id: str
     title: str
     date: datetime
@@ -29,15 +30,19 @@ class MeetingTranscript:
 class FirefliesClient:
     """Client for interacting with Fireflies.ai API."""
 
-    def __init__(self, api_key: str, base_url: str = "https://api.fireflies.ai/graphql"):
+    def __init__(
+        self, api_key: str, base_url: str = "https://api.fireflies.ai/graphql"
+    ):
         self.api_key = api_key
         self.base_url = base_url
         self.headers = {
             "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
-    def get_recent_meetings(self, days_back: int = 7, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_recent_meetings(
+        self, days_back: int = 7, limit: int = 100
+    ) -> List[Dict[str, Any]]:
         """Fetch meetings from the last N days with pagination support."""
         all_transcripts = []
         skip = 0
@@ -79,13 +84,16 @@ class FirefliesClient:
             filtered = []
             for t in transcripts:
                 # Handle millisecond timestamps
-                if t.get('date'):
+                if t.get("date"):
                     try:
                         # If date is in milliseconds
-                        if isinstance(t['date'], (int, float)) and t['date'] > 1000000000000:
-                            meeting_date = datetime.fromtimestamp(t['date'] / 1000)
+                        if (
+                            isinstance(t["date"], (int, float))
+                            and t["date"] > 1000000000000
+                        ):
+                            meeting_date = datetime.fromtimestamp(t["date"] / 1000)
                         else:
-                            meeting_date = datetime.fromisoformat(str(t['date']))
+                            meeting_date = datetime.fromisoformat(str(t["date"]))
 
                         if meeting_date >= cutoff_date:
                             filtered.append(t)
@@ -99,7 +107,10 @@ class FirefliesClient:
 
         # Log deduplication stats
         stats = deduplicator.get_stats()
-        if stats['exact_duplicates_removed'] > 0 or stats['fuzzy_duplicates_removed'] > 0:
+        if (
+            stats["exact_duplicates_removed"] > 0
+            or stats["fuzzy_duplicates_removed"] > 0
+        ):
             logger.info(
                 f"Fireflies meetings deduplicated: {stats['total']} → {stats['final_count']} "
                 f"(removed {stats['exact_duplicates_removed']} exact + "
@@ -185,11 +196,13 @@ class FirefliesClient:
                 # By default, all attendees have access
                 # Fireflies doesn't have explicit sharing API, so we use attendees as access list
                 "shared_with": participants if participants else [],
-                "is_public": False  # Meetings are private by default
-            }
+                "is_public": False,  # Meetings are private by default
+            },
         }
 
-    def get_unprocessed_meetings(self, last_processed_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_unprocessed_meetings(
+        self, last_processed_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get meetings that haven't been processed yet."""
         meetings = self.get_recent_meetings(days_back=7)
 
@@ -198,7 +211,9 @@ class FirefliesClient:
 
         # Filter out already processed meetings
         try:
-            last_index = next(i for i, m in enumerate(meetings) if m["id"] == last_processed_id)
+            last_index = next(
+                i for i, m in enumerate(meetings) if m["id"] == last_processed_id
+            )
             return meetings[:last_index]
         except StopIteration:
             # Last processed meeting not in recent list, return all
@@ -224,10 +239,7 @@ class FirefliesClient:
         }
         """
 
-        variables = {
-            "search": query,
-            "limit": limit
-        }
+        variables = {"search": query, "limit": limit}
 
         response = self._make_request(graphql_query, variables)
         return response.get("data", {}).get("transcripts", [])
@@ -235,17 +247,11 @@ class FirefliesClient:
     @retry_with_backoff(max_retries=3, base_delay=1.0)
     def _make_request(self, query: str, variables: Dict[str, Any]) -> Dict[str, Any]:
         """Make GraphQL request to Fireflies API with automatic retries."""
-        payload = {
-            "query": query,
-            "variables": variables
-        }
+        payload = {"query": query, "variables": variables}
 
         try:
             response = requests.post(
-                self.base_url,
-                json=payload,
-                headers=self.headers,
-                timeout=30
+                self.base_url, json=payload, headers=self.headers, timeout=30
             )
             response.raise_for_status()
             return response.json()

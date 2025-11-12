@@ -15,11 +15,11 @@ from config.settings import settings
 
 # Enable debug logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
+
 
 @pytest.mark.asyncio
 async def test_snuggle_bugz_search():
@@ -40,7 +40,7 @@ async def test_snuggle_bugz_search():
         days_back=90,
         sources=None,  # Search all sources
         user_id=1,
-        debug=True
+        debug=True,
     )
 
     logger.info("=" * 80)
@@ -73,7 +73,9 @@ async def test_snuggle_bugz_search():
         with engine.connect() as conn:
             # Check projects table
             result = conn.execute(
-                text("SELECT key, name FROM projects WHERE LOWER(name) LIKE '%snuggle%'")
+                text(
+                    "SELECT key, name FROM projects WHERE LOWER(name) LIKE '%snuggle%'"
+                )
             )
             projects = list(result)
 
@@ -81,11 +83,13 @@ async def test_snuggle_bugz_search():
                 logger.info(f"✅ Found {len(projects)} Snuggle Bugz-related projects:")
                 for row in projects:
                     logger.info(f"   {row[0]}: {row[1]}")
-                    
+
                     # Check keywords for this project
                     keyword_result = conn.execute(
-                        text("SELECT keyword FROM project_keywords WHERE project_key = :key"),
-                        {"key": row[0]}
+                        text(
+                            "SELECT keyword FROM project_keywords WHERE project_key = :key"
+                        ),
+                        {"key": row[0]},
                     )
                     keywords = [k[0] for k in keyword_result]
                     logger.info(f"   Keywords: {keywords}")
@@ -98,12 +102,16 @@ async def test_snuggle_bugz_search():
             logger.info("=" * 80)
 
             result = conn.execute(
-                text("SELECT project_key, keyword FROM project_keywords WHERE LOWER(keyword) LIKE '%searchspring%'")
+                text(
+                    "SELECT project_key, keyword FROM project_keywords WHERE LOWER(keyword) LIKE '%searchspring%'"
+                )
             )
             searchspring_keywords = list(result)
 
             if searchspring_keywords:
-                logger.info(f"✅ Found {len(searchspring_keywords)} Searchspring-related keywords:")
+                logger.info(
+                    f"✅ Found {len(searchspring_keywords)} Searchspring-related keywords:"
+                )
                 for row in searchspring_keywords:
                     logger.info(f"   {row[0]}: {row[1]}")
             else:
@@ -131,46 +139,56 @@ async def test_snuggle_bugz_search():
                     pinecone_results = vector_search.pinecone_index.query(
                         vector=embedding,
                         top_k=100,
-                        filter={
-                            "timestamp_epoch": {"$gte": int(cutoff.timestamp())}
-                        },
-                        include_metadata=True
+                        filter={"timestamp_epoch": {"$gte": int(cutoff.timestamp())}},
+                        include_metadata=True,
                     )
 
                     # Look for Searchspring or Snuggle Bugz mentions
                     searchspring_matches = []
                     snuggle_bugz_matches = []
 
-                    for match in pinecone_results.get('matches', []):
-                        metadata = match.get('metadata', {})
-                        title = metadata.get('title', '').lower()
-                        content = metadata.get('content_preview', '').lower()
+                    for match in pinecone_results.get("matches", []):
+                        metadata = match.get("metadata", {})
+                        title = metadata.get("title", "").lower()
+                        content = metadata.get("content_preview", "").lower()
 
-                        if 'searchspring' in title or 'searchspring' in content:
-                            searchspring_matches.append({
-                                'title': metadata.get('title'),
-                                'source': metadata.get('source'),
-                                'score': match.get('score'),
-                                'date': metadata.get('date')
-                            })
+                        if "searchspring" in title or "searchspring" in content:
+                            searchspring_matches.append(
+                                {
+                                    "title": metadata.get("title"),
+                                    "source": metadata.get("source"),
+                                    "score": match.get("score"),
+                                    "date": metadata.get("date"),
+                                }
+                            )
 
-                        if 'snuggle' in title or 'snuggle' in content:
-                            snuggle_bugz_matches.append({
-                                'title': metadata.get('title'),
-                                'source': metadata.get('source'),
-                                'score': match.get('score'),
-                                'date': metadata.get('date')
-                            })
+                        if "snuggle" in title or "snuggle" in content:
+                            snuggle_bugz_matches.append(
+                                {
+                                    "title": metadata.get("title"),
+                                    "source": metadata.get("source"),
+                                    "score": match.get("score"),
+                                    "date": metadata.get("date"),
+                                }
+                            )
 
-                    logger.info(f"\n📊 Pinecone results with 'searchspring': {len(searchspring_matches)}")
+                    logger.info(
+                        f"\n📊 Pinecone results with 'searchspring': {len(searchspring_matches)}"
+                    )
                     if searchspring_matches:
                         for i, match in enumerate(searchspring_matches[:10], 1):
-                            logger.info(f"{i}. [{match['source']}] {match['title']} (Score: {match['score']:.3f})")
+                            logger.info(
+                                f"{i}. [{match['source']}] {match['title']} (Score: {match['score']:.3f})"
+                            )
 
-                    logger.info(f"\n📊 Pinecone results with 'snuggle': {len(snuggle_bugz_matches)}")
+                    logger.info(
+                        f"\n📊 Pinecone results with 'snuggle': {len(snuggle_bugz_matches)}"
+                    )
                     if snuggle_bugz_matches:
                         for i, match in enumerate(snuggle_bugz_matches[:10], 1):
-                            logger.info(f"{i}. [{match['source']}] {match['title']} (Score: {match['score']:.3f})")
+                            logger.info(
+                                f"{i}. [{match['source']}] {match['title']} (Score: {match['score']:.3f})"
+                            )
 
             except Exception as e:
                 logger.error(f"Error querying Pinecone directly: {e}")
@@ -180,6 +198,7 @@ async def test_snuggle_bugz_search():
             logger.info(f"\n{i}. [{result.source.upper()}] {result.title}")
             logger.info(f"   Date: {result.date.strftime('%Y-%m-%d')}")
             logger.info(f"   Score: {result.relevance_score:.3f}")
+
 
 if __name__ == "__main__":
     asyncio.run(test_snuggle_bugz_search())

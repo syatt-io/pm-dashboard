@@ -1,4 +1,5 @@
 """Encryption utilities for sensitive data like API keys."""
+
 import os
 import base64
 from cryptography.fernet import Fernet
@@ -20,24 +21,28 @@ class EncryptionManager:
     def _initialize_encryption_key(self):
         """Initialize the encryption key from environment or generate one."""
         # Get encryption key from environment
-        encryption_key = os.getenv('ENCRYPTION_KEY')
+        encryption_key = os.getenv("ENCRYPTION_KEY")
 
         if not encryption_key:
             # Fail fast in production, use temporary key in development
-            is_production = os.getenv('FLASK_ENV') == 'production'
+            is_production = os.getenv("FLASK_ENV") == "production"
             if is_production:
                 raise ValueError("ENCRYPTION_KEY must be set in production environment")
 
             # Generate a key and log a warning for development
-            logger.warning("No ENCRYPTION_KEY found in environment. Generating temporary key.")
-            logger.warning("This means encrypted data will not persist across restarts.")
+            logger.warning(
+                "No ENCRYPTION_KEY found in environment. Generating temporary key."
+            )
+            logger.warning(
+                "This means encrypted data will not persist across restarts."
+            )
             logger.warning("Set ENCRYPTION_KEY environment variable for production.")
             encryption_key = Fernet.generate_key().decode()
 
         # If the key is a password/phrase, derive a proper key
-        if len(encryption_key) != 44 or not encryption_key.endswith('='):
+        if len(encryption_key) != 44 or not encryption_key.endswith("="):
             # Derive key from password using PBKDF2
-            salt = b'syatt_pm_agent_salt_v1'  # Static salt for consistency
+            salt = b"syatt_pm_agent_salt_v1"  # Static salt for consistency
             kdf = PBKDF2HMAC(
                 algorithm=hashes.SHA256(),
                 length=32,
@@ -120,7 +125,10 @@ def validate_fireflies_api_key(api_key: str) -> bool:
                 # Add current directory to path if needed
                 import sys
                 import os
-                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+                current_dir = os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                )
                 if current_dir not in sys.path:
                     sys.path.insert(0, current_dir)
                 from integrations.fireflies import FirefliesClient
@@ -156,7 +164,10 @@ def validate_google_oauth_token(token_data: dict) -> bool:
                 # Add current directory to path if needed
                 import sys
                 import os
-                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+                current_dir = os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                )
                 if current_dir not in sys.path:
                     sys.path.insert(0, current_dir)
                 from integrations.google_workspace import GoogleWorkspaceClient
@@ -186,7 +197,10 @@ def validate_notion_api_key(api_key: str) -> bool:
                 # Add current directory to path if needed
                 import sys
                 import os
-                current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+                current_dir = os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                )
                 if current_dir not in sys.path:
                     sys.path.insert(0, current_dir)
                 from integrations.notion import NotionClient

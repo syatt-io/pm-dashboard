@@ -33,7 +33,7 @@ class ReportGenerator:
         self,
         month: str,
         epic_data: List[Dict[str, Any]],
-        project_summary: Dict[str, Any]
+        project_summary: Dict[str, Any],
     ) -> BytesIO:
         """
         Generate monthly epic reconciliation report in Excel format.
@@ -59,7 +59,9 @@ class ReportGenerator:
         self._create_epic_details_sheet(wb, month, epic_data)
 
         # Sheet 3: Variance Analysis (only >10% variance)
-        high_variance_epics = [e for e in epic_data if abs(e.get("variance_pct", 0)) > 10]
+        high_variance_epics = [
+            e for e in epic_data if abs(e.get("variance_pct", 0)) > 10
+        ]
         self._create_variance_analysis_sheet(wb, month, high_variance_epics)
 
         # Sheet 4: Team Performance
@@ -81,7 +83,9 @@ class ReportGenerator:
 
         # Title
         ws.merge_cells("A1:F1")
-        ws["A1"] = f"Monthly Epic Reconciliation - {datetime.strptime(month, '%Y-%m').strftime('%B %Y')}"
+        ws["A1"] = (
+            f"Monthly Epic Reconciliation - {datetime.strptime(month, '%Y-%m').strftime('%B %Y')}"
+        )
         ws["A1"].font = Font(size=16, bold=True, color=self.PURPLE_PRIMARY)
         ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
         ws.row_dimensions[1].height = 30
@@ -99,7 +103,11 @@ class ReportGenerator:
             cell = ws.cell(row, col)
             cell.value = header
             cell.font = Font(bold=True, color=self.WHITE)
-            cell.fill = PatternFill(start_color=self.PURPLE_PRIMARY, end_color=self.PURPLE_PRIMARY, fill_type="solid")
+            cell.fill = PatternFill(
+                start_color=self.PURPLE_PRIMARY,
+                end_color=self.PURPLE_PRIMARY,
+                fill_type="solid",
+            )
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         row += 1
@@ -111,8 +119,8 @@ class ReportGenerator:
             ("Forecast Hours (Total)", f"{summary.get('total_forecast_hours', 0):.1f}"),
             ("Actual Hours (Total)", f"{summary.get('total_actual_hours', 0):.1f}"),
             ("Overall Variance", f"{summary.get('total_variance_pct', 0):.1f}%"),
-            ("Epics Over Budget (>10%)", summary.get('epics_over_budget', 0)),
-            ("Epics Under Budget (<-10%)", summary.get('epics_under_budget', 0))
+            ("Epics Over Budget (>10%)", summary.get("epics_over_budget", 0)),
+            ("Epics Under Budget (<-10%)", summary.get("epics_under_budget", 0)),
         ]
 
         for metric_name, metric_value in metrics:
@@ -121,7 +129,7 @@ class ReportGenerator:
 
             # Color code variance
             if "Variance" in metric_name:
-                variance = summary.get('total_variance_pct', 0)
+                variance = summary.get("total_variance_pct", 0)
                 if abs(variance) > 20:
                     ws.cell(row, 2).font = Font(bold=True, color=self.RED)
                 elif abs(variance) > 10:
@@ -141,15 +149,25 @@ class ReportGenerator:
 
         # Headers
         headers = [
-            "Project", "Epic Key", "Epic Name", "Team",
-            "Forecast Hours", "Actual Hours", "Variance Hours", "Variance %"
+            "Project",
+            "Epic Key",
+            "Epic Name",
+            "Team",
+            "Forecast Hours",
+            "Actual Hours",
+            "Variance Hours",
+            "Variance %",
         ]
 
         for col, header in enumerate(headers, 1):
             cell = ws.cell(1, col)
             cell.value = header
             cell.font = Font(bold=True, color=self.WHITE)
-            cell.fill = PatternFill(start_color=self.PURPLE_PRIMARY, end_color=self.PURPLE_PRIMARY, fill_type="solid")
+            cell.fill = PatternFill(
+                start_color=self.PURPLE_PRIMARY,
+                end_color=self.PURPLE_PRIMARY,
+                fill_type="solid",
+            )
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         # Data rows
@@ -184,7 +202,10 @@ class ReportGenerator:
         ws.column_dimensions["C"].width = 40  # Epic name
 
     def _create_variance_analysis_sheet(
-        self, wb: openpyxl.Workbook, month: str, high_variance_epics: List[Dict[str, Any]]
+        self,
+        wb: openpyxl.Workbook,
+        month: str,
+        high_variance_epics: List[Dict[str, Any]],
     ) -> None:
         """Create variance analysis sheet (>10% variance only)."""
         ws = wb.create_sheet("Variance Analysis")
@@ -197,24 +218,40 @@ class ReportGenerator:
 
         # Headers
         headers = [
-            "Project", "Epic", "Team", "Forecast", "Actual", "Variance", "Variance %"
+            "Project",
+            "Epic",
+            "Team",
+            "Forecast",
+            "Actual",
+            "Variance",
+            "Variance %",
         ]
 
         for col, header in enumerate(headers, 1):
             cell = ws.cell(3, col)
             cell.value = header
             cell.font = Font(bold=True, color=self.WHITE)
-            cell.fill = PatternFill(start_color=self.PURPLE_PRIMARY, end_color=self.PURPLE_PRIMARY, fill_type="solid")
+            cell.fill = PatternFill(
+                start_color=self.PURPLE_PRIMARY,
+                end_color=self.PURPLE_PRIMARY,
+                fill_type="solid",
+            )
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         # Sort by abs(variance_pct) descending
-        sorted_epics = sorted(high_variance_epics, key=lambda x: abs(x.get("variance_pct", 0)), reverse=True)
+        sorted_epics = sorted(
+            high_variance_epics,
+            key=lambda x: abs(x.get("variance_pct", 0)),
+            reverse=True,
+        )
 
         # Data rows
         row = 4
         for epic in sorted_epics:
             ws.cell(row, 1).value = epic.get("project_key", "")
-            ws.cell(row, 2).value = f"{epic.get('epic_key', '')} - {epic.get('epic_name', '')}"
+            ws.cell(row, 2).value = (
+                f"{epic.get('epic_key', '')} - {epic.get('epic_name', '')}"
+            )
             ws.cell(row, 3).value = epic.get("team", "")
             ws.cell(row, 4).value = epic.get("forecast_hours", 0)
             ws.cell(row, 4).number_format = "0.0"
@@ -249,6 +286,7 @@ class ReportGenerator:
 
         # Aggregate by team
         from collections import defaultdict
+
         team_stats = defaultdict(lambda: {"forecast": 0.0, "actual": 0.0, "count": 0})
 
         for epic in epic_data:
@@ -258,13 +296,24 @@ class ReportGenerator:
             team_stats[team]["count"] += 1
 
         # Headers
-        headers = ["Team", "# Epics", "Forecast Hours", "Actual Hours", "Variance Hours", "Variance %"]
+        headers = [
+            "Team",
+            "# Epics",
+            "Forecast Hours",
+            "Actual Hours",
+            "Variance Hours",
+            "Variance %",
+        ]
 
         for col, header in enumerate(headers, 1):
             cell = ws.cell(1, col)
             cell.value = header
             cell.font = Font(bold=True, color=self.WHITE)
-            cell.fill = PatternFill(start_color=self.PURPLE_PRIMARY, end_color=self.PURPLE_PRIMARY, fill_type="solid")
+            cell.fill = PatternFill(
+                start_color=self.PURPLE_PRIMARY,
+                end_color=self.PURPLE_PRIMARY,
+                fill_type="solid",
+            )
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         # Data rows
@@ -283,7 +332,9 @@ class ReportGenerator:
             ws.cell(row, 4).number_format = "0.0"
             ws.cell(row, 5).value = variance
             ws.cell(row, 5).number_format = "0.0"
-            ws.cell(row, 6).value = variance_pct / 100  # Convert to decimal for percentage format
+            ws.cell(row, 6).value = (
+                variance_pct / 100
+            )  # Convert to decimal for percentage format
             ws.cell(row, 6).number_format = "0.0%"
 
             # Color code variance

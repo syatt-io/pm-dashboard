@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ProgressSignal:
     """A single progress signal extracted from a result."""
+
     type: str  # 'jira_status', 'github_activity', 'blocker', 'stale', 'recent_activity'
     entity: str  # Jira ticket, PR number, commit SHA, etc.
     status: str  # Current status or description
@@ -23,6 +24,7 @@ class ProgressSignal:
 @dataclass
 class ProgressAnalysis:
     """Comprehensive progress analysis across all sources."""
+
     jira_status: Dict[str, Any]  # Ticket statuses and transitions
     github_activity: Dict[str, Any]  # PR and commit activity
     blockers: List[Dict[str, str]]  # Detected blockers
@@ -41,41 +43,69 @@ class ProgressAnalyzer:
 
         # Blocker keywords to detect
         self.blocker_keywords = {
-            'blocked on', 'blocked by', 'waiting for', 'waiting on',
-            'dependency on', 'needs', 'requires', 'can\'t proceed',
-            'stuck', 'issue with', 'problem with', 'pending'
+            "blocked on",
+            "blocked by",
+            "waiting for",
+            "waiting on",
+            "dependency on",
+            "needs",
+            "requires",
+            "can't proceed",
+            "stuck",
+            "issue with",
+            "problem with",
+            "pending",
         }
 
         # Jira status categories - split between in-review and deployed
         self.status_categories = {
-            'todo': {'to do', 'open', 'backlog', 'new'},
-            'in_progress': {'in progress', 'in development'},
-            'in_review': {
+            "todo": {"to do", "open", "backlog", "new"},
+            "in_progress": {"in progress", "in development"},
+            "in_review": {
                 # Code review statuses
-                'in review', 'code review', 'internal review', 'peer review',
+                "in review",
+                "code review",
+                "internal review",
+                "peer review",
                 # Testing/QA statuses - work is done but awaiting validation
-                'qa', 'in qa', 'ready for qa',
-                'uat', 'in uat', 'ready for uat',
-                'testing', 'ready for testing',
-                'ready for review'
+                "qa",
+                "in qa",
+                "ready for qa",
+                "uat",
+                "in uat",
+                "ready for uat",
+                "testing",
+                "ready for testing",
+                "ready for review",
             },
-            'ready_to_deploy': {
+            "ready_to_deploy": {
                 # Approved and ready for release
-                'ready for deployment', 'ready to deploy', 'ready for release',
-                'approved', 'ready for prod', 'ready for production'
+                "ready for deployment",
+                "ready to deploy",
+                "ready for release",
+                "approved",
+                "ready for prod",
+                "ready for production",
             },
-            'deployed': {
+            "deployed": {
                 # Fully complete and in production
-                'deployed', 'released', 'in production', 'live',
-                'done', 'closed', 'resolved', 'completed', 'merged'
+                "deployed",
+                "released",
+                "in production",
+                "live",
+                "done",
+                "closed",
+                "resolved",
+                "completed",
+                "merged",
             },
-            'blocked': {'blocked', 'on hold', 'waiting'}
+            "blocked": {"blocked", "on hold", "waiting"},
         }
 
     async def analyze_progress(
         self,
         results: List[Any],  # List of SearchResult objects
-        entity_links: Dict[str, Any]
+        entity_links: Dict[str, Any],
     ) -> ProgressAnalysis:
         """Extract progress insights from search results.
 
@@ -122,10 +152,12 @@ class ProgressAnalyzer:
             recent_activity=recent_activity,
             stale_items=stale_items,
             timeline=timeline,
-            progress_summary=progress_summary
+            progress_summary=progress_summary,
         )
 
-    def _extract_signals_from_result(self, result: Any, idx: int) -> List[ProgressSignal]:
+    def _extract_signals_from_result(
+        self, result: Any, idx: int
+    ) -> List[ProgressSignal]:
         """Extract progress signals from a single search result.
 
         Args:
@@ -139,61 +171,67 @@ class ProgressAnalyzer:
         combined_text = f"{result.title} {result.content}"
 
         # Extract Jira ticket status signals
-        if result.source == 'jira':
+        if result.source == "jira":
             # Parse status from content (format: "[Status] [Type] Assignee: ...")
-            status_match = re.search(r'\[([^\]]+)\]', result.content)
+            status_match = re.search(r"\[([^\]]+)\]", result.content)
             if status_match:
                 status = status_match.group(1)
 
                 # Extract ticket key from title (format: "KEY-123: Summary")
-                ticket_match = re.search(r'^([A-Z]{2,6}-\d+):', result.title)
+                ticket_match = re.search(r"^([A-Z]{2,6}-\d+):", result.title)
                 if ticket_match:
                     ticket_key = ticket_match.group(1)
 
-                    signals.append(ProgressSignal(
-                        type='jira_status',
-                        entity=ticket_key,
-                        status=status,
-                        date=result.date,
-                        source=result.source,
-                        details=result.content[:200]
-                    ))
+                    signals.append(
+                        ProgressSignal(
+                            type="jira_status",
+                            entity=ticket_key,
+                            status=status,
+                            date=result.date,
+                            source=result.source,
+                            details=result.content[:200],
+                        )
+                    )
 
         # Extract GitHub PR/commit activity signals
-        elif result.source == 'github':
+        elif result.source == "github":
             # PR signals
-            pr_match = re.search(r'PR #(\d+):', result.title)
+            pr_match = re.search(r"PR #(\d+):", result.title)
             if pr_match:
                 pr_number = pr_match.group(1)
 
                 # Parse state from content (format: "[State] PR #123 ...")
-                state_match = re.search(r'\[(Merged|Open|Closed)\]', result.content)
+                state_match = re.search(r"\[(Merged|Open|Closed)\]", result.content)
                 if state_match:
                     state = state_match.group(1)
 
-                    signals.append(ProgressSignal(
-                        type='github_pr',
-                        entity=f"#{pr_number}",
-                        status=state,
-                        date=result.date,
-                        source=result.source,
-                        details=result.title
-                    ))
+                    signals.append(
+                        ProgressSignal(
+                            type="github_pr",
+                            entity=f"#{pr_number}",
+                            status=state,
+                            date=result.date,
+                            source=result.source,
+                            details=result.title,
+                        )
+                    )
 
             # Commit signals
-            elif 'Commit:' in result.title:
-                commit_match = re.search(r'Commit ([a-f0-9]{7})', result.content)
+            elif "Commit:" in result.title:
+                commit_match = re.search(r"Commit ([a-f0-9]{7})", result.content)
                 if commit_match:
                     commit_sha = commit_match.group(1)
 
-                    signals.append(ProgressSignal(
-                        type='github_commit',
-                        entity=commit_sha,
-                        status='committed',
-                        date=result.date,
-                        source=result.source,
-                        details=result.title
-                    ))
+                    signals.append(
+                        ProgressSignal(
+                            type="github_commit",
+                            entity=commit_sha,
+                            status="committed",
+                            date=result.date,
+                            source=result.source,
+                            details=result.title,
+                        )
+                    )
 
         # Detect blocker signals in any source
         blocker_text = self._extract_blocker_text(combined_text)
@@ -201,14 +239,16 @@ class ProgressAnalyzer:
             # Try to extract entity (Jira ticket, PR, etc.)
             entity = self._extract_entity_from_text(result.title)
 
-            signals.append(ProgressSignal(
-                type='blocker',
-                entity=entity or 'general',
-                status='blocked',
-                date=result.date,
-                source=result.source,
-                details=blocker_text
-            ))
+            signals.append(
+                ProgressSignal(
+                    type="blocker",
+                    entity=entity or "general",
+                    status="blocked",
+                    date=result.date,
+                    source=result.source,
+                    details=blocker_text,
+                )
+            )
 
         return signals
 
@@ -228,10 +268,10 @@ class ProgressAnalyzer:
             if pos != -1:
                 # Extract sentence containing the blocker keyword
                 # Find sentence boundaries (., !, ?) or newlines
-                start = max(0, text_lower.rfind('.', 0, pos) + 1)
-                end = text_lower.find('.', pos)
+                start = max(0, text_lower.rfind(".", 0, pos) + 1)
+                end = text_lower.find(".", pos)
                 if end == -1:
-                    end = text_lower.find('\n', pos)
+                    end = text_lower.find("\n", pos)
                 if end == -1:
                     end = min(len(text), pos + 200)
 
@@ -250,12 +290,12 @@ class ProgressAnalyzer:
             Entity identifier or None
         """
         # Try Jira ticket first
-        jira_match = re.search(r'\b([A-Z]{2,6}-\d+)\b', text)
+        jira_match = re.search(r"\b([A-Z]{2,6}-\d+)\b", text)
         if jira_match:
             return jira_match.group(1)
 
         # Try PR number
-        pr_match = re.search(r'PR #?(\d+)', text, re.IGNORECASE)
+        pr_match = re.search(r"PR #?(\d+)", text, re.IGNORECASE)
         if pr_match:
             return f"#{pr_match.group(1)}"
 
@@ -265,7 +305,7 @@ class ProgressAnalyzer:
         self,
         results: List[Any],
         entity_links: Dict[str, Any],
-        signals: List[ProgressSignal]
+        signals: List[ProgressSignal],
     ) -> Dict[str, Any]:
         """Analyze Jira ticket statuses and transitions.
 
@@ -276,35 +316,35 @@ class ProgressAnalyzer:
 
         # Extract status from signals
         for signal in signals:
-            if signal.type == 'jira_status':
+            if signal.type == "jira_status":
                 ticket = signal.entity
                 if ticket not in jira_tickets:
                     jira_tickets[ticket] = {
-                        'ticket': ticket,
-                        'status': signal.status,
-                        'last_updated': signal.date,
-                        'source_count': 1,
-                        'details': signal.details
+                        "ticket": ticket,
+                        "status": signal.status,
+                        "last_updated": signal.date,
+                        "source_count": 1,
+                        "details": signal.details,
                     }
                 else:
                     # Update with most recent status
-                    if signal.date > jira_tickets[ticket]['last_updated']:
-                        jira_tickets[ticket]['status'] = signal.status
-                        jira_tickets[ticket]['last_updated'] = signal.date
-                    jira_tickets[ticket]['source_count'] += 1
+                    if signal.date > jira_tickets[ticket]["last_updated"]:
+                        jira_tickets[ticket]["status"] = signal.status
+                        jira_tickets[ticket]["last_updated"] = signal.date
+                    jira_tickets[ticket]["source_count"] += 1
 
         # Categorize tickets by status (with new granular categories)
         status_breakdown = {
-            'todo': [],
-            'in_progress': [],
-            'in_review': [],
-            'ready_to_deploy': [],
-            'deployed': [],
-            'blocked': []
+            "todo": [],
+            "in_progress": [],
+            "in_review": [],
+            "ready_to_deploy": [],
+            "deployed": [],
+            "blocked": [],
         }
 
         for ticket_info in jira_tickets.values():
-            status_lower = ticket_info['status'].lower()
+            status_lower = ticket_info["status"].lower()
 
             # Categorize based on status
             categorized = False
@@ -316,29 +356,27 @@ class ProgressAnalyzer:
 
             # Default to in_progress if unknown status
             if not categorized:
-                status_breakdown['in_progress'].append(ticket_info)
+                status_breakdown["in_progress"].append(ticket_info)
 
         # Find recently updated tickets (last 7 days)
         recent_updates = []
         cutoff = datetime.now() - timedelta(days=7)
         for ticket_info in jira_tickets.values():
-            if ticket_info['last_updated'] >= cutoff:
+            if ticket_info["last_updated"] >= cutoff:
                 recent_updates.append(ticket_info)
 
         # Sort by date descending
-        recent_updates.sort(key=lambda x: x['last_updated'], reverse=True)
+        recent_updates.sort(key=lambda x: x["last_updated"], reverse=True)
 
         return {
-            'tickets': jira_tickets,
-            'breakdown': status_breakdown,
-            'recent_updates': recent_updates[:10],  # Top 10 most recent
-            'total_count': len(jira_tickets)
+            "tickets": jira_tickets,
+            "breakdown": status_breakdown,
+            "recent_updates": recent_updates[:10],  # Top 10 most recent
+            "total_count": len(jira_tickets),
         }
 
     def _analyze_github_activity(
-        self,
-        results: List[Any],
-        signals: List[ProgressSignal]
+        self, results: List[Any], signals: List[ProgressSignal]
     ) -> Dict[str, Any]:
         """Analyze GitHub PR and commit activity.
 
@@ -350,63 +388,59 @@ class ProgressAnalyzer:
 
         # Extract from signals
         for signal in signals:
-            if signal.type == 'github_pr':
+            if signal.type == "github_pr":
                 pr_num = signal.entity
                 if pr_num not in prs:
                     prs[pr_num] = {
-                        'pr': pr_num,
-                        'status': signal.status,
-                        'date': signal.date,
-                        'title': signal.details
+                        "pr": pr_num,
+                        "status": signal.status,
+                        "date": signal.date,
+                        "title": signal.details,
                     }
                 else:
                     # Update with most recent info
-                    if signal.date > prs[pr_num]['date']:
-                        prs[pr_num]['status'] = signal.status
-                        prs[pr_num]['date'] = signal.date
+                    if signal.date > prs[pr_num]["date"]:
+                        prs[pr_num]["status"] = signal.status
+                        prs[pr_num]["date"] = signal.date
 
-            elif signal.type == 'github_commit':
-                commits.append({
-                    'sha': signal.entity,
-                    'date': signal.date,
-                    'message': signal.details
-                })
+            elif signal.type == "github_commit":
+                commits.append(
+                    {
+                        "sha": signal.entity,
+                        "date": signal.date,
+                        "message": signal.details,
+                    }
+                )
 
         # Categorize PRs by status
-        pr_breakdown = {
-            'merged': [],
-            'open': [],
-            'closed': []
-        }
+        pr_breakdown = {"merged": [], "open": [], "closed": []}
 
         for pr_info in prs.values():
-            status = pr_info['status'].lower()
+            status = pr_info["status"].lower()
             if status in pr_breakdown:
                 pr_breakdown[status].append(pr_info)
 
         # Find recent activity (last 7 days)
         cutoff = datetime.now() - timedelta(days=7)
-        recent_prs = [pr for pr in prs.values() if pr['date'] >= cutoff]
-        recent_commits = [c for c in commits if c['date'] >= cutoff]
+        recent_prs = [pr for pr in prs.values() if pr["date"] >= cutoff]
+        recent_commits = [c for c in commits if c["date"] >= cutoff]
 
         # Sort by date descending
-        recent_prs.sort(key=lambda x: x['date'], reverse=True)
-        recent_commits.sort(key=lambda x: x['date'], reverse=True)
+        recent_prs.sort(key=lambda x: x["date"], reverse=True)
+        recent_commits.sort(key=lambda x: x["date"], reverse=True)
 
         return {
-            'prs': prs,
-            'commits': commits,
-            'pr_breakdown': pr_breakdown,
-            'recent_prs': recent_prs[:10],
-            'recent_commits': recent_commits[:10],
-            'total_pr_count': len(prs),
-            'total_commit_count': len(commits)
+            "prs": prs,
+            "commits": commits,
+            "pr_breakdown": pr_breakdown,
+            "recent_prs": recent_prs[:10],
+            "recent_commits": recent_commits[:10],
+            "total_pr_count": len(prs),
+            "total_commit_count": len(commits),
         }
 
     def _detect_blockers(
-        self,
-        results: List[Any],
-        signals: List[ProgressSignal]
+        self, results: List[Any], signals: List[ProgressSignal]
     ) -> List[Dict[str, str]]:
         """Detect and extract blocker information.
 
@@ -417,24 +451,24 @@ class ProgressAnalyzer:
 
         # Extract from blocker signals
         for signal in signals:
-            if signal.type == 'blocker':
-                blockers.append({
-                    'entity': signal.entity,
-                    'description': signal.details or 'Blocker detected',
-                    'source': signal.source,
-                    'date': signal.date.strftime('%Y-%m-%d'),
-                    'days_ago': (datetime.now() - signal.date).days
-                })
+            if signal.type == "blocker":
+                blockers.append(
+                    {
+                        "entity": signal.entity,
+                        "description": signal.details or "Blocker detected",
+                        "source": signal.source,
+                        "date": signal.date.strftime("%Y-%m-%d"),
+                        "days_ago": (datetime.now() - signal.date).days,
+                    }
+                )
 
         # Sort by recency (most recent first)
-        blockers.sort(key=lambda x: x['days_ago'])
+        blockers.sort(key=lambda x: x["days_ago"])
 
         return blockers[:10]  # Limit to 10 most recent blockers
 
     def _find_recent_activity(
-        self,
-        results: List[Any],
-        signals: List[ProgressSignal]
+        self, results: List[Any], signals: List[ProgressSignal]
     ) -> List[Dict[str, str]]:
         """Find activity from the last 7 days.
 
@@ -445,19 +479,21 @@ class ProgressAnalyzer:
         recent = []
 
         for signal in signals:
-            if signal.date >= cutoff and signal.type != 'blocker':
-                recent.append({
-                    'type': signal.type,
-                    'entity': signal.entity,
-                    'status': signal.status,
-                    'date': signal.date.strftime('%Y-%m-%d'),
-                    'days_ago': (datetime.now() - signal.date).days,
-                    'source': signal.source,
-                    'details': signal.details[:100] if signal.details else ''
-                })
+            if signal.date >= cutoff and signal.type != "blocker":
+                recent.append(
+                    {
+                        "type": signal.type,
+                        "entity": signal.entity,
+                        "status": signal.status,
+                        "date": signal.date.strftime("%Y-%m-%d"),
+                        "days_ago": (datetime.now() - signal.date).days,
+                        "source": signal.source,
+                        "details": signal.details[:100] if signal.details else "",
+                    }
+                )
 
         # Sort by recency
-        recent.sort(key=lambda x: x['days_ago'])
+        recent.sort(key=lambda x: x["days_ago"])
 
         return recent[:15]  # Limit to 15 most recent
 
@@ -465,7 +501,7 @@ class ProgressAnalyzer:
         self,
         results: List[Any],
         jira_status: Dict[str, Any],
-        github_activity: Dict[str, Any]
+        github_activity: Dict[str, Any],
     ) -> List[Dict[str, str]]:
         """Find work items with no updates in 14+ days.
 
@@ -476,37 +512,46 @@ class ProgressAnalyzer:
         stale = []
 
         # Check Jira tickets
-        for ticket_info in jira_status['tickets'].values():
-            if ticket_info['last_updated'] < cutoff:
+        for ticket_info in jira_status["tickets"].values():
+            if ticket_info["last_updated"] < cutoff:
                 # Only flag non-deployed/non-ready-to-deploy tickets as stale
                 # Tickets in review, UAT, or ready-to-deploy are expected to stay in that state
-                status_lower = ticket_info['status'].lower()
-                is_final_state = (
-                    status_lower in self.status_categories.get('deployed', set()) or
-                    status_lower in self.status_categories.get('ready_to_deploy', set())
+                status_lower = ticket_info["status"].lower()
+                is_final_state = status_lower in self.status_categories.get(
+                    "deployed", set()
+                ) or status_lower in self.status_categories.get(
+                    "ready_to_deploy", set()
                 )
                 if not is_final_state:
-                    stale.append({
-                        'type': 'jira',
-                        'entity': ticket_info['ticket'],
-                        'status': ticket_info['status'],
-                        'last_updated': ticket_info['last_updated'].strftime('%Y-%m-%d'),
-                        'days_ago': (datetime.now() - ticket_info['last_updated']).days
-                    })
+                    stale.append(
+                        {
+                            "type": "jira",
+                            "entity": ticket_info["ticket"],
+                            "status": ticket_info["status"],
+                            "last_updated": ticket_info["last_updated"].strftime(
+                                "%Y-%m-%d"
+                            ),
+                            "days_ago": (
+                                datetime.now() - ticket_info["last_updated"]
+                            ).days,
+                        }
+                    )
 
         # Check GitHub PRs (only open PRs)
-        for pr_info in github_activity['prs'].values():
-            if pr_info['date'] < cutoff and pr_info['status'].lower() == 'open':
-                stale.append({
-                    'type': 'github_pr',
-                    'entity': pr_info['pr'],
-                    'status': pr_info['status'],
-                    'last_updated': pr_info['date'].strftime('%Y-%m-%d'),
-                    'days_ago': (datetime.now() - pr_info['date']).days
-                })
+        for pr_info in github_activity["prs"].values():
+            if pr_info["date"] < cutoff and pr_info["status"].lower() == "open":
+                stale.append(
+                    {
+                        "type": "github_pr",
+                        "entity": pr_info["pr"],
+                        "status": pr_info["status"],
+                        "last_updated": pr_info["date"].strftime("%Y-%m-%d"),
+                        "days_ago": (datetime.now() - pr_info["date"]).days,
+                    }
+                )
 
         # Sort by staleness (oldest first)
-        stale.sort(key=lambda x: x['days_ago'], reverse=True)
+        stale.sort(key=lambda x: x["days_ago"], reverse=True)
 
         return stale[:10]  # Limit to 10 stalest items
 
@@ -520,25 +565,27 @@ class ProgressAnalyzer:
 
         for signal in signals:
             # Skip blocker signals in timeline (they're shown separately)
-            if signal.type == 'blocker':
+            if signal.type == "blocker":
                 continue
 
             event_desc = self._format_signal_for_timeline(signal)
             if event_desc:
-                timeline.append({
-                    'date': signal.date.strftime('%Y-%m-%d'),
-                    'event': event_desc,
-                    'type': signal.type
-                })
+                timeline.append(
+                    {
+                        "date": signal.date.strftime("%Y-%m-%d"),
+                        "event": event_desc,
+                        "type": signal.type,
+                    }
+                )
 
         # Sort by date descending (most recent first)
-        timeline.sort(key=lambda x: x['date'], reverse=True)
+        timeline.sort(key=lambda x: x["date"], reverse=True)
 
         # Deduplicate similar events on same date
         seen = set()
         deduped = []
         for item in timeline:
-            key = (item['date'], item['event'][:50])  # Use first 50 chars as key
+            key = (item["date"], item["event"][:50])  # Use first 50 chars as key
             if key not in seen:
                 seen.add(key)
                 deduped.append(item)
@@ -554,11 +601,11 @@ class ProgressAnalyzer:
         Returns:
             Formatted event string or None
         """
-        if signal.type == 'jira_status':
+        if signal.type == "jira_status":
             return f"{signal.entity} → {signal.status}"
-        elif signal.type == 'github_pr':
+        elif signal.type == "github_pr":
             return f"PR {signal.entity} {signal.status}"
-        elif signal.type == 'github_commit':
+        elif signal.type == "github_commit":
             return f"Commit {signal.entity}: {signal.details[:50]}"
         else:
             return f"{signal.entity}: {signal.status}"
@@ -569,7 +616,7 @@ class ProgressAnalyzer:
         github_activity: Dict[str, Any],
         blockers: List[Dict[str, str]],
         recent_activity: List[Dict[str, str]],
-        stale_items: List[Dict[str, str]]
+        stale_items: List[Dict[str, str]],
     ) -> str:
         """Generate high-level progress summary.
 
@@ -579,9 +626,9 @@ class ProgressAnalyzer:
         parts = []
 
         # Jira summary with granular status breakdown
-        jira_total = jira_status['total_count']
+        jira_total = jira_status["total_count"]
         if jira_total > 0:
-            breakdown = jira_status['breakdown']
+            breakdown = jira_status["breakdown"]
             parts.append(
                 f"{jira_total} Jira tickets: "
                 f"{len(breakdown['deployed'])} deployed, "
@@ -591,14 +638,14 @@ class ProgressAnalyzer:
                 f"{len(breakdown['todo'])} to do"
             )
             # Add blocked count if any
-            if len(breakdown['blocked']) > 0:
+            if len(breakdown["blocked"]) > 0:
                 parts.append(f"{len(breakdown['blocked'])} blocked")
 
         # GitHub summary
-        pr_total = github_activity['total_pr_count']
-        commit_total = github_activity['total_commit_count']
+        pr_total = github_activity["total_pr_count"]
+        commit_total = github_activity["total_commit_count"]
         if pr_total > 0 or commit_total > 0:
-            pr_breakdown = github_activity['pr_breakdown']
+            pr_breakdown = github_activity["pr_breakdown"]
             parts.append(
                 f"{pr_total} PRs ({len(pr_breakdown['merged'])} merged, "
                 f"{len(pr_breakdown['open'])} open), "

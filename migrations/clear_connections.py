@@ -7,6 +7,7 @@ using the new title-only matching approach.
 import sqlite3
 import os
 
+
 def clear_meeting_connections():
     """Clear all meeting-project connections from the database."""
     db_path = "../database/pm_agent.db"
@@ -42,6 +43,7 @@ def clear_meeting_connections():
         return False
 
     return True
+
 
 if __name__ == "__main__":
     clear_meeting_connections()

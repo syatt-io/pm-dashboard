@@ -1,4 +1,5 @@
 """System settings model for admin-configurable application settings."""
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean
 from datetime import datetime, timezone
 import logging
@@ -10,13 +11,18 @@ logger = logging.getLogger(__name__)
 
 class SystemSettings(Base):
     """System-wide settings configurable by admins."""
-    __tablename__ = 'system_settings'
+
+    __tablename__ = "system_settings"
 
     id = Column(Integer, primary_key=True)
 
     # AI Configuration
-    ai_provider = Column(String(50), default="openai", nullable=False)  # openai, anthropic, google
-    ai_model = Column(String(100), nullable=True)  # Model name (e.g., gpt-4, claude-3-5-sonnet)
+    ai_provider = Column(
+        String(50), default="openai", nullable=False
+    )  # openai, anthropic, google
+    ai_model = Column(
+        String(100), nullable=True
+    )  # Model name (e.g., gpt-4, claude-3-5-sonnet)
     ai_temperature = Column(Float, default=0.3, nullable=False)
     ai_max_tokens = Column(Integer, default=2000, nullable=False)
 
@@ -26,26 +32,32 @@ class SystemSettings(Base):
     google_api_key_encrypted = Column(Text, nullable=True)
 
     # Epic Association Configuration
-    epic_auto_update_enabled = Column(Boolean, default=False, nullable=False)  # Auto-update Jira vs summary mode
+    epic_auto_update_enabled = Column(
+        Boolean, default=False, nullable=False
+    )  # Auto-update Jira vs summary mode
 
     # Metadata
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
     updated_by_user_id = Column(Integer, nullable=True)  # Track who made the change
 
     def to_dict(self):
         """Convert settings to dictionary."""
         return {
-            'id': self.id,
-            'ai_provider': self.ai_provider,
-            'ai_model': self.ai_model,
-            'ai_temperature': self.ai_temperature,
-            'ai_max_tokens': self.ai_max_tokens,
-            'has_openai_key': bool(self.openai_api_key_encrypted),
-            'has_anthropic_key': bool(self.anthropic_api_key_encrypted),
-            'has_google_key': bool(self.google_api_key_encrypted),
-            'epic_auto_update_enabled': self.epic_auto_update_enabled,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'updated_by_user_id': self.updated_by_user_id
+            "id": self.id,
+            "ai_provider": self.ai_provider,
+            "ai_model": self.ai_model,
+            "ai_temperature": self.ai_temperature,
+            "ai_max_tokens": self.ai_max_tokens,
+            "has_openai_key": bool(self.openai_api_key_encrypted),
+            "has_anthropic_key": bool(self.anthropic_api_key_encrypted),
+            "has_google_key": bool(self.google_api_key_encrypted),
+            "epic_auto_update_enabled": self.epic_auto_update_enabled,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "updated_by_user_id": self.updated_by_user_id,
         }
 
     def set_api_key(self, provider: str, api_key: str):

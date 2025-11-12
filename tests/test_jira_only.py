@@ -1,4 +1,5 @@
 """Test JIRA search only."""
+
 import asyncio
 import logging
 
@@ -7,10 +8,8 @@ import pytest
 from src.services.context_search import ContextSearchService
 
 # Enable debug logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
 
 @pytest.mark.asyncio
 async def test_jira():
@@ -26,9 +25,9 @@ async def test_jira():
         results = await search_service.search(
             query=query,
             days_back=90,
-            sources=['jira'],  # Only Jira
+            sources=["jira"],  # Only Jira
             user_id=1,
-            debug=True  # Enable debug to see what's happening
+            debug=True,  # Enable debug to see what's happening
         )
 
         print(f"\n✅ JIRA: Found {len(results.results)} results")
@@ -42,7 +41,9 @@ async def test_jira():
     except Exception as e:
         print(f"❌ JIRA: Error - {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     asyncio.run(test_jira())

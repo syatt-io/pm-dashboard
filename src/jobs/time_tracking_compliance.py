@@ -84,8 +84,7 @@ class TimeTrackingComplianceJob:
         logger.info(f"Fetching worklogs for {start_date} to {end_date}")
 
         worklogs = self.tempo_client.get_worklogs(
-            from_date=start_date.isoformat(),
-            to_date=end_date.isoformat()
+            from_date=start_date.isoformat(), to_date=end_date.isoformat()
         )
 
         logger.info(f"Fetched {len(worklogs)} worklogs for the week")
@@ -137,12 +136,15 @@ class TimeTrackingComplianceJob:
             unmapped_tempo_users = []
 
             # Get all users with jira_account_id mapped (active team members)
-            mapped_users = session.query(User).filter(
-                User.jira_account_id.isnot(None),
-                User.is_active == True
-            ).all()
+            mapped_users = (
+                session.query(User)
+                .filter(User.jira_account_id.isnot(None), User.is_active == True)
+                .all()
+            )
 
-            logger.info(f"Checking compliance for {len(mapped_users)} mapped team members")
+            logger.info(
+                f"Checking compliance for {len(mapped_users)} mapped team members"
+            )
 
             # Track which Tempo users we've mapped
             mapped_account_ids = set()
@@ -163,7 +165,7 @@ class TimeTrackingComplianceJob:
                     "hours": hours,
                     "team": user.team or "Unassigned",
                     "threshold": threshold,
-                    "email": user.email
+                    "email": user.email,
                 }
 
                 if hours >= threshold:
@@ -178,11 +180,13 @@ class TimeTrackingComplianceJob:
                 if account_id not in mapped_account_ids:
                     # Try to get user name from Jira API
                     user_email = self._get_user_email(account_id)
-                    unmapped_tempo_users.append({
-                        "account_id": account_id,
-                        "hours": hours,
-                        "email": user_email or "unknown"
-                    })
+                    unmapped_tempo_users.append(
+                        {
+                            "account_id": account_id,
+                            "hours": hours,
+                            "email": user_email or "unknown",
+                        }
+                    )
 
             logger.info(
                 f"Compliance breakdown - Compliant: {len(compliant)}, "
@@ -195,11 +199,7 @@ class TimeTrackingComplianceJob:
         finally:
             session.close()
 
-    def store_compliance_data(
-        self,
-        week_start: date,
-        all_users: List[Dict]
-    ) -> None:
+    def store_compliance_data(self, week_start: date, all_users: List[Dict]) -> None:
         """
         Store compliance data in database.
 
@@ -213,10 +213,14 @@ class TimeTrackingComplianceJob:
                 is_compliant = user_data["hours"] >= self.COMPLIANT_THRESHOLD
 
                 # Upsert compliance record
-                existing = session.query(TimeTrackingCompliance).filter_by(
-                    user_account_id=user_data["account_id"],
-                    week_start_date=week_start
-                ).first()
+                existing = (
+                    session.query(TimeTrackingCompliance)
+                    .filter_by(
+                        user_account_id=user_data["account_id"],
+                        week_start_date=week_start,
+                    )
+                    .first()
+                )
 
                 if existing:
                     existing.hours_logged = user_data["hours"]
@@ -228,7 +232,7 @@ class TimeTrackingComplianceJob:
                         hours_logged=user_data["hours"],
                         is_compliant=is_compliant,
                         notification_sent=False,
-                        pm_notified=False
+                        pm_notified=False,
                     )
                     session.add(compliance_record)
 
@@ -247,7 +251,7 @@ class TimeTrackingComplianceJob:
         partial_users: List[Dict],
         non_compliant_users: List[Dict],
         week_start: date,
-        week_end: date
+        week_end: date,
     ) -> Dict[str, int]:
         """
         Send Slack DMs to users who need to log time.
@@ -276,14 +280,18 @@ class TimeTrackingComplianceJob:
                 # Get user email from Jira API
                 user_email = self._get_user_email(account_id)
                 if not user_email:
-                    logger.warning(f"No email found for user {user_name} ({account_id})")
+                    logger.warning(
+                        f"No email found for user {user_name} ({account_id})"
+                    )
                     stats["failed"] += 1
                     continue
 
                 # Look up Slack user ID by email
                 db_user = session.query(User).filter_by(email=user_email).first()
                 if not db_user or not db_user.slack_user_id:
-                    logger.warning(f"No User/Slack ID found for {user_name} ({user_email})")
+                    logger.warning(
+                        f"No User/Slack ID found for {user_name} ({user_email})"
+                    )
                     stats["failed"] += 1
                     continue
 
@@ -312,8 +320,7 @@ class TimeTrackingComplianceJob:
                 # Send DM
                 try:
                     result = await self.notification_manager._send_slack_dm(
-                        slack_user_id=db_user.slack_user_id,
-                        message=message
+                        slack_user_id=db_user.slack_user_id, message=message
                     )
 
                     if result.get("success"):
@@ -325,7 +332,9 @@ class TimeTrackingComplianceJob:
                         # Mark as notified in database
                         self._mark_notification_sent(session, account_id, week_start)
                     else:
-                        logger.error(f"Failed to send DM to {user_name}: {result.get('error')}")
+                        logger.error(
+                            f"Failed to send DM to {user_name}: {result.get('error')}"
+                        )
                         stats["failed"] += 1
 
                 except Exception as e:
@@ -337,7 +346,9 @@ class TimeTrackingComplianceJob:
         finally:
             session.close()
 
-        logger.info(f"Sent {stats['partial']} partial + {stats['non_compliant']} non-compliant notifications")
+        logger.info(
+            f"Sent {stats['partial']} partial + {stats['non_compliant']} non-compliant notifications"
+        )
         return stats
 
     def _get_user_email(self, account_id: str) -> str:
@@ -356,7 +367,9 @@ class TimeTrackingComplianceJob:
             # Use Tempo client's Jira credentials
             url = f"{self.tempo_client.jira_url}/rest/api/3/user"
             params = {"accountId": account_id}
-            response = requests.get(url, headers=self.tempo_client.jira_headers, params=params, timeout=10)
+            response = requests.get(
+                url, headers=self.tempo_client.jira_headers, params=params, timeout=10
+            )
             response.raise_for_status()
 
             user_data = response.json()
@@ -367,12 +380,15 @@ class TimeTrackingComplianceJob:
             logger.debug(f"Error getting email for account ID {account_id}: {e}")
             return ""
 
-    def _mark_notification_sent(self, session, account_id: str, week_start: date) -> None:
+    def _mark_notification_sent(
+        self, session, account_id: str, week_start: date
+    ) -> None:
         """Mark that notification was sent to user."""
-        record = session.query(TimeTrackingCompliance).filter_by(
-            user_account_id=account_id,
-            week_start_date=week_start
-        ).first()
+        record = (
+            session.query(TimeTrackingCompliance)
+            .filter_by(user_account_id=account_id, week_start_date=week_start)
+            .first()
+        )
 
         if record:
             record.notification_sent = True
@@ -384,7 +400,7 @@ class TimeTrackingComplianceJob:
         non_compliant_users: List[Dict],
         unmapped_tempo_users: List[Dict],
         week_start: date,
-        week_end: date
+        week_end: date,
     ) -> None:
         """
         Send summary to PM Slack channel.
@@ -408,36 +424,51 @@ class TimeTrackingComplianceJob:
         message_lines = [
             f"📊 *Weekly Time Tracking Compliance Report*",
             f"Week of {week_start.strftime('%b %d')} - {week_end.strftime('%b %d')}\n",
-            f"*Overall Compliance: {compliance_pct:.1f}%* ({len(compliant_users)}/{total} team members)\n"
+            f"*Overall Compliance: {compliance_pct:.1f}%* ({len(compliant_users)}/{total} team members)\n",
         ]
 
         # Compliant section
         if compliant_users:
-            message_lines.append(f"✅ *Compliant ({len(compliant_users)}):* ≥32 hours logged")
+            message_lines.append(
+                f"✅ *Compliant ({len(compliant_users)}):* ≥32 hours logged"
+            )
             # Group by team
             by_team = defaultdict(list)
             for user in compliant_users:
-                by_team[user["team"]].append(f"{user['user_name']} ({user['hours']:.1f}h)")
+                by_team[user["team"]].append(
+                    f"{user['user_name']} ({user['hours']:.1f}h)"
+                )
 
             for team, users in sorted(by_team.items()):
-                message_lines.append(f"  • {team}: {', '.join(users[:5])}" + (f" +{len(users)-5} more" if len(users) > 5 else ""))
+                message_lines.append(
+                    f"  • {team}: {', '.join(users[:5])}"
+                    + (f" +{len(users)-5} more" if len(users) > 5 else "")
+                )
 
             message_lines.append("")
 
         # Partial section
         if partial_users:
-            message_lines.append(f"🟡 *Partial ({len(partial_users)}):* 16-31 hours logged")
+            message_lines.append(
+                f"🟡 *Partial ({len(partial_users)}):* 16-31 hours logged"
+            )
             for user in partial_users[:10]:  # Limit to 10
-                message_lines.append(f"  • {user['user_name']} ({user['team']}): {user['hours']:.1f}h")
+                message_lines.append(
+                    f"  • {user['user_name']} ({user['team']}): {user['hours']:.1f}h"
+                )
             if len(partial_users) > 10:
                 message_lines.append(f"  ... and {len(partial_users) - 10} more")
             message_lines.append("")
 
         # Non-compliant section
         if non_compliant_users:
-            message_lines.append(f"🔴 *Non-Compliant ({len(non_compliant_users)}):* <16 hours logged")
+            message_lines.append(
+                f"🔴 *Non-Compliant ({len(non_compliant_users)}):* <16 hours logged"
+            )
             for user in non_compliant_users[:10]:  # Limit to 10
-                message_lines.append(f"  • {user['user_name']} ({user['team']}): {user['hours']:.1f}h")
+                message_lines.append(
+                    f"  • {user['user_name']} ({user['team']}): {user['hours']:.1f}h"
+                )
             if len(non_compliant_users) > 10:
                 message_lines.append(f"  ... and {len(non_compliant_users) - 10} more")
             message_lines.append("")
@@ -452,12 +483,18 @@ class TimeTrackingComplianceJob:
 
         # Unmapped Tempo users section
         if unmapped_tempo_users:
-            message_lines.append(f"❓ *Unmapped Tempo Users ({len(unmapped_tempo_users)}):* Time logged but not in User Management")
+            message_lines.append(
+                f"❓ *Unmapped Tempo Users ({len(unmapped_tempo_users)}):* Time logged but not in User Management"
+            )
             for user in unmapped_tempo_users[:10]:  # Limit to 10
-                message_lines.append(f"  • {user['email']} ({user['account_id']}): {user['hours']:.1f}h")
+                message_lines.append(
+                    f"  • {user['email']} ({user['account_id']}): {user['hours']:.1f}h"
+                )
             if len(unmapped_tempo_users) > 10:
                 message_lines.append(f"  ... and {len(unmapped_tempo_users) - 10} more")
-            message_lines.append("_Add these users to User Management to track their compliance._")
+            message_lines.append(
+                "_Add these users to User Management to track their compliance._"
+            )
             message_lines.append("")
 
         message = "\n".join(message_lines)
@@ -469,8 +506,7 @@ class TimeTrackingComplianceJob:
             # Use the Slack client directly for channel messages
             if self.notification_manager.slack_client:
                 response = self.notification_manager.slack_client.chat_postMessage(
-                    channel=pm_channel,
-                    text=message
+                    channel=pm_channel, text=message
                 )
                 logger.info(f"Sent PM summary to {pm_channel}")
             else:
@@ -501,11 +537,15 @@ class TimeTrackingComplianceJob:
 
                 # Check previous week
                 previous_week = current_week - timedelta(days=7)
-                previous_record = session.query(TimeTrackingCompliance).filter_by(
-                    user_account_id=account_id,
-                    week_start_date=previous_week,
-                    is_compliant=False
-                ).first()
+                previous_record = (
+                    session.query(TimeTrackingCompliance)
+                    .filter_by(
+                        user_account_id=account_id,
+                        week_start_date=previous_week,
+                        is_compliant=False,
+                    )
+                    .first()
+                )
 
                 if previous_record:
                     repeat_offenders.append(user)
@@ -536,7 +576,9 @@ class TimeTrackingComplianceJob:
             user_hours = self.calculate_user_hours(worklogs)
 
             # Classify users by compliance
-            compliant, partial, non_compliant, unmapped_tempo_users = self.classify_users(user_hours)
+            compliant, partial, non_compliant, unmapped_tempo_users = (
+                self.classify_users(user_hours)
+            )
 
             # Combine all users for storage
             all_users = compliant + partial + non_compliant
@@ -546,7 +588,14 @@ class TimeTrackingComplianceJob:
 
             # Send PM summary only (no individual DMs for testing phase)
             asyncio.run(
-                self.send_pm_summary(compliant, partial, non_compliant, unmapped_tempo_users, week_start, week_end)
+                self.send_pm_summary(
+                    compliant,
+                    partial,
+                    non_compliant,
+                    unmapped_tempo_users,
+                    week_start,
+                    week_end,
+                )
             )
 
             end_time = datetime.now()
@@ -564,10 +613,14 @@ class TimeTrackingComplianceJob:
                 "partial_users": len(partial),
                 "non_compliant_users": len(non_compliant),
                 "unmapped_tempo_users": len(unmapped_tempo_users),
-                "compliance_percentage": (len(compliant) / len(all_users) * 100) if all_users else 0
+                "compliance_percentage": (
+                    (len(compliant) / len(all_users) * 100) if all_users else 0
+                ),
             }
 
-            logger.info(f"Time Tracking Compliance job completed successfully in {duration:.2f}s")
+            logger.info(
+                f"Time Tracking Compliance job completed successfully in {duration:.2f}s"
+            )
             logger.info(f"Stats: {stats}")
 
             return stats
@@ -576,14 +629,17 @@ class TimeTrackingComplianceJob:
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
 
-            logger.error(f"Time Tracking Compliance job failed after {duration:.2f}s: {e}", exc_info=True)
+            logger.error(
+                f"Time Tracking Compliance job failed after {duration:.2f}s: {e}",
+                exc_info=True,
+            )
 
             return {
                 "success": False,
                 "start_time": start_time.isoformat(),
                 "end_time": end_time.isoformat(),
                 "duration_seconds": duration,
-                "error": str(e)
+                "error": str(e),
             }
 
 
@@ -596,13 +652,16 @@ def run_time_tracking_compliance():
         job = TimeTrackingComplianceJob()
         return job.run()
     except Exception as e:
-        logger.error(f"Failed to initialize or run Time Tracking Compliance job: {e}", exc_info=True)
+        logger.error(
+            f"Failed to initialize or run Time Tracking Compliance job: {e}",
+            exc_info=True,
+        )
         return {
             "success": False,
             "error": str(e),
             "start_time": datetime.now().isoformat(),
             "end_time": datetime.now().isoformat(),
-            "duration_seconds": 0
+            "duration_seconds": 0,
         }
 
 
@@ -610,7 +669,7 @@ if __name__ == "__main__":
     # Allow running job manually for testing
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     print("Running Time Tracking Compliance job manually...")

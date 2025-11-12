@@ -31,7 +31,9 @@ def mock_session():
 def mock_tempo_client():
     """Create a mock TempoAPIClient."""
     client = MagicMock()
-    client.get_current_month_hours = MagicMock(return_value={"SUBS": 10.5, "BEVS": 5.25})
+    client.get_current_month_hours = MagicMock(
+        return_value={"SUBS": 10.5, "BEVS": 5.25}
+    )
     client.get_all_time_hours = MagicMock(return_value={"SUBS": 120.0, "BEVS": 60.0})
     return client
 
@@ -39,8 +41,8 @@ def mock_tempo_client():
 class TestTempoSyncJob:
     """Tests for TempoSyncJob"""
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
     def test_init_success(self, mock_client_class, mock_create_engine, mock_env_vars):
         """Test successful initialization."""
         mock_engine = MagicMock()
@@ -51,9 +53,11 @@ class TestTempoSyncJob:
         assert job.database_url == "sqlite:///:memory:"
         mock_create_engine.assert_called_once_with("sqlite:///:memory:")
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
-    def test_init_missing_database_url(self, mock_client_class, mock_create_engine, monkeypatch):
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
+    def test_init_missing_database_url(
+        self, mock_client_class, mock_create_engine, monkeypatch
+    ):
         """Test initialization fails without DATABASE_URL."""
         monkeypatch.setenv("TEMPO_API_TOKEN", "test-tempo-token")
         monkeypatch.setenv("JIRA_URL", "https://test.atlassian.net")
@@ -64,9 +68,11 @@ class TestTempoSyncJob:
         with pytest.raises(ValueError, match="DATABASE_URL"):
             TempoSyncJob()
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
-    def test_get_active_projects(self, mock_client_class, mock_create_engine, mock_env_vars):
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
+    def test_get_active_projects(
+        self, mock_client_class, mock_create_engine, mock_env_vars
+    ):
         """Test getting active projects from database."""
         mock_engine = MagicMock()
         mock_create_engine.return_value = mock_engine
@@ -75,7 +81,9 @@ class TestTempoSyncJob:
 
         # Mock session and result
         mock_result = MagicMock()
-        mock_result.__iter__ = Mock(return_value=iter([("SUBS",), ("BEVS",), ("RNWL",)]))
+        mock_result.__iter__ = Mock(
+            return_value=iter([("SUBS",), ("BEVS",), ("RNWL",)])
+        )
 
         mock_session_instance = MagicMock()
         mock_session_instance.execute.return_value = mock_result
@@ -91,9 +99,11 @@ class TestTempoSyncJob:
         assert "RNWL" in projects
         mock_session_instance.close.assert_called_once()
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
-    def test_update_project_hours_success(self, mock_client_class, mock_create_engine, mock_env_vars):
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
+    def test_update_project_hours_success(
+        self, mock_client_class, mock_create_engine, mock_env_vars
+    ):
         """Test successful project hours update."""
         mock_engine = MagicMock()
         mock_create_engine.return_value = mock_engine
@@ -122,9 +132,11 @@ class TestTempoSyncJob:
         assert stats["total"] == 2
         mock_session_instance.commit.assert_called_once()
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
-    def test_update_project_hours_project_not_found(self, mock_client_class, mock_create_engine, mock_env_vars):
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
+    def test_update_project_hours_project_not_found(
+        self, mock_client_class, mock_create_engine, mock_env_vars
+    ):
         """Test handling of projects not found in database."""
         mock_engine = MagicMock()
         mock_create_engine.return_value = mock_engine
@@ -154,9 +166,11 @@ class TestTempoSyncJob:
         assert stats["skipped"] == 0
         assert stats["total"] == 1
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
-    def test_update_project_hours_rollback_on_error(self, mock_client_class, mock_create_engine, mock_env_vars):
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
+    def test_update_project_hours_rollback_on_error(
+        self, mock_client_class, mock_create_engine, mock_env_vars
+    ):
         """Test rollback on database error."""
         mock_engine = MagicMock()
         mock_create_engine.return_value = mock_engine
@@ -180,8 +194,8 @@ class TestTempoSyncJob:
 
         mock_session_instance.rollback.assert_called_once()
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
     def test_run_success(self, mock_client_class, mock_create_engine, mock_env_vars):
         """Test successful job execution."""
         mock_engine = MagicMock()
@@ -196,11 +210,9 @@ class TestTempoSyncJob:
         job = TempoSyncJob()
 
         # Mock update_project_hours
-        job.update_project_hours = MagicMock(return_value={
-            "updated": 1,
-            "skipped": 0,
-            "total": 1
-        })
+        job.update_project_hours = MagicMock(
+            return_value={"updated": 1, "skipped": 0, "total": 1}
+        )
 
         stats = job.run()
 
@@ -213,8 +225,8 @@ class TestTempoSyncJob:
         assert "end_time" in stats
         assert "duration_seconds" in stats
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
     def test_run_failure(self, mock_client_class, mock_create_engine, mock_env_vars):
         """Test job execution with failure."""
         mock_engine = MagicMock()
@@ -236,7 +248,7 @@ class TestTempoSyncJob:
         assert "end_time" in stats
         assert "duration_seconds" in stats
 
-    @patch('src.jobs.tempo_sync.TempoSyncJob')
+    @patch("src.jobs.tempo_sync.TempoSyncJob")
     def test_run_tempo_sync_function(self, mock_job_class):
         """Test run_tempo_sync function."""
         mock_job = MagicMock()
@@ -250,9 +262,11 @@ class TestTempoSyncJob:
         mock_job_class.assert_called_once()
         mock_job.run.assert_called_once()
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
-    def test_zero_hours_handling(self, mock_client_class, mock_create_engine, mock_env_vars):
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
+    def test_zero_hours_handling(
+        self, mock_client_class, mock_create_engine, mock_env_vars
+    ):
         """Test handling of projects with zero hours."""
         mock_engine = MagicMock()
         mock_create_engine.return_value = mock_engine
@@ -282,9 +296,11 @@ class TestTempoSyncJob:
         # Should still update even with 0 hours
         assert stats["projects_updated"] == 1
 
-    @patch('src.jobs.tempo_sync.create_engine')
-    @patch('src.jobs.tempo_sync.TempoAPIClient')
-    def test_multiple_projects_update(self, mock_client_class, mock_create_engine, mock_env_vars):
+    @patch("src.jobs.tempo_sync.create_engine")
+    @patch("src.jobs.tempo_sync.TempoAPIClient")
+    def test_multiple_projects_update(
+        self, mock_client_class, mock_create_engine, mock_env_vars
+    ):
         """Test updating multiple projects."""
         mock_engine = MagicMock()
         mock_create_engine.return_value = mock_engine
@@ -294,13 +310,13 @@ class TestTempoSyncJob:
             "SUBS": 10.5,
             "BEVS": 5.25,
             "RNWL": 15.75,
-            "ECSC": 20.0
+            "ECSC": 20.0,
         }
         mock_client.get_all_time_hours.return_value = {
             "SUBS": 120.0,
             "BEVS": 60.0,
             "RNWL": 180.0,
-            "ECSC": 240.0
+            "ECSC": 240.0,
         }
         mock_client_class.return_value = mock_client
 
@@ -316,7 +332,9 @@ class TestTempoSyncJob:
         mock_session_instance.close = MagicMock()
 
         job.Session = MagicMock(return_value=mock_session_instance)
-        job.get_active_projects = MagicMock(return_value=["SUBS", "BEVS", "RNWL", "ECSC"])
+        job.get_active_projects = MagicMock(
+            return_value=["SUBS", "BEVS", "RNWL", "ECSC"]
+        )
 
         stats = job.run()
 

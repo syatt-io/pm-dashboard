@@ -9,7 +9,7 @@ import sys
 from sqlalchemy import create_engine, text
 
 # Get database URL from environment
-DATABASE_URL = os.getenv('DATABASE_URL')
+DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     print("Error: DATABASE_URL environment variable not set", file=sys.stderr)
     sys.exit(1)
@@ -18,15 +18,20 @@ if not DATABASE_URL:
 MEETING_TITLE = "Jon <> Brit <> Mike | Projections & PhillyN/A"
 MEETING_SUMMARY = ""  # Unknown summary for now
 
+
 def get_project_keywords():
     """Fetch all project keywords from production database."""
     engine = create_engine(DATABASE_URL)
     with engine.connect() as conn:
-        result = conn.execute(text("""
+        result = conn.execute(
+            text(
+                """
             SELECT project_key, keyword
             FROM project_keywords
             ORDER BY project_key, keyword
-        """))
+        """
+            )
+        )
         keywords_by_project = {}
         for row in result:
             project_key, keyword = row
@@ -34,6 +39,7 @@ def get_project_keywords():
                 keywords_by_project[project_key] = []
             keywords_by_project[project_key].append(keyword.lower())
         return keywords_by_project
+
 
 def test_matching():
     """Test keyword matching against the problematic meeting."""
@@ -79,6 +85,7 @@ def test_matching():
     if matching_projects:
         print(f"Projects: {[p[0] for p in matching_projects]}")
     print("=" * 80)
+
 
 if __name__ == "__main__":
     try:

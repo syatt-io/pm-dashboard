@@ -6,7 +6,7 @@ import pytz
 
 
 # Define EST timezone
-EST = pytz.timezone('America/New_York')
+EST = pytz.timezone("America/New_York")
 
 
 def to_est(dt: datetime) -> datetime:

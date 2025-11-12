@@ -19,12 +19,14 @@ from collections import OrderedDict
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from src.integrations.tempo import TempoAPIClient
 
 # Valid team values
-VALID_TEAMS = ['PMs', 'Design', 'UX', 'FE Devs', 'BE Devs', 'Data', 'Unassigned']
+VALID_TEAMS = ["PMs", "Design", "UX", "FE Devs", "BE Devs", "Data", "Unassigned"]
+
 
 def fetch_all_users(tempo_client):
     """Fetch all unique users from Tempo worklogs (last 6 months)."""
@@ -37,10 +39,7 @@ def fetch_all_users(tempo_client):
     print(f"   Date range: {from_date} to {to_date}")
 
     # Fetch worklogs using TempoAPIClient
-    worklogs = tempo_client.get_worklogs(
-        from_date=str(from_date),
-        to_date=str(to_date)
-    )
+    worklogs = tempo_client.get_worklogs(from_date=str(from_date), to_date=str(to_date))
 
     print(f"   Retrieved {len(worklogs)} worklogs")
 
@@ -71,25 +70,27 @@ def fetch_all_users(tempo_client):
     return users
 
 
-def generate_template_csv(users, output_file='user_teams_template.csv'):
+def generate_template_csv(users, output_file="user_teams_template.csv"):
     """Generate CSV template with users and default team assignment."""
     print(f"\n📝 Generating CSV template: {output_file}")
 
     # Sort users by display name for easier manual editing
     sorted_users = OrderedDict(sorted(users.items(), key=lambda x: x[1].lower()))
 
-    with open(output_file, 'w', newline='') as csvfile:
-        fieldnames = ['account_id', 'display_name', 'team']
+    with open(output_file, "w", newline="") as csvfile:
+        fieldnames = ["account_id", "display_name", "team"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
 
         for account_id, display_name in sorted_users.items():
-            writer.writerow({
-                'account_id': account_id,
-                'display_name': display_name,
-                'team': 'Unassigned'
-            })
+            writer.writerow(
+                {
+                    "account_id": account_id,
+                    "display_name": display_name,
+                    "team": "Unassigned",
+                }
+            )
 
     print(f"✅ CSV template generated with {len(users)} users")
     return output_file
@@ -129,5 +130,5 @@ def main():
     print("=" * 80)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

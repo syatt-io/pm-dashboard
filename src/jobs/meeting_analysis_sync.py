@@ -33,9 +33,13 @@ class MeetingAnalysisSyncJob:
             raise ValueError("DATABASE_URL environment variable is required")
 
         # Get system-level Fireflies API key (fallback to regular key if not set)
-        self.fireflies_api_key = os.getenv("FIREFLIES_SYSTEM_API_KEY") or os.getenv("FIREFLIES_API_KEY")
+        self.fireflies_api_key = os.getenv("FIREFLIES_SYSTEM_API_KEY") or os.getenv(
+            "FIREFLIES_API_KEY"
+        )
         if not self.fireflies_api_key:
-            raise ValueError("FIREFLIES_SYSTEM_API_KEY or FIREFLIES_API_KEY environment variable is required")
+            raise ValueError(
+                "FIREFLIES_SYSTEM_API_KEY or FIREFLIES_API_KEY environment variable is required"
+            )
 
         # Initialize clients
         self.fireflies_client = FirefliesClient(api_key=self.fireflies_api_key)
@@ -67,8 +71,10 @@ class MeetingAnalysisSyncJob:
             # Get keywords for each project
             for project in projects:
                 keyword_result = session.execute(
-                    text("SELECT keyword FROM project_keywords WHERE project_key = :project_key"),
-                    {"project_key": project["key"]}
+                    text(
+                        "SELECT keyword FROM project_keywords WHERE project_key = :project_key"
+                    ),
+                    {"project_key": project["key"]},
                 )
                 project["keywords"] = [row[0].lower() for row in keyword_result]
 
@@ -91,8 +97,7 @@ class MeetingAnalysisSyncJob:
 
         # Fetch recent meetings from Fireflies
         all_meetings = self.fireflies_client.get_recent_meetings(
-            days_back=days_back,
-            limit=100
+            days_back=days_back, limit=100
         )
 
         logger.info(f"Found {len(all_meetings)} total meetings from Fireflies")
@@ -101,10 +106,14 @@ class MeetingAnalysisSyncJob:
         session = self.Session()
         try:
             result = session.execute(
-                text("SELECT fireflies_id FROM processed_meetings WHERE fireflies_id IS NOT NULL")
+                text(
+                    "SELECT fireflies_id FROM processed_meetings WHERE fireflies_id IS NOT NULL"
+                )
             )
             processed_ids = {row[0] for row in result}
-            logger.info(f"Found {len(processed_ids)} already processed meetings in database")
+            logger.info(
+                f"Found {len(processed_ids)} already processed meetings in database"
+            )
         finally:
             session.close()
 
@@ -115,9 +124,7 @@ class MeetingAnalysisSyncJob:
         return unanalyzed
 
     def filter_meetings_by_projects(
-        self,
-        meetings: List[Dict],
-        projects: List[Dict[str, any]]
+        self, meetings: List[Dict], projects: List[Dict[str, any]]
     ) -> List[tuple]:
         """
         Filter meetings by project keywords.
@@ -138,13 +145,17 @@ class MeetingAnalysisSyncJob:
 
         # Blacklist of common company terms that should be ignored for project matching
         # These terms appear in too many meetings to be useful discriminators
-        KEYWORD_BLACKLIST = {'syatt'}
+        KEYWORD_BLACKLIST = {"syatt"}
 
         matched_meetings = []
 
         # Log what we're working with for debugging
-        logger.info(f"Filtering {len(meetings)} meetings against {len(projects)} projects")
-        logger.info(f"Sample meeting titles: {[m.get('title', 'Untitled')[:50] for m in meetings[:3]]}")
+        logger.info(
+            f"Filtering {len(meetings)} meetings against {len(projects)} projects"
+        )
+        logger.info(
+            f"Sample meeting titles: {[m.get('title', 'Untitled')[:50] for m in meetings[:3]]}"
+        )
 
         for meeting in meetings:
             title_lower = meeting.get("title", "").lower()
@@ -161,14 +172,19 @@ class MeetingAnalysisSyncJob:
 
                 # Filter out blacklisted keywords
                 filtered_keywords = [
-                    kw for kw in project["keywords"]
+                    kw
+                    for kw in project["keywords"]
                     if kw.lower() not in KEYWORD_BLACKLIST
                 ]
 
-                logger.info(f"  Project {project['key']}: keywords={project.get('keywords', [])} -> filtered={filtered_keywords}")
+                logger.info(
+                    f"  Project {project['key']}: keywords={project.get('keywords', [])} -> filtered={filtered_keywords}"
+                )
 
                 if not filtered_keywords:
-                    logger.info(f"  Project {project['key']}: Skipped (no keywords after blacklist filter)")
+                    logger.info(
+                        f"  Project {project['key']}: Skipped (no keywords after blacklist filter)"
+                    )
                     continue
 
                 # Use word boundary regex matching to prevent false positives
@@ -177,14 +193,16 @@ class MeetingAnalysisSyncJob:
                     # Escape special regex characters in the keyword
                     escaped_keyword = re.escape(keyword)
                     # Match whole words only using word boundaries
-                    pattern = r'\b' + escaped_keyword + r'\b'
+                    pattern = r"\b" + escaped_keyword + r"\b"
                     return bool(re.search(pattern, text, re.IGNORECASE))
 
                 # Check if any keyword appears in title or summary
                 matched = False
                 matched_keyword = None
                 for keyword in filtered_keywords:
-                    if matches_keyword(title_lower, keyword) or matches_keyword(summary_lower, keyword):
+                    if matches_keyword(title_lower, keyword) or matches_keyword(
+                        summary_lower, keyword
+                    ):
                         matched = True
                         matched_keyword = keyword
                         break
@@ -225,7 +243,9 @@ class MeetingAnalysisSyncJob:
 
             transcript_text = transcript_data.get("transcript", "")
             if not transcript_text or len(transcript_text) < 100:
-                logger.warning(f"Transcript too short or empty for meeting {meeting_id}, skipping")
+                logger.warning(
+                    f"Transcript too short or empty for meeting {meeting_id}, skipping"
+                )
                 return False
 
             # Convert date from milliseconds to datetime
@@ -237,6 +257,7 @@ class MeetingAnalysisSyncJob:
 
             # Get AI config to track which model is being used
             from config.settings import Settings
+
             ai_config = Settings.get_fresh_ai_config()
             ai_provider = ai_config.provider if ai_config else "unknown"
             ai_model = ai_config.model if ai_config else "unknown"
@@ -246,7 +267,7 @@ class MeetingAnalysisSyncJob:
             analysis = self.analyzer.analyze_transcript(
                 transcript=transcript_text,
                 meeting_title=meeting_title,
-                meeting_date=meeting_date
+                meeting_date=meeting_date,
             )
 
             # Generate meeting summary for digest consumption
@@ -254,29 +275,34 @@ class MeetingAnalysisSyncJob:
             summary_parts = []
             for topic in analysis.topics[:3]:
                 # Add topic title and first 2 content items
-                summary_parts.append(f"{topic.title}: {', '.join(topic.content_items[:2])}")
-            meeting_summary = "; ".join(summary_parts) if summary_parts else "No summary available"
+                summary_parts.append(
+                    f"{topic.title}: {', '.join(topic.content_items[:2])}"
+                )
+            meeting_summary = (
+                "; ".join(summary_parts) if summary_parts else "No summary available"
+            )
 
             # Prepare action items for storage
             action_items_data = []
             for item in analysis.action_items:
-                action_items_data.append({
-                    "title": item.title,
-                    "description": item.description,
-                    "assignee": item.assignee,
-                    "due_date": item.due_date,
-                    "priority": item.priority,
-                    "context": item.context,
-                    "dependencies": item.dependencies or []
-                })
+                action_items_data.append(
+                    {
+                        "title": item.title,
+                        "description": item.description,
+                        "assignee": item.assignee,
+                        "due_date": item.due_date,
+                        "priority": item.priority,
+                        "context": item.context,
+                        "dependencies": item.dependencies or [],
+                    }
+                )
 
             # Prepare topics for storage
             topics_data = []
             for topic in analysis.topics:
-                topics_data.append({
-                    "title": topic.title,
-                    "content_items": topic.content_items
-                })
+                topics_data.append(
+                    {"title": topic.title, "content_items": topic.content_items}
+                )
 
             # Store in database
             session = self.Session()
@@ -286,7 +312,8 @@ class MeetingAnalysisSyncJob:
                 now = datetime.now(timezone.utc)
 
                 session.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO processed_meetings (
                             id, fireflies_id, title, date, duration,
                             summary, topics, action_items,
@@ -298,7 +325,8 @@ class MeetingAnalysisSyncJob:
                             :ai_provider, :ai_model,
                             :analyzed_at, :created_at, :updated_at
                         )
-                    """),
+                    """
+                    ),
                     {
                         "id": meeting_uuid,
                         "fireflies_id": meeting_id,
@@ -312,8 +340,8 @@ class MeetingAnalysisSyncJob:
                         "ai_model": ai_model,
                         "analyzed_at": now,
                         "created_at": now,
-                        "updated_at": now
-                    }
+                        "updated_at": now,
+                    },
                 )
 
                 session.commit()
@@ -327,8 +355,10 @@ class MeetingAnalysisSyncJob:
                 # Check if project has email notifications enabled
                 try:
                     result = session.execute(
-                        text("SELECT send_meeting_emails FROM projects WHERE key = :key"),
-                        {"key": project["key"]}
+                        text(
+                            "SELECT send_meeting_emails FROM projects WHERE key = :key"
+                        ),
+                        {"key": project["key"]},
                     )
                     row = result.fetchone()
                     send_emails = row[0] if row else False
@@ -343,7 +373,10 @@ class MeetingAnalysisSyncJob:
                         ]
 
                         # ⚠️ SAFETY: Default to test mode unless explicitly set to production
-                        test_mode = os.getenv("MEETING_EMAIL_TEST_MODE", "true").lower() == "true"
+                        test_mode = (
+                            os.getenv("MEETING_EMAIL_TEST_MODE", "true").lower()
+                            == "true"
+                        )
                         test_recipient = os.getenv("MEETING_EMAIL_TEST_RECIPIENT")
 
                         if test_mode:
@@ -372,13 +405,17 @@ class MeetingAnalysisSyncJob:
 
                             # Send email asynchronously
                             # Convert topics to dict format for email template
-                            topics_data = [
-                                {
-                                    "title": topic.title,
-                                    "content_items": topic.content_items
-                                }
-                                for topic in analysis.topics
-                            ] if analysis.topics else []
+                            topics_data = (
+                                [
+                                    {
+                                        "title": topic.title,
+                                        "content_items": topic.content_items,
+                                    }
+                                    for topic in analysis.topics
+                                ]
+                                if analysis.topics
+                                else []
+                            )
 
                             email_result = asyncio.run(
                                 self.notification_manager.send_meeting_analysis_email(
@@ -388,32 +425,50 @@ class MeetingAnalysisSyncJob:
                                     topics=topics_data,
                                     action_items=action_items_data,
                                     ai_provider=ai_provider,
-                                    ai_model=ai_model
+                                    ai_model=ai_model,
                                 )
                             )
 
                             if email_result.get("success"):
-                                logger.info(f"✅ Meeting analysis email sent successfully to {email_result.get('recipients')}")
+                                logger.info(
+                                    f"✅ Meeting analysis email sent successfully to {email_result.get('recipients')}"
+                                )
                             else:
-                                logger.error(f"Failed to send meeting analysis email: {email_result.get('error')}")
+                                logger.error(
+                                    f"Failed to send meeting analysis email: {email_result.get('error')}"
+                                )
                         else:
-                            logger.warning(f"No participant emails found for meeting {meeting_id}")
+                            logger.warning(
+                                f"No participant emails found for meeting {meeting_id}"
+                            )
                     elif send_emails and not self.notification_manager:
-                        logger.warning(f"Email notifications enabled for project {project['key']} but notification manager not available")
+                        logger.warning(
+                            f"Email notifications enabled for project {project['key']} but notification manager not available"
+                        )
                     else:
-                        logger.debug(f"Email notifications disabled for project {project['key']}")
+                        logger.debug(
+                            f"Email notifications disabled for project {project['key']}"
+                        )
 
                 except Exception as email_error:
-                    logger.error(f"Error sending meeting analysis email: {email_error}", exc_info=True)
+                    logger.error(
+                        f"Error sending meeting analysis email: {email_error}",
+                        exc_info=True,
+                    )
                     # Don't fail the whole meeting analysis if email fails
 
                 # Send Slack DM notifications to project followers
                 try:
                     if self.notification_manager:
-                        logger.info(f"Sending Slack DM notifications to project followers for {project['key']}")
+                        logger.info(
+                            f"Sending Slack DM notifications to project followers for {project['key']}"
+                        )
 
                         # Get Fireflies recording URL
-                        fireflies_url = transcript_data.get("recording_url") or f"https://app.fireflies.ai/view/{meeting_id}"
+                        fireflies_url = (
+                            transcript_data.get("recording_url")
+                            or f"https://app.fireflies.ai/view/{meeting_id}"
+                        )
 
                         slack_dm_result = asyncio.run(
                             self.notification_manager.send_meeting_analysis_slack_dms(
@@ -424,20 +479,29 @@ class MeetingAnalysisSyncJob:
                                 action_items=action_items_data,
                                 meeting_url=fireflies_url,
                                 ai_provider=ai_provider,
-                                ai_model=ai_model
+                                ai_model=ai_model,
                             )
                         )
 
                         if slack_dm_result.get("success"):
                             sent_count = slack_dm_result.get("sent_count", 0)
-                            logger.info(f"✅ Meeting analysis Slack DMs sent to {sent_count} followers")
+                            logger.info(
+                                f"✅ Meeting analysis Slack DMs sent to {sent_count} followers"
+                            )
                         else:
-                            logger.error(f"Failed to send meeting analysis Slack DMs: {slack_dm_result.get('error')}")
+                            logger.error(
+                                f"Failed to send meeting analysis Slack DMs: {slack_dm_result.get('error')}"
+                            )
                     else:
-                        logger.warning("Notification manager not available for Slack DMs")
+                        logger.warning(
+                            "Notification manager not available for Slack DMs"
+                        )
 
                 except Exception as slack_error:
-                    logger.error(f"Error sending meeting analysis Slack DMs: {slack_error}", exc_info=True)
+                    logger.error(
+                        f"Error sending meeting analysis Slack DMs: {slack_error}",
+                        exc_info=True,
+                    )
                     # Don't fail the whole task if Slack DMs fail
 
                 return True
@@ -480,48 +544,47 @@ class MeetingAnalysisSyncJob:
             message_blocks = [
                 {
                     "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": f"{emoji} {title}"
-                    }
+                    "text": {"type": "plain_text", "text": f"{emoji} {title}"},
                 },
                 {
                     "type": "section",
                     "fields": [
                         {
                             "type": "mrkdwn",
-                            "text": f"*Active Projects:* {stats.get('active_projects', 0)}"
+                            "text": f"*Active Projects:* {stats.get('active_projects', 0)}",
                         },
                         {
                             "type": "mrkdwn",
-                            "text": f"*Meetings Analyzed:* {stats.get('meetings_analyzed', 0)}"
+                            "text": f"*Meetings Analyzed:* {stats.get('meetings_analyzed', 0)}",
                         },
                         {
                             "type": "mrkdwn",
-                            "text": f"*Errors:* {stats.get('errors', 0)}"
+                            "text": f"*Errors:* {stats.get('errors', 0)}",
                         },
                         {
                             "type": "mrkdwn",
-                            "text": f"*Duration:* {stats.get('duration_seconds', 0):.1f}s"
-                        }
-                    ]
-                }
+                            "text": f"*Duration:* {stats.get('duration_seconds', 0):.1f}s",
+                        },
+                    ],
+                },
             ]
 
             if stats.get("error"):
-                message_blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*Error:* {stats['error']}"
+                message_blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Error:* {stats['error']}",
+                        },
                     }
-                })
+                )
 
             # Send to Slack
             client.chat_postMessage(
                 channel=slack_channel,
                 blocks=message_blocks,
-                text=title  # Fallback text
+                text=title,  # Fallback text
             )
 
             logger.info(f"Sent Slack notification to {slack_channel}")
@@ -546,7 +609,7 @@ class MeetingAnalysisSyncJob:
             "meetings_analyzed": 0,
             "errors": 0,
             "meetings_matched": 0,
-            "meetings_total": 0
+            "meetings_total": 0,
         }
 
         try:
@@ -571,8 +634,7 @@ class MeetingAnalysisSyncJob:
 
             # Filter by project keywords
             matched_meetings = self.filter_meetings_by_projects(
-                unanalyzed_meetings,
-                active_projects
+                unanalyzed_meetings, active_projects
             )
             stats["meetings_matched"] = len(matched_meetings)
 
@@ -606,7 +668,9 @@ class MeetingAnalysisSyncJob:
             stats["end_time"] = end_time.isoformat()
             stats["duration_seconds"] = duration
 
-            logger.info(f"Meeting analysis sync completed successfully in {duration:.2f}s")
+            logger.info(
+                f"Meeting analysis sync completed successfully in {duration:.2f}s"
+            )
             logger.info(f"Stats: {stats}")
 
             # Send Slack notification
@@ -618,7 +682,10 @@ class MeetingAnalysisSyncJob:
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
 
-            logger.error(f"Meeting analysis sync failed after {duration:.2f}s: {e}", exc_info=True)
+            logger.error(
+                f"Meeting analysis sync failed after {duration:.2f}s: {e}",
+                exc_info=True,
+            )
 
             stats["success"] = False
             stats["end_time"] = end_time.isoformat()
@@ -640,13 +707,15 @@ def run_meeting_analysis_sync():
         job = MeetingAnalysisSyncJob()
         return job.run()
     except Exception as e:
-        logger.error(f"Failed to initialize or run meeting analysis sync job: {e}", exc_info=True)
+        logger.error(
+            f"Failed to initialize or run meeting analysis sync job: {e}", exc_info=True
+        )
         return {
             "success": False,
             "error": str(e),
             "start_time": datetime.now().isoformat(),
             "end_time": datetime.now().isoformat(),
-            "duration_seconds": 0
+            "duration_seconds": 0,
         }
 
 
@@ -654,7 +723,7 @@ if __name__ == "__main__":
     # Allow running job manually for testing
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     print("Running meeting analysis sync job manually...")

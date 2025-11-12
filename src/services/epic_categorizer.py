@@ -26,7 +26,7 @@ class EpicCategorizer:
         "Data",
         "Infrastructure",
         "QA",
-        "Uncategorized"
+        "Uncategorized",
     ]
 
     def __init__(self, db_session: Session):
@@ -44,31 +44,35 @@ class EpicCategorizer:
         ai_config = Settings.get_fresh_ai_config()
 
         if not ai_config:
-            logger.warning("AI configuration not available - EpicCategorizer will not be functional")
+            logger.warning(
+                "AI configuration not available - EpicCategorizer will not be functional"
+            )
             return None
 
-        logger.info(f"Creating LLM for categorization with provider={ai_config.provider}, model={ai_config.model}")
+        logger.info(
+            f"Creating LLM for categorization with provider={ai_config.provider}, model={ai_config.model}"
+        )
 
         if ai_config.provider == "openai":
             return ChatOpenAI(
                 model=ai_config.model,
                 temperature=0.1,  # Low temperature for consistent categorization
                 max_tokens=50,  # Only need category name
-                api_key=ai_config.api_key
+                api_key=ai_config.api_key,
             )
         elif ai_config.provider == "anthropic":
             return ChatAnthropic(
                 model=ai_config.model,
                 anthropic_api_key=ai_config.api_key,
                 temperature=0.1,
-                max_tokens=50
+                max_tokens=50,
             )
         elif ai_config.provider == "google":
             return ChatGoogleGenerativeAI(
                 model=ai_config.model,
                 google_api_key=ai_config.api_key,
                 temperature=0.1,
-                max_tokens=50
+                max_tokens=50,
             )
         else:
             logger.error(f"Unsupported AI provider: {ai_config.provider}")
@@ -90,12 +94,16 @@ class EpicCategorizer:
             return self._cache[epic_key]
 
         # Check database for existing mapping
-        existing_mapping = self.db_session.query(EpicCategoryMapping).filter_by(
-            epic_key=epic_key
-        ).first()
+        existing_mapping = (
+            self.db_session.query(EpicCategoryMapping)
+            .filter_by(epic_key=epic_key)
+            .first()
+        )
 
         if existing_mapping:
-            logger.debug(f"Found existing category mapping for {epic_key}: {existing_mapping.category}")
+            logger.debug(
+                f"Found existing category mapping for {epic_key}: {existing_mapping.category}"
+            )
             self._cache[epic_key] = existing_mapping.category
             return existing_mapping.category
 
@@ -153,7 +161,7 @@ Example responses:
         try:
             messages = [
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=user_prompt)
+                HumanMessage(content=user_prompt),
             ]
 
             response = self.llm.invoke(messages)
@@ -164,7 +172,9 @@ Example responses:
                 logger.info(f"AI categorized epic as: {category}")
                 return category
             else:
-                logger.warning(f"AI returned invalid category '{category}', defaulting to 'Uncategorized'")
+                logger.warning(
+                    f"AI returned invalid category '{category}', defaulting to 'Uncategorized'"
+                )
                 return "Uncategorized"
 
         except Exception as e:
@@ -180,9 +190,11 @@ Example responses:
         """
         try:
             # Check if mapping already exists
-            existing = self.db_session.query(EpicCategoryMapping).filter_by(
-                epic_key=epic_key
-            ).first()
+            existing = (
+                self.db_session.query(EpicCategoryMapping)
+                .filter_by(epic_key=epic_key)
+                .first()
+            )
 
             if existing:
                 # Update existing mapping
@@ -190,17 +202,16 @@ Example responses:
                 logger.debug(f"Updated category mapping for {epic_key} to {category}")
             else:
                 # Create new mapping
-                mapping = EpicCategoryMapping(
-                    epic_key=epic_key,
-                    category=category
-                )
+                mapping = EpicCategoryMapping(epic_key=epic_key, category=category)
                 self.db_session.add(mapping)
                 logger.debug(f"Created category mapping for {epic_key}: {category}")
 
             self.db_session.commit()
 
         except Exception as e:
-            logger.error(f"Error saving category mapping for {epic_key}: {e}", exc_info=True)
+            logger.error(
+                f"Error saving category mapping for {epic_key}: {e}", exc_info=True
+            )
             self.db_session.rollback()
 
     def categorize_batch(self, epics: list[tuple[str, str]]) -> Dict[str, str]:

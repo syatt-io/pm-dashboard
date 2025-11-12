@@ -1,4 +1,5 @@
 """Diagnostic test for context search - verify all sources are being searched."""
+
 import asyncio
 import logging
 
@@ -8,9 +9,9 @@ from src.services.context_search import ContextSearchService
 
 # Enable debug logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+
 
 @pytest.mark.asyncio
 async def test_search():
@@ -28,9 +29,9 @@ async def test_search():
     results = await search_service.search(
         query=query,
         days_back=90,
-        sources=['slack', 'fireflies', 'jira', 'notion'],
+        sources=["slack", "fireflies", "jira", "notion"],
         user_id=1,  # Use user_id 1 for testing
-        debug=True
+        debug=True,
     )
 
     print(f"\n{'='*80}")
@@ -44,7 +45,7 @@ async def test_search():
         source_counts[result.source] = source_counts.get(result.source, 0) + 1
 
     print(f"\nResults by source:")
-    for source in ['slack', 'fireflies', 'jira', 'notion']:
+    for source in ["slack", "fireflies", "jira", "notion"]:
         count = source_counts.get(source, 0)
         print(f"  {source}: {count}")
 
@@ -60,6 +61,7 @@ async def test_search():
         print(f"    Preview: {result.content[:100]}...")
         if result.url:
             print(f"    URL: {result.url}")
+
 
 if __name__ == "__main__":
     asyncio.run(test_search())

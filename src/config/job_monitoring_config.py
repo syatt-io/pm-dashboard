@@ -14,6 +14,7 @@ from dataclasses import dataclass
 @dataclass
 class JobConfig:
     """Configuration for a single scheduled job."""
+
     job_name: str
     category: str  # vector_ingestion, notifications, pm_automation, etc.
     priority: str  # critical, high, normal, low
@@ -39,7 +40,9 @@ LOW = "low"  # Nice-to-have - digest only
 
 # Alert Configuration
 ALERT_CONFIG = {
-    "immediate_alert_priorities": [CRITICAL],  # Only critical failures get immediate Slack alert
+    "immediate_alert_priorities": [
+        CRITICAL
+    ],  # Only critical failures get immediate Slack alert
     "daily_digest_time": "09:00",  # 9 AM EST
     "alert_cooldown_minutes": 15,  # Prevent duplicate alerts for same failure
     "slow_job_threshold": 1.5,  # Alert if job takes 1.5x expected duration
@@ -94,7 +97,6 @@ JOBS: Dict[str, JobConfig] = {
         description="Daily ingestion of Tempo worklogs into Pinecone vector DB",
         alert_on_failure=True,
     ),
-
     # ========================================================================
     # 2. NOTIFICATION & REMINDERS (7 Tasks) - NORMAL/LOW
     # ========================================================================
@@ -154,7 +156,6 @@ JOBS: Dict[str, JobConfig] = {
         description="Weekly project hours reports to PMs (Mondays 10 AM EST)",
         alert_on_failure=False,  # Digest only
     ),
-
     # ========================================================================
     # 3. DATA SYNC OPERATIONS (1 Task) - HIGH
     # ========================================================================
@@ -166,7 +167,6 @@ JOBS: Dict[str, JobConfig] = {
         description="Daily sync of project hours from Tempo API to database",
         alert_on_failure=True,
     ),
-
     # ========================================================================
     # 4. MEETING ANALYSIS (1 Task) - HIGH
     # ========================================================================
@@ -178,7 +178,6 @@ JOBS: Dict[str, JobConfig] = {
         description="Nightly analysis of Fireflies meeting transcripts with AI",
         alert_on_failure=True,
     ),
-
     # ========================================================================
     # 5. PM AUTOMATION JOBS (2 Tasks) - HIGH
     # ========================================================================
@@ -198,7 +197,6 @@ JOBS: Dict[str, JobConfig] = {
         description="Monthly epic hours reconciliation report (3rd of month)",
         alert_on_failure=True,
     ),
-
     # ========================================================================
     # 6. JOB MONITORING DIGEST (1 Task) - NORMAL
     # ========================================================================
@@ -210,7 +208,6 @@ JOBS: Dict[str, JobConfig] = {
         description="Daily job monitoring digest via email and Slack (9:05 AM EST)",
         alert_on_failure=False,  # Digest only
     ),
-
     # ========================================================================
     # 7. PROACTIVE AGENT JOBS (3 Tasks) - HIGH/NORMAL
     # ========================================================================
@@ -285,6 +282,7 @@ JOBS: Dict[str, JobConfig] = {
 # HELPER FUNCTIONS
 # ============================================================================
 
+
 def get_job_config(job_name: str) -> JobConfig:
     """Get configuration for a specific job.
 
@@ -315,9 +313,7 @@ def get_jobs_by_category(category: str) -> Dict[str, JobConfig]:
         Dictionary of job_name -> JobConfig for all jobs in category
     """
     return {
-        name: config
-        for name, config in JOBS.items()
-        if config.category == category
+        name: config for name, config in JOBS.items() if config.category == category
     }
 
 
@@ -331,9 +327,7 @@ def get_jobs_by_priority(priority: str) -> Dict[str, JobConfig]:
         Dictionary of job_name -> JobConfig for all jobs at priority level
     """
     return {
-        name: config
-        for name, config in JOBS.items()
-        if config.priority == priority
+        name: config for name, config in JOBS.items() if config.priority == priority
     }
 
 
@@ -358,8 +352,8 @@ def should_send_immediate_alert(job_name: str) -> bool:
     try:
         config = get_job_config(job_name)
         return (
-            config.alert_on_failure and
-            config.priority in ALERT_CONFIG["immediate_alert_priorities"]
+            config.alert_on_failure
+            and config.priority in ALERT_CONFIG["immediate_alert_priorities"]
         )
     except KeyError:
         # Unknown jobs get immediate alerts for safety
@@ -388,6 +382,7 @@ def get_all_priorities() -> list[str]:
 # STATISTICS
 # ============================================================================
 
+
 def get_job_stats() -> Dict[str, Any]:
     """Get statistics about configured jobs.
 
@@ -403,12 +398,14 @@ def get_job_stats() -> Dict[str, Any]:
 
     for config in JOBS.values():
         # Count by category
-        stats["by_category"][config.category] = \
+        stats["by_category"][config.category] = (
             stats["by_category"].get(config.category, 0) + 1
+        )
 
         # Count by priority
-        stats["by_priority"][config.priority] = \
+        stats["by_priority"][config.priority] = (
             stats["by_priority"].get(config.priority, 0) + 1
+        )
 
         # Count immediate alerts
         if should_send_immediate_alert(config.job_name):
@@ -420,25 +417,26 @@ def get_job_stats() -> Dict[str, Any]:
 # Print stats when module is imported (useful for debugging)
 if __name__ == "__main__":
     import json
-    print("\n" + "="*70)
+
+    print("\n" + "=" * 70)
     print("JOB MONITORING CONFIGURATION SUMMARY")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     stats = get_job_stats()
     print(f"Total Configured Jobs: {stats['total_jobs']}")
     print(f"\nBy Category:")
-    for category, count in sorted(stats['by_category'].items()):
+    for category, count in sorted(stats["by_category"].items()):
         print(f"  {category}: {count}")
 
     print(f"\nBy Priority:")
-    for priority, count in sorted(stats['by_priority'].items()):
+    for priority, count in sorted(stats["by_priority"].items()):
         print(f"  {priority}: {count}")
 
     print(f"\nImmediate Alerts Enabled: {stats['immediate_alerts_enabled']} jobs")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("CRITICAL JOBS (Immediate Alerts)")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     for name, config in get_critical_jobs().items():
         print(f"  • {name}")

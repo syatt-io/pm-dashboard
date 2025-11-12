@@ -27,11 +27,15 @@ class CeleryMonitor:
     def __init__(self):
         """Initialize the monitor with Slack client."""
         self.slack_client = None
-        self.alert_channel = os.getenv("SLACK_ALERT_CHANNEL") or os.getenv("SLACK_CHANNEL", "#general")
+        self.alert_channel = os.getenv("SLACK_ALERT_CHANNEL") or os.getenv(
+            "SLACK_CHANNEL", "#general"
+        )
         self.environment = os.getenv("FLASK_ENV", "development")
 
         # Only send alerts in production by default
-        self.enable_alerts = os.getenv("CELERY_ALERTS_ENABLED", "true").lower() == "true"
+        self.enable_alerts = (
+            os.getenv("CELERY_ALERTS_ENABLED", "true").lower() == "true"
+        )
 
         # Slack setup
         slack_token = os.getenv("SLACK_BOT_TOKEN")
@@ -44,7 +48,9 @@ class CeleryMonitor:
 
         # Track task failures to avoid spam
         self.recent_failures = {}  # task_name -> timestamp
-        self.failure_cooldown = int(os.getenv("CELERY_ALERT_COOLDOWN_MINUTES", "15")) * 60  # 15 min default
+        self.failure_cooldown = (
+            int(os.getenv("CELERY_ALERT_COOLDOWN_MINUTES", "15")) * 60
+        )  # 15 min default
 
     def should_alert(self, task_name: str) -> bool:
         """Check if we should send an alert for this task (cooldown logic)."""
@@ -57,7 +63,9 @@ class CeleryMonitor:
         if last_failure:
             time_since_last = (now - last_failure).total_seconds()
             if time_since_last < self.failure_cooldown:
-                logger.info(f"Suppressing alert for {task_name} (cooldown: {int(time_since_last)}s < {self.failure_cooldown}s)")
+                logger.info(
+                    f"Suppressing alert for {task_name} (cooldown: {int(time_since_last)}s < {self.failure_cooldown}s)"
+                )
                 return False
 
         self.recent_failures[task_name] = now
@@ -71,7 +79,11 @@ class CeleryMonitor:
 
         try:
             # Add environment indicator
-            env_prefix = f"[{self.environment.upper()}] " if self.environment != "production" else ""
+            env_prefix = (
+                f"[{self.environment.upper()}] "
+                if self.environment != "production"
+                else ""
+            )
 
             # Add emoji based on priority
             emoji = "🚨" if priority == "critical" else "⚠️"
@@ -82,10 +94,12 @@ class CeleryMonitor:
                 channel=self.alert_channel,
                 text=full_message,
                 unfurl_links=False,
-                unfurl_media=False
+                unfurl_media=False,
             )
 
-            logger.info(f"✓ Sent Celery alert to {self.alert_channel}: {response['ts']}")
+            logger.info(
+                f"✓ Sent Celery alert to {self.alert_channel}: {response['ts']}"
+            )
 
         except SlackApiError as e:
             logger.error(f"❌ Slack API error sending Celery alert: {e}")
@@ -100,7 +114,7 @@ class CeleryMonitor:
         args: tuple = (),
         kwargs: dict = None,
         retries: int = 0,
-        max_retries: int = 3
+        max_retries: int = 3,
     ) -> str:
         """Format a comprehensive task failure alert message."""
         kwargs = kwargs or {}
@@ -137,7 +151,7 @@ class CeleryMonitor:
         task_id: str,
         soft_time_limit: int,
         args: tuple = (),
-        kwargs: dict = None
+        kwargs: dict = None,
     ) -> str:
         """Format a task timeout alert message."""
         kwargs = kwargs or {}
@@ -164,9 +178,18 @@ monitor = CeleryMonitor()
 
 # ========== Celery Signal Handlers ==========
 
+
 @signals.task_failure.connect
-def task_failure_handler(sender=None, task_id=None, exception=None, args=None, kwargs=None,
-                        traceback=None, einfo=None, **extra_kwargs):
+def task_failure_handler(
+    sender=None,
+    task_id=None,
+    exception=None,
+    args=None,
+    kwargs=None,
+    traceback=None,
+    einfo=None,
+    **extra_kwargs,
+):
     """
     Handle task failures and send alerts.
 
@@ -181,8 +204,8 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
             "task_name": task_name,
             "task_id": task_id,
             "args": args,
-            "kwargs": kwargs
-        }
+            "kwargs": kwargs,
+        },
     )
 
     # Check if we should alert (cooldown logic)
@@ -190,8 +213,12 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
         return
 
     # Get retry info from task
-    retries = getattr(sender.request, 'retries', 0) if sender and hasattr(sender, 'request') else 0
-    max_retries = getattr(sender, 'max_retries', 3) if sender else 3
+    retries = (
+        getattr(sender.request, "retries", 0)
+        if sender and hasattr(sender, "request")
+        else 0
+    )
+    max_retries = getattr(sender, "max_retries", 3) if sender else 3
 
     # Send Slack alert
     alert_message = monitor.format_task_failure_alert(
@@ -201,7 +228,7 @@ def task_failure_handler(sender=None, task_id=None, exception=None, args=None, k
         args=args or (),
         kwargs=kwargs or {},
         retries=retries,
-        max_retries=max_retries
+        max_retries=max_retries,
     )
 
     monitor.send_slack_alert(alert_message, priority="critical")
@@ -215,8 +242,12 @@ def task_retry_handler(sender=None, task_id=None, reason=None, einfo=None, **kwa
     This signal is sent when a task is retried.
     """
     task_name = sender.name if sender else "Unknown Task"
-    retries = getattr(sender.request, 'retries', 0) if sender and hasattr(sender, 'request') else 0
-    max_retries = getattr(sender, 'max_retries', 3) if sender else 3
+    retries = (
+        getattr(sender.request, "retries", 0)
+        if sender and hasattr(sender, "request")
+        else 0
+    )
+    max_retries = getattr(sender, "max_retries", 3) if sender else 3
 
     logger.warning(
         f"🔄 Celery task retry: {task_name} (ID: {task_id}, attempt {retries + 1}/{max_retries + 1})",
@@ -225,8 +256,8 @@ def task_retry_handler(sender=None, task_id=None, reason=None, einfo=None, **kwa
             "task_id": task_id,
             "reason": str(reason),
             "retries": retries,
-            "max_retries": max_retries
-        }
+            "max_retries": max_retries,
+        },
     )
 
 
@@ -243,15 +274,14 @@ def task_success_handler(sender=None, result=None, **kwargs):
     if os.getenv("CELERY_LOG_SUCCESS", "false").lower() == "true":
         logger.info(
             f"✅ Celery task succeeded: {task_name}",
-            extra={
-                "task_name": task_name,
-                "result": result
-            }
+            extra={"task_name": task_name, "result": result},
         )
 
 
 @signals.task_revoked.connect
-def task_revoked_handler(sender=None, request=None, terminated=None, signum=None, expired=None, **kwargs):
+def task_revoked_handler(
+    sender=None, request=None, terminated=None, signum=None, expired=None, **kwargs
+):
     """
     Handle task revocations (usually due to worker restarts or manual intervention).
 
@@ -269,8 +299,8 @@ def task_revoked_handler(sender=None, request=None, terminated=None, signum=None
             "task_id": task_id,
             "reason": reason,
             "terminated": terminated,
-            "expired": expired
-        }
+            "expired": expired,
+        },
     )
 
     # Alert on terminated tasks (usually means worker crash or OOM)
@@ -290,12 +320,14 @@ def task_revoked_handler(sender=None, request=None, terminated=None, signum=None
 def worker_shutdown_handler(sender, **kwargs):
     """Handle worker shutdown events."""
     logger.warning(
-        f"⚠️  Celery worker shutting down: {sender}",
-        extra={"worker": str(sender)}
+        f"⚠️  Celery worker shutting down: {sender}", extra={"worker": str(sender)}
     )
 
     # Alert on worker shutdown (could be crash or deployment)
-    if monitor.enable_alerts and os.getenv("CELERY_ALERT_ON_WORKER_SHUTDOWN", "false").lower() == "true":
+    if (
+        monitor.enable_alerts
+        and os.getenv("CELERY_ALERT_ON_WORKER_SHUTDOWN", "false").lower() == "true"
+    ):
         message = f"*Celery Worker Shutdown*\n\n"
         message += f"• *Worker*: `{sender}`\n"
         message += f"• *Time*: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
@@ -307,13 +339,11 @@ def worker_shutdown_handler(sender, **kwargs):
 @signals.worker_ready.connect
 def worker_ready_handler(sender, **kwargs):
     """Handle worker ready events."""
-    logger.info(
-        f"✓ Celery worker ready: {sender}",
-        extra={"worker": str(sender)}
-    )
+    logger.info(f"✓ Celery worker ready: {sender}", extra={"worker": str(sender)})
 
 
 # ========== Helper Functions ==========
+
 
 def check_queue_health() -> Dict[str, Any]:
     """
@@ -346,7 +376,7 @@ def check_queue_health() -> Dict[str, Any]:
             "active_tasks": total_active,
             "scheduled_tasks": total_scheduled,
             "reserved_tasks": total_reserved,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
@@ -354,7 +384,7 @@ def check_queue_health() -> Dict[str, Any]:
         return {
             "healthy": False,
             "error": str(e),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
 
@@ -362,7 +392,9 @@ def send_health_check_alert(health_status: Dict[str, Any]):
     """Send alert if queue health check fails."""
     if not health_status.get("healthy") and monitor.should_alert("celery_health_check"):
         message = f"*Celery Health Check Failed*\n\n"
-        message += f"• *Workers Available*: {health_status.get('workers_available', False)}\n"
+        message += (
+            f"• *Workers Available*: {health_status.get('workers_available', False)}\n"
+        )
         message += f"• *Error*: {health_status.get('error', 'Unknown')}\n"
         message += f"• *Time*: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
         message += f"\n🚨 *Action Required*: Celery workers may be down - investigate immediately"
@@ -370,4 +402,4 @@ def send_health_check_alert(health_status: Dict[str, Any]):
         monitor.send_slack_alert(message, priority="critical")
 
 
-__all__ = ['monitor', 'check_queue_health', 'send_health_check_alert']
+__all__ = ["monitor", "check_queue_health", "send_health_check_alert"]

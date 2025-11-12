@@ -20,7 +20,7 @@ from typing import Dict, List, Tuple
 import logging
 
 # Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from dotenv import load_dotenv
 from src.integrations.tempo import TempoAPIClient
@@ -28,8 +28,7 @@ from src.integrations.tempo import TempoAPIClient
 load_dotenv()
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,9 @@ class HoursByEpicAnalyzer:
             Tuple of (epic_key, epic_summary) or ("No Epic", "") if no epic
         """
         if issue_key in self.epic_cache:
-            return self.epic_cache[issue_key], self.issue_summary_cache.get(issue_key, "")
+            return self.epic_cache[issue_key], self.issue_summary_cache.get(
+                issue_key, ""
+            )
 
         try:
             # Rate limit to avoid hitting Jira API limits
@@ -64,11 +65,9 @@ class HoursByEpicAnalyzer:
             params = {"fields": "parent,summary,issuetype"}
 
             import requests
+
             response = requests.get(
-                url,
-                headers=self.tempo_client.jira_headers,
-                params=params,
-                timeout=10
+                url, headers=self.tempo_client.jira_headers, params=params, timeout=10
             )
             response.raise_for_status()
 
@@ -93,7 +92,7 @@ class HoursByEpicAnalyzer:
                     parent_url,
                     headers=self.tempo_client.jira_headers,
                     params={"fields": "summary"},
-                    timeout=10
+                    timeout=10,
                 )
                 parent_response.raise_for_status()
                 parent_data = parent_response.json()
@@ -115,10 +114,7 @@ class HoursByEpicAnalyzer:
             return "Unknown", ""
 
     def analyze_worklogs(
-        self,
-        project_keys: List[str],
-        start_date: str,
-        end_date: str
+        self, project_keys: List[str], start_date: str, end_date: str
     ) -> Dict[str, Dict[str, Dict[str, Dict[str, float]]]]:
         """
         Analyze worklogs grouped by project, epic, month, and team.
@@ -138,7 +134,9 @@ class HoursByEpicAnalyzer:
         logger.info(f"Retrieved {len(worklogs)} worklogs")
 
         # Structure: {project: {month: {epic: {team: hours}}}}
-        results = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
+        results = defaultdict(
+            lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+        )
 
         # Track epic summaries
         epic_summaries = {}
@@ -188,7 +186,11 @@ class HoursByEpicAnalyzer:
                 # Get user's team
                 author = worklog.get("author", {})
                 account_id = author.get("accountId")
-                team = self.tempo_client.get_user_team(account_id) if account_id else "Unassigned"
+                team = (
+                    self.tempo_client.get_user_team(account_id)
+                    if account_id
+                    else "Unassigned"
+                )
                 if not team:
                     team = "Unassigned"
 
@@ -212,7 +214,7 @@ class HoursByEpicAnalyzer:
     def print_report(
         self,
         results: Dict[str, Dict[str, Dict[str, Dict[str, float]]]],
-        format_type: str = "table"
+        format_type: str = "table",
     ):
         """
         Print analysis results in various formats.
@@ -223,6 +225,7 @@ class HoursByEpicAnalyzer:
         """
         if format_type == "json":
             import json
+
             print(json.dumps(results, indent=2))
             return
 
@@ -233,7 +236,9 @@ class HoursByEpicAnalyzer:
                     for epic, teams in sorted(epics.items()):
                         epic_summary = self.epic_summaries.get(epic, "")
                         for team, hours in sorted(teams.items()):
-                            print(f"{project},{month},{epic},{team},\"{epic_summary}\",{hours:.2f}")
+                            print(
+                                f'{project},{month},{epic},{team},"{epic_summary}",{hours:.2f}'
+                            )
             return
 
         # Table format (default)
@@ -261,9 +266,7 @@ class HoursByEpicAnalyzer:
                 epics = months[month]
 
                 # Calculate month total
-                month_total = sum(
-                    sum(teams.values()) for teams in epics.values()
-                )
+                month_total = sum(sum(teams.values()) for teams in epics.values())
 
                 print(f"\n   {'─' * 90}")
                 print(f"   📅 {month} - Total: {month_total:.2f}h")
@@ -271,27 +274,42 @@ class HoursByEpicAnalyzer:
 
                 # Sort epics by total hours (descending)
                 epic_totals = {
-                    epic: sum(teams.values())
-                    for epic, teams in epics.items()
+                    epic: sum(teams.values()) for epic, teams in epics.items()
                 }
-                sorted_epics = sorted(epic_totals.items(), key=lambda x: x[1], reverse=True)
+                sorted_epics = sorted(
+                    epic_totals.items(), key=lambda x: x[1], reverse=True
+                )
 
                 for epic_key, epic_total_hours in sorted_epics:
                     epic_summary = self.epic_summaries.get(epic_key, "")
-                    percentage = (epic_total_hours / month_total * 100) if month_total > 0 else 0
+                    percentage = (
+                        (epic_total_hours / month_total * 100) if month_total > 0 else 0
+                    )
 
                     # Print epic header
                     if epic_summary:
-                        print(f"      🎯 {epic_key}: {epic_total_hours:6.2f}h ({percentage:5.1f}%) - {epic_summary}")
+                        print(
+                            f"      🎯 {epic_key}: {epic_total_hours:6.2f}h ({percentage:5.1f}%) - {epic_summary}"
+                        )
                     else:
-                        print(f"      🎯 {epic_key}: {epic_total_hours:6.2f}h ({percentage:5.1f}%)")
+                        print(
+                            f"      🎯 {epic_key}: {epic_total_hours:6.2f}h ({percentage:5.1f}%)"
+                        )
 
                     # Print team breakdown for this epic
                     teams = epics[epic_key]
-                    sorted_teams = sorted(teams.items(), key=lambda x: x[1], reverse=True)
+                    sorted_teams = sorted(
+                        teams.items(), key=lambda x: x[1], reverse=True
+                    )
                     for team, hours in sorted_teams:
-                        team_percentage = (hours / epic_total_hours * 100) if epic_total_hours > 0 else 0
-                        print(f"         └─ {team}: {hours:6.2f}h ({team_percentage:5.1f}%)")
+                        team_percentage = (
+                            (hours / epic_total_hours * 100)
+                            if epic_total_hours > 0
+                            else 0
+                        )
+                        print(
+                            f"         └─ {team}: {hours:6.2f}h ({team_percentage:5.1f}%)"
+                        )
 
         print("\n" + "=" * 100)
         print("SUMMARY")
@@ -317,7 +335,9 @@ class HoursByEpicAnalyzer:
             num_epics = len(all_epics)
             num_teams = len(all_teams)
 
-            print(f"| {project:7} | {total_hours:11.2f} | {num_months:6} | {num_epics:5} | {num_teams:5} |")
+            print(
+                f"| {project:7} | {total_hours:11.2f} | {num_months:6} | {num_epics:5} | {num_teams:5} |"
+            )
 
 
 def main():
@@ -338,43 +358,35 @@ Examples:
 
   # Export to CSV
   python scripts/analyze_hours_by_epic.py --projects COOP --months 6 --format csv > coop_analysis.csv
-        """
+        """,
     )
 
     parser.add_argument(
-        '--projects',
-        nargs='+',
-        help='Project keys to analyze (e.g., COOP SUBS). If not specified, use --all-projects'
+        "--projects",
+        nargs="+",
+        help="Project keys to analyze (e.g., COOP SUBS). If not specified, use --all-projects",
     )
     parser.add_argument(
-        '--all-projects',
-        action='store_true',
-        help='Analyze all projects (ignores --projects)'
+        "--all-projects",
+        action="store_true",
+        help="Analyze all projects (ignores --projects)",
     )
     parser.add_argument(
-        '--months',
-        type=int,
-        help='Number of months back to analyze (from today)'
+        "--months", type=int, help="Number of months back to analyze (from today)"
     )
     parser.add_argument(
-        '--start-date',
-        help='Start date in YYYY-MM-DD format (overrides --months)'
+        "--start-date", help="Start date in YYYY-MM-DD format (overrides --months)"
     )
     parser.add_argument(
-        '--end-date',
-        help='End date in YYYY-MM-DD format (defaults to today)'
+        "--end-date", help="End date in YYYY-MM-DD format (defaults to today)"
     )
     parser.add_argument(
-        '--format',
-        choices=['table', 'csv', 'json'],
-        default='table',
-        help='Output format (default: table)'
+        "--format",
+        choices=["table", "csv", "json"],
+        default="table",
+        help="Output format (default: table)",
     )
-    parser.add_argument(
-        '--debug',
-        action='store_true',
-        help='Enable debug logging'
-    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     args = parser.parse_args()
 
@@ -389,7 +401,9 @@ Examples:
     if args.start_date:
         start_date = args.start_date
     elif args.months:
-        start_date = (datetime.now() - timedelta(days=args.months * 30)).strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=args.months * 30)).strftime(
+            "%Y-%m-%d"
+        )
     else:
         parser.error("Must specify --months or --start-date")
 
@@ -406,9 +420,7 @@ Examples:
         logger.info(f"Date range: {start_date} to {end_date}")
 
         results = analyzer.analyze_worklogs(
-            project_keys=project_keys,
-            start_date=start_date,
-            end_date=end_date
+            project_keys=project_keys, start_date=start_date, end_date=end_date
         )
 
         analyzer.print_report(results, format_type=args.format)
@@ -416,6 +428,7 @@ Examples:
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

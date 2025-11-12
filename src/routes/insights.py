@@ -1,4 +1,5 @@
 """API routes for proactive insights management."""
+
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
@@ -10,10 +11,10 @@ from src.services.auth import auth_required
 
 logger = logging.getLogger(__name__)
 
-insights_bp = Blueprint('insights', __name__, url_prefix='/api/insights')
+insights_bp = Blueprint("insights", __name__, url_prefix="/api/insights")
 
 
-@insights_bp.route('', methods=['GET'])
+@insights_bp.route("", methods=["GET"])
 @auth_required
 def list_insights(user):
     """Get all insights for the current user.
@@ -31,47 +32,53 @@ def list_insights(user):
 
     try:
         # Build query
-        query = db.query(ProactiveInsight).filter(
-            ProactiveInsight.user_id == user.id
-        )
+        query = db.query(ProactiveInsight).filter(ProactiveInsight.user_id == user.id)
 
         # Filter by dismissed status
-        include_dismissed = request.args.get('dismissed', 'false').lower() == 'true'
+        include_dismissed = request.args.get("dismissed", "false").lower() == "true"
         if not include_dismissed:
             query = query.filter(ProactiveInsight.dismissed_at.is_(None))
 
         # Filter by severity
-        severity = request.args.get('severity')
+        severity = request.args.get("severity")
         if severity:
             query = query.filter(ProactiveInsight.severity == severity)
 
         # Filter by insight type
-        insight_type = request.args.get('insight_type')
+        insight_type = request.args.get("insight_type")
         if insight_type:
             query = query.filter(ProactiveInsight.insight_type == insight_type)
 
         # Apply limit
-        limit = int(request.args.get('limit', 50))
+        limit = int(request.args.get("limit", 50))
 
         # Order by severity (critical first) then by creation date (newest first)
-        insights = query.order_by(
-            ProactiveInsight.severity.desc(),
-            ProactiveInsight.created_at.desc()
-        ).limit(limit).all()
+        insights = (
+            query.order_by(
+                ProactiveInsight.severity.desc(), ProactiveInsight.created_at.desc()
+            )
+            .limit(limit)
+            .all()
+        )
 
-        return jsonify({
-            'insights': [insight.to_dict() for insight in insights],
-            'total': len(insights)
-        }), 200
+        return (
+            jsonify(
+                {
+                    "insights": [insight.to_dict() for insight in insights],
+                    "total": len(insights),
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error fetching insights for user {user.id}: {e}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch insights'}), 500
+        return jsonify({"error": "Failed to fetch insights"}), 500
     finally:
         db.close()
 
 
-@insights_bp.route('/<insight_id>', methods=['GET'])
+@insights_bp.route("/<insight_id>", methods=["GET"])
 @auth_required
 def get_insight(user, insight_id: str):
     """Get a specific insight by ID.
@@ -85,24 +92,27 @@ def get_insight(user, insight_id: str):
     db: Session = next(get_db())
 
     try:
-        insight = db.query(ProactiveInsight).filter(
-            ProactiveInsight.id == insight_id,
-            ProactiveInsight.user_id == user.id
-        ).first()
+        insight = (
+            db.query(ProactiveInsight)
+            .filter(
+                ProactiveInsight.id == insight_id, ProactiveInsight.user_id == user.id
+            )
+            .first()
+        )
 
         if not insight:
-            return jsonify({'error': 'Insight not found'}), 404
+            return jsonify({"error": "Insight not found"}), 404
 
-        return jsonify({'insight': insight.to_dict()}), 200
+        return jsonify({"insight": insight.to_dict()}), 200
 
     except Exception as e:
         logger.error(f"Error fetching insight {insight_id}: {e}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch insight'}), 500
+        return jsonify({"error": "Failed to fetch insight"}), 500
     finally:
         db.close()
 
 
-@insights_bp.route('/<insight_id>/dismiss', methods=['POST'])
+@insights_bp.route("/<insight_id>/dismiss", methods=["POST"])
 @auth_required
 def dismiss_insight(user: User, insight_id: str):
     """Dismiss an insight.
@@ -116,13 +126,16 @@ def dismiss_insight(user: User, insight_id: str):
     db: Session = next(get_db())
 
     try:
-        insight = db.query(ProactiveInsight).filter(
-            ProactiveInsight.id == insight_id,
-            ProactiveInsight.user_id == user.id
-        ).first()
+        insight = (
+            db.query(ProactiveInsight)
+            .filter(
+                ProactiveInsight.id == insight_id, ProactiveInsight.user_id == user.id
+            )
+            .first()
+        )
 
         if not insight:
-            return jsonify({'error': 'Insight not found'}), 404
+            return jsonify({"error": "Insight not found"}), 404
 
         # Mark as dismissed
         insight.dismissed_at = datetime.now(timezone.utc)
@@ -130,20 +143,25 @@ def dismiss_insight(user: User, insight_id: str):
 
         logger.info(f"User {user.id} dismissed insight {insight_id}")
 
-        return jsonify({
-            'message': 'Insight dismissed successfully',
-            'insight': insight.to_dict()
-        }), 200
+        return (
+            jsonify(
+                {
+                    "message": "Insight dismissed successfully",
+                    "insight": insight.to_dict(),
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error dismissing insight {insight_id}: {e}", exc_info=True)
         db.rollback()
-        return jsonify({'error': 'Failed to dismiss insight'}), 500
+        return jsonify({"error": "Failed to dismiss insight"}), 500
     finally:
         db.close()
 
 
-@insights_bp.route('/<insight_id>/act', methods=['POST'])
+@insights_bp.route("/<insight_id>/act", methods=["POST"])
 @auth_required
 def act_on_insight(user: User, insight_id: str):
     """Mark an insight as acted upon.
@@ -163,15 +181,18 @@ def act_on_insight(user: User, insight_id: str):
 
     try:
         data = request.get_json()
-        action_taken = data.get('action_taken', 'acted_on')
+        action_taken = data.get("action_taken", "acted_on")
 
-        insight = db.query(ProactiveInsight).filter(
-            ProactiveInsight.id == insight_id,
-            ProactiveInsight.user_id == user.id
-        ).first()
+        insight = (
+            db.query(ProactiveInsight)
+            .filter(
+                ProactiveInsight.id == insight_id, ProactiveInsight.user_id == user.id
+            )
+            .first()
+        )
 
         if not insight:
-            return jsonify({'error': 'Insight not found'}), 404
+            return jsonify({"error": "Insight not found"}), 404
 
         # Mark as acted on
         insight.acted_on_at = datetime.now(timezone.utc)
@@ -180,20 +201,25 @@ def act_on_insight(user: User, insight_id: str):
 
         logger.info(f"User {user.id} acted on insight {insight_id}: {action_taken}")
 
-        return jsonify({
-            'message': 'Insight marked as acted upon',
-            'insight': insight.to_dict()
-        }), 200
+        return (
+            jsonify(
+                {
+                    "message": "Insight marked as acted upon",
+                    "insight": insight.to_dict(),
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error acting on insight {insight_id}: {e}", exc_info=True)
         db.rollback()
-        return jsonify({'error': 'Failed to update insight'}), 500
+        return jsonify({"error": "Failed to update insight"}), 500
     finally:
         db.close()
 
 
-@insights_bp.route('/stats', methods=['GET'])
+@insights_bp.route("/stats", methods=["GET"])
 @auth_required
 def get_insight_stats(user: User):
     """Get insight statistics for the current user.
@@ -210,47 +236,57 @@ def get_insight_stats(user: User):
 
     try:
         # Get all non-dismissed insights
-        insights = db.query(ProactiveInsight).filter(
-            ProactiveInsight.user_id == user.id,
-            ProactiveInsight.dismissed_at.is_(None)
-        ).all()
+        insights = (
+            db.query(ProactiveInsight)
+            .filter(
+                ProactiveInsight.user_id == user.id,
+                ProactiveInsight.dismissed_at.is_(None),
+            )
+            .all()
+        )
 
         # Calculate stats
         stats = {
-            'total_insights': len(insights),
-            'by_severity': {
-                'critical': sum(1 for i in insights if i.severity == 'critical'),
-                'warning': sum(1 for i in insights if i.severity == 'warning'),
-                'info': sum(1 for i in insights if i.severity == 'info')
+            "total_insights": len(insights),
+            "by_severity": {
+                "critical": sum(1 for i in insights if i.severity == "critical"),
+                "warning": sum(1 for i in insights if i.severity == "warning"),
+                "info": sum(1 for i in insights if i.severity == "info"),
             },
-            'by_type': {},
-            'dismissed_count': db.query(ProactiveInsight).filter(
+            "by_type": {},
+            "dismissed_count": db.query(ProactiveInsight)
+            .filter(
                 ProactiveInsight.user_id == user.id,
-                ProactiveInsight.dismissed_at.isnot(None)
-            ).count(),
-            'acted_on_count': db.query(ProactiveInsight).filter(
+                ProactiveInsight.dismissed_at.isnot(None),
+            )
+            .count(),
+            "acted_on_count": db.query(ProactiveInsight)
+            .filter(
                 ProactiveInsight.user_id == user.id,
-                ProactiveInsight.acted_on_at.isnot(None)
-            ).count()
+                ProactiveInsight.acted_on_at.isnot(None),
+            )
+            .count(),
         }
 
         # Count by type
         for insight in insights:
             insight_type = insight.insight_type
-            if insight_type not in stats['by_type']:
-                stats['by_type'][insight_type] = 0
-            stats['by_type'][insight_type] += 1
+            if insight_type not in stats["by_type"]:
+                stats["by_type"][insight_type] = 0
+            stats["by_type"][insight_type] += 1
 
         return jsonify(stats), 200
 
     except Exception as e:
-        logger.error(f"Error fetching insight stats for user {user.id}: {e}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch stats'}), 500
+        logger.error(
+            f"Error fetching insight stats for user {user.id}: {e}", exc_info=True
+        )
+        return jsonify({"error": "Failed to fetch stats"}), 500
     finally:
         db.close()
 
 
-@insights_bp.route('/preferences', methods=['GET'])
+@insights_bp.route("/preferences", methods=["GET"])
 @auth_required
 def get_notification_preferences(user: User):
     """Get notification preferences for the current user.
@@ -261,38 +297,45 @@ def get_notification_preferences(user: User):
     db: Session = next(get_db())
 
     try:
-        prefs = db.query(UserNotificationPreferences).filter(
-            UserNotificationPreferences.user_id == user.id
-        ).first()
+        prefs = (
+            db.query(UserNotificationPreferences)
+            .filter(UserNotificationPreferences.user_id == user.id)
+            .first()
+        )
 
         # If no preferences exist, return defaults
         if not prefs:
-            return jsonify({
-                'preferences': {
-                    'daily_brief_slack': True,
-                    'daily_brief_email': False,
-                    'enable_stale_pr_alerts': True,
-                    'enable_budget_alerts': True,
-                    'enable_missing_ticket_alerts': True,
-                    'enable_anomaly_alerts': True,
-                    'enable_meeting_prep': True,
-                    'daily_brief_time': '09:00',
-                    'timezone': 'America/New_York'
-                }
-            }), 200
+            return (
+                jsonify(
+                    {
+                        "preferences": {
+                            "daily_brief_slack": True,
+                            "daily_brief_email": False,
+                            "enable_stale_pr_alerts": True,
+                            "enable_budget_alerts": True,
+                            "enable_missing_ticket_alerts": True,
+                            "enable_anomaly_alerts": True,
+                            "enable_meeting_prep": True,
+                            "daily_brief_time": "09:00",
+                            "timezone": "America/New_York",
+                        }
+                    }
+                ),
+                200,
+            )
 
-        return jsonify({
-            'preferences': prefs.to_dict()
-        }), 200
+        return jsonify({"preferences": prefs.to_dict()}), 200
 
     except Exception as e:
-        logger.error(f"Error fetching preferences for user {user.id}: {e}", exc_info=True)
-        return jsonify({'error': 'Failed to fetch preferences'}), 500
+        logger.error(
+            f"Error fetching preferences for user {user.id}: {e}", exc_info=True
+        )
+        return jsonify({"error": "Failed to fetch preferences"}), 500
     finally:
         db.close()
 
 
-@insights_bp.route('/preferences', methods=['PUT'])
+@insights_bp.route("/preferences", methods=["PUT"])
 @auth_required
 def update_notification_preferences(user: User):
     """Update notification preferences for the current user.
@@ -319,46 +362,55 @@ def update_notification_preferences(user: User):
         data = request.get_json()
 
         # Get or create preferences
-        prefs = db.query(UserNotificationPreferences).filter(
-            UserNotificationPreferences.user_id == user.id
-        ).first()
+        prefs = (
+            db.query(UserNotificationPreferences)
+            .filter(UserNotificationPreferences.user_id == user.id)
+            .first()
+        )
 
         if not prefs:
             prefs = UserNotificationPreferences(user_id=user.id)
             db.add(prefs)
 
         # Update fields
-        if 'daily_brief_slack' in data:
-            prefs.daily_brief_slack = data['daily_brief_slack']
-        if 'daily_brief_email' in data:
-            prefs.daily_brief_email = data['daily_brief_email']
-        if 'enable_stale_pr_alerts' in data:
-            prefs.enable_stale_pr_alerts = data['enable_stale_pr_alerts']
-        if 'enable_budget_alerts' in data:
-            prefs.enable_budget_alerts = data['enable_budget_alerts']
-        if 'enable_missing_ticket_alerts' in data:
-            prefs.enable_missing_ticket_alerts = data['enable_missing_ticket_alerts']
-        if 'enable_anomaly_alerts' in data:
-            prefs.enable_anomaly_alerts = data['enable_anomaly_alerts']
-        if 'enable_meeting_prep' in data:
-            prefs.enable_meeting_prep = data['enable_meeting_prep']
-        if 'daily_brief_time' in data:
-            prefs.daily_brief_time = data['daily_brief_time']
-        if 'timezone' in data:
-            prefs.timezone = data['timezone']
+        if "daily_brief_slack" in data:
+            prefs.daily_brief_slack = data["daily_brief_slack"]
+        if "daily_brief_email" in data:
+            prefs.daily_brief_email = data["daily_brief_email"]
+        if "enable_stale_pr_alerts" in data:
+            prefs.enable_stale_pr_alerts = data["enable_stale_pr_alerts"]
+        if "enable_budget_alerts" in data:
+            prefs.enable_budget_alerts = data["enable_budget_alerts"]
+        if "enable_missing_ticket_alerts" in data:
+            prefs.enable_missing_ticket_alerts = data["enable_missing_ticket_alerts"]
+        if "enable_anomaly_alerts" in data:
+            prefs.enable_anomaly_alerts = data["enable_anomaly_alerts"]
+        if "enable_meeting_prep" in data:
+            prefs.enable_meeting_prep = data["enable_meeting_prep"]
+        if "daily_brief_time" in data:
+            prefs.daily_brief_time = data["daily_brief_time"]
+        if "timezone" in data:
+            prefs.timezone = data["timezone"]
 
         db.commit()
 
         logger.info(f"Updated notification preferences for user {user.id}")
 
-        return jsonify({
-            'message': 'Preferences updated successfully',
-            'preferences': prefs.to_dict()
-        }), 200
+        return (
+            jsonify(
+                {
+                    "message": "Preferences updated successfully",
+                    "preferences": prefs.to_dict(),
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
-        logger.error(f"Error updating preferences for user {user.id}: {e}", exc_info=True)
+        logger.error(
+            f"Error updating preferences for user {user.id}: {e}", exc_info=True
+        )
         db.rollback()
-        return jsonify({'error': 'Failed to update preferences'}), 500
+        return jsonify({"error": "Failed to update preferences"}), 500
     finally:
         db.close()

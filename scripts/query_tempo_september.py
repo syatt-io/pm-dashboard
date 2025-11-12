@@ -3,6 +3,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.services.vector_search import VectorSearchService
@@ -33,7 +34,9 @@ def query_september_tempo_hours():
         start_epoch = int(sept_start.timestamp())
         end_epoch = int(sept_end.timestamp())
 
-        logger.info(f"📅 Date range: {sept_start.strftime('%Y-%m-%d')} to {sept_end.strftime('%Y-%m-%d')}")
+        logger.info(
+            f"📅 Date range: {sept_start.strftime('%Y-%m-%d')} to {sept_end.strftime('%Y-%m-%d')}"
+        )
         logger.info(f"   Epoch range: {start_epoch} to {end_epoch}\n")
 
         # Get a dummy query embedding (we just need metadata, not semantic search)
@@ -48,7 +51,7 @@ def query_september_tempo_hours():
             "$and": [
                 {"source": "tempo"},
                 {"timestamp_epoch": {"$gte": start_epoch}},
-                {"timestamp_epoch": {"$lte": end_epoch}}
+                {"timestamp_epoch": {"$lte": end_epoch}},
             ]
         }
 
@@ -59,15 +62,17 @@ def query_september_tempo_hours():
             vector=query_embedding,
             top_k=10000,  # Large number to get all September worklogs
             filter=filter_query,
-            include_metadata=True
+            include_metadata=True,
         )
 
-        matches = results.get('matches', [])
+        matches = results.get("matches", [])
         logger.info(f"✅ Found {len(matches)} Tempo worklogs in September 2025\n")
 
         if not matches:
             logger.warning("⚠️  No Tempo worklogs found in Pinecone for September 2025")
-            logger.warning("    Make sure the Tempo backfill has been run: python src/tasks/backfill_tempo.py")
+            logger.warning(
+                "    Make sure the Tempo backfill has been run: python src/tasks/backfill_tempo.py"
+            )
             return
 
         # Aggregate hours by person and project
@@ -79,13 +84,13 @@ def query_september_tempo_hours():
         worklogs_missing_data = 0
 
         for match in matches:
-            metadata = match.get('metadata', {})
+            metadata = match.get("metadata", {})
 
             # Extract required fields
-            author_name = metadata.get('author_name')
-            issue_key = metadata.get('issue_key')
+            author_name = metadata.get("author_name")
+            issue_key = metadata.get("issue_key")
             # Note: Ingestion stores as 'hours_logged', not 'time_spent_seconds'
-            hours_logged = metadata.get('hours_logged')
+            hours_logged = metadata.get("hours_logged")
 
             # Skip worklogs with missing data
             if not author_name or not issue_key or hours_logged is None:
@@ -93,7 +98,7 @@ def query_september_tempo_hours():
                 continue
 
             # Extract project key from issue key (e.g., "SUBS-123" -> "SUBS")
-            project_key = issue_key.split('-')[0] if '-' in issue_key else issue_key
+            project_key = issue_key.split("-")[0] if "-" in issue_key else issue_key
 
             # hours_logged is already in hours
             hours = float(hours_logged)
@@ -106,7 +111,9 @@ def query_september_tempo_hours():
 
         logger.info(f"📊 Processed {worklogs_processed} worklogs")
         if worklogs_missing_data > 0:
-            logger.warning(f"⚠️  Skipped {worklogs_missing_data} worklogs with missing data\n")
+            logger.warning(
+                f"⚠️  Skipped {worklogs_missing_data} worklogs with missing data\n"
+            )
 
         # Display results
         print("=" * 100)
@@ -134,7 +141,9 @@ def query_september_tempo_hours():
         print()
 
         # Sort projects by total hours descending
-        sorted_projects = sorted(project_totals.items(), key=lambda x: x[1], reverse=True)
+        sorted_projects = sorted(
+            project_totals.items(), key=lambda x: x[1], reverse=True
+        )
 
         for project, hours in sorted_projects:
             print(f"📁 {project}: {hours:.2f} hours")

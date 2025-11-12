@@ -52,7 +52,7 @@ class TestTempoAPIClient:
         with pytest.raises(ValueError, match="JIRA_URL"):
             TempoAPIClient()
 
-    @patch('src.integrations.tempo.requests.get')
+    @patch("src.integrations.tempo.requests.get")
     def test_get_issue_key_from_jira_success(self, mock_get, tempo_client):
         """Test successful issue key resolution."""
         mock_response = Mock()
@@ -66,7 +66,7 @@ class TestTempoAPIClient:
         assert tempo_client.issue_cache["10001"] == "SUBS-123"
         mock_get.assert_called_once()
 
-    @patch('src.integrations.tempo.requests.get')
+    @patch("src.integrations.tempo.requests.get")
     def test_get_issue_key_from_jira_cached(self, mock_get, tempo_client):
         """Test cached issue key is returned without API call."""
         tempo_client.issue_cache["10001"] = "SUBS-123"
@@ -76,7 +76,7 @@ class TestTempoAPIClient:
         assert issue_key == "SUBS-123"
         mock_get.assert_not_called()
 
-    @patch('src.integrations.tempo.requests.get')
+    @patch("src.integrations.tempo.requests.get")
     def test_get_issue_key_from_jira_error(self, mock_get, tempo_client):
         """Test error handling when Jira API fails."""
         mock_get.side_effect = Exception("API Error")
@@ -86,16 +86,16 @@ class TestTempoAPIClient:
         assert issue_key is None
         assert tempo_client.issue_cache["10001"] is None
 
-    @patch('src.integrations.tempo.requests.get')
+    @patch("src.integrations.tempo.requests.get")
     def test_get_worklogs_success(self, mock_get, tempo_client):
         """Test successful worklog retrieval."""
         mock_response = Mock()
         mock_response.json.return_value = {
             "results": [
                 {"id": 1, "timeSpentSeconds": 3600},
-                {"id": 2, "timeSpentSeconds": 7200}
+                {"id": 2, "timeSpentSeconds": 7200},
             ],
-            "metadata": {}
+            "metadata": {},
         }
         mock_response.raise_for_status = Mock()
         mock_get.return_value = mock_response
@@ -106,14 +106,14 @@ class TestTempoAPIClient:
         assert worklogs[0]["id"] == 1
         assert worklogs[1]["timeSpentSeconds"] == 7200
 
-    @patch('src.integrations.tempo.requests.get')
+    @patch("src.integrations.tempo.requests.get")
     def test_get_worklogs_pagination(self, mock_get, tempo_client):
         """Test worklog retrieval with pagination."""
         # First page
         first_response = Mock()
         first_response.json.return_value = {
             "results": [{"id": 1, "timeSpentSeconds": 3600}],
-            "metadata": {"next": "https://api.tempo.io/4/worklogs?page=2"}
+            "metadata": {"next": "https://api.tempo.io/4/worklogs?page=2"},
         }
         first_response.raise_for_status = Mock()
 
@@ -121,7 +121,7 @@ class TestTempoAPIClient:
         second_response = Mock()
         second_response.json.return_value = {
             "results": [{"id": 2, "timeSpentSeconds": 7200}],
-            "metadata": {}
+            "metadata": {},
         }
         second_response.raise_for_status = Mock()
 
@@ -138,13 +138,13 @@ class TestTempoAPIClient:
             {
                 "description": "Working on SUBS-123",
                 "timeSpentSeconds": 3600,
-                "issue": {"id": "10001"}
+                "issue": {"id": "10001"},
             },
             {
                 "description": "Fixed bug BEVS-456",
                 "timeSpentSeconds": 7200,
-                "issue": {"id": "10002"}
-            }
+                "issue": {"id": "10002"},
+            },
         ]
 
         project_hours, processed, skipped = tempo_client.process_worklogs(worklogs)
@@ -154,7 +154,7 @@ class TestTempoAPIClient:
         assert project_hours["SUBS"] == 1.0  # 3600 / 3600
         assert project_hours["BEVS"] == 2.0  # 7200 / 3600
 
-    @patch.object(TempoAPIClient, 'get_issue_key_from_jira')
+    @patch.object(TempoAPIClient, "get_issue_key_from_jira")
     def test_process_worklogs_with_jira_lookup(self, mock_get_key, tempo_client):
         """Test worklog processing with Jira API lookup."""
         mock_get_key.side_effect = ["SUBS-123", "BEVS-456"]
@@ -163,13 +163,13 @@ class TestTempoAPIClient:
             {
                 "description": "Working on issue",
                 "timeSpentSeconds": 3600,
-                "issue": {"id": "10001"}
+                "issue": {"id": "10001"},
             },
             {
                 "description": "Fixed bug",
                 "timeSpentSeconds": 7200,
-                "issue": {"id": "10002"}
-            }
+                "issue": {"id": "10002"},
+            },
         ]
 
         project_hours, processed, skipped = tempo_client.process_worklogs(worklogs)
@@ -186,7 +186,7 @@ class TestTempoAPIClient:
             {
                 "description": "General work",
                 "timeSpentSeconds": 3600,
-                "issue": {}  # No issue ID
+                "issue": {},  # No issue ID
             }
         ]
 
@@ -196,14 +196,14 @@ class TestTempoAPIClient:
         assert skipped == 1
         assert len(project_hours) == 0
 
-    @patch.object(TempoAPIClient, 'get_worklogs')
+    @patch.object(TempoAPIClient, "get_worklogs")
     def test_get_current_month_hours(self, mock_get_worklogs, tempo_client):
         """Test getting current month hours."""
         mock_get_worklogs.return_value = [
             {
                 "description": "SUBS-123 work",
                 "timeSpentSeconds": 3600,
-                "issue": {"id": "10001"}
+                "issue": {"id": "10001"},
             }
         ]
 
@@ -213,14 +213,14 @@ class TestTempoAPIClient:
         assert project_hours["SUBS"] == 1.0
         mock_get_worklogs.assert_called_once()
 
-    @patch.object(TempoAPIClient, 'get_worklogs')
+    @patch.object(TempoAPIClient, "get_worklogs")
     def test_get_year_to_date_hours(self, mock_get_worklogs, tempo_client):
         """Test getting year-to-date hours."""
         mock_get_worklogs.return_value = [
             {
                 "description": "SUBS-123 work",
                 "timeSpentSeconds": 36000,  # 10 hours
-                "issue": {"id": "10001"}
+                "issue": {"id": "10001"},
             }
         ]
 
@@ -230,14 +230,14 @@ class TestTempoAPIClient:
         assert project_hours["SUBS"] == 10.0
         mock_get_worklogs.assert_called_once()
 
-    @patch.object(TempoAPIClient, 'get_worklogs')
+    @patch.object(TempoAPIClient, "get_worklogs")
     def test_get_date_range_hours(self, mock_get_worklogs, tempo_client):
         """Test getting hours for specific date range."""
         mock_get_worklogs.return_value = [
             {
                 "description": "SUBS-123 work",
                 "timeSpentSeconds": 7200,  # 2 hours
-                "issue": {"id": "10001"}
+                "issue": {"id": "10001"},
             }
         ]
 
@@ -253,13 +253,13 @@ class TestTempoAPIClient:
             {
                 "description": "SUBS-123",
                 "timeSpentSeconds": 1800,  # 0.5 hours
-                "issue": {"id": "10001"}
+                "issue": {"id": "10001"},
             },
             {
                 "description": "SUBS-124",
                 "timeSpentSeconds": 5400,  # 1.5 hours
-                "issue": {"id": "10002"}
-            }
+                "issue": {"id": "10002"},
+            },
         ]
 
         project_hours, _, _ = tempo_client.process_worklogs(worklogs)

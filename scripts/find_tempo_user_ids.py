@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +34,7 @@ class TempoUserIDFinder:
         self.jira_api_token = os.getenv("JIRA_API_TOKEN")
         self.jira_headers = {
             "Accept": "application/json",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         }
 
     def get_tempo_users_from_last_month(self):
@@ -45,8 +45,7 @@ class TempoUserIDFinder:
         start_date = end_date - timedelta(days=30)
 
         worklogs = self.tempo_client.get_worklogs(
-            from_date=start_date.isoformat(),
-            to_date=end_date.isoformat()
+            from_date=start_date.isoformat(), to_date=end_date.isoformat()
         )
 
         logger.info(f"Found {len(worklogs)} worklogs")
@@ -73,7 +72,7 @@ class TempoUserIDFinder:
                 headers=self.jira_headers,
                 params=params,
                 auth=(self.jira_username, self.jira_api_token),
-                timeout=10
+                timeout=10,
             )
             response.raise_for_status()
 
@@ -82,7 +81,7 @@ class TempoUserIDFinder:
                 "account_id": account_id,
                 "email": user_data.get("emailAddress", ""),
                 "display_name": user_data.get("displayName", ""),
-                "active": user_data.get("active", False)
+                "active": user_data.get("active", False),
             }
         except Exception as e:
             logger.warning(f"Error fetching user {account_id}: {e}")
@@ -90,7 +89,7 @@ class TempoUserIDFinder:
                 "account_id": account_id,
                 "email": "",
                 "display_name": "Unknown",
-                "active": False
+                "active": False,
             }
 
     def find_slack_user_id(self, email):
@@ -120,19 +119,22 @@ class TempoUserIDFinder:
 
         csv_path = Path(__file__).parent / output_file
 
-        with open(csv_path, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=[
-                'email',
-                'name',
-                'google_id',
-                'jira_account_id',
-                'slack_user_id',
-                'team',
-                'project_team',
-                'weekly_hours_minimum',
-                'role',
-                'is_active'
-            ])
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "email",
+                    "name",
+                    "google_id",
+                    "jira_account_id",
+                    "slack_user_id",
+                    "team",
+                    "project_team",
+                    "weekly_hours_minimum",
+                    "role",
+                    "is_active",
+                ],
+            )
             writer.writeheader()
 
             for user in users_data:
@@ -140,18 +142,20 @@ class TempoUserIDFinder:
                 # Format: email_username (will need to be updated manually)
                 google_id_placeholder = f"GOOGLE_ID_{user['email'].split('@')[0]}"
 
-                writer.writerow({
-                    'email': user['email'],
-                    'name': user['display_name'],
-                    'google_id': google_id_placeholder,  # NEEDS MANUAL UPDATE
-                    'jira_account_id': user['account_id'],
-                    'slack_user_id': user.get('slack_user_id', ''),
-                    'team': '',  # Leave blank for manual entry
-                    'project_team': '',  # Leave blank for manual entry
-                    'weekly_hours_minimum': 32.0,
-                    'role': 'member',
-                    'is_active': user['active']
-                })
+                writer.writerow(
+                    {
+                        "email": user["email"],
+                        "name": user["display_name"],
+                        "google_id": google_id_placeholder,  # NEEDS MANUAL UPDATE
+                        "jira_account_id": user["account_id"],
+                        "slack_user_id": user.get("slack_user_id", ""),
+                        "team": "",  # Leave blank for manual entry
+                        "project_team": "",  # Leave blank for manual entry
+                        "weekly_hours_minimum": 32.0,
+                        "role": "member",
+                        "is_active": user["active"],
+                    }
+                )
 
         logger.info(f"✅ CSV saved to: {csv_path}")
         logger.info(f"\n📝 NEXT STEPS:")
@@ -182,9 +186,9 @@ class TempoUserIDFinder:
             user_info = self.get_jira_user_info(account_id)
 
             # Try to find Slack ID
-            if user_info['email']:
-                slack_id = self.find_slack_user_id(user_info['email'])
-                user_info['slack_user_id'] = slack_id
+            if user_info["email"]:
+                slack_id = self.find_slack_user_id(user_info["email"])
+                user_info["slack_user_id"] = slack_id
 
             users_data.append(user_info)
 

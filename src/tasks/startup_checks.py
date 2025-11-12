@@ -35,11 +35,11 @@ def check_and_recover_missed_tasks(celery_app: Celery):
         # Check each scheduled task
         for task_name, task_config in schedule.items():
             # Skip celery internal tasks
-            if task_name.startswith('celery.'):
+            if task_name.startswith("celery."):
                 continue
 
-            schedule_config = task_config.get('schedule')
-            task_path = task_config.get('task')
+            schedule_config = task_config.get("schedule")
+            task_path = task_config.get("task")
 
             if not schedule_config or not task_path:
                 continue
@@ -47,7 +47,9 @@ def check_and_recover_missed_tasks(celery_app: Celery):
             # For crontab schedules, check if the task should have run recently
             if isinstance(schedule_config, crontab):
                 # Get the last scheduled time (within last 2 hours)
-                last_scheduled = get_last_scheduled_time(schedule_config, now, hours_back=2)
+                last_scheduled = get_last_scheduled_time(
+                    schedule_config, now, hours_back=2
+                )
 
                 if last_scheduled:
                     # Check if this task actually ran (simplified check)
@@ -57,12 +59,14 @@ def check_and_recover_missed_tasks(celery_app: Celery):
                     # If the task was scheduled more than 10 minutes ago but less than 2 hours
                     # it might have been missed during worker downtime
                     if 600 < time_since_scheduled < 7200:  # Between 10 min and 2 hours
-                        missed_tasks.append({
-                            'name': task_name,
-                            'task': task_path,
-                            'scheduled_time': last_scheduled,
-                            'minutes_ago': int(time_since_scheduled / 60)
-                        })
+                        missed_tasks.append(
+                            {
+                                "name": task_name,
+                                "task": task_path,
+                                "scheduled_time": last_scheduled,
+                                "minutes_ago": int(time_since_scheduled / 60),
+                            }
+                        )
 
         if missed_tasks:
             logger.warning(f"⚠️  Found {len(missed_tasks)} potentially missed tasks:")
@@ -73,10 +77,10 @@ def check_and_recover_missed_tasks(celery_app: Celery):
                 )
 
                 # Re-trigger critical tasks
-                if should_retry_task(missed['name'], missed['minutes_ago']):
+                if should_retry_task(missed["name"], missed["minutes_ago"]):
                     try:
                         logger.info(f"♻️  Re-triggering missed task: {missed['name']}")
-                        celery_app.send_task(missed['task'])
+                        celery_app.send_task(missed["task"])
                         logger.info(f"✅ Successfully re-triggered: {missed['name']}")
                     except Exception as e:
                         logger.error(f"❌ Failed to re-trigger {missed['name']}: {e}")
@@ -91,7 +95,9 @@ def check_and_recover_missed_tasks(celery_app: Celery):
         logger.error(f"❌ Error checking for missed tasks: {e}", exc_info=True)
 
 
-def get_last_scheduled_time(crontab_schedule, now: datetime, hours_back: int = 2) -> datetime:
+def get_last_scheduled_time(
+    crontab_schedule, now: datetime, hours_back: int = 2
+) -> datetime:
     """
     Calculate when this crontab schedule last should have run.
 
@@ -127,12 +133,12 @@ def should_retry_task(task_name: str, minutes_since: int) -> bool:
     """
     # Critical tasks that should always be retried if missed in the last 2 hours
     critical_tasks = {
-        'tempo-sync-daily': 120,  # Retry if missed within last 2 hours
-        'ingest-jira-daily': 120,
-        'ingest-notion-daily': 120,
-        'ingest-slack-daily': 120,
-        'ingest-fireflies-daily': 120,
-        'ingest-tempo-daily': 120,
+        "tempo-sync-daily": 120,  # Retry if missed within last 2 hours
+        "ingest-jira-daily": 120,
+        "ingest-notion-daily": 120,
+        "ingest-slack-daily": 120,
+        "ingest-fireflies-daily": 120,
+        "ingest-tempo-daily": 120,
     }
 
     # Check if task is critical and within retry window
@@ -141,7 +147,7 @@ def should_retry_task(task_name: str, minutes_since: int) -> bool:
         return minutes_since <= max_age
 
     # Don't retry notification tasks (not critical, will run on next schedule)
-    if 'reminder' in task_name.lower() or 'digest' in task_name.lower():
+    if "reminder" in task_name.lower() or "digest" in task_name.lower():
         return False
 
     return False
@@ -157,6 +163,7 @@ def on_worker_ready(**kwargs):
     """
     try:
         from src.tasks.celery_app import celery_app
+
         logger.info("🚀 Worker startup complete, running missed task check...")
         check_and_recover_missed_tasks(celery_app)
     except Exception as e:

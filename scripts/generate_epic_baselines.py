@@ -38,12 +38,11 @@ def normalize_epic_name(epic_summary: str) -> str:
     # Consolidation mappings (order matters - check specific patterns first)
     consolidations = {
         # Product detail page variants
-        'pdp details': 'product details',
-        'pdp image & summary': 'product details',
-        'product detail page': 'product details',
-
+        "pdp details": "product details",
+        "pdp image & summary": "product details",
+        "product detail page": "product details",
         # Globals variants
-        'globals': 'globals & style guide',
+        "globals": "globals & style guide",
     }
 
     # Apply consolidation mapping
@@ -63,11 +62,11 @@ def classify_variance(cv: float) -> str:
     - High: CV > 120% (highly variable, use P90 or custom scoping)
     """
     if cv < 80:
-        return 'low'
+        return "low"
     elif cv < 120:
-        return 'medium'
+        return "medium"
     else:
-        return 'high'
+        return "high"
 
 
 def generate_baselines(min_project_count: int = 3):
@@ -96,27 +95,25 @@ def generate_baselines(min_project_count: int = 3):
             project_epic_hours[normalized_name][record.project_key] += record.hours
 
         # Now calculate statistics across project totals
-        epic_data = defaultdict(lambda: {
-            'hours': [],
-            'projects': set(),
-            'occurrences': 0
-        })
+        epic_data = defaultdict(
+            lambda: {"hours": [], "projects": set(), "occurrences": 0}
+        )
 
         for epic_name, projects in project_epic_hours.items():
             for project_key, total_hours in projects.items():
-                epic_data[epic_name]['hours'].append(total_hours)
-                epic_data[epic_name]['projects'].add(project_key)
-                epic_data[epic_name]['occurrences'] += 1
+                epic_data[epic_name]["hours"].append(total_hours)
+                epic_data[epic_name]["projects"].add(project_key)
+                epic_data[epic_name]["occurrences"] += 1
 
         # Filter to common epics (3+ projects) and calculate statistics
         baselines = []
         for epic_name, data in epic_data.items():
-            project_count = len(data['projects'])
+            project_count = len(data["projects"])
 
             if project_count < min_project_count:
                 continue
 
-            hours = data['hours']
+            hours = data["hours"]
             mean_hours = statistics.mean(hours)
             median_hours = statistics.median(hours)
 
@@ -135,24 +132,30 @@ def generate_baselines(min_project_count: int = 3):
 
             variance_level = classify_variance(cv)
 
-            baselines.append({
-                'epic_category': epic_name,
-                'median_hours': round(median_hours, 2),
-                'mean_hours': round(mean_hours, 2),
-                'p75_hours': round(p75_hours, 2),
-                'p90_hours': round(p90_hours, 2),
-                'min_hours': round(min_hours, 2),
-                'max_hours': round(max_hours, 2),
-                'project_count': project_count,
-                'occurrence_count': data['occurrences'],
-                'coefficient_of_variation': round(cv, 2),
-                'variance_level': variance_level
-            })
+            baselines.append(
+                {
+                    "epic_category": epic_name,
+                    "median_hours": round(median_hours, 2),
+                    "mean_hours": round(mean_hours, 2),
+                    "p75_hours": round(p75_hours, 2),
+                    "p90_hours": round(p90_hours, 2),
+                    "min_hours": round(min_hours, 2),
+                    "max_hours": round(max_hours, 2),
+                    "project_count": project_count,
+                    "occurrence_count": data["occurrences"],
+                    "coefficient_of_variation": round(cv, 2),
+                    "variance_level": variance_level,
+                }
+            )
 
-        logger.info(f"Found {len(baselines)} common epics (appearing in {min_project_count}+ projects)")
+        logger.info(
+            f"Found {len(baselines)} common epics (appearing in {min_project_count}+ projects)"
+        )
 
         # Sort by project count (most common first)
-        baselines.sort(key=lambda x: (x['project_count'], x['median_hours']), reverse=True)
+        baselines.sort(
+            key=lambda x: (x["project_count"], x["median_hours"]), reverse=True
+        )
 
         # Clear existing baselines and insert new ones
         logger.info("Clearing existing baselines...")
@@ -176,9 +179,9 @@ def generate_baselines(min_project_count: int = 3):
         # Group by variance level
         by_variance = defaultdict(list)
         for b in baselines:
-            by_variance[b['variance_level']].append(b)
+            by_variance[b["variance_level"]].append(b)
 
-        for level in ['low', 'medium', 'high']:
+        for level in ["low", "medium", "high"]:
             count = len(by_variance[level])
             print(f"{level.upper()} variance epics: {count}")
 
@@ -189,11 +192,13 @@ def generate_baselines(min_project_count: int = 3):
         print("-" * 80)
 
         for baseline in baselines[:10]:
-            print(f"{baseline['epic_category']:<40} "
-                  f"{baseline['project_count']:<10} "
-                  f"{baseline['median_hours']:<10.1f} "
-                  f"{baseline['coefficient_of_variation']:<10.1f} "
-                  f"{baseline['variance_level']:<10}")
+            print(
+                f"{baseline['epic_category']:<40} "
+                f"{baseline['project_count']:<10} "
+                f"{baseline['median_hours']:<10.1f} "
+                f"{baseline['coefficient_of_variation']:<10.1f} "
+                f"{baseline['variance_level']:<10}"
+            )
 
         print("=" * 80)
 

@@ -39,7 +39,7 @@ class TempoAPIClient:
         self.tempo_base_url = "https://api.tempo.io/4"
         self.tempo_headers = {
             "Authorization": f"Bearer {self.tempo_token}",
-            "Accept": "application/json"
+            "Accept": "application/json",
         }
 
         # Setup Jira Basic Auth
@@ -47,7 +47,7 @@ class TempoAPIClient:
         encoded_creds = base64.b64encode(credentials.encode()).decode()
         self.jira_headers = {
             "Authorization": f"Basic {encoded_creds}",
-            "Accept": "application/json"
+            "Accept": "application/json",
         }
 
         # Cache for issue ID to key mappings
@@ -172,7 +172,9 @@ class TempoAPIClient:
 
             url = f"{self.jira_url}/rest/api/3/issue/{issue_key}"
             params = {"fields": "customfield_10014,parent"}
-            response = requests.get(url, headers=self.jira_headers, params=params, timeout=10)
+            response = requests.get(
+                url, headers=self.jira_headers, params=params, timeout=10
+            )
             response.raise_for_status()
 
             issue_data = response.json()
@@ -181,9 +183,9 @@ class TempoAPIClient:
             # Try Epic Link field first (legacy)
             epic_key = fields.get("customfield_10014")
             # Validate it's actually an issue key (PROJECT-NUMBER format), not a date or other string
-            if epic_key and isinstance(epic_key, str) and '-' in epic_key:
+            if epic_key and isinstance(epic_key, str) and "-" in epic_key:
                 # Check if it looks like an issue key (contains letters before dash)
-                parts = epic_key.split('-')
+                parts = epic_key.split("-")
                 if len(parts) == 2 and parts[0].isalpha() and parts[1].isdigit():
                     self.epic_cache[issue_key] = epic_key
                     return epic_key
@@ -225,16 +227,18 @@ class TempoAPIClient:
 
             url = f"{self.jira_url}/rest/api/3/issue/{epic_key}"
             params = {"fields": "summary,issuetype"}
-            response = requests.get(url, headers=self.jira_headers, params=params, timeout=10)
+            response = requests.get(
+                url, headers=self.jira_headers, params=params, timeout=10
+            )
             response.raise_for_status()
 
             issue_data = response.json()
             fields = issue_data.get("fields", {})
 
             return {
-                'key': epic_key,
-                'summary': fields.get("summary", epic_key),
-                'issuetype': fields.get("issuetype", {}).get("name", "")
+                "key": epic_key,
+                "summary": fields.get("summary", epic_key),
+                "issuetype": fields.get("issuetype", {}).get("name", ""),
             }
 
         except Exception as e:
@@ -261,7 +265,9 @@ class TempoAPIClient:
 
             url = f"{self.jira_url}/rest/api/3/user"
             params = {"accountId": account_id}
-            response = requests.get(url, headers=self.jira_headers, params=params, timeout=10)
+            response = requests.get(
+                url, headers=self.jira_headers, params=params, timeout=10
+            )
             response.raise_for_status()
 
             user_data = response.json()
@@ -294,7 +300,7 @@ class TempoAPIClient:
             from src.models import UserTeam
 
             # Get database URL
-            database_url = os.getenv('DATABASE_URL')
+            database_url = os.getenv("DATABASE_URL")
             if not database_url:
                 logger.warning("DATABASE_URL not set, cannot look up user teams")
                 self.team_cache[account_id] = None
@@ -306,14 +312,18 @@ class TempoAPIClient:
             session = Session()
 
             try:
-                user_team = session.query(UserTeam).filter_by(account_id=account_id).first()
+                user_team = (
+                    session.query(UserTeam).filter_by(account_id=account_id).first()
+                )
                 if user_team:
                     team = user_team.team
                     self.team_cache[account_id] = team
                     return team
                 else:
                     # User not found in team assignments
-                    logger.debug(f"No team assignment found for account ID {account_id}")
+                    logger.debug(
+                        f"No team assignment found for account ID {account_id}"
+                    )
                     self.team_cache[account_id] = "Unassigned"
                     return "Unassigned"
             finally:
@@ -330,7 +340,7 @@ class TempoAPIClient:
         from_date: str,
         to_date: str,
         limit: int = 5000,
-        project_key: Optional[str] = None
+        project_key: Optional[str] = None,
     ) -> List[Dict]:
         """
         Fetch all worklogs for a date range with pagination.
@@ -345,11 +355,7 @@ class TempoAPIClient:
             List of worklog dictionaries
         """
         url = f"{self.tempo_base_url}/worklogs"
-        params = {
-            "from": from_date,
-            "to": to_date,
-            "limit": limit
-        }
+        params = {"from": from_date, "to": to_date, "limit": limit}
 
         # Tempo API v4 requires numeric projectId (not projectKey string)
         # Get numeric project ID from Jira and add to query params for server-side filtering
@@ -357,19 +363,20 @@ class TempoAPIClient:
             project_id = self.get_project_id(project_key)
             if project_id:
                 params["projectId"] = project_id
-                logger.info(f"Filtering worklogs by project {project_key} (ID: {project_id})")
+                logger.info(
+                    f"Filtering worklogs by project {project_key} (ID: {project_id})"
+                )
             else:
-                logger.warning(f"Could not get project ID for {project_key}, fetching all worklogs")
+                logger.warning(
+                    f"Could not get project ID for {project_key}, fetching all worklogs"
+                )
 
         all_worklogs = []
 
         try:
             # First request
             response = requests.get(
-                url,
-                headers=self.tempo_headers,
-                params=params,
-                timeout=30
+                url, headers=self.tempo_headers, params=params, timeout=30
             )
             response.raise_for_status()
             data = response.json()
@@ -383,13 +390,17 @@ class TempoAPIClient:
                 next_url = data["metadata"]["next"]
                 logger.debug(f"Fetching next page: {next_url}")
 
-                response = requests.get(next_url, headers=self.tempo_headers, timeout=30)
+                response = requests.get(
+                    next_url, headers=self.tempo_headers, timeout=30
+                )
                 response.raise_for_status()
                 data = response.json()
 
                 results = data.get("results", [])
                 all_worklogs.extend(results)
-                logger.info(f"Fetched {len(results)} more worklogs (total: {len(all_worklogs)})")
+                logger.info(
+                    f"Fetched {len(results)} more worklogs (total: {len(all_worklogs)})"
+                )
 
             return all_worklogs
 
@@ -397,7 +408,9 @@ class TempoAPIClient:
             logger.error(f"Error fetching worklogs from Tempo: {e}")
             raise
 
-    def process_worklogs(self, worklogs: List[Dict]) -> Tuple[Dict[str, float], int, int]:
+    def process_worklogs(
+        self, worklogs: List[Dict]
+    ) -> Tuple[Dict[str, float], int, int]:
         """
         Process worklogs to calculate hours per project using dual resolution:
         1. Fast path: Extract issue key from description
@@ -414,7 +427,7 @@ class TempoAPIClient:
         skipped = 0
 
         # Issue key pattern: PROJECT-NUMBER (e.g., SUBS-123)
-        issue_pattern = re.compile(r'([A-Z]+-\d+)')
+        issue_pattern = re.compile(r"([A-Z]+-\d+)")
 
         for worklog in worklogs:
             description = worklog.get("description", "")

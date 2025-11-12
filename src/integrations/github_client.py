@@ -19,7 +19,7 @@ class GitHubClient:
         organization: str = "",
         app_id: str = "",
         private_key: str = "",
-        installation_id: str = ""
+        installation_id: str = "",
     ):
         """Initialize GitHub client.
 
@@ -45,9 +45,14 @@ class GitHubClient:
         self.base_url = "https://api.github.com"
 
         # Determine auth mode - check for non-empty strings
-        has_app_creds = (app_id and app_id.strip() and
-                         private_key and private_key.strip() and
-                         installation_id and installation_id.strip())
+        has_app_creds = (
+            app_id
+            and app_id.strip()
+            and private_key
+            and private_key.strip()
+            and installation_id
+            and installation_id.strip()
+        )
         has_token = api_token and api_token.strip()
 
         self.auth_mode = "app" if has_app_creds else "token"
@@ -71,7 +76,7 @@ class GitHubClient:
 
         self.headers = {
             "Accept": "application/vnd.github.v3+json",
-            "X-GitHub-Api-Version": "2022-11-28"
+            "X-GitHub-Api-Version": "2022-11-28",
         }
 
     async def _get_installation_token(self) -> str:
@@ -87,9 +92,10 @@ class GitHubClient:
         # Generate JWT for GitHub App authentication
         now = int(time.time())
         payload = {
-            "iat": now - 60,  # Issued at (60 seconds in the past to account for clock drift)
+            "iat": now
+            - 60,  # Issued at (60 seconds in the past to account for clock drift)
             "exp": now + 600,  # Expires in 10 minutes (max allowed)
-            "iss": self.app_id  # GitHub App ID
+            "iss": self.app_id,  # GitHub App ID
         }
 
         # Sign JWT with private key
@@ -103,22 +109,28 @@ class GitHubClient:
                     headers={
                         "Authorization": f"Bearer {jwt_token}",
                         "Accept": "application/vnd.github.v3+json",
-                        "X-GitHub-Api-Version": "2022-11-28"
+                        "X-GitHub-Api-Version": "2022-11-28",
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 201:
                     data = response.json()
                     self.installation_token = data["token"]
                     # Tokens expire in 1 hour
-                    expires_at = datetime.fromisoformat(data["expires_at"].replace("Z", "+00:00"))
+                    expires_at = datetime.fromisoformat(
+                        data["expires_at"].replace("Z", "+00:00")
+                    )
                     self.token_expires_at = expires_at.timestamp()
                     logger.info("Successfully obtained GitHub App installation token")
                     return self.installation_token
                 else:
-                    logger.error(f"Failed to get installation token: {response.status_code} - {response.text}")
-                    raise Exception(f"GitHub App authentication failed: {response.status_code}")
+                    logger.error(
+                        f"Failed to get installation token: {response.status_code} - {response.text}"
+                    )
+                    raise Exception(
+                        f"GitHub App authentication failed: {response.status_code}"
+                    )
 
             except Exception as e:
                 logger.error(f"Error getting GitHub App installation token: {e}")
@@ -144,7 +156,7 @@ class GitHubClient:
         self,
         query_keywords: List[str],
         repo_name: Optional[str] = None,
-        days_back: int = 60
+        days_back: int = 60,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Search for PRs and commits matching keywords.
 
@@ -158,10 +170,16 @@ class GitHubClient:
         """
         # Check if authentication is configured
         if self.auth_mode == "token" and not self.api_token:
-            logger.warning("GitHub authentication not configured - skipping GitHub search")
+            logger.warning(
+                "GitHub authentication not configured - skipping GitHub search"
+            )
             return {"prs": [], "commits": []}
-        elif self.auth_mode == "app" and not all([self.app_id, self.private_key, self.installation_id]):
-            logger.warning("GitHub App authentication incomplete - skipping GitHub search")
+        elif self.auth_mode == "app" and not all(
+            [self.app_id, self.private_key, self.installation_id]
+        ):
+            logger.warning(
+                "GitHub App authentication incomplete - skipping GitHub search"
+            )
             return {"prs": [], "commits": []}
 
         # Calculate date range
@@ -187,10 +205,7 @@ class GitHubClient:
             return {"prs": [], "commits": []}
 
     async def _search_pull_requests(
-        self,
-        query_keywords: List[str],
-        repo_name: Optional[str],
-        since_date: str
+        self, query_keywords: List[str], repo_name: Optional[str], since_date: str
     ) -> List[Dict[str, Any]]:
         """Search for pull requests."""
         query_parts = []
@@ -202,7 +217,11 @@ class GitHubClient:
 
         # Add repo filter
         if repo_name:
-            query_parts.append(f"repo:{self.organization}/{repo_name}" if self.organization else f"repo:{repo_name}")
+            query_parts.append(
+                f"repo:{self.organization}/{repo_name}"
+                if self.organization
+                else f"repo:{repo_name}"
+            )
         elif self.organization:
             query_parts.append(f"org:{self.organization}")
 
@@ -224,9 +243,9 @@ class GitHubClient:
                         "q": search_query,
                         "sort": "updated",
                         "order": "desc",
-                        "per_page": 30
+                        "per_page": 30,
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -235,21 +254,29 @@ class GitHubClient:
 
                     prs = []
                     for item in items:
-                        prs.append({
-                            "number": item.get("number"),
-                            "title": item.get("title"),
-                            "body": item.get("body", ""),
-                            "state": item.get("state"),
-                            "url": item.get("html_url"),
-                            "created_at": item.get("created_at"),
-                            "updated_at": item.get("updated_at"),
-                            "user": item.get("user", {}).get("login"),
-                            "repo": item.get("repository_url", "").split("/")[-1] if item.get("repository_url") else ""
-                        })
+                        prs.append(
+                            {
+                                "number": item.get("number"),
+                                "title": item.get("title"),
+                                "body": item.get("body", ""),
+                                "state": item.get("state"),
+                                "url": item.get("html_url"),
+                                "created_at": item.get("created_at"),
+                                "updated_at": item.get("updated_at"),
+                                "user": item.get("user", {}).get("login"),
+                                "repo": (
+                                    item.get("repository_url", "").split("/")[-1]
+                                    if item.get("repository_url")
+                                    else ""
+                                ),
+                            }
+                        )
 
                     return prs
                 else:
-                    logger.warning(f"GitHub PR search returned status {response.status_code}")
+                    logger.warning(
+                        f"GitHub PR search returned status {response.status_code}"
+                    )
                     return []
 
             except Exception as e:
@@ -257,10 +284,7 @@ class GitHubClient:
                 return []
 
     async def _search_commits(
-        self,
-        query_keywords: List[str],
-        repo_name: Optional[str],
-        since_date: str
+        self, query_keywords: List[str], repo_name: Optional[str], since_date: str
     ) -> List[Dict[str, Any]]:
         """Search for commits."""
         query_parts = []
@@ -272,7 +296,11 @@ class GitHubClient:
 
         # Add repo filter
         if repo_name:
-            query_parts.append(f"repo:{self.organization}/{repo_name}" if self.organization else f"repo:{repo_name}")
+            query_parts.append(
+                f"repo:{self.organization}/{repo_name}"
+                if self.organization
+                else f"repo:{repo_name}"
+            )
         elif self.organization:
             query_parts.append(f"org:{self.organization}")
 
@@ -293,9 +321,9 @@ class GitHubClient:
                         "q": search_query,
                         "sort": "committer-date",
                         "order": "desc",
-                        "per_page": 30
+                        "per_page": 30,
                     },
-                    timeout=10.0
+                    timeout=10.0,
                 )
 
                 if response.status_code == 200:
@@ -305,25 +333,31 @@ class GitHubClient:
                     commits = []
                     for item in items:
                         commit_data = item.get("commit", {})
-                        commits.append({
-                            "sha": item.get("sha"),
-                            "message": commit_data.get("message", ""),
-                            "author": commit_data.get("author", {}).get("name"),
-                            "date": commit_data.get("author", {}).get("date"),
-                            "url": item.get("html_url"),
-                            "repo": item.get("repository", {}).get("name", "")
-                        })
+                        commits.append(
+                            {
+                                "sha": item.get("sha"),
+                                "message": commit_data.get("message", ""),
+                                "author": commit_data.get("author", {}).get("name"),
+                                "date": commit_data.get("author", {}).get("date"),
+                                "url": item.get("html_url"),
+                                "repo": item.get("repository", {}).get("name", ""),
+                            }
+                        )
 
                     return commits
                 else:
-                    logger.warning(f"GitHub commit search returned status {response.status_code}")
+                    logger.warning(
+                        f"GitHub commit search returned status {response.status_code}"
+                    )
                     return []
 
             except Exception as e:
                 logger.error(f"Error searching GitHub commits: {e}")
                 return []
 
-    def detect_repo_name(self, project_key: str, project_keywords: List[str]) -> Optional[str]:
+    def detect_repo_name(
+        self, project_key: str, project_keywords: List[str]
+    ) -> Optional[str]:
         """Auto-detect GitHub repo name from project keywords.
 
         Args:
@@ -348,23 +382,21 @@ class GitHubClient:
         # Try first keyword variants
         if project_keywords:
             first_keyword = project_keywords[0]
-            candidates.extend([
-                first_keyword,  # "beauchamp"
-                f"{first_keyword}-store",  # "beauchamp-store"
-                f"{first_keyword}s",  # "beauchamps"
-                f"{first_keyword}s-store",  # "beauchamps-store"
-                f"{first_keyword}-api",
-                f"{first_keyword}-frontend"
-            ])
+            candidates.extend(
+                [
+                    first_keyword,  # "beauchamp"
+                    f"{first_keyword}-store",  # "beauchamp-store"
+                    f"{first_keyword}s",  # "beauchamps"
+                    f"{first_keyword}s-store",  # "beauchamps-store"
+                    f"{first_keyword}-api",
+                    f"{first_keyword}-frontend",
+                ]
+            )
 
             # Also try variants of all keywords, not just first one
             for kw in project_keywords[1:]:
                 if len(kw) >= 4:  # Only consider meaningful keywords
-                    candidates.extend([
-                        kw,
-                        f"{kw}-store",
-                        f"{kw}s"
-                    ])
+                    candidates.extend([kw, f"{kw}-store", f"{kw}s"])
 
         # Special case for "ethel" middleware repo (shared across projects)
         candidates.append("ethel")
@@ -393,7 +425,7 @@ class GitHubClient:
                         f"{self.base_url}/installation/repositories",
                         headers=headers,
                         params={"per_page": per_page, "page": page},
-                        timeout=10.0
+                        timeout=10.0,
                     )
 
                     if response.status_code == 200:
@@ -414,7 +446,9 @@ class GitHubClient:
 
                         page += 1
                     else:
-                        logger.warning(f"Failed to list accessible repos: {response.status_code}")
+                        logger.warning(
+                            f"Failed to list accessible repos: {response.status_code}"
+                        )
                         break
 
                 logger.info(f"GitHub App has access to {len(all_repos)} repositories")
@@ -430,7 +464,7 @@ class GitHubClient:
         project_key: str,
         project_keywords: List[str],
         repo_name: Optional[str] = None,
-        days_back: int = 7
+        days_back: int = 7,
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Get PRs organized by state (merged, in_review, open) for a project.
 
@@ -447,7 +481,9 @@ class GitHubClient:
         if self.auth_mode == "token" and not self.api_token:
             logger.warning("GitHub authentication not configured - skipping PR fetch")
             return {"merged": [], "in_review": [], "open": []}
-        elif self.auth_mode == "app" and not all([self.app_id, self.private_key, self.installation_id]):
+        elif self.auth_mode == "app" and not all(
+            [self.app_id, self.private_key, self.installation_id]
+        ):
             logger.warning("GitHub App authentication incomplete - skipping PR fetch")
             return {"merged": [], "in_review": [], "open": []}
 
@@ -458,9 +494,13 @@ class GitHubClient:
                 detected_name = self.detect_repo_name(project_key, project_keywords)
                 if detected_name in accessible_repos:
                     repo_name = detected_name
-                    logger.info(f"Auto-detected repo '{repo_name}' for project {project_key}")
+                    logger.info(
+                        f"Auto-detected repo '{repo_name}' for project {project_key}"
+                    )
                 else:
-                    logger.warning(f"Could not find matching repo for project {project_key}")
+                    logger.warning(
+                        f"Could not find matching repo for project {project_key}"
+                    )
                     # Fall back to org-wide search
                     repo_name = None
 
@@ -472,40 +512,35 @@ class GitHubClient:
             merged_prs = await self._fetch_prs_by_query(
                 repo_name=repo_name,
                 since_date=since_iso,
-                additional_filters="is:pr is:merged"
+                additional_filters="is:pr is:merged",
             )
 
             # In review: open PRs with review activity
             in_review_prs = await self._fetch_prs_by_query(
                 repo_name=repo_name,
                 since_date=since_iso,
-                additional_filters="is:pr is:open review:approved,review:changes_requested"
+                additional_filters="is:pr is:open review:approved,review:changes_requested",
             )
 
             # Open PRs without review activity
             open_prs = await self._fetch_prs_by_query(
                 repo_name=repo_name,
                 since_date=since_iso,
-                additional_filters="is:pr is:open -review:approved -review:changes_requested"
+                additional_filters="is:pr is:open -review:approved -review:changes_requested",
             )
 
-            logger.info(f"Found {len(merged_prs)} merged, {len(in_review_prs)} in review, {len(open_prs)} open PRs")
+            logger.info(
+                f"Found {len(merged_prs)} merged, {len(in_review_prs)} in review, {len(open_prs)} open PRs"
+            )
 
-            return {
-                "merged": merged_prs,
-                "in_review": in_review_prs,
-                "open": open_prs
-            }
+            return {"merged": merged_prs, "in_review": in_review_prs, "open": open_prs}
 
         except Exception as e:
             logger.error(f"Error fetching PRs by state: {e}")
             return {"merged": [], "in_review": [], "open": []}
 
     async def _fetch_prs_by_query(
-        self,
-        repo_name: Optional[str],
-        since_date: str,
-        additional_filters: str
+        self, repo_name: Optional[str], since_date: str, additional_filters: str
     ) -> List[Dict[str, Any]]:
         """Fetch PRs with specific query filters.
 
@@ -521,7 +556,11 @@ class GitHubClient:
 
         # Add repo or org filter
         if repo_name:
-            repo_filter = f"repo:{self.organization}/{repo_name}" if self.organization else f"repo:{repo_name}"
+            repo_filter = (
+                f"repo:{self.organization}/{repo_name}"
+                if self.organization
+                else f"repo:{repo_name}"
+            )
             query_parts.append(repo_filter)
         elif self.organization:
             query_parts.append(f"org:{self.organization}")
@@ -544,9 +583,9 @@ class GitHubClient:
                         "q": search_query,
                         "sort": "updated",
                         "order": "desc",
-                        "per_page": 50  # Get more results for weekly recap
+                        "per_page": 50,  # Get more results for weekly recap
                     },
-                    timeout=15.0
+                    timeout=15.0,
                 )
 
                 if response.status_code == 200:
@@ -558,13 +597,23 @@ class GitHubClient:
                         pr_data = {
                             "number": item.get("number"),
                             "title": item.get("title"),
-                            "body": item.get("body", "")[:200] if item.get("body") else "",  # Truncate body
+                            "body": (
+                                item.get("body", "")[:200] if item.get("body") else ""
+                            ),  # Truncate body
                             "state": item.get("state"),
                             "url": item.get("html_url"),
                             "created_at": item.get("created_at"),
                             "updated_at": item.get("updated_at"),
-                            "author": item.get("user", {}).get("login") if item.get("user") else None,
-                            "repo": item.get("repository_url", "").split("/")[-1] if item.get("repository_url") else ""
+                            "author": (
+                                item.get("user", {}).get("login")
+                                if item.get("user")
+                                else None
+                            ),
+                            "repo": (
+                                item.get("repository_url", "").split("/")[-1]
+                                if item.get("repository_url")
+                                else ""
+                            ),
                         }
 
                         # Add merged_at if available - check if pull_request exists and has merged_at
@@ -576,7 +625,9 @@ class GitHubClient:
 
                     return prs
                 else:
-                    logger.warning(f"GitHub PR query returned status {response.status_code}: {search_query}")
+                    logger.warning(
+                        f"GitHub PR query returned status {response.status_code}: {search_query}"
+                    )
                     return []
 
             except Exception as e:
@@ -584,11 +635,7 @@ class GitHubClient:
                 return []
 
     async def get_prs_by_date_range(
-        self,
-        repo_name: str,
-        start_date: str,
-        end_date: str,
-        state: str = 'all'
+        self, repo_name: str, start_date: str, end_date: str, state: str = "all"
     ) -> List[Dict[str, Any]]:
         """Get PRs for a specific repo within a date range.
 
@@ -617,7 +664,7 @@ class GitHubClient:
         query_parts.append("is:pr")
 
         # Add state filter if not 'all'
-        if state != 'all':
+        if state != "all":
             query_parts.append(f"is:{state}")
 
         search_query = " ".join(query_parts)
@@ -634,9 +681,9 @@ class GitHubClient:
                         "q": search_query,
                         "sort": "created",
                         "order": "desc",
-                        "per_page": 100  # Max allowed
+                        "per_page": 100,  # Max allowed
                     },
-                    timeout=15.0
+                    timeout=15.0,
                 )
 
                 if response.status_code == 200:
@@ -653,8 +700,12 @@ class GitHubClient:
                             "url": item.get("html_url"),
                             "created_at": item.get("created_at"),
                             "updated_at": item.get("updated_at"),
-                            "author": item.get("user", {}).get("login") if item.get("user") else None,
-                            "repo": repo_name
+                            "author": (
+                                item.get("user", {}).get("login")
+                                if item.get("user")
+                                else None
+                            ),
+                            "repo": repo_name,
                         }
 
                         # Add merged_at if available
@@ -666,7 +717,9 @@ class GitHubClient:
 
                     return prs
                 else:
-                    logger.warning(f"GitHub PR search returned status {response.status_code}: {search_query}")
+                    logger.warning(
+                        f"GitHub PR search returned status {response.status_code}: {search_query}"
+                    )
                     return []
 
             except Exception as e:

@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class JiraTicket:
     """Jira ticket structure."""
+
     summary: str
     description: str
     issue_type: str = "Task"
@@ -30,8 +31,13 @@ class JiraTicket:
 class JiraMCPClient:
     """Client for interacting with Jira through MCP server."""
 
-    def __init__(self, mcp_server_url: str = "http://localhost:3000",
-                 jira_url: str = None, username: str = None, api_token: str = None):
+    def __init__(
+        self,
+        mcp_server_url: str = "http://localhost:3000",
+        jira_url: str = None,
+        username: str = None,
+        api_token: str = None,
+    ):
         """Initialize Jira MCP client.
 
         Args:
@@ -61,14 +67,14 @@ class JiraMCPClient:
                     "assignee": ticket.assignee,
                     "dueDate": ticket.due_date,
                     "labels": ticket.labels or [],
-                    "components": ticket.components or []
-                }
+                    "components": ticket.components or [],
+                },
             }
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -84,21 +90,20 @@ class JiraMCPClient:
             logger.error(f"Error creating Jira ticket: {e}")
             return {"success": False, "error": str(e)}
 
-    async def update_ticket(self, ticket_key: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_ticket(
+        self, ticket_key: str, updates: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Update an existing Jira ticket."""
         try:
             mcp_request = {
                 "method": "jira/updateIssue",
-                "params": {
-                    "issueKey": ticket_key,
-                    "updates": updates
-                }
+                "params": {"issueKey": ticket_key, "updates": updates},
             }
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -116,15 +121,13 @@ class JiraMCPClient:
         try:
             mcp_request = {
                 "method": "jira/getIssue",
-                "params": {
-                    "issueKey": ticket_key
-                }
+                "params": {"issueKey": ticket_key},
             }
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
             return response.json()
@@ -133,7 +136,13 @@ class JiraMCPClient:
             logger.error(f"Error fetching ticket {ticket_key}: {e}")
             return {"success": False, "error": str(e)}
 
-    async def search_tickets(self, jql: str, max_results: int = 50, expand_comments: bool = False, start_at: int = 0) -> List[Dict[str, Any]]:
+    async def search_tickets(
+        self,
+        jql: str,
+        max_results: int = 50,
+        expand_comments: bool = False,
+        start_at: int = 0,
+    ) -> List[Dict[str, Any]]:
         """Search tickets using JQL.
 
         Args:
@@ -149,7 +158,10 @@ class JiraMCPClient:
             # Try direct Jira API call first (multi-word keywords filtered out at JQL build time)
             if self.jira_url and self.username and self.api_token:
                 import base64
-                auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
+
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
                 # Build params for /search/jql endpoint
                 # NOTE: POST /search endpoints return 410 Gone, must use GET /search/jql
@@ -160,7 +172,7 @@ class JiraMCPClient:
                 params = {
                     "jql": jql,
                     "maxResults": 1000,  # Jira's max allowed value
-                    "startAt": 0  # Always 0 since pagination doesn't work
+                    "startAt": 0,  # Always 0 since pagination doesn't work
                 }
 
                 # Step 1: Get issue IDs using GET /search/jql endpoint
@@ -169,20 +181,24 @@ class JiraMCPClient:
                     params=params,
                     headers={
                         "Authorization": f"Basic {auth_string}",
-                        "Accept": "application/json"
-                    }
+                        "Accept": "application/json",
+                    },
                 )
                 response.raise_for_status()
 
                 search_result = response.json()
 
                 # Debug: log pagination info
-                total = search_result.get('total', 0)
-                returned_start = search_result.get('startAt', 0)
-                max_results = search_result.get('maxResults', 0)
-                logger.info(f"Jira search: startAt={returned_start}, maxResults={max_results}, total={total}, got {len(search_result.get('issues', []))} issues")
+                total = search_result.get("total", 0)
+                returned_start = search_result.get("startAt", 0)
+                max_results = search_result.get("maxResults", 0)
+                logger.info(
+                    f"Jira search: startAt={returned_start}, maxResults={max_results}, total={total}, got {len(search_result.get('issues', []))} issues"
+                )
 
-                issue_ids = [issue.get('id') for issue in search_result.get('issues', [])]
+                issue_ids = [
+                    issue.get("id") for issue in search_result.get("issues", [])
+                ]
 
                 if not issue_ids:
                     return []
@@ -206,8 +222,8 @@ class JiraMCPClient:
                             },
                             headers={
                                 "Authorization": f"Basic {auth_string}",
-                                "Accept": "application/json"
-                            }
+                                "Accept": "application/json",
+                            },
                         )
                         issue_response.raise_for_status()
                         return issue_response.json()
@@ -220,12 +236,16 @@ class JiraMCPClient:
                 issues = []
                 batch_size = 5  # Reduced to 5 issues at a time to avoid rate limiting
                 for i in range(0, len(issue_ids), batch_size):
-                    batch_ids = issue_ids[i:i+batch_size]
-                    batch_results = await asyncio.gather(*[
-                        fetch_issue(issue_id, idx, len(issue_ids))
-                        for idx, issue_id in enumerate(batch_ids)
-                    ])
-                    issues.extend([issue for issue in batch_results if issue is not None])
+                    batch_ids = issue_ids[i : i + batch_size]
+                    batch_results = await asyncio.gather(
+                        *[
+                            fetch_issue(issue_id, idx, len(issue_ids))
+                            for idx, issue_id in enumerate(batch_ids)
+                        ]
+                    )
+                    issues.extend(
+                        [issue for issue in batch_results if issue is not None]
+                    )
 
                     # Add longer delay between batches
                     if i + batch_size < len(issue_ids):
@@ -233,7 +253,9 @@ class JiraMCPClient:
 
                 # Log if any issues failed
                 if failed_issues:
-                    logger.warning(f"Failed to fetch {len(failed_issues)}/{len(issue_ids)} issues. IDs: {failed_issues[:10]}")
+                    logger.warning(
+                        f"Failed to fetch {len(failed_issues)}/{len(issue_ids)} issues. IDs: {failed_issues[:10]}"
+                    )
 
                 # Create result dict that matches the original structure
                 result = {"issues": issues}
@@ -249,8 +271,8 @@ class JiraMCPClient:
                                 f"{self.jira_url}/rest/api/3/issue/{issue_key}/comment",
                                 headers={
                                     "Authorization": f"Basic {auth_string}",
-                                    "Accept": "application/json"
-                                }
+                                    "Accept": "application/json",
+                                },
                             )
                             comments_response.raise_for_status()
                             comments_data = comments_response.json()
@@ -258,29 +280,32 @@ class JiraMCPClient:
                             # Add comments to issue fields
                             if "fields" not in issue:
                                 issue["fields"] = {}
-                            issue["fields"]["comments"] = comments_data.get("comments", [])
+                            issue["fields"]["comments"] = comments_data.get(
+                                "comments", []
+                            )
                         except Exception as e:
-                            logger.warning(f"Error fetching comments for {issue_key}: {e}")
+                            logger.warning(
+                                f"Error fetching comments for {issue_key}: {e}"
+                            )
                             if "fields" not in issue:
                                 issue["fields"] = {}
                             issue["fields"]["comments"] = []
 
-                logger.info(f"Retrieved {len(issues)} tickets via direct API for JQL: {jql}{' with comments' if expand_comments else ''}")
+                logger.info(
+                    f"Retrieved {len(issues)} tickets via direct API for JQL: {jql}{' with comments' if expand_comments else ''}"
+                )
                 return issues
 
             # Fallback to MCP
             mcp_request = {
                 "method": "jira/searchIssues",
-                "params": {
-                    "jql": jql,
-                    "maxResults": max_results
-                }
+                "params": {"jql": jql, "maxResults": max_results},
             }
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -291,7 +316,13 @@ class JiraMCPClient:
             logger.error(f"Error searching tickets: {e}")
             return []
 
-    async def search_issues(self, jql: str, max_results: int = 50, expand_comments: bool = False, start_at: int = 0) -> Dict[str, Any]:
+    async def search_issues(
+        self,
+        jql: str,
+        max_results: int = 50,
+        expand_comments: bool = False,
+        start_at: int = 0,
+    ) -> Dict[str, Any]:
         """Alias for search_tickets that returns result in dict format with 'issues' key.
 
         This maintains backward compatibility with existing code.
@@ -304,16 +335,13 @@ class JiraMCPClient:
         try:
             mcp_request = {
                 "method": "jira/addComment",
-                "params": {
-                    "issueKey": ticket_key,
-                    "body": comment
-                }
+                "params": {"issueKey": ticket_key, "body": comment},
             }
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
             return response.json()
@@ -322,21 +350,20 @@ class JiraMCPClient:
             logger.error(f"Error adding comment to {ticket_key}: {e}")
             return {"success": False, "error": str(e)}
 
-    async def transition_ticket(self, ticket_key: str, transition_name: str) -> Dict[str, Any]:
+    async def transition_ticket(
+        self, ticket_key: str, transition_name: str
+    ) -> Dict[str, Any]:
         """Transition a ticket to a new status."""
         try:
             mcp_request = {
                 "method": "jira/transitionIssue",
-                "params": {
-                    "issueKey": ticket_key,
-                    "transitionName": transition_name
-                }
+                "params": {"issueKey": ticket_key, "transitionName": transition_name},
             }
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
             return response.json()
@@ -345,7 +372,9 @@ class JiraMCPClient:
             logger.error(f"Error transitioning ticket {ticket_key}: {e}")
             return {"success": False, "error": str(e)}
 
-    async def get_overdue_tickets(self, project_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_overdue_tickets(
+        self, project_key: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get overdue tickets."""
         jql = f"duedate < now() AND status not in (Done, Closed, Resolved)"
         if project_key:
@@ -353,7 +382,9 @@ class JiraMCPClient:
 
         return await self.search_tickets(jql)
 
-    async def get_tickets_due_soon(self, days: int = 3, project_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_tickets_due_soon(
+        self, days: int = 3, project_key: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get tickets due within specified days."""
         jql = f"duedate >= now() AND duedate <= {days}d AND status not in (Done, Closed, Resolved)"
         if project_key:
@@ -361,7 +392,9 @@ class JiraMCPClient:
 
         return await self.search_tickets(jql)
 
-    async def create_tickets_batch(self, tickets: List[JiraTicket]) -> List[Dict[str, Any]]:
+    async def create_tickets_batch(
+        self, tickets: List[JiraTicket]
+    ) -> List[Dict[str, Any]]:
         """Create multiple tickets in batch."""
         results = []
         for ticket in tickets:
@@ -377,17 +410,22 @@ class JiraMCPClient:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
-                logger.info(f"Attempting to fetch projects from Jira API: {self.jira_url}")
+
+                logger.info(
+                    f"Attempting to fetch projects from Jira API: {self.jira_url}"
+                )
                 logger.info(f"Using username: {self.username}")
 
-                auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
                 response = await self.client.get(
                     f"{self.jira_url}/rest/api/3/project",
                     headers={
                         "Authorization": f"Basic {auth_string}",
-                        "Accept": "application/json"
-                    }
+                        "Accept": "application/json",
+                    },
                 )
 
                 logger.info(f"Jira API response status: {response.status_code}")
@@ -398,16 +436,15 @@ class JiraMCPClient:
                 return projects
 
             # Fallback to MCP
-            logger.warning("Jira credentials not configured for direct API, trying MCP fallback")
-            mcp_request = {
-                "method": "jira/getProjects",
-                "params": {}
-            }
+            logger.warning(
+                "Jira credentials not configured for direct API, trying MCP fallback"
+            )
+            mcp_request = {"method": "jira/getProjects", "params": {}}
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -422,17 +459,23 @@ class JiraMCPClient:
 
         except Exception as e:
             import traceback
+
             logger.error(f"Error fetching Jira projects: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []
 
-    async def get_issue_types(self, project_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_issue_types(
+        self, project_key: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
         """Get available issue types for a project."""
         try:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
-                auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
+
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
                 url = f"{self.jira_url}/rest/api/3/issuetype"
                 # Note: For now, return all issue types regardless of project
@@ -442,8 +485,8 @@ class JiraMCPClient:
                     url,
                     headers={
                         "Authorization": f"Basic {auth_string}",
-                        "Accept": "application/json"
-                    }
+                        "Accept": "application/json",
+                    },
                 )
                 response.raise_for_status()
 
@@ -452,10 +495,7 @@ class JiraMCPClient:
                 return issue_types
 
             # Fallback to MCP
-            mcp_request = {
-                "method": "jira/getIssueTypes",
-                "params": {}
-            }
+            mcp_request = {"method": "jira/getIssueTypes", "params": {}}
 
             if project_key:
                 mcp_request["params"]["projectKey"] = project_key
@@ -463,7 +503,7 @@ class JiraMCPClient:
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -480,13 +520,18 @@ class JiraMCPClient:
             logger.error(f"Error fetching issue types: {e}")
             return []
 
-    async def get_users(self, project_key: Optional[str] = None, max_results: int = 200) -> List[Dict[str, Any]]:
+    async def get_users(
+        self, project_key: Optional[str] = None, max_results: int = 200
+    ) -> List[Dict[str, Any]]:
         """Get users that can be assigned to issues."""
         try:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
-                auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
+
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
                 if project_key:
                     # For project-specific users, use the multiProjectSearch endpoint
@@ -499,23 +544,28 @@ class JiraMCPClient:
                     url,
                     headers={
                         "Authorization": f"Basic {auth_string}",
-                        "Accept": "application/json"
-                    }
+                        "Accept": "application/json",
+                    },
                 )
                 response.raise_for_status()
 
                 users = response.json()
                 # Sort users by display name
-                users.sort(key=lambda u: (u.get('displayName') or u.get('name') or u.get('emailAddress') or '').lower())
+                users.sort(
+                    key=lambda u: (
+                        u.get("displayName")
+                        or u.get("name")
+                        or u.get("emailAddress")
+                        or ""
+                    ).lower()
+                )
                 logger.info(f"Retrieved {len(users)} assignable users via direct API")
                 return users
 
             # Fallback to MCP
             mcp_request = {
                 "method": "jira/getAssignableUsers",
-                "params": {
-                    "maxResults": max_results
-                }
+                "params": {"maxResults": max_results},
             }
 
             if project_key:
@@ -524,7 +574,7 @@ class JiraMCPClient:
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -541,13 +591,18 @@ class JiraMCPClient:
             logger.error(f"Error fetching assignable users: {e}")
             return []
 
-    async def search_users(self, query: str, project_key: Optional[str] = None, max_results: int = 20) -> List[Dict[str, Any]]:
+    async def search_users(
+        self, query: str, project_key: Optional[str] = None, max_results: int = 20
+    ) -> List[Dict[str, Any]]:
         """Search users by query string for autocomplete."""
         try:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
-                auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
+
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
                 if project_key:
                     # For project-specific users, use the multiProjectSearch endpoint
@@ -560,24 +615,30 @@ class JiraMCPClient:
                     url,
                     headers={
                         "Authorization": f"Basic {auth_string}",
-                        "Accept": "application/json"
-                    }
+                        "Accept": "application/json",
+                    },
                 )
                 response.raise_for_status()
 
                 users = response.json()
                 # Sort users by display name
-                users.sort(key=lambda u: (u.get('displayName') or u.get('name') or u.get('emailAddress') or '').lower())
-                logger.info(f"Retrieved {len(users)} users for query '{query}' via direct API")
+                users.sort(
+                    key=lambda u: (
+                        u.get("displayName")
+                        or u.get("name")
+                        or u.get("emailAddress")
+                        or ""
+                    ).lower()
+                )
+                logger.info(
+                    f"Retrieved {len(users)} users for query '{query}' via direct API"
+                )
                 return users
 
             # Fallback to MCP
             mcp_request = {
                 "method": "jira/searchUsers",
-                "params": {
-                    "query": query,
-                    "maxResults": max_results
-                }
+                "params": {"query": query, "maxResults": max_results},
             }
 
             if project_key:
@@ -586,7 +647,7 @@ class JiraMCPClient:
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -609,14 +670,17 @@ class JiraMCPClient:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
-                auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
+
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
                 response = await self.client.get(
                     f"{self.jira_url}/rest/api/3/priority",
                     headers={
                         "Authorization": f"Basic {auth_string}",
-                        "Accept": "application/json"
-                    }
+                        "Accept": "application/json",
+                    },
                 )
                 response.raise_for_status()
 
@@ -625,15 +689,12 @@ class JiraMCPClient:
                 return priorities
 
             # Fallback to MCP
-            mcp_request = {
-                "method": "jira/getPriorities",
-                "params": {}
-            }
+            mcp_request = {"method": "jira/getPriorities", "params": {}}
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -660,20 +721,25 @@ class JiraMCPClient:
             priorities_task = self.get_priorities()
 
             projects, issue_types, users, priorities = await asyncio.gather(
-                projects_task, issue_types_task, users_task, priorities_task,
-                return_exceptions=True
+                projects_task,
+                issue_types_task,
+                users_task,
+                priorities_task,
+                return_exceptions=True,
             )
 
             # Find the specific project
             project = None
             if isinstance(projects, list):
-                project = next((p for p in projects if p.get("key") == project_key), None)
+                project = next(
+                    (p for p in projects if p.get("key") == project_key), None
+                )
 
             metadata = {
                 "project": project,
                 "issue_types": issue_types if isinstance(issue_types, list) else [],
                 "users": users if isinstance(users, list) else [],
-                "priorities": priorities if isinstance(priorities, list) else []
+                "priorities": priorities if isinstance(priorities, list) else [],
             }
 
             logger.info(f"Retrieved metadata for project {project_key}")
@@ -681,47 +747,46 @@ class JiraMCPClient:
 
         except Exception as e:
             logger.error(f"Error fetching project metadata: {e}")
-            return {
-                "project": None,
-                "issue_types": [],
-                "users": [],
-                "priorities": []
-            }
+            return {"project": None, "issue_types": [], "users": [], "priorities": []}
 
-    async def get_ticket_with_changelog(self, ticket_key: str) -> Optional[Dict[str, Any]]:
+    async def get_ticket_with_changelog(
+        self, ticket_key: str
+    ) -> Optional[Dict[str, Any]]:
         """Get a ticket with its change history."""
         try:
             # Try direct Jira API call first
             if self.jira_url and self.username and self.api_token:
                 import base64
-                auth_string = base64.b64encode(f"{self.username}:{self.api_token}".encode()).decode()
+
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
                 response = await self.client.get(
                     f"{self.jira_url}/rest/api/3/issue/{ticket_key}?expand=changelog",
                     headers={
                         "Authorization": f"Basic {auth_string}",
-                        "Accept": "application/json"
-                    }
+                        "Accept": "application/json",
+                    },
                 )
                 response.raise_for_status()
 
                 ticket = response.json()
-                logger.debug(f"Retrieved ticket {ticket_key} with changelog via direct API")
+                logger.debug(
+                    f"Retrieved ticket {ticket_key} with changelog via direct API"
+                )
                 return ticket
 
             # Fallback to MCP
             mcp_request = {
                 "method": "jira/getIssue",
-                "params": {
-                    "issueKey": ticket_key,
-                    "expand": ["changelog"]
-                }
+                "params": {"issueKey": ticket_key, "expand": ["changelog"]},
             }
 
             response = await self.client.post(
                 f"{self.mcp_server_url}/mcp",
                 json=mcp_request,
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json"},
             )
             response.raise_for_status()
 
@@ -731,7 +796,9 @@ class JiraMCPClient:
                 logger.debug(f"Retrieved ticket {ticket_key} with changelog via MCP")
                 return ticket
             else:
-                logger.error(f"Failed to get ticket with changelog: {result.get('error')}")
+                logger.error(
+                    f"Failed to get ticket with changelog: {result.get('error')}"
+                )
                 return None
 
         except Exception as e:

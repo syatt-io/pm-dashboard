@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VectorSearchResult:
     """Search result from Pinecone with score."""
+
     id: str
     score: float  # Similarity score (0-1)
     metadata: Dict[str, Any]
@@ -35,10 +36,14 @@ class VectorSearchService:
         self.settings = settings
 
         # Always use OpenAI for embeddings (get from env, not from dynamic AI config)
-        openai_api_key = os.getenv('OPENAI_API_KEY')
+        openai_api_key = os.getenv("OPENAI_API_KEY")
         if not openai_api_key:
-            logger.warning("OPENAI_API_KEY not set - vector search embeddings will fail")
-            logger.warning("Vector search requires OpenAI for embeddings regardless of LLM provider")
+            logger.warning(
+                "OPENAI_API_KEY not set - vector search embeddings will fail"
+            )
+            logger.warning(
+                "Vector search requires OpenAI for embeddings regardless of LLM provider"
+            )
 
         self.openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
         self.pinecone_index = None
@@ -55,7 +60,9 @@ class VectorSearchService:
 
             pc = Pinecone(api_key=self.settings.pinecone.api_key)
             self.pinecone_index = pc.Index(self.settings.pinecone.index_name)
-            logger.info(f"✅ Connected to Pinecone index: {self.settings.pinecone.index_name}")
+            logger.info(
+                f"✅ Connected to Pinecone index: {self.settings.pinecone.index_name}"
+            )
 
         except Exception as e:
             logger.error(f"Failed to initialize Pinecone: {e}")
@@ -78,7 +85,7 @@ class VectorSearchService:
         try:
             response = self.openai_client.embeddings.create(
                 model="text-embedding-3-small",
-                input=text[:8000]  # Truncate to token limit
+                input=text[:8000],  # Truncate to token limit
             )
             return response.data[0].embedding
 
@@ -94,7 +101,7 @@ class VectorSearchService:
         sources: Optional[List[str]] = None,
         user_email: Optional[str] = None,
         project_key: Optional[str] = None,
-        epic_key: Optional[str] = None
+        epic_key: Optional[str] = None,
     ) -> List[SearchResult]:
         """Perform hybrid vector + metadata search.
 
@@ -121,7 +128,9 @@ class VectorSearchService:
             return []
 
         # Build metadata filter
-        filter_conditions = self._build_filter(days_back, sources, user_email, project_key, epic_key)
+        filter_conditions = self._build_filter(
+            days_back, sources, user_email, project_key, epic_key
+        )
 
         # Debug: Log the actual Pinecone filter being applied
         logger.info(f"🔍 Pinecone filter conditions: {filter_conditions}")
@@ -132,27 +141,29 @@ class VectorSearchService:
                 vector=query_embedding,
                 top_k=top_k * 2,  # Get extra for reranking
                 filter=filter_conditions,
-                include_metadata=True
+                include_metadata=True,
             )
 
             # Convert to SearchResult objects and apply title boost
             search_results = []
-            for match in results.get('matches', []):
-                metadata = match.get('metadata', {})
+            for match in results.get("matches", []):
+                metadata = match.get("metadata", {})
 
                 # Parse date
-                date_str = metadata.get('timestamp', '')
+                date_str = metadata.get("timestamp", "")
                 try:
-                    result_date = datetime.fromisoformat(date_str) if date_str else datetime.now()
+                    result_date = (
+                        datetime.fromisoformat(date_str) if date_str else datetime.now()
+                    )
                 except:
                     result_date = datetime.now()
 
                 # Get base relevance score
-                base_score = float(match.get('score', 0.0))
+                base_score = float(match.get("score", 0.0))
 
                 # Apply multiple boost types (multiplicative)
-                title = metadata.get('title', 'Untitled')
-                source = metadata.get('source', 'unknown')
+                title = metadata.get("title", "Untitled")
+                source = metadata.get("source", "unknown")
 
                 # 1. Apply title boost for Fireflies meetings with project keywords
                 score = self._apply_title_boost(
@@ -160,43 +171,43 @@ class VectorSearchService:
                     title=title,
                     source=source,
                     query=query,
-                    project_key=project_key
+                    project_key=project_key,
                 )
 
                 # 2. Apply entity boost for exact ticket keys and project names
                 score = self._apply_entity_boost(
-                    base_score=score,
-                    query=query,
-                    metadata=metadata,
-                    source=source
+                    base_score=score, query=query, metadata=metadata, source=source
                 )
 
                 # 3. Apply recency boost for recently updated Jira tickets
                 score = self._apply_recency_boost(
-                    base_score=score,
-                    source=source,
-                    updated_at=result_date
+                    base_score=score, source=source, updated_at=result_date
                 )
 
                 boosted_score = score
 
                 # Create SearchResult with source-specific metadata
-                source = metadata.get('source', 'unknown')
+                source = metadata.get("source", "unknown")
                 search_result = SearchResult(
                     source=source,
                     title=title,
-                    content=metadata.get('content_preview', ''),
+                    content=metadata.get("content_preview", ""),
                     date=result_date,
-                    url=metadata.get('url') or metadata.get('permalink'),
-                    author=metadata.get('assignee') or metadata.get('user_id', 'Unknown'),
+                    url=metadata.get("url") or metadata.get("permalink"),
+                    author=metadata.get("assignee")
+                    or metadata.get("user_id", "Unknown"),
                     relevance_score=boosted_score,
                     # Jira-specific metadata (only populated for Jira sources)
-                    status=metadata.get('status') if source == 'jira' else None,
-                    issue_key=metadata.get('issue_key') if source == 'jira' else None,
-                    priority=metadata.get('priority') if source == 'jira' else None,
-                    issue_type=metadata.get('issue_type') if source == 'jira' else None,
-                    project_key=metadata.get('project_key') if source == 'jira' else None,
-                    assignee_name=metadata.get('assignee_name') if source == 'jira' else None
+                    status=metadata.get("status") if source == "jira" else None,
+                    issue_key=metadata.get("issue_key") if source == "jira" else None,
+                    priority=metadata.get("priority") if source == "jira" else None,
+                    issue_type=metadata.get("issue_type") if source == "jira" else None,
+                    project_key=(
+                        metadata.get("project_key") if source == "jira" else None
+                    ),
+                    assignee_name=(
+                        metadata.get("assignee_name") if source == "jira" else None
+                    ),
                 )
 
                 search_results.append(search_result)
@@ -205,7 +216,9 @@ class VectorSearchService:
             search_results.sort(key=lambda x: x.relevance_score, reverse=True)
 
             # Enrich with hierarchically related Jira issues (subtasks, linked issues)
-            enriched_results = self._enrich_with_related_issues(search_results, top_n_candidates=5)
+            enriched_results = self._enrich_with_related_issues(
+                search_results, top_n_candidates=5
+            )
 
             # Re-sort after enrichment (new related issues might have high hierarchical scores)
             enriched_results.sort(key=lambda x: x.relevance_score, reverse=True)
@@ -218,10 +231,16 @@ class VectorSearchService:
             for result in diversified_results:
                 source_counts[result.source] = source_counts.get(result.source, 0) + 1
 
-            logger.info(f"✅ Vector search found {len(diversified_results)} results for: {query}")
+            logger.info(
+                f"✅ Vector search found {len(diversified_results)} results for: {query}"
+            )
             if source_counts:
-                source_breakdown = ', '.join([f"{src}: {count}" for src, count in source_counts.items()])
-                logger.info(f"   📊 Results by source (after diversification): {source_breakdown}")
+                source_breakdown = ", ".join(
+                    [f"{src}: {count}" for src, count in source_counts.items()]
+                )
+                logger.info(
+                    f"   📊 Results by source (after diversification): {source_breakdown}"
+                )
 
             return diversified_results
 
@@ -235,7 +254,7 @@ class VectorSearchService:
         sources: Optional[List[str]] = None,
         user_email: Optional[str] = None,
         project_key: Optional[str] = None,
-        epic_key: Optional[str] = None
+        epic_key: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Build Pinecone metadata filter.
 
@@ -253,9 +272,7 @@ class VectorSearchService:
 
         # Date filter - use numeric timestamp_epoch for Pinecone $gte operator
         cutoff_date = datetime.now() - timedelta(days=days_back)
-        conditions.append({
-            "timestamp_epoch": {"$gte": int(cutoff_date.timestamp())}
-        })
+        conditions.append({"timestamp_epoch": {"$gte": int(cutoff_date.timestamp())}})
 
         # Project filter - applies across all data sources using resource mappings
         if project_key:
@@ -264,30 +281,34 @@ class VectorSearchService:
             project_filters = self._get_project_resource_filters(project_key.upper())
 
             if project_filters:
-                logger.info(f"✅ Applied project filter with {len(project_filters.get('$or', []))} resource types")
+                logger.info(
+                    f"✅ Applied project filter with {len(project_filters.get('$or', []))} resource types"
+                )
                 logger.info(f"📋 Filter conditions: {project_filters}")
                 conditions.append(project_filters)
             else:
                 # If project couldn't be resolved, return empty results
-                logger.warning(f"⚠️  Could not find project '{project_key}' - returning no results")
+                logger.warning(
+                    f"⚠️  Could not find project '{project_key}' - returning no results"
+                )
                 # Return a filter that matches nothing
                 conditions.append({"project_key": "__NONEXISTENT__"})
 
         # Epic filter - for Jira tickets belonging to a specific epic
         if epic_key:
             logger.info(f"🎯 Applying epic filter: epic_key={epic_key}")
-            conditions.append({
-                "$or": [
-                    {"epic_key": epic_key},  # Child tickets of the epic
-                    {"issue_key": epic_key}  # The epic itself
-                ]
-            })
+            conditions.append(
+                {
+                    "$or": [
+                        {"epic_key": epic_key},  # Child tickets of the epic
+                        {"issue_key": epic_key},  # The epic itself
+                    ]
+                }
+            )
 
         # Source filter
         if sources:
-            conditions.append({
-                "source": {"$in": sources}
-            })
+            conditions.append({"source": {"$in": sources}})
 
         # Permission filters
         # For Slack and Jira: access_type = 'all' (all users have access)
@@ -303,18 +324,13 @@ class VectorSearchService:
                     # Fireflies public meetings
                     {"is_public": True},
                     # Fireflies shared meetings where user is in access_list
-                    {"access_list": {"$in": [user_email]}}
+                    {"access_list": {"$in": [user_email]}},
                 ]
             }
             conditions.append(permission_filter)
         else:
             # No user email - only show public/all content
-            conditions.append({
-                "$or": [
-                    {"access_type": "all"},
-                    {"is_public": True}
-                ]
-            })
+            conditions.append({"$or": [{"access_type": "all"}, {"is_public": True}]})
 
         # Combine all conditions with AND
         if len(conditions) == 1:
@@ -329,7 +345,7 @@ class VectorSearchService:
         days_back: int = 90,
         sources: Optional[List[str]] = None,
         user_email: Optional[str] = None,
-        alpha: float = 0.7  # Weight for vector vs keyword (1.0 = pure vector, 0.0 = pure keyword)
+        alpha: float = 0.7,  # Weight for vector vs keyword (1.0 = pure vector, 0.0 = pure keyword)
     ) -> List[SearchResult]:
         """Perform hybrid search combining vector similarity and keyword matching.
 
@@ -366,7 +382,7 @@ class VectorSearchService:
                 # Try exact match on key first
                 result = conn.execute(
                     text("SELECT key FROM projects WHERE key = :key"),
-                    {"key": project_input.upper()}
+                    {"key": project_input.upper()},
                 )
                 row = result.fetchone()
                 if row:
@@ -375,7 +391,7 @@ class VectorSearchService:
                 # Try case-insensitive match on name
                 result = conn.execute(
                     text("SELECT key FROM projects WHERE LOWER(name) = LOWER(:name)"),
-                    {"name": project_input}
+                    {"name": project_input},
                 )
                 row = result.fetchone()
                 if row:
@@ -383,8 +399,10 @@ class VectorSearchService:
 
                 # Try partial match on name (e.g., "berns" matches "Berns Garden Center")
                 result = conn.execute(
-                    text("SELECT key FROM projects WHERE LOWER(name) LIKE LOWER(:name)"),
-                    {"name": f"%{project_input}%"}
+                    text(
+                        "SELECT key FROM projects WHERE LOWER(name) LIKE LOWER(:name)"
+                    ),
+                    {"name": f"%{project_input}%"},
                 )
                 row = result.fetchone()
                 if row:
@@ -396,7 +414,9 @@ class VectorSearchService:
             logger.error(f"Error resolving project key: {e}")
             return None
 
-    def _get_project_resource_filters(self, project_key: str) -> Optional[Dict[str, Any]]:
+    def _get_project_resource_filters(
+        self, project_key: str
+    ) -> Optional[Dict[str, Any]]:
         """Build Pinecone filter for project using resource mappings from database.
 
         Args:
@@ -414,7 +434,9 @@ class VectorSearchService:
             # Resolve project name/key to canonical key
             canonical_key = self._resolve_project_key(project_key)
             if not canonical_key:
-                logger.warning(f"⚠️  Could not resolve project '{project_key}' to a valid project key")
+                logger.warning(
+                    f"⚠️  Could not resolve project '{project_key}' to a valid project key"
+                )
                 return None
 
             logger.info(f"📋 Resolved '{project_key}' to project key: {canonical_key}")
@@ -422,21 +444,29 @@ class VectorSearchService:
             engine = get_engine()
             with engine.connect() as conn:
                 result = conn.execute(
-                    text("SELECT slack_channel_ids, notion_page_ids, github_repos, jira_project_keys FROM project_resource_mappings WHERE project_key = :key"),
-                    {"key": canonical_key}
+                    text(
+                        "SELECT slack_channel_ids, notion_page_ids, github_repos, jira_project_keys FROM project_resource_mappings WHERE project_key = :key"
+                    ),
+                    {"key": canonical_key},
                 )
                 row = result.fetchone()
 
                 if not row:
                     return None
 
-                slack_channel_ids, notion_page_ids, github_repos, jira_project_keys = row
+                slack_channel_ids, notion_page_ids, github_repos, jira_project_keys = (
+                    row
+                )
 
                 # Parse JSON arrays
-                slack_channels = json.loads(slack_channel_ids) if slack_channel_ids else []
+                slack_channels = (
+                    json.loads(slack_channel_ids) if slack_channel_ids else []
+                )
                 notion_pages = json.loads(notion_page_ids) if notion_page_ids else []
                 github_repo_list = json.loads(github_repos) if github_repos else []
-                jira_projects = json.loads(jira_project_keys) if jira_project_keys else []
+                jira_projects = (
+                    json.loads(jira_project_keys) if jira_project_keys else []
+                )
 
                 # Build $or filter combining all resource types
                 or_conditions = []
@@ -457,12 +487,18 @@ class VectorSearchService:
                 # 1. The parent page itself (page_id matches)
                 # 2. All child pages (parent_id matches)
                 if notion_pages:
-                    or_conditions.append({
-                        "$or": [
-                            {"page_id": {"$in": notion_pages}},  # Match parent pages directly
-                            {"parent_id": {"$in": notion_pages}}  # Match all child pages
-                        ]
-                    })
+                    or_conditions.append(
+                        {
+                            "$or": [
+                                {
+                                    "page_id": {"$in": notion_pages}
+                                },  # Match parent pages directly
+                                {
+                                    "parent_id": {"$in": notion_pages}
+                                },  # Match all child pages
+                            ]
+                        }
+                    )
 
                 # GitHub: Match by repo name (stored in metadata during ingestion)
                 if github_repo_list:
@@ -474,17 +510,21 @@ class VectorSearchService:
                 fireflies_filter = {
                     "$and": [
                         {"source": "fireflies"},
-                        {"project_tags": {"$in": [canonical_key]}}
+                        {"project_tags": {"$in": [canonical_key]}},
                     ]
                 }
 
                 or_conditions.append(fireflies_filter)
-                logger.info(f"📝 Added Fireflies filter for project tag: {canonical_key}")
+                logger.info(
+                    f"📝 Added Fireflies filter for project tag: {canonical_key}"
+                )
 
                 if not or_conditions:
                     return None
 
-                logger.info(f"Project {project_key} filter: {len(or_conditions)} resource types")
+                logger.info(
+                    f"Project {project_key} filter: {len(or_conditions)} resource types"
+                )
                 return {"$or": or_conditions}
 
         except Exception as e:
@@ -497,7 +537,7 @@ class VectorSearchService:
         title: str,
         source: str,
         query: str,
-        project_key: Optional[str] = None
+        project_key: Optional[str] = None,
     ) -> float:
         """Apply title boost to meetings with project keywords in title.
 
@@ -512,7 +552,7 @@ class VectorSearchService:
             Boosted score if project keyword found in title, otherwise base score
         """
         # Only boost Fireflies meetings
-        if source != 'fireflies':
+        if source != "fireflies":
             return base_score
 
         # Get project keywords to check for in title
@@ -534,7 +574,7 @@ class VectorSearchService:
                     with engine.connect() as conn:
                         result = conn.execute(
                             text("SELECT name FROM projects WHERE key = :key"),
-                            {"key": canonical_key}
+                            {"key": canonical_key},
                         )
                         row = result.fetchone()
                         if row:
@@ -544,14 +584,27 @@ class VectorSearchService:
                             name_parts = project_name.lower().split()
                             keywords_to_check.extend(name_parts)
                 except Exception as e:
-                    logger.debug(f"Could not fetch project name for {canonical_key}: {e}")
+                    logger.debug(
+                        f"Could not fetch project name for {canonical_key}: {e}"
+                    )
 
         # Also extract potential project names from the query
         # Common patterns: "Beauchamp", "Berns", etc.
         query_words = query.lower().split()
         for word in query_words:
             # Filter out common stop words
-            if len(word) > 3 and word not in ['what', 'when', 'where', 'which', 'been', 'focused', 'working', 'last', 'weeks', 'days']:
+            if len(word) > 3 and word not in [
+                "what",
+                "when",
+                "where",
+                "which",
+                "been",
+                "focused",
+                "working",
+                "last",
+                "weeks",
+                "days",
+            ]:
                 keywords_to_check.append(word)
 
         # Check if any keywords appear in title
@@ -567,17 +620,15 @@ class VectorSearchService:
         # Apply 30% boost if project keyword found in title
         if boost_applied:
             boosted_score = base_score * 1.3
-            logger.debug(f"   Base score: {base_score:.3f} → Boosted: {boosted_score:.3f}")
+            logger.debug(
+                f"   Base score: {base_score:.3f} → Boosted: {boosted_score:.3f}"
+            )
             return boosted_score
 
         return base_score
 
     def _apply_entity_boost(
-        self,
-        base_score: float,
-        query: str,
-        metadata: dict,
-        source: str
+        self, base_score: float, query: str, metadata: dict, source: str
     ) -> float:
         """Apply strong boost for exact entity matches (ticket keys, project names).
 
@@ -595,16 +646,16 @@ class VectorSearchService:
         multiplier = 1.0
 
         # Check for exact ticket key match (SUBS-123, PROJ-456)
-        if source == 'jira':
-            issue_key = metadata.get('issue_key', '')
+        if source == "jira":
+            issue_key = metadata.get("issue_key", "")
             if issue_key and issue_key in query_upper:
                 multiplier = 2.0  # 100% boost for exact ticket match
                 logger.debug(f"🎯 Exact ticket match: {issue_key} → 2.0x boost")
                 boost_applied = True
 
         # Check for project key match (SUBS, PROJ)
-        if not boost_applied and source == 'jira':
-            project_key = metadata.get('project_key', '')
+        if not boost_applied and source == "jira":
+            project_key = metadata.get("project_key", "")
             if project_key and project_key in query_upper:
                 multiplier = 1.5  # 50% boost for project match
                 logger.debug(f"📁 Project match: {project_key} → 1.5x boost")
@@ -614,11 +665,13 @@ class VectorSearchService:
         # Extract multi-word entities like "SearchSpring", "Snuggle Bugz"
         if not boost_applied:
             query_words = query.lower().split()
-            title_content = (metadata.get('title', '') + ' ' + metadata.get('summary', '')).lower()
+            title_content = (
+                metadata.get("title", "") + " " + metadata.get("summary", "")
+            ).lower()
 
             # Check for 2-3 word phrases
             for i in range(len(query_words) - 1):
-                phrase = ' '.join(query_words[i:i+3])
+                phrase = " ".join(query_words[i : i + 3])
                 if len(phrase) > 8 and phrase in title_content:
                     multiplier = 1.4  # 40% boost for multi-word entity match
                     logger.debug(f"🔍 Entity phrase match: '{phrase}' → 1.4x boost")
@@ -628,10 +681,7 @@ class VectorSearchService:
         return base_score * multiplier
 
     def _apply_recency_boost(
-        self,
-        base_score: float,
-        source: str,
-        updated_at: Optional[datetime]
+        self, base_score: float, source: str, updated_at: Optional[datetime]
     ) -> float:
         """Apply recency boost to Jira tickets based on update time.
 
@@ -644,7 +694,7 @@ class VectorSearchService:
             Boosted score with recency multiplier
         """
         # Only boost Jira tickets with valid timestamps
-        if source != 'jira' or not updated_at:
+        if source != "jira" or not updated_at:
             return base_score
 
         # Calculate days since update
@@ -663,15 +713,14 @@ class VectorSearchService:
             multiplier = 1.0  # No boost for older items
 
         if multiplier > 1.0:
-            logger.debug(f"📅 Recency boost: {days_old}d old → {multiplier}x multiplier")
+            logger.debug(
+                f"📅 Recency boost: {days_old}d old → {multiplier}x multiplier"
+            )
 
         return base_score * multiplier
 
     def _diversify_sources(
-        self,
-        results: List[SearchResult],
-        target_count: int,
-        min_jira_pct: float = 0.30
+        self, results: List[SearchResult], target_count: int, min_jira_pct: float = 0.30
     ) -> List[SearchResult]:
         """Rerank results to ensure diverse source representation.
 
@@ -688,11 +737,11 @@ class VectorSearchService:
             return results
 
         # Group by source
-        by_source = {'jira': [], 'slack': [], 'github': [], 'fireflies': []}
+        by_source = {"jira": [], "slack": [], "github": [], "fireflies": []}
         for result in results:
-            source_key = result.source if result.source in by_source else 'other'
-            if source_key == 'other':
-                by_source.setdefault('other', []).append(result)
+            source_key = result.source if result.source in by_source else "other"
+            if source_key == "other":
+                by_source.setdefault("other", []).append(result)
             else:
                 by_source[source_key].append(result)
 
@@ -701,14 +750,16 @@ class VectorSearchService:
 
         # Phase 1: Ensure minimum Jira representation
         diversified = []
-        jira_results = by_source['jira'][:min_jira]
+        jira_results = by_source["jira"][:min_jira]
         diversified.extend(jira_results)
-        logger.debug(f"🎯 Diversification: Added {len(jira_results)} Jira results (min: {min_jira})")
+        logger.debug(
+            f"🎯 Diversification: Added {len(jira_results)} Jira results (min: {min_jira})"
+        )
 
         # Phase 2: Round-robin from all sources for remaining slots
         remaining_slots = target_count - len(diversified)
-        sources = ['slack', 'github', 'fireflies', 'jira']
-        source_ptrs = {s: min_jira if s == 'jira' else 0 for s in sources}
+        sources = ["slack", "github", "fireflies", "jira"]
+        source_ptrs = {s: min_jira if s == "jira" else 0 for s in sources}
 
         added_count = {s: 0 for s in sources}
 
@@ -735,14 +786,14 @@ class VectorSearchService:
             if not added_this_round:
                 break
 
-        logger.debug(f"   Round-robin added: {', '.join([f'{src}: {count}' for src, count in added_count.items() if count > 0])}")
+        logger.debug(
+            f"   Round-robin added: {', '.join([f'{src}: {count}' for src, count in added_count.items() if count > 0])}"
+        )
 
         return diversified[:target_count]
 
     def _enrich_with_related_issues(
-        self,
-        results: List[SearchResult],
-        top_n_candidates: int = 5
+        self, results: List[SearchResult], top_n_candidates: int = 5
     ) -> List[SearchResult]:
         """Enrich search results with hierarchically related Jira issues.
 
@@ -761,13 +812,15 @@ class VectorSearchService:
             return results
 
         # Find top Jira candidates (epics or high-scoring tickets)
-        jira_results = [r for r in results if r.source == 'jira' and r.issue_key]
+        jira_results = [r for r in results if r.source == "jira" and r.issue_key]
         if not jira_results:
             logger.debug("No Jira issues found - skipping hierarchical enrichment")
             return results
 
         # Take top N by relevance score
-        candidates = sorted(jira_results, key=lambda x: x.relevance_score, reverse=True)[:top_n_candidates]
+        candidates = sorted(
+            jira_results, key=lambda x: x.relevance_score, reverse=True
+        )[:top_n_candidates]
         logger.info(f"🔗 Checking {len(candidates)} Jira issues for related tickets...")
 
         # Track existing issue keys to avoid duplicates
@@ -777,45 +830,61 @@ class VectorSearchService:
         related_results = []
         for candidate in candidates:
             issue_key = candidate.issue_key
-            logger.debug(f"   Fetching related issues for {issue_key} (issue_type: {candidate.issue_type}, score: {candidate.relevance_score:.4f})")
+            logger.debug(
+                f"   Fetching related issues for {issue_key} (issue_type: {candidate.issue_type}, score: {candidate.relevance_score:.4f})"
+            )
 
             # Fetch subtasks and linked issues via JQL
             related_issues = self._fetch_related_jira_issues_sync(issue_key)
 
             for issue_data in related_issues:
-                related_key = issue_data.get('key')
+                related_key = issue_data.get("key")
 
                 # Skip if already in results
                 if related_key in existing_keys:
                     continue
 
                 # Convert to SearchResult with hierarchical boost
-                fields = issue_data.get('fields', {})
-                status = fields.get('status', {}).get('name', 'Unknown')
-                priority = fields.get('priority', {}).get('name', 'Medium')
-                issue_type = fields.get('issuetype', {}).get('name', 'Task')
-                assignee_name = fields.get('assignee', {}).get('displayName', 'Unassigned')
-                project_key = fields.get('project', {}).get('key', '')
-                summary = fields.get('summary', '')
-                description = fields.get('description', '')
+                fields = issue_data.get("fields", {})
+                status = fields.get("status", {}).get("name", "Unknown")
+                priority = fields.get("priority", {}).get("name", "Medium")
+                issue_type = fields.get("issuetype", {}).get("name", "Task")
+                assignee_name = fields.get("assignee", {}).get(
+                    "displayName", "Unassigned"
+                )
+                project_key = fields.get("project", {}).get("key", "")
+                summary = fields.get("summary", "")
+                description = fields.get("description", "")
 
                 # Parse dates
-                created_str = fields.get('created', '')
-                updated_str = fields.get('updated', '')
+                created_str = fields.get("created", "")
+                updated_str = fields.get("updated", "")
                 try:
-                    created_date = datetime.fromisoformat(created_str.replace('Z', '+00:00')) if created_str else datetime.now()
-                    updated_date = datetime.fromisoformat(updated_str.replace('Z', '+00:00')) if updated_str else datetime.now()
+                    created_date = (
+                        datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                        if created_str
+                        else datetime.now()
+                    )
+                    updated_date = (
+                        datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
+                        if updated_str
+                        else datetime.now()
+                    )
                 except:
                     created_date = updated_date = datetime.now()
 
                 # Apply hierarchical boost (30% boost for being related to a high-scoring result)
-                base_score = candidate.relevance_score * 0.8  # Related issues get 80% of parent's score
-                hierarchical_score = base_score * 1.3  # Then apply 30% hierarchical boost
+                base_score = (
+                    candidate.relevance_score * 0.8
+                )  # Related issues get 80% of parent's score
+                hierarchical_score = (
+                    base_score * 1.3
+                )  # Then apply 30% hierarchical boost
 
                 related_result = SearchResult(
-                    source='jira',
+                    source="jira",
                     title=summary,
-                    content=description[:500] if description else '',
+                    content=description[:500] if description else "",
                     date=updated_date,
                     url=f"{self.settings.jira.url}/browse/{related_key}",
                     author=assignee_name,
@@ -825,15 +894,19 @@ class VectorSearchService:
                     priority=priority,
                     issue_type=issue_type,
                     project_key=project_key,
-                    assignee_name=assignee_name
+                    assignee_name=assignee_name,
                 )
 
                 related_results.append(related_result)
                 existing_keys.add(related_key)
-                logger.debug(f"      → Added {related_key}: {summary[:50]} (score: {hierarchical_score:.4f})")
+                logger.debug(
+                    f"      → Added {related_key}: {summary[:50]} (score: {hierarchical_score:.4f})"
+                )
 
         if related_results:
-            logger.info(f"   ✅ Added {len(related_results)} related Jira issues via hierarchical retrieval")
+            logger.info(
+                f"   ✅ Added {len(related_results)} related Jira issues via hierarchical retrieval"
+            )
             return results + related_results
         else:
             logger.debug("   No new related issues found")
@@ -855,7 +928,9 @@ class VectorSearchService:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                result = loop.run_until_complete(self._fetch_related_jira_issues(issue_key))
+                result = loop.run_until_complete(
+                    self._fetch_related_jira_issues(issue_key)
+                )
                 return result
             finally:
                 loop.close()
@@ -884,8 +959,14 @@ class VectorSearchService:
         try:
             # Fetch subtasks
             subtasks_jql = f"parent = {issue_key}"
-            subtasks_result = await jira_client.search_tickets(subtasks_jql, max_results=20)
-            subtasks = subtasks_result if isinstance(subtasks_result, list) else subtasks_result.get('issues', [])
+            subtasks_result = await jira_client.search_tickets(
+                subtasks_jql, max_results=20
+            )
+            subtasks = (
+                subtasks_result
+                if isinstance(subtasks_result, list)
+                else subtasks_result.get("issues", [])
+            )
 
             if subtasks:
                 logger.debug(f"      Found {len(subtasks)} subtasks")
@@ -894,7 +975,11 @@ class VectorSearchService:
             # Fetch linked issues
             linked_jql = f"issue in linkedIssues({issue_key})"
             linked_result = await jira_client.search_tickets(linked_jql, max_results=20)
-            linked = linked_result if isinstance(linked_result, list) else linked_result.get('issues', [])
+            linked = (
+                linked_result
+                if isinstance(linked_result, list)
+                else linked_result.get("issues", [])
+            )
 
             if linked:
                 logger.debug(f"      Found {len(linked)} linked issues")
@@ -918,9 +1003,9 @@ class VectorSearchService:
             stats = self.pinecone_index.describe_index_stats()
             return {
                 "available": True,
-                "total_vectors": stats.get('total_vector_count', 0),
-                "dimension": stats.get('dimension', 0),
-                "index_fullness": stats.get('index_fullness', 0.0)
+                "total_vectors": stats.get("total_vector_count", 0),
+                "dimension": stats.get("dimension", 0),
+                "index_fullness": stats.get("index_fullness", 0.0),
             }
 
         except Exception as e:

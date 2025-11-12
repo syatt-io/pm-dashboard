@@ -18,10 +18,7 @@ class QueryExpander:
         self._cache_time = None
 
     def expand_query(
-        self,
-        query: str,
-        project_key: Optional[str] = None,
-        max_expansions: int = 5
+        self, query: str, project_key: Optional[str] = None, max_expansions: int = 5
     ) -> Tuple[Set[str], Dict[str, List[str]]]:
         """Expand query with synonyms, acronyms, and related terms.
 
@@ -50,10 +47,7 @@ class QueryExpander:
 
             # Get expansions for this term
             expanded = self._get_expansions_for_term(
-                term_lower,
-                expansions_db,
-                project_key,
-                max_expansions
+                term_lower, expansions_db, project_key, max_expansions
             )
 
             if expanded:
@@ -80,10 +74,12 @@ class QueryExpander:
             List of words
         """
         # Extract words (alphanumeric and hyphens/underscores)
-        words = re.findall(r'\b[\w-]+\b', query.lower())
+        words = re.findall(r"\b[\w-]+\b", query.lower())
         return [w for w in words if len(w) >= 2]  # Filter very short words
 
-    def _load_expansions(self, project_key: Optional[str] = None) -> Dict[str, List[Dict[str, Any]]]:
+    def _load_expansions(
+        self, project_key: Optional[str] = None
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """Load query expansions from database with caching.
 
         Args:
@@ -93,7 +89,10 @@ class QueryExpander:
             Dict mapping original_term -> [expansion_dicts]
         """
         # Check cache (5 minute TTL)
-        if self._cache_time and (datetime.now() - self._cache_time).total_seconds() < 300:
+        if (
+            self._cache_time
+            and (datetime.now() - self._cache_time).total_seconds() < 300
+        ):
             if self._expansion_cache:
                 return self._expansion_cache
 
@@ -106,13 +105,15 @@ class QueryExpander:
             with session_scope() as session:
                 # Load active expansions
                 # Filter by project if provided, otherwise get global expansions
-                query = session.query(QueryExpansion).filter(QueryExpansion.is_active == True)
+                query = session.query(QueryExpansion).filter(
+                    QueryExpansion.is_active == True
+                )
 
                 if project_key:
                     # Get both project-specific and global (project_key IS NULL) expansions
                     query = query.filter(
-                        (QueryExpansion.project_key == project_key) |
-                        (QueryExpansion.project_key.is_(None))
+                        (QueryExpansion.project_key == project_key)
+                        | (QueryExpansion.project_key.is_(None))
                     )
                 else:
                     # Only global expansions
@@ -123,17 +124,25 @@ class QueryExpander:
                     if original not in expansions:
                         expansions[original] = []
 
-                    expansions[original].append({
-                        'term': exp.expanded_term.lower(),
-                        'type': exp.expansion_type,
-                        'confidence': exp.confidence_score,
-                        'success_rate': (exp.success_count / exp.usage_count) if exp.usage_count > 0 else 0.5
-                    })
+                    expansions[original].append(
+                        {
+                            "term": exp.expanded_term.lower(),
+                            "type": exp.expansion_type,
+                            "confidence": exp.confidence_score,
+                            "success_rate": (
+                                (exp.success_count / exp.usage_count)
+                                if exp.usage_count > 0
+                                else 0.5
+                            ),
+                        }
+                    )
 
             self._expansion_cache = expansions
             self._cache_time = datetime.now()
 
-            self.logger.info(f"Loaded {len(expansions)} query expansion rules from database")
+            self.logger.info(
+                f"Loaded {len(expansions)} query expansion rules from database"
+            )
 
             return expansions
 
@@ -147,7 +156,7 @@ class QueryExpander:
         term: str,
         expansions_db: Dict[str, List[Dict[str, Any]]],
         project_key: Optional[str],
-        max_expansions: int
+        max_expansions: int,
     ) -> List[str]:
         """Get expansions for a single term.
 
@@ -167,13 +176,13 @@ class QueryExpander:
             # Sort by confidence * success_rate
             db_expansions = sorted(
                 expansions_db[term],
-                key=lambda x: x['confidence'] * x['success_rate'],
-                reverse=True
+                key=lambda x: x["confidence"] * x["success_rate"],
+                reverse=True,
             )
 
             # Add top expansions
             for exp in db_expansions[:max_expansions]:
-                expanded.append(exp['term'])
+                expanded.append(exp["term"])
 
         # 2. Morphological variations (plural/singular)
         if not expanded or len(expanded) < max_expansions:
@@ -196,33 +205,30 @@ class QueryExpander:
         variations = []
 
         # Simple plural/singular rules
-        if term.endswith('s') and len(term) > 3:
+        if term.endswith("s") and len(term) > 3:
             # Might be plural, try singular
             singular = term[:-1]
             variations.append(singular)
 
             # Handle -ies -> -y
-            if term.endswith('ies'):
-                singular_y = term[:-3] + 'y'
+            if term.endswith("ies"):
+                singular_y = term[:-3] + "y"
                 variations.append(singular_y)
 
-        elif not term.endswith('s'):
+        elif not term.endswith("s"):
             # Might be singular, try plural
             # Basic -s plural
-            variations.append(term + 's')
+            variations.append(term + "s")
 
             # -y -> -ies plural
-            if term.endswith('y') and len(term) > 2:
-                plural_ies = term[:-1] + 'ies'
+            if term.endswith("y") and len(term) > 2:
+                plural_ies = term[:-1] + "ies"
                 variations.append(plural_ies)
 
         return variations
 
     async def record_expansion_usage(
-        self,
-        original_term: str,
-        expanded_term: str,
-        was_helpful: Optional[bool] = None
+        self, original_term: str, expanded_term: str, was_helpful: Optional[bool] = None
     ):
         """Record usage of a query expansion for learning.
 
@@ -237,10 +243,14 @@ class QueryExpander:
 
             with session_scope() as session:
                 # Find or create expansion
-                expansion = session.query(QueryExpansion).filter(
-                    QueryExpansion.original_term == original_term.lower(),
-                    QueryExpansion.expanded_term == expanded_term.lower()
-                ).first()
+                expansion = (
+                    session.query(QueryExpansion)
+                    .filter(
+                        QueryExpansion.original_term == original_term.lower(),
+                        QueryExpansion.expanded_term == expanded_term.lower(),
+                    )
+                    .first()
+                )
 
                 if expansion:
                     # Update usage stats
@@ -259,10 +269,7 @@ class QueryExpander:
             self.logger.error(f"Error recording expansion usage: {e}")
 
     async def learn_expansion_from_feedback(
-        self,
-        query: str,
-        results: List[Any],
-        was_helpful: bool
+        self, query: str, results: List[Any], was_helpful: bool
     ):
         """Learn new query expansions from user feedback.
 
@@ -300,21 +307,25 @@ class QueryExpander:
 
                     for related_term in related[:3]:  # Limit to 3 per term
                         # Check if expansion already exists
-                        existing = session.query(QueryExpansion).filter(
-                            QueryExpansion.original_term == query_term.lower(),
-                            QueryExpansion.expanded_term == related_term.lower()
-                        ).first()
+                        existing = (
+                            session.query(QueryExpansion)
+                            .filter(
+                                QueryExpansion.original_term == query_term.lower(),
+                                QueryExpansion.expanded_term == related_term.lower(),
+                            )
+                            .first()
+                        )
 
                         if not existing:
                             # Create new learned expansion with low initial confidence
                             new_expansion = QueryExpansion(
                                 original_term=query_term.lower(),
                                 expanded_term=related_term.lower(),
-                                expansion_type='learned',
+                                expansion_type="learned",
                                 confidence_score=0.3,  # Low initial confidence
                                 usage_count=0,
                                 success_count=0,
-                                is_active=True
+                                is_active=True,
                             )
                             session.add(new_expansion)
 

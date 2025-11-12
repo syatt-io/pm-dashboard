@@ -1,6 +1,14 @@
 """Web-based interface for interactive meeting processing."""
 
-from flask import Flask, render_template, request, jsonify, session, redirect, send_from_directory
+from flask import (
+    Flask,
+    render_template,
+    request,
+    jsonify,
+    session,
+    redirect,
+    send_from_directory,
+)
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -14,6 +22,7 @@ import json
 
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.settings import settings
@@ -33,10 +42,18 @@ from src.routes.auth import create_auth_blueprint
 from src.models.user import UserWatchedProject
 from sqlalchemy import text
 from main import TodoItem
-from src.utils.database import get_engine, get_session_factory, get_session, close_session, init_database, session_scope
+from src.utils.database import (
+    get_engine,
+    get_session_factory,
+    get_session,
+    close_session,
+    init_database,
+    session_scope,
+)
 
 
 logger = logging.getLogger(__name__)
+
 
 def get_project_keywords_from_db():
     """Load project keywords from database as a dictionary."""
@@ -45,7 +62,9 @@ def get_project_keywords_from_db():
 
         project_keywords = {}
         with engine.connect() as conn:
-            result = conn.execute(text("SELECT project_key, keyword FROM project_keywords"))
+            result = conn.execute(
+                text("SELECT project_key, keyword FROM project_keywords")
+            )
             for row in result:
                 project_key, keyword = row
                 if project_key not in project_keywords:
@@ -58,19 +77,29 @@ def get_project_keywords_from_db():
         # Return empty dict if database query fails
         return {}
 
+
 import os
-template_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')
+
+template_dir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "templates"
+)
 # Configure React build directory for static files
-react_build_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build')
-app = Flask(__name__,
-            template_folder=template_dir,
-            static_folder=react_build_dir,
-            static_url_path='')
+react_build_dir = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend", "build"
+)
+app = Flask(
+    __name__,
+    template_folder=template_dir,
+    static_folder=react_build_dir,
+    static_url_path="",
+)
 
 # ✅ SECURITY: Production-ready secret key validation
 # CRITICAL: JWT_SECRET_KEY must be set in production - no fallbacks allowed
-jwt_secret = os.getenv('JWT_SECRET_KEY', '').strip()  # Handle DigitalOcean SECRET type whitespace
-is_production = os.getenv('FLASK_ENV') == 'production'
+jwt_secret = os.getenv(
+    "JWT_SECRET_KEY", ""
+).strip()  # Handle DigitalOcean SECRET type whitespace
+is_production = os.getenv("FLASK_ENV") == "production"
 
 # Validate JWT_SECRET_KEY
 if not jwt_secret:
@@ -86,8 +115,10 @@ if not jwt_secret:
         raise ValueError(error_msg)
     else:
         # Development: use a fixed (but clearly insecure) secret
-        logger.warning("⚠️  JWT_SECRET_KEY not set - using development secret (NOT FOR PRODUCTION)")
-        jwt_secret = 'dev-secret-DO-NOT-USE-IN-PRODUCTION-' + 'a' * 32
+        logger.warning(
+            "⚠️  JWT_SECRET_KEY not set - using development secret (NOT FOR PRODUCTION)"
+        )
+        jwt_secret = "dev-secret-DO-NOT-USE-IN-PRODUCTION-" + "a" * 32
 
 # Validate minimum secret length (at least 32 characters for HS256)
 MIN_SECRET_LENGTH = 32
@@ -101,10 +132,12 @@ if len(jwt_secret) < MIN_SECRET_LENGTH:
     if is_production:
         raise ValueError(error_msg)
     else:
-        logger.warning("⚠️  Continuing in development with weak secret (NOT FOR PRODUCTION)")
+        logger.warning(
+            "⚠️  Continuing in development with weak secret (NOT FOR PRODUCTION)"
+        )
 
 # Warn about common weak secrets
-WEAK_SECRETS = ['dev', 'test', 'secret', 'password', 'changeme', '12345']
+WEAK_SECRETS = ["dev", "test", "secret", "password", "changeme", "12345"]
 if any(weak in jwt_secret.lower() for weak in WEAK_SECRETS):
     logger.warning(
         f"⚠️  JWT_SECRET_KEY appears to contain common weak patterns. "
@@ -116,25 +149,29 @@ logger.info("✅ JWT_SECRET_KEY validated and configured")
 
 # Configure CORS for development and production
 # ✅ FIXED: Strict CORS configuration - production only allows single domain
-if os.getenv('FLASK_ENV') == 'production':
+if os.getenv("FLASK_ENV") == "production":
     # Production: only allow the production domain
-    base_url = os.getenv('WEB_BASE_URL', 'https://agent-pm-tsbbb.ondigitalocean.app')
+    base_url = os.getenv("WEB_BASE_URL", "https://agent-pm-tsbbb.ondigitalocean.app")
     cors_origins = [base_url]
     logger.info(f"Production CORS: {cors_origins}")
 else:
     # Development: allow localhost on multiple ports for testing
-    frontend_port = int(os.getenv('FRONTEND_PORT', 4001))
+    frontend_port = int(os.getenv("FRONTEND_PORT", 4001))
     cors_origins = [
         f"http://localhost:{frontend_port}",
         "http://localhost:3000",
         "http://localhost:3001",
-        "http://localhost:3002"
+        "http://localhost:3002",
     ]
     logger.info(f"Development CORS: {cors_origins}")
 
-CORS(app, origins=cors_origins, supports_credentials=True,
-     allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token'],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+CORS(
+    app,
+    origins=cors_origins,
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization", "X-CSRF-Token"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+)
 
 # ✅ SECURITY: Initialize CSRF protection for state-changing operations
 # CSRF tokens provide defense in depth beyond SameSite cookies
@@ -142,23 +179,23 @@ csrf = CSRFProtect(app)
 # Exempt API routes that use JWT authentication (JWT provides CSRF protection)
 # Webhooks are also exempt as they use signature verification
 # Note: WTF_CSRF_EXEMPT_LIST doesn't support wildcards, so we exempt specific views
-app.config['WTF_CSRF_CHECK_DEFAULT'] = False  # Disable by default, enable selectively
+app.config["WTF_CSRF_CHECK_DEFAULT"] = False  # Disable by default, enable selectively
 logger.info("✅ CSRF protection initialized (disabled by default for API routes)")
 
 # ✅ FIXED: Initialize rate limiter for API protection
 # Use Redis if available (production), otherwise in-memory (development)
 try:
-    redis_url = os.getenv('REDIS_URL')
+    redis_url = os.getenv("REDIS_URL")
     if redis_url:
         # Configure Redis connection with proper timeouts and connection pooling
         # Flatten parameters - connection_pool_kwargs is not a valid parameter
         storage_options = {
-            'socket_connect_timeout': 5,
-            'socket_timeout': 5,
-            'retry_on_timeout': True,
-            'health_check_interval': 30,
-            'max_connections': 50,
-            'socket_keepalive': True,
+            "socket_connect_timeout": 5,
+            "socket_timeout": 5,
+            "retry_on_timeout": True,
+            "health_check_interval": 30,
+            "max_connections": 50,
+            "socket_keepalive": True,
         }
         storage_uri = redis_url
         logger.info(f"Rate limiter using Redis: {redis_url.split('@')[0]}@***")
@@ -179,7 +216,7 @@ try:
         # ✅ SECURITY: Fail open on Redis errors (allow requests) but log warnings
         swallow_errors=True,
         # Add headers to responses showing rate limit status
-        headers_enabled=True
+        headers_enabled=True,
     )
     logger.info("✅ Rate limiter initialized successfully with moving-window strategy")
 except Exception as e:
@@ -193,7 +230,7 @@ except Exception as e:
             storage_uri="memory://",
             strategy="moving-window",
             swallow_errors=True,
-            headers_enabled=True
+            headers_enabled=True,
         )
         logger.warning("⚠️  Running with in-memory rate limiter (fallback mode)")
     except Exception as fallback_error:
@@ -238,7 +275,7 @@ app.auth_service = auth_service
 # Start the scheduler for nightly jobs (Tempo sync, reminders, etc.)
 # NOTE: When running under Gunicorn, the scheduler is started by gunicorn_config.py
 # to ensure it only runs in ONE worker (prevents duplicate notifications)
-if __name__ == '__main__':
+if __name__ == "__main__":
     # OLD SCHEDULER DISABLED - Migrated to Celery Beat
     # The old Python 'schedule' library scheduler has been replaced with Celery Beat
     # for better reliability, timezone handling, and production deployment.
@@ -251,7 +288,9 @@ if __name__ == '__main__':
     # import atexit
     # atexit.register(stop_scheduler)
 
-    logger.info("ℹ️  Old scheduler DISABLED - all scheduled tasks now run via Celery Beat")
+    logger.info(
+        "ℹ️  Old scheduler DISABLED - all scheduled tasks now run via Celery Beat"
+    )
     logger.info("ℹ️  To run scheduler locally: celery -A src.tasks.celery_app beat")
 else:
     # In production (Gunicorn), scheduler is managed by gunicorn_config.py
@@ -397,8 +436,9 @@ app.register_blueprint(epic_categories_bp)
 app.register_blueprint(epic_templates_bp)
 app.register_blueprint(historical_import_bp)
 
+
 # ✅ SECURITY: CSRF token endpoint for frontend to fetch tokens
-@app.route('/api/csrf-token', methods=['GET'])
+@app.route("/api/csrf-token", methods=["GET"])
 def get_csrf_token():
     """
     Return a CSRF token for the frontend.
@@ -410,12 +450,14 @@ def get_csrf_token():
     state-changing requests.
     """
     token = generate_csrf()
-    return jsonify({'csrf_token': token}), 200
+    return jsonify({"csrf_token": token}), 200
+
 
 logger.info("✅ CSRF token endpoint registered at /api/csrf-token")
 
+
 # ✅ Fireflies Webhook Endpoint
-@app.route('/api/webhooks/fireflies', methods=['POST'])
+@app.route("/api/webhooks/fireflies", methods=["POST"])
 @csrf.exempt  # Webhook uses HMAC signature verification, not CSRF tokens
 def fireflies_webhook():
     """
@@ -427,16 +469,19 @@ def fireflies_webhook():
     """
     return handle_fireflies_webhook()
 
-logger.info("✅ Fireflies webhook endpoint registered at /api/webhooks/fireflies (CSRF exempt)")
+
+logger.info(
+    "✅ Fireflies webhook endpoint registered at /api/webhooks/fireflies (CSRF exempt)"
+)
 
 # ✅ Apply rate limiting to backfill endpoints (expensive operations)
 if limiter:
-    limiter.limit("3 per hour")(app.view_functions['backfill.backfill_jira'])
-    limiter.limit("3 per hour")(app.view_functions['backfill.backfill_slack'])
-    limiter.limit("3 per hour")(app.view_functions['backfill.backfill_notion'])
-    limiter.limit("5 per hour")(app.view_functions['backfill.backfill_fireflies'])
-    limiter.limit("5 per hour")(app.view_functions['backfill.backfill_github'])
-    limiter.limit("5 per hour")(app.view_functions['backfill.backfill_tempo'])
+    limiter.limit("3 per hour")(app.view_functions["backfill.backfill_jira"])
+    limiter.limit("3 per hour")(app.view_functions["backfill.backfill_slack"])
+    limiter.limit("3 per hour")(app.view_functions["backfill.backfill_notion"])
+    limiter.limit("5 per hour")(app.view_functions["backfill.backfill_fireflies"])
+    limiter.limit("5 per hour")(app.view_functions["backfill.backfill_github"])
+    limiter.limit("5 per hour")(app.view_functions["backfill.backfill_tempo"])
     logger.info("✅ Rate limits applied to backfill endpoints")
 else:
     logger.warning("⚠️  Skipping rate limit application (limiter not available)")
@@ -447,12 +492,14 @@ analyzer = None
 notifier = None
 todo_manager = None
 
+
 def get_fireflies():
     """Lazy-load Fireflies client on first use."""
     global fireflies
     if fireflies is None:
         fireflies = FirefliesClient(settings.fireflies.api_key)
     return fireflies
+
 
 def get_analyzer():
     """Lazy-load TranscriptAnalyzer on first use."""
@@ -461,12 +508,14 @@ def get_analyzer():
         analyzer = TranscriptAnalyzer()
     return analyzer
 
+
 def get_notifier():
     """Lazy-load NotificationManager on first use."""
     global notifier
     if notifier is None:
         notifier = NotificationManager(settings.notifications)
     return notifier
+
 
 def get_todo_manager():
     """Lazy-load TodoManager on first use."""
@@ -475,10 +524,13 @@ def get_todo_manager():
         todo_manager = TodoManager()
     return todo_manager
 
+
 # Initialize Slack routes with config (lazy initialization - bot created on first use)
 init_slack_routes(
     bot_token=settings.notifications.slack_bot_token,
-    signing_secret=getattr(settings.notifications, 'slack_signing_secret', 'dummy_secret')
+    signing_secret=getattr(
+        settings.notifications, "slack_signing_secret", "dummy_secret"
+    ),
 )
 logger.info("Slack routes initialized (bot will be created on first use)")
 
@@ -489,6 +541,7 @@ init_projects_routes(get_notifier)
 # ============================================================================
 # Standardized API Response Helpers
 # ============================================================================
+
 
 def success_response(data=None, message=None, status_code=200):
     """
@@ -502,13 +555,13 @@ def success_response(data=None, message=None, status_code=200):
     Returns:
         Flask jsonify response with consistent format
     """
-    response = {'success': True}
+    response = {"success": True}
 
     if data is not None:
-        response['data'] = data
+        response["data"] = data
 
     if message is not None:
-        response['message'] = message
+        response["message"] = message
 
     return jsonify(response), status_code
 
@@ -525,13 +578,10 @@ def error_response(error, status_code=500, details=None):
     Returns:
         Flask jsonify response with consistent format
     """
-    response = {
-        'success': False,
-        'error': str(error)
-    }
+    response = {"success": False, "error": str(error)}
 
     if details is not None:
-        response['details'] = details
+        response["details"] = details
 
     return jsonify(response), status_code
 
@@ -542,16 +592,17 @@ def run_database_migrations():
         # Run Alembic migrations first
         import subprocess
         import os
+
         logger.info("Running Alembic migrations...")
         try:
             # Get the project root directory
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             result = subprocess.run(
-                ['alembic', 'upgrade', 'head'],
+                ["alembic", "upgrade", "head"],
                 cwd=project_root,
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
             )
             logger.info(f"Alembic migrations completed: {result.stdout}")
         except subprocess.CalledProcessError as e:
@@ -560,6 +611,7 @@ def run_database_migrations():
             logger.warning(f"Alembic migration error: {e}")
 
         from sqlalchemy.orm import sessionmaker
+
         engine = get_engine()
 
         with engine.connect() as conn:
@@ -573,7 +625,11 @@ def run_database_migrations():
 
                 # Add new column if it doesn't exist
                 try:
-                    conn.execute(text("ALTER TABLE user_preferences ADD COLUMN slack_username TEXT"))
+                    conn.execute(
+                        text(
+                            "ALTER TABLE user_preferences ADD COLUMN slack_username TEXT"
+                        )
+                    )
                     conn.commit()
                     logger.info("Added slack_username column")
                 except Exception:
@@ -582,7 +638,11 @@ def run_database_migrations():
 
                 # Copy data from old column to new column
                 try:
-                    conn.execute(text("UPDATE user_preferences SET slack_username = slack_user_id WHERE slack_user_id IS NOT NULL AND slack_username IS NULL"))
+                    conn.execute(
+                        text(
+                            "UPDATE user_preferences SET slack_username = slack_user_id WHERE slack_user_id IS NOT NULL AND slack_username IS NULL"
+                        )
+                    )
                     conn.commit()
                     logger.info("Copied data from slack_user_id to slack_username")
                 except Exception as e:
@@ -592,31 +652,41 @@ def run_database_migrations():
 
             except Exception:
                 # Old column doesn't exist, so no migration needed
-                logger.info("No migration needed - slack_username column already exists")
+                logger.info(
+                    "No migration needed - slack_username column already exists"
+                )
 
             # Add new columns to processed_meetings table
             columns_to_add = [
-                ('key_decisions', 'TEXT'),
-                ('blockers', 'TEXT'),
-                ('analyzed_at', 'TIMESTAMP'),
-                ('processed_at', 'TIMESTAMP'),
-                ('tickets_created', 'TEXT'),
-                ('todos_created', 'TEXT'),
-                ('success', 'BOOLEAN DEFAULT true')
+                ("key_decisions", "TEXT"),
+                ("blockers", "TEXT"),
+                ("analyzed_at", "TIMESTAMP"),
+                ("processed_at", "TIMESTAMP"),
+                ("tickets_created", "TEXT"),
+                ("todos_created", "TEXT"),
+                ("success", "BOOLEAN DEFAULT true"),
             ]
 
             for column_name, column_type in columns_to_add:
                 try:
-                    conn.execute(text(f"ALTER TABLE processed_meetings ADD COLUMN {column_name} {column_type}"))
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE processed_meetings ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
                     conn.commit()
                     logger.info(f"Added {column_name} column to processed_meetings")
                 except Exception as e:
                     # Column might already exist
-                    if 'already exists' not in str(e).lower() and 'duplicate' not in str(e).lower():
+                    if (
+                        "already exists" not in str(e).lower()
+                        and "duplicate" not in str(e).lower()
+                    ):
                         logger.debug(f"Column {column_name} migration note: {e}")
 
     except Exception as e:
         logger.warning(f"Migration failed: {e}")
+
 
 # Run migrations on startup
 # TEMPORARILY DISABLED: Causing health check failures due to blocking each gunicorn worker
@@ -624,30 +694,28 @@ def run_database_migrations():
 # run_database_migrations()
 
 
-
-
-
-
-
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
 def serve_react(path):
     """Serve React application in production."""
     try:
         print(f"=== SERVE_REACT CALLED: path='{path}' ===", flush=True)
 
         # Skip API and Slack routes
-        if path.startswith('api/') or path.startswith('slack/'):
+        if path.startswith("api/") or path.startswith("slack/"):
             print(f"Skipping API/Slack route: {path}", flush=True)
-            return jsonify({'error': 'Not found'}), 404
+            return jsonify({"error": "Not found"}), 404
 
         # Try multiple possible build directory paths
         possible_build_dirs = [
-            '/workspace/frontend/build',  # DigitalOcean workspace (production)
-            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'build'),  # Local dev
-            os.path.join(os.getcwd(), 'frontend', 'build'),  # Current working directory
-            'frontend/build'  # Relative path
+            "/workspace/frontend/build",  # DigitalOcean workspace (production)
+            os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "frontend",
+                "build",
+            ),  # Local dev
+            os.path.join(os.getcwd(), "frontend", "build"),  # Current working directory
+            "frontend/build",  # Relative path
         ]
 
         print(f"Checking build directories...", flush=True)
@@ -662,7 +730,7 @@ def serve_react(path):
 
         # In production, serve React build
         if react_build_dir:
-            index_path = os.path.join(react_build_dir, 'index.html')
+            index_path = os.path.join(react_build_dir, "index.html")
             index_exists = os.path.exists(index_path)
             print(f"index.html exists: {index_exists}", flush=True)
 
@@ -673,14 +741,14 @@ def serve_react(path):
             else:
                 # Serve index.html for client-side routing
                 print(f"Serving index.html for SPA route: '{path}'", flush=True)
-                return send_from_directory(react_build_dir, 'index.html')
+                return send_from_directory(react_build_dir, "index.html")
         else:
             # Debug information for troubleshooting
             debug_info = {
-                'message': 'React build directory not found',
-                'cwd': os.getcwd(),
-                'checked_paths': possible_build_dirs,
-                'exists_checks': [os.path.exists(p) for p in possible_build_dirs]
+                "message": "React build directory not found",
+                "cwd": os.getcwd(),
+                "checked_paths": possible_build_dirs,
+                "exists_checks": [os.path.exists(p) for p in possible_build_dirs],
             }
             print(f"❌ ERROR: React build not found! {debug_info}", flush=True)
             return jsonify(debug_info), 404
@@ -688,6 +756,7 @@ def serve_react(path):
     except Exception as e:
         print(f"❌ EXCEPTION in serve_react: {e}", flush=True)
         import traceback
+
         traceback.print_exc()
         raise
 
@@ -700,15 +769,15 @@ def not_found(e):
     path = request.path
 
     # Skip API routes - return actual 404
-    if path.startswith('/api/') or path.startswith('/slack/'):
-        return jsonify({'error': 'Not found'}), 404
+    if path.startswith("/api/") or path.startswith("/slack/"):
+        return jsonify({"error": "Not found"}), 404
 
     # For all other routes, serve React app (let React Admin handle routing)
     print(f"=== 404 HANDLER: serving React for path '{path}' ===", flush=True)
-    return serve_react(path.lstrip('/'))
+    return serve_react(path.lstrip("/"))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Get port from environment variable, default to 4000
-    port = int(os.getenv('BACKEND_PORT', 4000))
-    app.run(debug=True, host='127.0.0.1', port=port)
+    port = int(os.getenv("BACKEND_PORT", 4000))
+    app.run(debug=True, host="127.0.0.1", port=port)

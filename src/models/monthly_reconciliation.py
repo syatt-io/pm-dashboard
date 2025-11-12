@@ -23,11 +23,13 @@ class MonthlyReconciliationReport(Base):
         report_metadata: JSON with additional report details (projects analyzed, etc.)
     """
 
-    __tablename__ = 'monthly_reconciliation_reports'
+    __tablename__ = "monthly_reconciliation_reports"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     month = Column(String(7), nullable=False, unique=True, index=True)  # YYYY-MM
-    generated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    generated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     file_path = Column(String(500), nullable=True)  # URL or path to report file
     total_projects = Column(Integer, nullable=False, default=0)
     total_epics = Column(Integer, nullable=False, default=0)

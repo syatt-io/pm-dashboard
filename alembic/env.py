@@ -20,11 +20,11 @@ config = context.config
 
 # Load database URL directly from environment
 # Don't import settings to avoid unnecessary dependency on JIRA/other configs
-database_url = os.getenv('DATABASE_URL')
+database_url = os.getenv("DATABASE_URL")
 if not database_url:
     # Fallback to default SQLite for local development
-    database_url = 'sqlite:///database/pm_agent.db'
-config.set_main_option('sqlalchemy.url', database_url)
+    database_url = "sqlite:///database/pm_agent.db"
+config.set_main_option("sqlalchemy.url", database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -84,9 +84,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

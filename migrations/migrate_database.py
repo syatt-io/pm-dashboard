@@ -14,7 +14,7 @@ def migrate_database():
     """Add new columns to processed_meetings table."""
     # Extract database path from URL
     db_url = settings.agent.database_url
-    if db_url.startswith('sqlite:///'):
+    if db_url.startswith("sqlite:///"):
         db_path = db_url[10:]  # Remove 'sqlite:///' prefix
     else:
         logger.error(f"Unsupported database URL: {db_url}")
@@ -33,11 +33,11 @@ def migrate_database():
 
         # Add missing columns
         new_columns = [
-            ('analyzed_at', 'DATETIME'),
-            ('summary', 'TEXT'),
-            ('key_decisions', 'TEXT'),  # JSON stored as TEXT
-            ('blockers', 'TEXT'),       # JSON stored as TEXT
-            ('todos_created', 'TEXT')   # JSON stored as TEXT
+            ("analyzed_at", "DATETIME"),
+            ("summary", "TEXT"),
+            ("key_decisions", "TEXT"),  # JSON stored as TEXT
+            ("blockers", "TEXT"),  # JSON stored as TEXT
+            ("todos_created", "TEXT"),  # JSON stored as TEXT
         ]
 
         for column_name, column_type in new_columns:

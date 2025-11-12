@@ -4,17 +4,18 @@ Test script to verify smooth interpolation in forecasting service.
 Validates that BE Dev boost multiplier scales smoothly from 1-5.
 """
 
+
 def test_be_dev_boost():
     """Test BE Dev boost multiplier across full 1-5 scale."""
     print("Testing BE Dev Boost Multiplier (Extensive Customizations)")
     print("=" * 60)
 
     expected = {
-        1: 1.0,   # No boost
-        2: 1.0,   # No boost
-        3: 1.1,   # +10%
-        4: 1.2,   # +20%
-        5: 1.3    # +30%
+        1: 1.0,  # No boost
+        2: 1.0,  # No boost
+        3: 1.1,  # +10%
+        4: 1.2,  # +20%
+        5: 1.3,  # +30%
     }
 
     for value in range(1, 6):
@@ -26,8 +27,9 @@ def test_be_dev_boost():
         boost_percent = (multiplier - 1.0) * 100
         print(f"  Value {value}: {multiplier:.2f}x ({boost_percent:+.0f}%) {match}")
 
-        assert abs(multiplier - expected_multiplier) < 0.001, \
-            f"Value {value}: Expected {expected_multiplier}, got {multiplier}"
+        assert (
+            abs(multiplier - expected_multiplier) < 0.001
+        ), f"Value {value}: Expected {expected_multiplier}, got {multiplier}"
 
     print("\n✓ All BE Dev boost tests passed!")
 
@@ -38,11 +40,11 @@ def test_blend_factor():
     print("=" * 60)
 
     expected = {
-        1: 0.00,   # 100% no_integration baseline
-        2: 0.25,   # 75% no_integration, 25% with_integration
-        3: 0.50,   # 50/50 blend
-        4: 0.75,   # 75% with_integration, 25% no_integration
-        5: 1.00    # 100% with_integration baseline
+        1: 0.00,  # 100% no_integration baseline
+        2: 0.25,  # 75% no_integration, 25% with_integration
+        3: 0.50,  # 50/50 blend
+        4: 0.75,  # 75% with_integration, 25% no_integration
+        5: 1.00,  # 100% with_integration baseline
     }
 
     for value in range(1, 6):
@@ -53,11 +55,14 @@ def test_blend_factor():
 
         no_int_pct = (1 - blend_factor) * 100
         with_int_pct = blend_factor * 100
-        print(f"  Value {value}: {blend_factor:.2f} "
-              f"({no_int_pct:.0f}% no_int / {with_int_pct:.0f}% with_int) {match}")
+        print(
+            f"  Value {value}: {blend_factor:.2f} "
+            f"({no_int_pct:.0f}% no_int / {with_int_pct:.0f}% with_int) {match}"
+        )
 
-        assert abs(blend_factor - expected_factor) < 0.001, \
-            f"Value {value}: Expected {expected_factor}, got {blend_factor}"
+        assert (
+            abs(blend_factor - expected_factor) < 0.001
+        ), f"Value {value}: Expected {expected_factor}, got {blend_factor}"
 
     print("\n✓ All blend factor tests passed!")
 

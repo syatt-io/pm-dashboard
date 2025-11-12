@@ -34,10 +34,7 @@ auth_string = base64.b64encode(f"{username}:{api_token}".encode()).decode()
 print("Making API request...")
 response = requests.get(
     f"{jira_url}/rest/api/3/project",
-    headers={
-        "Authorization": f"Basic {auth_string}",
-        "Accept": "application/json"
-    }
+    headers={"Authorization": f"Basic {auth_string}", "Accept": "application/json"},
 )
 
 print(f"Status Code: {response.status_code}")

@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -39,18 +39,20 @@ class UserCSVImporter:
         """Validate required fields in CSV row."""
         errors = []
 
-        if not row.get('email'):
+        if not row.get("email"):
             errors.append(f"Row {row_num}: Missing email")
 
-        if not row.get('name'):
+        if not row.get("name"):
             errors.append(f"Row {row_num}: Missing name")
 
-        if not row.get('google_id'):
+        if not row.get("google_id"):
             errors.append(f"Row {row_num}: Missing google_id")
-        elif row['google_id'].startswith('GOOGLE_ID_'):
-            errors.append(f"Row {row_num}: google_id is still a placeholder - needs real Google ID")
+        elif row["google_id"].startswith("GOOGLE_ID_"):
+            errors.append(
+                f"Row {row_num}: google_id is still a placeholder - needs real Google ID"
+            )
 
-        if not row.get('jira_account_id'):
+        if not row.get("jira_account_id"):
             errors.append(f"Row {row_num}: Missing jira_account_id")
 
         return errors
@@ -74,10 +76,12 @@ class UserCSVImporter:
         errors = []
 
         try:
-            with open(csv_path, 'r') as f:
+            with open(csv_path, "r") as f:
                 reader = csv.DictReader(f)
 
-                for row_num, row in enumerate(reader, start=2):  # Start at 2 (row 1 is header)
+                for row_num, row in enumerate(
+                    reader, start=2
+                ):  # Start at 2 (row 1 is header)
                     # Validate row
                     validation_errors = self.validate_csv_row(row, row_num)
                     if validation_errors:
@@ -86,38 +90,51 @@ class UserCSVImporter:
                         continue
 
                     # Check if user already exists
-                    existing = session.query(User).filter(
-                        (User.email == row['email']) | (User.google_id == row['google_id'])
-                    ).first()
+                    existing = (
+                        session.query(User)
+                        .filter(
+                            (User.email == row["email"])
+                            | (User.google_id == row["google_id"])
+                        )
+                        .first()
+                    )
 
                     if existing:
-                        logger.warning(f"⚠️  Row {row_num}: User {row['email']} already exists - SKIPPING")
+                        logger.warning(
+                            f"⚠️  Row {row_num}: User {row['email']} already exists - SKIPPING"
+                        )
                         skipped += 1
                         continue
 
                     # Create user
                     try:
                         user = User(
-                            email=row['email'],
-                            name=row['name'],
-                            google_id=row['google_id'],
-                            jira_account_id=row['jira_account_id'] or None,
-                            slack_user_id=row['slack_user_id'] or None,
-                            team=row['team'] or None,
-                            project_team=row['project_team'] or None,
-                            weekly_hours_minimum=float(row.get('weekly_hours_minimum', 32.0)),
-                            role=UserRole[row.get('role', 'MEMBER').upper()],
-                            is_active=row.get('is_active', 'True').lower() == 'true'
+                            email=row["email"],
+                            name=row["name"],
+                            google_id=row["google_id"],
+                            jira_account_id=row["jira_account_id"] or None,
+                            slack_user_id=row["slack_user_id"] or None,
+                            team=row["team"] or None,
+                            project_team=row["project_team"] or None,
+                            weekly_hours_minimum=float(
+                                row.get("weekly_hours_minimum", 32.0)
+                            ),
+                            role=UserRole[row.get("role", "MEMBER").upper()],
+                            is_active=row.get("is_active", "True").lower() == "true",
                         )
 
                         session.add(user)
                         session.flush()  # Get the ID
 
-                        logger.info(f"✅ Row {row_num}: Created {row['email']} (ID: {user.id})")
+                        logger.info(
+                            f"✅ Row {row_num}: Created {row['email']} (ID: {user.id})"
+                        )
                         imported += 1
 
                     except Exception as e:
-                        logger.error(f"❌ Row {row_num}: Error creating {row['email']}: {e}")
+                        logger.error(
+                            f"❌ Row {row_num}: Error creating {row['email']}: {e}"
+                        )
                         errors.append(f"Row {row_num}: {str(e)}")
                         skipped += 1
 
@@ -160,9 +177,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Import users from CSV file")
     parser.add_argument(
         "csv_file",
-        nargs='?',
+        nargs="?",
         default="scripts/tempo_users.csv",
-        help="Path to CSV file (default: scripts/tempo_users.csv)"
+        help="Path to CSV file (default: scripts/tempo_users.csv)",
     )
 
     args = parser.parse_args()

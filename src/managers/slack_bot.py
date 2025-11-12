@@ -28,10 +28,7 @@ class SlackTodoBot:
 
     def __init__(self, bot_token: str, signing_secret: str):
         """Initialize Slack bot."""
-        self.app = App(
-            token=bot_token,
-            signing_secret=signing_secret
-        )
+        self.app = App(token=bot_token, signing_secret=signing_secret)
         self.client = WebClient(token=bot_token)
         self.todo_manager = TodoManager()
         self.learning_manager = LearningManager()
@@ -39,7 +36,9 @@ class SlackTodoBot:
 
         # Initialize database session manager for interactive buttons
         self.session_manager = get_db_session_manager()
-        logger.info(f"Slack bot initialized with database session manager (healthy: {self.session_manager.health_check()})")
+        logger.info(
+            f"Slack bot initialized with database session manager (healthy: {self.session_manager.health_check()})"
+        )
 
         self._register_commands()
         self._register_listeners()
@@ -53,10 +52,10 @@ class SlackTodoBot:
             ack()
 
             try:
-                user_id = command.get('user_id')
-                text = command.get('text', '').strip()
+                user_id = command.get("user_id")
+                text = command.get("text", "").strip()
 
-                if not text or text == 'help':
+                if not text or text == "help":
                     respond(self._get_help_message())
                     return
 
@@ -64,42 +63,48 @@ class SlackTodoBot:
                 args = text.split()
                 subcommand = args[0].lower()
 
-                if subcommand == 'list':
-                    assignee = args[1] if len(args) > 1 and args[1] != 'me' else None
-                    if args[1:] and args[1] == 'me':
+                if subcommand == "list":
+                    assignee = args[1] if len(args) > 1 and args[1] != "me" else None
+                    if args[1:] and args[1] == "me":
                         assignee = self._get_user_display_name(user_id)
                     respond(self._list_todos(assignee))
 
-                elif subcommand == 'add':
-                    title = ' '.join(args[1:])
+                elif subcommand == "add":
+                    title = " ".join(args[1:])
                     if title:
                         respond(self._create_todo_interactive(user_id, title))
                     else:
-                        respond("❌ Please provide a title: `/todos add Fix the login bug`")
+                        respond(
+                            "❌ Please provide a title: `/todos add Fix the login bug`"
+                        )
 
-                elif subcommand == 'complete':
+                elif subcommand == "complete":
                     if len(args) > 1:
                         todo_id = args[1]
                         respond(self._complete_todo(user_id, todo_id))
                     else:
                         respond("❌ Please provide TODO ID: `/todos complete abc123`")
 
-                elif subcommand == 'snooze':
+                elif subcommand == "snooze":
                     if len(args) > 1:
                         todo_id = args[1]
                         days = int(args[2]) if len(args) > 2 else 1
                         respond(self._snooze_todo(user_id, todo_id, days))
                     else:
-                        respond("❌ Please provide TODO ID: `/todos snooze abc123 [days]`")
+                        respond(
+                            "❌ Please provide TODO ID: `/todos snooze abc123 [days]`"
+                        )
 
-                elif subcommand == 'summary':
+                elif subcommand == "summary":
                     respond(self._get_summary())
 
-                elif subcommand == 'channels':
+                elif subcommand == "channels":
                     respond(self._list_channels())
 
                 else:
-                    respond(f"❌ Unknown command: `{subcommand}`. Use `/todos help` for available commands.")
+                    respond(
+                        f"❌ Unknown command: `{subcommand}`. Use `/todos help` for available commands."
+                    )
 
             except Exception as e:
                 logger.error(f"Error handling /todos command: {e}")
@@ -110,8 +115,8 @@ class SlackTodoBot:
             """Handle /todo slash command (shorthand)."""
             ack()
 
-            user_id = command.get('user_id')
-            text = command.get('text', '').strip()
+            user_id = command.get("user_id")
+            text = command.get("text", "").strip()
 
             if text:
                 # Quick create TODO
@@ -125,17 +130,19 @@ class SlackTodoBot:
             ack()
 
             try:
-                user_id = command.get('user_id')
-                text = command.get('text', '').strip()
+                user_id = command.get("user_id")
+                text = command.get("text", "").strip()
 
-                if not text or text == 'help':
+                if not text or text == "help":
                     respond(self._get_agenda_help_message())
                     return
 
                 # Parse command: /agenda PROJECT-KEY [days]
                 args = text.split()
                 if len(args) < 1:
-                    respond("❌ Please provide a project key: `/agenda PROJ-123 [days]`")
+                    respond(
+                        "❌ Please provide a project key: `/agenda PROJ-123 [days]`"
+                    )
                     return
 
                 project_key = args[0].upper()
@@ -158,10 +165,10 @@ class SlackTodoBot:
             ack()
 
             try:
-                user_id = command.get('user_id')
-                text = command.get('text', '').strip()
-                channel_id = command.get('channel_id')
-                user_name = command.get('user_name', 'someone')
+                user_id = command.get("user_id")
+                text = command.get("text", "").strip()
+                channel_id = command.get("channel_id")
+                user_name = command.get("user_name", "someone")
 
                 # Parse parameters from text
                 subject = None
@@ -172,17 +179,17 @@ class SlackTodoBot:
                     parts = text.lower()
 
                     # Extract subject (after "about")
-                    if 'about ' in parts:
-                        about_idx = parts.index('about ') + 6
-                        for_idx = parts.find(' for ', about_idx)
+                    if "about " in parts:
+                        about_idx = parts.index("about ") + 6
+                        for_idx = parts.find(" for ", about_idx)
                         if for_idx > -1:
                             subject = text[about_idx:for_idx].strip()
                         else:
                             subject = text[about_idx:].strip()
 
                     # Extract person name (after "for")
-                    if ' for ' in parts:
-                        for_idx = parts.index(' for ') + 5
+                    if " for " in parts:
+                        for_idx = parts.index(" for ") + 5
                         person_name = text[for_idx:].strip()
 
                     # If no keywords, treat entire text as subject
@@ -202,10 +209,7 @@ class SlackTodoBot:
                     return
 
                 # Post in channel
-                self.client.chat_postMessage(
-                    channel=channel_id,
-                    text=joke_response
-                )
+                self.client.chat_postMessage(channel=channel_id, text=joke_response)
 
                 # Respond to command (only visible to user)
                 respond("Dad joke delivered! 🎭")
@@ -220,37 +224,41 @@ class SlackTodoBot:
             ack()
 
             try:
-                user_id = command.get('user_id')
-                text = command.get('text', '').strip()
+                user_id = command.get("user_id")
+                text = command.get("text", "").strip()
 
-                if not text or text == 'help':
+                if not text or text == "help":
                     respond(self._get_learning_help_message())
                     return
 
                 # Parse command
                 args = text.split()
                 if not args:
-                    respond("❌ Please provide a learning: `/learning Your insight here`")
+                    respond(
+                        "❌ Please provide a learning: `/learning Your insight here`"
+                    )
                     return
 
                 subcommand = args[0].lower()
 
                 # Check for subcommands
-                if subcommand == 'list':
+                if subcommand == "list":
                     category = args[1] if len(args) > 1 else None
                     respond(self._list_learnings(category))
 
-                elif subcommand == 'search':
+                elif subcommand == "search":
                     if len(args) > 1:
-                        search_term = ' '.join(args[1:])
+                        search_term = " ".join(args[1:])
                         respond(self._search_learnings(search_term))
                     else:
-                        respond("❌ Please provide search terms: `/learning search API patterns`")
+                        respond(
+                            "❌ Please provide search terms: `/learning search API patterns`"
+                        )
 
-                elif subcommand == 'stats':
+                elif subcommand == "stats":
                     respond(self._get_learning_stats())
 
-                elif subcommand == 'categories':
+                elif subcommand == "categories":
                     respond(self._list_categories())
 
                 else:
@@ -267,10 +275,10 @@ class SlackTodoBot:
             ack()
 
             try:
-                user_id = command.get('user_id')
-                text = command.get('text', '').strip()
+                user_id = command.get("user_id")
+                text = command.get("text", "").strip()
 
-                if not text or text == 'help':
+                if not text or text == "help":
                     respond(self._get_feedback_help_message())
                     return
 
@@ -280,22 +288,26 @@ class SlackTodoBot:
                 content = text
 
                 # Check if text starts with @mention
-                if text.startswith('<@'):
+                if text.startswith("<@"):
                     # Extract Slack user ID from mention
-                    parts = text.split('>', 1)
+                    parts = text.split(">", 1)
                     if len(parts) == 2:
-                        recipient_id = parts[0].replace('<@', '').strip()
+                        recipient_id = parts[0].replace("<@", "").strip()
                         # Validate recipient exists in Slack
                         if self._validate_slack_user(recipient_id):
                             recipient = self._get_user_display_name(recipient_id)
                             content = parts[1].strip()
                         else:
-                            respond("❌ Invalid recipient. Please use a valid Slack user mention.")
+                            respond(
+                                "❌ Invalid recipient. Please use a valid Slack user mention."
+                            )
                             return
 
                 # Validate content is not empty
                 if not content:
-                    respond("❌ Please provide feedback content: `/feedforward @user Your feedback here`")
+                    respond(
+                        "❌ Please provide feedback content: `/feedforward @user Your feedback here`"
+                    )
                     return
 
                 # Create the feedback
@@ -311,17 +323,19 @@ class SlackTodoBot:
             ack()
 
             try:
-                user_id = command.get('user_id')
-                text = command.get('text', '').strip()
+                user_id = command.get("user_id")
+                text = command.get("text", "").strip()
 
-                if not text or text == 'help':
+                if not text or text == "help":
                     respond(self._get_find_context_help_message())
                     return
 
                 # Parse command: /find-context <topic> [--days 180] [--project PROJ] or [--project=PROJ]
                 args = text.split()
                 if len(args) < 1:
-                    respond("❌ Please provide a search topic: `/find-context authentication flow`")
+                    respond(
+                        "❌ Please provide a search topic: `/find-context authentication flow`"
+                    )
                     return
 
                 # Extract --days and --project parameters if present
@@ -331,7 +345,7 @@ class SlackTodoBot:
                 i = 0
                 while i < len(args):
                     # Handle --days N or --days=N
-                    if args[i] == '--days' and i + 1 < len(args):
+                    if args[i] == "--days" and i + 1 < len(args):
                         try:
                             days = int(args[i + 1])
                             if days < 1 or days > 365:
@@ -342,9 +356,9 @@ class SlackTodoBot:
                         except ValueError:
                             respond("❌ Invalid days value. Must be a number.")
                             return
-                    elif args[i].startswith('--days='):
+                    elif args[i].startswith("--days="):
                         try:
-                            days = int(args[i].split('=', 1)[1])
+                            days = int(args[i].split("=", 1)[1])
                             if days < 1 or days > 365:
                                 respond("❌ Days must be between 1 and 365")
                                 return
@@ -354,43 +368,47 @@ class SlackTodoBot:
                             respond("❌ Invalid days value. Must be a number.")
                             return
                     # Handle --project PROJ or --project=PROJ
-                    elif args[i] == '--project' and i + 1 < len(args):
+                    elif args[i] == "--project" and i + 1 < len(args):
                         project = args[i + 1].upper()
                         i += 2
                         continue
-                    elif args[i].startswith('--project='):
-                        project = args[i].split('=', 1)[1].upper()
+                    elif args[i].startswith("--project="):
+                        project = args[i].split("=", 1)[1].upper()
                         i += 1
                         continue
                     query_parts.append(args[i])
                     i += 1
 
-                query = ' '.join(query_parts)
+                query = " ".join(query_parts)
                 if not query:
                     respond("❌ Please provide a search topic")
                     return
 
                 # Show searching message
                 project_msg = f" for project *{project}*" if project else ""
-                respond(f"🔍 Searching for *{query}*{project_msg} across Slack, Fireflies, Jira, GitHub, and Notion (last {days} days)...\n_This may take a moment_")
+                respond(
+                    f"🔍 Searching for *{query}*{project_msg} across Slack, Fireflies, Jira, GitHub, and Notion (last {days} days)...\n_This may take a moment_"
+                )
 
                 # Perform the search asynchronously to avoid timeout
                 # Get channel_id for posting results
-                channel_id = command.get('channel_id')
+                channel_id = command.get("channel_id")
 
                 # Run search in background thread
                 import threading
+
                 def run_search():
                     try:
-                        result = self._find_context(user_id, query, days, project=project)
+                        result = self._find_context(
+                            user_id, query, days, project=project
+                        )
 
                         # Split blocks into header and body for threading
-                        blocks = result.get('blocks', [])
+                        blocks = result.get("blocks", [])
                         if not blocks:
                             # Fallback: post as-is if no blocks
                             self.app.client.chat_postMessage(
-                                channel=channel_id,
-                                **result
+                                channel=channel_id, **result
                             )
                             return
 
@@ -400,11 +418,11 @@ class SlackTodoBot:
                             header_response = self.app.client.chat_postMessage(
                                 channel=channel_id,
                                 blocks=[header_block],
-                                text=result.get('text', 'Context search results')
+                                text=result.get("text", "Context search results"),
                             )
 
                             # Get thread timestamp
-                            thread_ts = header_response['ts']
+                            thread_ts = header_response["ts"]
 
                             # Post remaining blocks in thread
                             body_blocks = blocks[1:]
@@ -413,20 +431,18 @@ class SlackTodoBot:
                                     channel=channel_id,
                                     thread_ts=thread_ts,
                                     blocks=body_blocks,
-                                    text=result.get('text', 'Context search summary')
+                                    text=result.get("text", "Context search summary"),
                                 )
                         else:
                             # No header, post everything as-is
                             self.app.client.chat_postMessage(
-                                channel=channel_id,
-                                **result
+                                channel=channel_id, **result
                             )
 
                     except Exception as e:
                         logger.error(f"Error in background search: {e}")
                         self.app.client.chat_postMessage(
-                            channel=channel_id,
-                            text=f"❌ Search failed: {str(e)}"
+                            channel=channel_id, text=f"❌ Search failed: {str(e)}"
                         )
 
                 thread = threading.Thread(target=run_search)
@@ -444,17 +460,19 @@ class SlackTodoBot:
             ack()
 
             try:
-                session_id = body['actions'][0]['value'].split(':')[1]
-                user_id = body['user']['id']
+                session_id = body["actions"][0]["value"].split(":")[1]
+                user_id = body["user"]["id"]
 
                 # Retrieve session from Redis
                 session = self.session_manager.get(session_id)
                 if session is None:
                     logger.warning(f"Session {session_id} not found in Redis")
-                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
+                    say(
+                        "❌ Search session expired (1 hour timeout). Please run `/find-context` again."
+                    )
                     return
 
-                results = session['results']
+                results = session["results"]
 
                 # Show detailed view of top 3 citations
                 blocks = [
@@ -462,29 +480,33 @@ class SlackTodoBot:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f"🔍 Detailed View: {session['query']}"
-                        }
+                            "text": f"🔍 Detailed View: {session['query']}",
+                        },
                     }
                 ]
 
                 for citation in results.citations[:3]:
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"*[{citation.id}] {citation.title}*\n"
-                                   f"_{citation.date.strftime('%Y-%m-%d')} • {citation.author}_\n\n"
-                                   f"*Full Content:*\n{citation.content[:500]}..."
-                        }
-                    })
-                    if citation.url:
-                        blocks.append({
+                    blocks.append(
+                        {
                             "type": "section",
                             "text": {
                                 "type": "mrkdwn",
-                                "text": f"<{citation.url}|View Full Source>"
+                                "text": f"*[{citation.id}] {citation.title}*\n"
+                                f"_{citation.date.strftime('%Y-%m-%d')} • {citation.author}_\n\n"
+                                f"*Full Content:*\n{citation.content[:500]}...",
+                            },
+                        }
+                    )
+                    if citation.url:
+                        blocks.append(
+                            {
+                                "type": "section",
+                                "text": {
+                                    "type": "mrkdwn",
+                                    "text": f"<{citation.url}|View Full Source>",
+                                },
                             }
-                        })
+                        )
                     blocks.append({"type": "divider"})
 
                 say(blocks=blocks)
@@ -499,22 +521,26 @@ class SlackTodoBot:
             ack()
 
             try:
-                session_id = body['actions'][0]['value'].split(':')[1]
+                session_id = body["actions"][0]["value"].split(":")[1]
 
                 # Retrieve session from Redis
                 session = self.session_manager.get(session_id)
                 if session is None:
                     logger.warning(f"Session {session_id} not found in Redis")
-                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
+                    say(
+                        "❌ Search session expired (1 hour timeout). Please run `/find-context` again."
+                    )
                     return
 
-                results = session['results']
+                results = session["results"]
 
                 # Collect all citations with quotes
                 quotes = []
                 for citation in results.citations:
                     if citation.key_quote:
-                        quotes.append(f"*[{citation.id}]* {citation.title}\n💡 \"{citation.key_quote}\"")
+                        quotes.append(
+                            f'*[{citation.id}]* {citation.title}\n💡 "{citation.key_quote}"'
+                        )
 
                 if not quotes:
                     say("No key quotes were extracted from the sources.")
@@ -525,16 +551,13 @@ class SlackTodoBot:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f"💡 All Key Quotes: {session['query']}"
-                        }
+                            "text": f"💡 All Key Quotes: {session['query']}",
+                        },
                     },
                     {
                         "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": "\n\n".join(quotes)
-                        }
-                    }
+                        "text": {"type": "mrkdwn", "text": "\n\n".join(quotes)},
+                    },
                 ]
 
                 say(blocks=blocks)
@@ -549,11 +572,11 @@ class SlackTodoBot:
             ack()
 
             try:
-                session_id = body['actions'][0]['value'].split(':')[1]
+                session_id = body["actions"][0]["value"].split(":")[1]
 
                 # Get channel and thread info from the action's message
-                channel_id = body['container']['channel_id']
-                message_ts = body['container']['message_ts']
+                channel_id = body["container"]["channel_id"]
+                message_ts = body["container"]["message_ts"]
                 # The message_ts from the button is the header message in the channel
                 # We need to post in the thread, so use message_ts as thread_ts
                 thread_ts = message_ts
@@ -565,18 +588,18 @@ class SlackTodoBot:
                     self.app.client.chat_postMessage(
                         channel=channel_id,
                         thread_ts=thread_ts,
-                        text="❌ Search session expired (1 hour timeout). Please run `/find-context` again."
+                        text="❌ Search session expired (1 hour timeout). Please run `/find-context` again.",
                     )
                     return
 
-                results = session['results']
-                citations = getattr(results, 'citations', []) or []
+                results = session["results"]
+                citations = getattr(results, "citations", []) or []
 
                 if not citations:
                     self.app.client.chat_postMessage(
                         channel=channel_id,
                         thread_ts=thread_ts,
-                        text="No sources/citations available for this search."
+                        text="No sources/citations available for this search.",
                     )
                     return
 
@@ -586,73 +609,78 @@ class SlackTodoBot:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f"📚 Sources & Citations: {session['query']}"
-                        }
+                            "text": f"📚 Sources & Citations: {session['query']}",
+                        },
                     },
                     {
                         "type": "section",
                         "text": {
                             "type": "mrkdwn",
-                            "text": f"Showing all {len(citations)} sources with citations:"
-                        }
+                            "text": f"Showing all {len(citations)} sources with citations:",
+                        },
                     },
-                    {"type": "divider"}
+                    {"type": "divider"},
                 ]
 
                 # Show all citations
                 for citation in citations:
                     # Format source emoji
                     source_emoji = {
-                        'slack': '💬',
-                        'fireflies': '🎙️',
-                        'jira': '📋',
-                        'github': '💻',
-                        'notion': '📝'
-                    }.get(citation.source, '📄')
+                        "slack": "💬",
+                        "fireflies": "🎙️",
+                        "jira": "📋",
+                        "github": "💻",
+                        "notion": "📝",
+                    }.get(citation.source, "📄")
 
                     # Format date
-                    date_str = citation.date.strftime('%Y-%m-%d')
+                    date_str = citation.date.strftime("%Y-%m-%d")
 
                     # Build citation text
-                    citation_text = f"*[{citation.id}]* {source_emoji} *{citation.title}*\n"
+                    citation_text = (
+                        f"*[{citation.id}]* {source_emoji} *{citation.title}*\n"
+                    )
                     citation_text += f"_{date_str}_ • _{citation.author}_"
 
                     # Add key quote if available
                     if citation.key_quote:
                         # Truncate long quotes
-                        quote = citation.key_quote[:200] + "..." if len(citation.key_quote) > 200 else citation.key_quote
+                        quote = (
+                            citation.key_quote[:200] + "..."
+                            if len(citation.key_quote) > 200
+                            else citation.key_quote
+                        )
                         citation_text += f"\n💡 _{quote}_"
 
                     # Add URL if available
                     if citation.url:
                         citation_text += f"\n<{citation.url}|View Full Source>"
 
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": citation_text
+                    blocks.append(
+                        {
+                            "type": "section",
+                            "text": {"type": "mrkdwn", "text": citation_text},
                         }
-                    })
+                    )
 
                 # Post in thread
                 self.app.client.chat_postMessage(
                     channel=channel_id,
                     thread_ts=thread_ts,
                     blocks=blocks,
-                    text=f"Sources & Citations: {session['query']}"
+                    text=f"Sources & Citations: {session['query']}",
                 )
 
             except Exception as e:
                 logger.error(f"Error showing sources: {e}")
                 # Try to get channel/thread info for error message
                 try:
-                    channel_id = body['container']['channel_id']
-                    thread_ts = body['container']['message_ts']
+                    channel_id = body["container"]["channel_id"]
+                    thread_ts = body["container"]["message_ts"]
                     self.app.client.chat_postMessage(
                         channel=channel_id,
                         thread_ts=thread_ts,
-                        text=f"❌ Error: {str(e)}"
+                        text=f"❌ Error: {str(e)}",
                     )
                 except:
                     say(f"❌ Error: {str(e)}")
@@ -663,26 +691,30 @@ class SlackTodoBot:
             ack()
 
             try:
-                session_id = body['actions'][0]['value'].split(':')[1]
+                session_id = body["actions"][0]["value"].split(":")[1]
 
                 # Retrieve session from Redis
                 session = self.session_manager.get(session_id)
                 if session is None:
                     logger.warning(f"Session {session_id} not found in Redis")
-                    say("❌ Search session expired (1 hour timeout). Please run `/find-context` again.")
+                    say(
+                        "❌ Search session expired (1 hour timeout). Please run `/find-context` again."
+                    )
                     return
 
-                query = session['query']
-                current_days = session['days']
+                query = session["query"]
+                current_days = session["days"]
                 new_days = current_days * 2  # Double the search window
 
                 if new_days > 365:
                     new_days = 365
 
-                say(f"🔄 Expanding search to last {new_days} days...\n_This may take a moment_")
+                say(
+                    f"🔄 Expanding search to last {new_days} days...\n_This may take a moment_"
+                )
 
                 # Re-run search with expanded window
-                result = self._find_context(session['user_id'], query, new_days)
+                result = self._find_context(session["user_id"], query, new_days)
                 say(**result)
 
             except Exception as e:
@@ -695,8 +727,8 @@ class SlackTodoBot:
         @self.app.message(re.compile(r".*todo.*", re.IGNORECASE))
         def handle_todo_mention(message, say):
             """Handle messages mentioning 'todo'."""
-            user_id = message.get('user')
-            text = message.get('text', '').lower()
+            user_id = message.get("user")
+            text = message.get("text", "").lower()
 
             # Only respond to direct mentions or DMs
             if f"<@{self.app.client.auth_test()['user_id']}>" in text:
@@ -706,12 +738,12 @@ class SlackTodoBot:
         def handle_channel_message(event, say):
             """Handle all channel messages for monitoring."""
             # Skip bot messages
-            if event.get('subtype') == 'bot_message':
+            if event.get("subtype") == "bot_message":
                 return
 
-            user_id = event.get('user')
-            text = event.get('text', '')
-            channel = event.get('channel')
+            user_id = event.get("user")
+            text = event.get("text", "")
+            channel = event.get("channel")
 
             # Log the message for analysis
             logger.info(f"Channel message from {user_id} in {channel}: {text}")
@@ -723,25 +755,27 @@ class SlackTodoBot:
         @self.app.event("channel_created")
         def handle_channel_created(event):
             """Handle new channel creation."""
-            channel = event['channel']
+            channel = event["channel"]
             logger.info(f"New channel created: {channel['name']} ({channel['id']})")
 
         @self.app.event("channel_deleted")
         def handle_channel_deleted(event):
             """Handle channel deletion."""
-            channel = event['channel']
+            channel = event["channel"]
             logger.info(f"Channel deleted: {channel} ")
 
         # Slack chat feature handlers (DMs and @mentions)
         if settings.slack_chat.enabled:
-            logger.info(f"🤖 Slack chat feature enabled! Whitelist: {settings.slack_chat.whitelisted_users}")
+            logger.info(
+                f"🤖 Slack chat feature enabled! Whitelist: {settings.slack_chat.whitelisted_users}"
+            )
 
             @self.app.event("app_mention")
             def handle_app_mention(event, say):
                 """Handle @bot mentions for conversational chat."""
-                user_id = event.get('user')
-                text = event.get('text', '')
-                channel_id = event.get('channel')
+                user_id = event.get("user")
+                text = event.get("text", "")
+                channel_id = event.get("channel")
 
                 # CRITICAL FIX: For thread consistency, we need to use the SAME thread_ts for all messages in a thread
                 #
@@ -751,79 +785,100 @@ class SlackTodoBot:
                 # When bot replies, it creates a thread. Future replies in that thread will use the
                 # ORIGINAL user message ts as thread_ts (not the bot's reply ts).
 
-                original_thread_ts = event.get('thread_ts')  # Will be set if replying in existing thread
-                current_ts = event.get('ts')  # Current message timestamp
+                original_thread_ts = event.get(
+                    "thread_ts"
+                )  # Will be set if replying in existing thread
+                current_ts = event.get("ts")  # Current message timestamp
 
                 # For conversation history: always use the earliest message in the thread
                 # If thread_ts exists, use it (we're in an existing thread)
                 # If not, use current ts (we're starting a new thread)
-                thread_ts_for_history = original_thread_ts if original_thread_ts else current_ts
+                thread_ts_for_history = (
+                    original_thread_ts if original_thread_ts else current_ts
+                )
 
                 # For bot reply: use thread_ts if in thread, otherwise use current ts to create thread
-                thread_ts_for_reply = original_thread_ts if original_thread_ts else current_ts
+                thread_ts_for_reply = (
+                    original_thread_ts if original_thread_ts else current_ts
+                )
 
                 # Debug logging for thread handling
                 logger.info(f"📌 app_mention - user={user_id}, channel={channel_id}")
-                logger.info(f"📌   original_thread_ts={original_thread_ts}, current_ts={current_ts}")
-                logger.info(f"📌   using for history: {thread_ts_for_history}, using for reply: {thread_ts_for_reply}")
+                logger.info(
+                    f"📌   original_thread_ts={original_thread_ts}, current_ts={current_ts}"
+                )
+                logger.info(
+                    f"📌   using for history: {thread_ts_for_history}, using for reply: {thread_ts_for_reply}"
+                )
                 logger.info(f"📌   is_thread_reply: {original_thread_ts is not None}")
 
                 # Check whitelist
-                if settings.slack_chat.whitelisted_users and user_id not in settings.slack_chat.whitelisted_users:
-                    logger.info(f"User {user_id} not in whitelist, ignoring chat request")
+                if (
+                    settings.slack_chat.whitelisted_users
+                    and user_id not in settings.slack_chat.whitelisted_users
+                ):
+                    logger.info(
+                        f"User {user_id} not in whitelist, ignoring chat request"
+                    )
                     return
 
                 # Remove bot mention from text
-                bot_user_id = self.app.client.auth_test()['user_id']
-                question = re.sub(f'<@{bot_user_id}>', '', text).strip()
+                bot_user_id = self.app.client.auth_test()["user_id"]
+                question = re.sub(f"<@{bot_user_id}>", "", text).strip()
 
                 if not question:
                     say(
                         channel=channel_id,
                         thread_ts=thread_ts_for_reply,
-                        text="👋 Hi! Ask me anything and I'll search across Slack, meetings, Jira, GitHub, and Notion to help you."
+                        text="👋 Hi! Ask me anything and I'll search across Slack, meetings, Jira, GitHub, and Notion to help you.",
                     )
                     return
 
                 # Handle the question via chat service
                 try:
                     from src.services.slack_chat_service import SlackChatService
+
                     chat_service = SlackChatService()
 
                     # CRITICAL: Use the same thread_ts for conversation history
                     # This ensures follow-up messages in the same thread have access to previous context
-                    asyncio.run(chat_service.handle_question(
-                        user_id=user_id,
-                        question=question,
-                        channel_id=channel_id,
-                        thread_ts=thread_ts_for_history  # Use consistent thread_ts for history lookup
-                    ))
+                    asyncio.run(
+                        chat_service.handle_question(
+                            user_id=user_id,
+                            question=question,
+                            channel_id=channel_id,
+                            thread_ts=thread_ts_for_history,  # Use consistent thread_ts for history lookup
+                        )
+                    )
                 except Exception as e:
                     logger.error(f"Error handling app_mention: {e}")
                     say(
                         channel=channel_id,
                         thread_ts=thread_ts_for_reply,
-                        text=f"❌ Sorry, I encountered an error: {str(e)}"
+                        text=f"❌ Sorry, I encountered an error: {str(e)}",
                     )
 
             @self.app.event("message")
             def handle_dm_message(event):
                 """Handle direct messages for conversational chat."""
                 # Only process DMs (not channel messages)
-                channel_type = event.get('channel_type')
-                if channel_type != 'im':
+                channel_type = event.get("channel_type")
+                if channel_type != "im":
                     return  # Ignore channel messages
 
                 # Skip bot messages
-                if event.get('subtype') == 'bot_message':
+                if event.get("subtype") == "bot_message":
                     return
 
-                user_id = event.get('user')
-                text = event.get('text', '')
-                channel_id = event.get('channel')
+                user_id = event.get("user")
+                text = event.get("text", "")
+                channel_id = event.get("channel")
 
                 # Check whitelist
-                if settings.slack_chat.whitelisted_users and user_id not in settings.slack_chat.whitelisted_users:
+                if (
+                    settings.slack_chat.whitelisted_users
+                    and user_id not in settings.slack_chat.whitelisted_users
+                ):
                     logger.info(f"User {user_id} not in whitelist, ignoring DM")
                     return
 
@@ -833,21 +888,25 @@ class SlackTodoBot:
                 # Handle the question via chat service
                 try:
                     from src.services.slack_chat_service import SlackChatService
+
                     chat_service = SlackChatService()
 
                     # Run async handler
-                    asyncio.run(chat_service.handle_question(
-                        user_id=user_id,
-                        question=text.strip(),
-                        channel_id=channel_id,
-                        thread_ts=None  # DMs don't have threads
-                    ))
+                    asyncio.run(
+                        chat_service.handle_question(
+                            user_id=user_id,
+                            question=text.strip(),
+                            channel_id=channel_id,
+                            thread_ts=None,  # DMs don't have threads
+                        )
+                    )
                 except Exception as e:
                     logger.error(f"Error handling DM: {e}")
                     self.client.chat_postMessage(
                         channel=channel_id,
-                        text=f"❌ Sorry, I encountered an error: {str(e)}"
+                        text=f"❌ Sorry, I encountered an error: {str(e)}",
                     )
+
         else:
             logger.info("🤖 Slack chat feature is disabled (SLACK_CHAT_ENABLED=false)")
 
@@ -856,55 +915,56 @@ class SlackTodoBot:
         blocks = [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "📋 TODO Bot Commands"
-                }
+                "text": {"type": "plain_text", "text": "📋 TODO Bot Commands"},
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": "*Available Commands:*\n\n"
-                           "`/todos list [assignee|me]` - List TODOs\n"
-                           "`/todos add <title>` - Create new TODO\n"
-                           "`/todos complete <id>` - Mark TODO complete\n"
-                           "`/todos snooze <id> [days]` - Snooze TODO\n"
-                           "`/todos summary` - Get team summary\n"
-                           "`/todos channels` - List available channels\n"
-                           "`/todo <title>` - Quick create TODO\n"
-                           "`/agenda <project-key> [days]` - Generate project agenda\n"
-                           "`/dadjoke [about <topic>] [for <person>]` - Get a dad joke\n"
-                           "`/learning <text>` - Save a team learning\n"
-                           "`/feedback [@user] <text>` - Save private feedback\n"
-                           "`/find-context <topic> [--days N]` - Search across all sources\n\n"
-                           "*Examples:*\n"
-                           "• `/todos list me` - My TODOs\n"
-                           "• `/todo Fix login bug` - Quick create\n"
-                           "• `/todos complete abc123` - Complete TODO\n"
-                           "• `/agenda PROJ-123 7` - 7-day project digest\n"
-                           "• `/dadjoke` - Random dad joke\n"
-                           "• `/dadjoke about coffee` - Coffee-themed joke\n"
-                           "• `/dadjoke for Mike` - Joke for Mike"
-                }
+                    "`/todos list [assignee|me]` - List TODOs\n"
+                    "`/todos add <title>` - Create new TODO\n"
+                    "`/todos complete <id>` - Mark TODO complete\n"
+                    "`/todos snooze <id> [days]` - Snooze TODO\n"
+                    "`/todos summary` - Get team summary\n"
+                    "`/todos channels` - List available channels\n"
+                    "`/todo <title>` - Quick create TODO\n"
+                    "`/agenda <project-key> [days]` - Generate project agenda\n"
+                    "`/dadjoke [about <topic>] [for <person>]` - Get a dad joke\n"
+                    "`/learning <text>` - Save a team learning\n"
+                    "`/feedback [@user] <text>` - Save private feedback\n"
+                    "`/find-context <topic> [--days N]` - Search across all sources\n\n"
+                    "*Examples:*\n"
+                    "• `/todos list me` - My TODOs\n"
+                    "• `/todo Fix login bug` - Quick create\n"
+                    "• `/todos complete abc123` - Complete TODO\n"
+                    "• `/agenda PROJ-123 7` - 7-day project digest\n"
+                    "• `/dadjoke` - Random dad joke\n"
+                    "• `/dadjoke about coffee` - Coffee-themed joke\n"
+                    "• `/dadjoke for Mike` - Joke for Mike",
+                },
             },
             {
                 "type": "context",
-                "elements": [{
-                    "type": "plain_text",
-                    "text": "💡 Tip: Use the web dashboard for advanced editing and filtering"
-                }]
-            }
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": "💡 Tip: Use the web dashboard for advanced editing and filtering",
+                    }
+                ],
+            },
         ]
 
         return {"blocks": blocks}
 
     def _get_quick_help(self) -> str:
         """Get quick help message for mentions."""
-        return ("👋 Hi! I can help manage TODOs. Try:\n"
-                "• `/todos list` - See your TODOs\n"
-                "• `/todo Fix bug` - Create TODO\n"
-                "• `/todos help` - Full command list")
+        return (
+            "👋 Hi! I can help manage TODOs. Try:\n"
+            "• `/todos list` - See your TODOs\n"
+            "• `/todo Fix bug` - Create TODO\n"
+            "• `/todos help` - Full command list"
+        )
 
     def _list_todos(self, assignee: Optional[str] = None) -> Dict[str, Any]:
         """List TODOs for user or team."""
@@ -918,18 +978,12 @@ class SlackTodoBot:
 
             if not todos:
                 return {
-                    "text": f"🎉 No active TODOs found" + (f" for {assignee}" if assignee else "") + "!"
+                    "text": f"🎉 No active TODOs found"
+                    + (f" for {assignee}" if assignee else "")
+                    + "!"
                 }
 
-            blocks = [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": title
-                    }
-                }
-            ]
+            blocks = [{"type": "header", "text": {"type": "plain_text", "text": title}}]
 
             # Group TODOs by status
             overdue = []
@@ -965,27 +1019,23 @@ class SlackTodoBot:
                 blocks.append(self._create_todo_section("📝 No Due Date", no_date[:5]))
 
             # Add action buttons
-            blocks.append({
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "🌐 Open Dashboard"
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "🌐 Open Dashboard"},
+                            "url": f"{settings.web.base_url}/todos",
                         },
-                        "url": f"{settings.web.base_url}/todos"
-                    },
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "➕ Add TODO"
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "➕ Add TODO"},
+                            "action_id": "add_todo_button",
                         },
-                        "action_id": "add_todo_button"
-                    }
-                ]
-            })
+                    ],
+                }
+            )
 
             return {"blocks": blocks}
 
@@ -1005,10 +1055,10 @@ class SlackTodoBot:
                 line += f" - {todo.assignee}"
 
             if todo.due_date:
-                date_str = todo.due_date.strftime('%m/%d')
+                date_str = todo.due_date.strftime("%m/%d")
                 line += f" ({date_str})"
 
-            if todo.priority and todo.priority != 'Medium':
+            if todo.priority and todo.priority != "Medium":
                 priority_emoji = {"High": "🔴", "Low": "🟢"}.get(todo.priority, "")
                 line += f" {priority_emoji}"
 
@@ -1016,10 +1066,7 @@ class SlackTodoBot:
 
         return {
             "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*{title}*\n" + "\n".join(todo_lines)
-            }
+            "text": {"type": "mrkdwn", "text": f"*{title}*\n" + "\n".join(todo_lines)},
         }
 
     def _create_todo_quick(self, user_id: str, title: str) -> Dict[str, Any]:
@@ -1038,23 +1085,25 @@ class SlackTodoBot:
                 title=title,
                 description=f"Created via Slack by {assignee}",
                 assignee=assignee,
-                status='pending',
-                priority='Medium',
+                status="pending",
+                priority="Medium",
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
                 user_id=app_user_id,  # Link to app user if found
-                source='slack'  # Mark as Slack-created for visibility filtering
+                source="slack",  # Mark as Slack-created for visibility filtering
             )
 
             self.todo_manager.session.add(todo)
             self.todo_manager.session.commit()
 
-            visibility_note = "🔒 (Private - only you can see this)" if app_user_id else ""
+            visibility_note = (
+                "🔒 (Private - only you can see this)" if app_user_id else ""
+            )
 
             return {
                 "text": f"✅ TODO created: *{title}* {visibility_note}\n"
-                       f"ID: `{todo.id[:8]}` | Assigned to: {assignee}\n"
-                       f"💡 Use `/todos complete {todo.id[:8]}` to mark done"
+                f"ID: `{todo.id[:8]}` | Assigned to: {assignee}\n"
+                f"💡 Use `/todos complete {todo.id[:8]}` to mark done"
             }
 
         except Exception as e:
@@ -1069,42 +1118,27 @@ class SlackTodoBot:
         # Add interactive buttons for editing
         if "✅" in result["text"]:
             blocks = [
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": result["text"]
-                    }
-                },
+                {"type": "section", "text": {"type": "mrkdwn", "text": result["text"]}},
                 {
                     "type": "actions",
                     "elements": [
                         {
                             "type": "button",
-                            "text": {
-                                "type": "plain_text",
-                                "text": "🗓️ Set Due Date"
-                            },
-                            "action_id": "set_due_date"
+                            "text": {"type": "plain_text", "text": "🗓️ Set Due Date"},
+                            "action_id": "set_due_date",
                         },
                         {
                             "type": "button",
-                            "text": {
-                                "type": "plain_text",
-                                "text": "⚠️ Set Priority"
-                            },
-                            "action_id": "set_priority"
+                            "text": {"type": "plain_text", "text": "⚠️ Set Priority"},
+                            "action_id": "set_priority",
                         },
                         {
                             "type": "button",
-                            "text": {
-                                "type": "plain_text",
-                                "text": "✏️ Edit Details"
-                            },
-                            "action_id": "edit_todo"
-                        }
-                    ]
-                }
+                            "text": {"type": "plain_text", "text": "✏️ Edit Details"},
+                            "action_id": "edit_todo",
+                        },
+                    ],
+                },
             ]
             return {"blocks": blocks}
 
@@ -1115,20 +1149,25 @@ class SlackTodoBot:
         try:
             # Find TODO by partial ID
             from main import TodoItem
-            todo = self.todo_manager.session.query(TodoItem).filter(
-                TodoItem.id.startswith(todo_id)
-            ).first()
+
+            todo = (
+                self.todo_manager.session.query(TodoItem)
+                .filter(TodoItem.id.startswith(todo_id))
+                .first()
+            )
 
             if not todo:
                 return {"text": f"❌ TODO not found with ID starting with: `{todo_id}`"}
 
             assignee = self._get_user_display_name(user_id)
-            success = self.todo_manager.complete_todo(todo.id, assignee, "Completed via Slack")
+            success = self.todo_manager.complete_todo(
+                todo.id, assignee, "Completed via Slack"
+            )
 
             if success:
                 return {
                     "text": f"✅ Completed: *{todo.title}*\n"
-                           f"Marked complete by {assignee}"
+                    f"Marked complete by {assignee}"
                 }
             else:
                 return {"text": f"❌ Failed to complete TODO: `{todo.id[:8]}`"}
@@ -1141,9 +1180,12 @@ class SlackTodoBot:
         """Snooze a TODO item."""
         try:
             from main import TodoItem
-            todo = self.todo_manager.session.query(TodoItem).filter(
-                TodoItem.id.startswith(todo_id)
-            ).first()
+
+            todo = (
+                self.todo_manager.session.query(TodoItem)
+                .filter(TodoItem.id.startswith(todo_id))
+                .first()
+            )
 
             if not todo:
                 return {"text": f"❌ TODO not found with ID starting with: `{todo_id}`"}
@@ -1151,10 +1193,10 @@ class SlackTodoBot:
             success = self.todo_manager.snooze_todo(todo.id, days)
 
             if success:
-                new_date = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
+                new_date = (datetime.now() + timedelta(days=days)).strftime("%Y-%m-%d")
                 return {
                     "text": f"😴 Snoozed: *{todo.title}*\n"
-                           f"New due date: {new_date} (+{days} days)"
+                    f"New due date: {new_date} (+{days} days)"
                 }
             else:
                 return {"text": f"❌ Failed to snooze TODO: `{todo.id[:8]}`"}
@@ -1171,48 +1213,46 @@ class SlackTodoBot:
             blocks = [
                 {
                     "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "📊 Team TODO Summary"
-                    }
+                    "text": {"type": "plain_text", "text": "📊 Team TODO Summary"},
                 },
                 {
                     "type": "section",
                     "fields": [
                         {
                             "type": "mrkdwn",
-                            "text": f"*📋 Total Active:*\n{summary.total}"
+                            "text": f"*📋 Total Active:*\n{summary.total}",
+                        },
+                        {"type": "mrkdwn", "text": f"*🚨 Overdue:*\n{summary.overdue}"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*📅 Due Today:*\n{summary.due_today}",
                         },
                         {
                             "type": "mrkdwn",
-                            "text": f"*🚨 Overdue:*\n{summary.overdue}"
+                            "text": f"*✅ Completed Today:*\n{summary.completed_today}",
                         },
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*📅 Due Today:*\n{summary.due_today}"
-                        },
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*✅ Completed Today:*\n{summary.completed_today}"
-                        }
-                    ]
-                }
+                    ],
+                },
             ]
 
             # Add assignee breakdown
             if summary.by_assignee:
-                assignee_text = "\n".join([
-                    f"• {assignee}: {count}"
-                    for assignee, count in sorted(summary.by_assignee.items())
-                ])
+                assignee_text = "\n".join(
+                    [
+                        f"• {assignee}: {count}"
+                        for assignee, count in sorted(summary.by_assignee.items())
+                    ]
+                )
 
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*By Assignee:*\n{assignee_text}"
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*By Assignee:*\n{assignee_text}",
+                        },
                     }
-                })
+                )
 
             return {"blocks": blocks}
 
@@ -1225,64 +1265,78 @@ class SlackTodoBot:
         try:
             # This is a synchronous wrapper for the async method
             import asyncio
+
             channels = asyncio.run(self.list_channels())
 
             if not channels:
-                return {"text": "❌ No channels found or unable to access channel list."}
+                return {
+                    "text": "❌ No channels found or unable to access channel list."
+                }
 
             blocks = [
                 {
                     "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "📺 Available Channels"
-                    }
+                    "text": {"type": "plain_text", "text": "📺 Available Channels"},
                 }
             ]
 
             # Separate channels by type
-            public_channels = [ch for ch in channels if ch['type'] == 'public_channel']
-            private_channels = [ch for ch in channels if ch['type'] == 'private_channel']
+            public_channels = [ch for ch in channels if ch["type"] == "public_channel"]
+            private_channels = [
+                ch for ch in channels if ch["type"] == "private_channel"
+            ]
 
             # Add public channels section
             if public_channels:
-                public_text = "\n".join([
-                    f"• #{channel['name']} ({channel['num_members']} members)" +
-                    (" - 🤖 Member" if channel.get('is_member') else "")
-                    for channel in public_channels[:10]
-                ])
+                public_text = "\n".join(
+                    [
+                        f"• #{channel['name']} ({channel['num_members']} members)"
+                        + (" - 🤖 Member" if channel.get("is_member") else "")
+                        for channel in public_channels[:10]
+                    ]
+                )
 
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*🌐 Public Channels:*\n{public_text}"
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*🌐 Public Channels:*\n{public_text}",
+                        },
                     }
-                })
+                )
 
             # Add private channels section
             if private_channels:
-                private_text = "\n".join([
-                    f"• #{channel['name']} ({channel['num_members']} members)"
-                    for channel in private_channels[:10]
-                ])
+                private_text = "\n".join(
+                    [
+                        f"• #{channel['name']} ({channel['num_members']} members)"
+                        for channel in private_channels[:10]
+                    ]
+                )
 
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*🔒 Private Channels:*\n{private_text}"
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*🔒 Private Channels:*\n{private_text}",
+                        },
                     }
-                })
+                )
 
             total_channels = len(channels)
-            blocks.append({
-                "type": "context",
-                "elements": [{
-                    "type": "plain_text",
-                    "text": f"Total: {total_channels} channels accessible"
-                }]
-            })
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "plain_text",
+                            "text": f"Total: {total_channels} channels accessible",
+                        }
+                    ],
+                }
+            )
 
             return {"blocks": blocks}
 
@@ -1295,7 +1349,11 @@ class SlackTodoBot:
         try:
             response = self.client.users_info(user=user_id)
             user = response["user"]
-            return user.get("display_name") or user.get("real_name") or user.get("name", user_id)
+            return (
+                user.get("display_name")
+                or user.get("real_name")
+                or user.get("name", user_id)
+            )
         except SlackApiError:
             return user_id
 
@@ -1331,12 +1389,20 @@ class SlackTodoBot:
 
             try:
                 # Look up user by Slack user ID
-                user = session.query(User).filter(User.slack_user_id == slack_user_id).first()
+                user = (
+                    session.query(User)
+                    .filter(User.slack_user_id == slack_user_id)
+                    .first()
+                )
                 if user:
-                    logger.info(f"Mapped Slack user {slack_user_id} to app user {user.id} ({user.email})")
+                    logger.info(
+                        f"Mapped Slack user {slack_user_id} to app user {user.id} ({user.email})"
+                    )
                     return user.id
                 else:
-                    logger.info(f"No app user found for Slack user {slack_user_id}. Using global credentials.")
+                    logger.info(
+                        f"No app user found for Slack user {slack_user_id}. Using global credentials."
+                    )
                     return None
             finally:
                 session.close()
@@ -1364,8 +1430,8 @@ class SlackTodoBot:
                     None,
                     lambda: self.client.chat_postMessage(
                         channel=channel,
-                        text="🎉 No active TODOs today! Great job team!"
-                    )
+                        text="🎉 No active TODOs today! Great job team!",
+                    ),
                 )
                 return
 
@@ -1374,68 +1440,68 @@ class SlackTodoBot:
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f"📋 Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}"
-                    }
+                        "text": f"📋 Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}",
+                    },
                 },
                 {
                     "type": "section",
                     "fields": [
                         {
                             "type": "mrkdwn",
-                            "text": f"*📋 Active TODOs:*\n{summary.total}"
+                            "text": f"*📋 Active TODOs:*\n{summary.total}",
+                        },
+                        {"type": "mrkdwn", "text": f"*🚨 Overdue:*\n{summary.overdue}"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*📅 Due Today:*\n{summary.due_today}",
                         },
                         {
                             "type": "mrkdwn",
-                            "text": f"*🚨 Overdue:*\n{summary.overdue}"
+                            "text": f"*✅ Completed:*\n{summary.completed_today}",
                         },
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*📅 Due Today:*\n{summary.due_today}"
-                        },
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*✅ Completed:*\n{summary.completed_today}"
-                        }
-                    ]
-                }
+                    ],
+                },
             ]
 
             # Add urgent items if any
             if overdue_todos:
-                urgent_text = "\n".join([
-                    f"• {todo.title} ({todo.assignee or 'Unassigned'})"
-                    for todo in overdue_todos[:5]
-                ])
+                urgent_text = "\n".join(
+                    [
+                        f"• {todo.title} ({todo.assignee or 'Unassigned'})"
+                        for todo in overdue_todos[:5]
+                    ]
+                )
 
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*🚨 Urgent - Overdue Items:*\n{urgent_text}"
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*🚨 Urgent - Overdue Items:*\n{urgent_text}",
+                        },
                     }
-                })
+                )
 
-            blocks.append({
-                "type": "actions",
-                "elements": [{
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "📋 View Dashboard"
-                    },
-                    "url": f"{settings.web.base_url}/todos"
-                }]
-            })
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "📋 View Dashboard"},
+                            "url": f"{settings.web.base_url}/todos",
+                        }
+                    ],
+                }
+            )
 
             # Run synchronous Slack API call in executor
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 None,
                 lambda: self.client.chat_postMessage(
-                    channel=channel,
-                    blocks=blocks,
-                    text="Daily TODO Digest"
-                )
+                    channel=channel, blocks=blocks, text="Daily TODO Digest"
+                ),
             )
 
         except Exception as e:
@@ -1445,9 +1511,18 @@ class SlackTodoBot:
         """Analyze message content for potential TODOs or action items."""
         # Keywords that might indicate action items
         action_keywords = [
-            'action item', 'todo', 'task', 'follow up', 'need to',
-            'should do', 'will do', 'assigned to', 'deadline',
-            'by friday', 'by next week', 'remind me'
+            "action item",
+            "todo",
+            "task",
+            "follow up",
+            "need to",
+            "should do",
+            "will do",
+            "assigned to",
+            "deadline",
+            "by friday",
+            "by next week",
+            "remind me",
         ]
 
         text_lower = text.lower()
@@ -1467,34 +1542,36 @@ class SlackTodoBot:
 
             # Get public channels
             response = await self.client.conversations_list(
-                types="public_channel",
-                exclude_archived=True
+                types="public_channel", exclude_archived=True
             )
 
-            for channel in response.get('channels', []):
-                channels.append({
-                    'id': channel['id'],
-                    'name': channel['name'],
-                    'type': 'public_channel',
-                    'is_member': channel.get('is_member', False),
-                    'num_members': channel.get('num_members', 0)
-                })
+            for channel in response.get("channels", []):
+                channels.append(
+                    {
+                        "id": channel["id"],
+                        "name": channel["name"],
+                        "type": "public_channel",
+                        "is_member": channel.get("is_member", False),
+                        "num_members": channel.get("num_members", 0),
+                    }
+                )
 
             # Get private channels bot is member of
             response = await self.client.conversations_list(
-                types="private_channel",
-                exclude_archived=True
+                types="private_channel", exclude_archived=True
             )
 
-            for channel in response.get('channels', []):
-                if channel.get('is_member'):
-                    channels.append({
-                        'id': channel['id'],
-                        'name': channel['name'],
-                        'type': 'private_channel',
-                        'is_member': True,
-                        'num_members': channel.get('num_members', 0)
-                    })
+            for channel in response.get("channels", []):
+                if channel.get("is_member"):
+                    channels.append(
+                        {
+                            "id": channel["id"],
+                            "name": channel["name"],
+                            "type": "private_channel",
+                            "is_member": True,
+                            "num_members": channel.get("num_members", 0),
+                        }
+                    )
 
             return channels
 
@@ -1505,10 +1582,14 @@ class SlackTodoBot:
     async def resolve_channel_name_to_id(self, channel_name: str) -> str:
         """Resolve a channel name to its ID. Returns the input if it's already an ID."""
         # Strip # prefix if present
-        clean_name = channel_name.lstrip('#')
+        clean_name = channel_name.lstrip("#")
 
         # If it looks like a channel ID (starts with C and is alphanumeric), return as-is
-        if clean_name.startswith('C') and clean_name.replace('C', '').isalnum() and len(clean_name) >= 9:
+        if (
+            clean_name.startswith("C")
+            and clean_name.replace("C", "").isalnum()
+            and len(clean_name) >= 9
+        ):
             logger.info(f"'{channel_name}' appears to be a channel ID, using as-is")
             return clean_name
 
@@ -1516,77 +1597,99 @@ class SlackTodoBot:
             # Get all channels and find the one matching the name
             channels = await self.list_channels()
             for channel in channels:
-                if channel['name'] == clean_name:
-                    logger.info(f"Resolved channel name '{clean_name}' to ID '{channel['id']}'")
-                    return channel['id']
+                if channel["name"] == clean_name:
+                    logger.info(
+                        f"Resolved channel name '{clean_name}' to ID '{channel['id']}'"
+                    )
+                    return channel["id"]
 
             # If not found, log warning and return the original name
-            logger.warning(f"Could not resolve channel name '{clean_name}' to ID. Available channels: {[c['name'] for c in channels[:5]]}")
+            logger.warning(
+                f"Could not resolve channel name '{clean_name}' to ID. Available channels: {[c['name'] for c in channels[:5]]}"
+            )
             return clean_name
 
         except Exception as e:
             logger.error(f"Error resolving channel name '{clean_name}': {e}")
             return clean_name
 
-    async def read_channel_history(self, channel_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def read_channel_history(
+        self, channel_id: str, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """Read recent messages from a specific channel, including threaded replies."""
         try:
             response = self.client.conversations_history(
-                channel=channel_id,
-                limit=limit
+                channel=channel_id, limit=limit
             )
 
-            logger.info(f"Slack API response for channel {channel_id}: {len(response.get('messages', []))} total messages")
+            logger.info(
+                f"Slack API response for channel {channel_id}: {len(response.get('messages', []))} total messages"
+            )
 
             messages = []
-            for message in response.get('messages', []):
-                message_type = message.get('type')
-                has_subtype = 'subtype' in message
-                has_text = bool(message.get('text'))
-                has_thread = 'thread_ts' in message
+            for message in response.get("messages", []):
+                message_type = message.get("type")
+                has_subtype = "subtype" in message
+                has_text = bool(message.get("text"))
+                has_thread = "thread_ts" in message
 
-                logger.info(f"Message - type: {message_type}, has_subtype: {has_subtype}, has_text: {has_text}, has_thread: {has_thread}, text: {message.get('text', '')[:50]}...")
+                logger.info(
+                    f"Message - type: {message_type}, has_subtype: {has_subtype}, has_text: {has_text}, has_thread: {has_thread}, text: {message.get('text', '')[:50]}..."
+                )
 
                 # Include main message if it's a regular message
-                if message.get('type') == 'message' and 'subtype' not in message:
-                    messages.append({
-                        'user': message.get('user'),
-                        'text': message.get('text'),
-                        'timestamp': message.get('ts'),
-                        'channel': channel_id,
-                        'is_thread_parent': has_thread
-                    })
+                if message.get("type") == "message" and "subtype" not in message:
+                    messages.append(
+                        {
+                            "user": message.get("user"),
+                            "text": message.get("text"),
+                            "timestamp": message.get("ts"),
+                            "channel": channel_id,
+                            "is_thread_parent": has_thread,
+                        }
+                    )
 
                 # If this message has threaded replies, fetch them
                 if has_thread:
                     try:
                         thread_response = self.client.conversations_replies(
-                            channel=channel_id,
-                            ts=message.get('thread_ts')
+                            channel=channel_id, ts=message.get("thread_ts")
                         )
 
                         # Add all replies (excluding the parent message which is already added)
-                        for reply in thread_response.get('messages', [])[1:]:  # Skip first message (parent)
-                            if (reply.get('type') == 'message' and
-                                'subtype' not in reply and
-                                reply.get('text')):
+                        for reply in thread_response.get("messages", [])[
+                            1:
+                        ]:  # Skip first message (parent)
+                            if (
+                                reply.get("type") == "message"
+                                and "subtype" not in reply
+                                and reply.get("text")
+                            ):
 
-                                messages.append({
-                                    'user': reply.get('user'),
-                                    'text': reply.get('text'),
-                                    'timestamp': reply.get('ts'),
-                                    'channel': channel_id,
-                                    'is_thread_reply': True,
-                                    'thread_ts': message.get('thread_ts')
-                                })
+                                messages.append(
+                                    {
+                                        "user": reply.get("user"),
+                                        "text": reply.get("text"),
+                                        "timestamp": reply.get("ts"),
+                                        "channel": channel_id,
+                                        "is_thread_reply": True,
+                                        "thread_ts": message.get("thread_ts"),
+                                    }
+                                )
 
-                        logger.info(f"Added {len(thread_response.get('messages', [])) - 1} thread replies for message {message.get('ts')}")
+                        logger.info(
+                            f"Added {len(thread_response.get('messages', [])) - 1} thread replies for message {message.get('ts')}"
+                        )
 
                     except SlackApiError as e:
-                        logger.warning(f"Error fetching thread replies for message {message.get('ts')}: {e}")
+                        logger.warning(
+                            f"Error fetching thread replies for message {message.get('ts')}: {e}"
+                        )
                         continue
 
-            logger.info(f"SlackTodoBot returning {len(messages)} filtered messages (including thread replies)")
+            logger.info(
+                f"SlackTodoBot returning {len(messages)} filtered messages (including thread replies)"
+            )
             return messages
 
         except SlackApiError as e:
@@ -1598,42 +1701,45 @@ class SlackTodoBot:
         blocks = [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "📅 Agenda Generator Help"
-                }
+                "text": {"type": "plain_text", "text": "📅 Agenda Generator Help"},
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": "*Generate Project Meeting Agendas*\n\n"
-                           "`/agenda <project-key> [days]` - Generate agenda for project\n\n"
-                           "*Parameters:*\n"
-                           "• `project-key` - Jira project key (e.g., PROJ, DEV, SATG)\n"
-                           "• `days` - Number of days to look back (1-30, default: 7)\n\n"
-                           "*Examples:*\n"
-                           "• `/agenda PROJ-123` - 7-day agenda for PROJ-123\n"
-                           "• `/agenda DEV-456 14` - 14-day agenda for DEV-456\n"
-                           "• `/agenda SATG 3` - 3-day agenda for SATG"
-                }
+                    "`/agenda <project-key> [days]` - Generate agenda for project\n\n"
+                    "*Parameters:*\n"
+                    "• `project-key` - Jira project key (e.g., PROJ, DEV, SATG)\n"
+                    "• `days` - Number of days to look back (1-30, default: 7)\n\n"
+                    "*Examples:*\n"
+                    "• `/agenda PROJ-123` - 7-day agenda for PROJ-123\n"
+                    "• `/agenda DEV-456 14` - 14-day agenda for DEV-456\n"
+                    "• `/agenda SATG 3` - 3-day agenda for SATG",
+                },
             },
             {
                 "type": "context",
-                "elements": [{
-                    "type": "plain_text",
-                    "text": "💡 The agenda includes meeting summaries, completed tickets, time tracking, and AI-generated insights"
-                }]
-            }
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": "💡 The agenda includes meeting summaries, completed tickets, time tracking, and AI-generated insights",
+                    }
+                ],
+            },
         ]
 
         return {"blocks": blocks}
 
-    def _generate_project_agenda(self, user_id: str, project_key: str, days: int) -> Dict[str, Any]:
+    def _generate_project_agenda(
+        self, user_id: str, project_key: str, days: int
+    ) -> Dict[str, Any]:
         """Generate project agenda using the ProjectActivityAggregator."""
         try:
             # Import the aggregator
-            from src.services.project_activity_aggregator import ProjectActivityAggregator
+            from src.services.project_activity_aggregator import (
+                ProjectActivityAggregator,
+            )
             import asyncio
 
             # Create aggregator instance
@@ -1642,11 +1748,13 @@ class SlackTodoBot:
             # Generate the activity summary
             try:
                 # Run the async aggregation
-                activity = asyncio.run(aggregator.aggregate_project_activity(
-                    project_key=project_key,
-                    project_name=project_key,  # Use project key as name for now
-                    days_back=days
-                ))
+                activity = asyncio.run(
+                    aggregator.aggregate_project_activity(
+                        project_key=project_key,
+                        project_name=project_key,  # Use project key as name for now
+                        days_back=days,
+                    )
+                )
 
                 # Generate markdown agenda
                 markdown_agenda = aggregator.format_client_agenda(activity)
@@ -1657,86 +1765,101 @@ class SlackTodoBot:
                         "type": "header",
                         "text": {
                             "type": "plain_text",
-                            "text": f"📅 {project_key} - {days} Day Agenda"
-                        }
+                            "text": f"📅 {project_key} - {days} Day Agenda",
+                        },
                     },
                     {
                         "type": "section",
                         "fields": [
                             {
                                 "type": "mrkdwn",
-                                "text": f"*📋 Meetings:*\n{len(activity.meetings)}"
+                                "text": f"*📋 Meetings:*\n{len(activity.meetings)}",
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*✅ Completed:*\n{len(activity.completed_tickets)}"
+                                "text": f"*✅ Completed:*\n{len(activity.completed_tickets)}",
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*🆕 New Tickets:*\n{len(activity.new_tickets)}"
+                                "text": f"*🆕 New Tickets:*\n{len(activity.new_tickets)}",
                             },
                             {
                                 "type": "mrkdwn",
-                                "text": f"*⏰ Hours:*\n{activity.total_hours:.1f}h"
-                            }
-                        ]
-                    }
+                                "text": f"*⏰ Hours:*\n{activity.total_hours:.1f}h",
+                            },
+                        ],
+                    },
                 ]
 
                 # Add progress summary if available
                 if activity.progress_summary:
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"*📊 Progress Summary:*\n{activity.progress_summary}"
+                    blocks.append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"*📊 Progress Summary:*\n{activity.progress_summary}",
+                            },
                         }
-                    })
+                    )
 
                 # Add key achievements if available
                 if activity.key_achievements:
-                    achievements_text = "\n".join([f"• {achievement}" for achievement in activity.key_achievements[:3]])
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"*🎯 Key Achievements:*\n{achievements_text}"
+                    achievements_text = "\n".join(
+                        [
+                            f"• {achievement}"
+                            for achievement in activity.key_achievements[:3]
+                        ]
+                    )
+                    blocks.append(
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": f"*🎯 Key Achievements:*\n{achievements_text}",
+                            },
                         }
-                    })
+                    )
 
                 # Add action buttons
-                blocks.append({
-                    "type": "actions",
-                    "elements": [
-                        {
-                            "type": "button",
-                            "text": {
-                                "type": "plain_text",
-                                "text": "🌐 View Full Dashboard"
+                blocks.append(
+                    {
+                        "type": "actions",
+                        "elements": [
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "🌐 View Full Dashboard",
+                                },
+                                "url": f"{settings.web.base_url}/",
                             },
-                            "url": f"{settings.web.base_url}/"
-                        },
-                        {
-                            "type": "button",
-                            "text": {
-                                "type": "plain_text",
-                                "text": "📄 Download Markdown"
+                            {
+                                "type": "button",
+                                "text": {
+                                    "type": "plain_text",
+                                    "text": "📄 Download Markdown",
+                                },
+                                "action_id": "download_agenda",
+                                "value": f"{project_key}_{days}days",
                             },
-                            "action_id": "download_agenda",
-                            "value": f"{project_key}_{days}days"
-                        }
-                    ]
-                })
+                        ],
+                    }
+                )
 
                 # Add context with generation info
                 user_name = self._get_user_display_name(user_id)
-                blocks.append({
-                    "type": "context",
-                    "elements": [{
-                        "type": "plain_text",
-                        "text": f"Generated by {user_name} • {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-                    }]
-                })
+                blocks.append(
+                    {
+                        "type": "context",
+                        "elements": [
+                            {
+                                "type": "plain_text",
+                                "text": f"Generated by {user_name} • {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                            }
+                        ],
+                    }
+                )
 
                 return {"blocks": blocks}
 
@@ -1744,7 +1867,7 @@ class SlackTodoBot:
                 logger.error(f"Error generating project activity: {e}")
                 return {
                     "text": f"❌ Error generating agenda for {project_key}: {str(e)}\n"
-                           f"Make sure the project key is valid and you have access to it."
+                    f"Make sure the project key is valid and you have access to it."
                 }
 
         except ImportError as e:
@@ -1753,7 +1876,12 @@ class SlackTodoBot:
                 "text": "❌ Agenda generation is not available. The project activity aggregator is not properly configured."
             }
 
-    def _generate_dad_joke(self, subject: Optional[str] = None, person_name: Optional[str] = None, requester: str = "someone") -> str:
+    def _generate_dad_joke(
+        self,
+        subject: Optional[str] = None,
+        person_name: Optional[str] = None,
+        requester: str = "someone",
+    ) -> str:
         """Generate a dad joke using AI."""
         import random  # Move import outside try block
 
@@ -1761,27 +1889,30 @@ class SlackTodoBot:
             # Initialize LLM based on configured provider
             if settings.ai.provider == "openai":
                 from langchain_openai import ChatOpenAI
+
                 llm = ChatOpenAI(
                     model=settings.ai.model,
                     temperature=1.2,  # Higher temperature for more creative jokes
                     max_tokens=200,
-                    api_key=settings.ai.api_key
+                    api_key=settings.ai.api_key,
                 )
             elif settings.ai.provider == "anthropic":
                 from langchain_anthropic import ChatAnthropic
+
                 llm = ChatAnthropic(
                     model=settings.ai.model,
                     temperature=1.2,
                     max_tokens=200,
-                    api_key=settings.ai.api_key
+                    api_key=settings.ai.api_key,
                 )
             elif settings.ai.provider == "google":
                 from langchain_google_genai import ChatGoogleGenerativeAI
+
                 llm = ChatGoogleGenerativeAI(
                     model=settings.ai.model,
                     temperature=1.2,
                     max_output_tokens=200,
-                    google_api_key=settings.ai.api_key
+                    google_api_key=settings.ai.api_key,
                 )
             else:
                 raise ValueError(f"Unsupported AI provider: {settings.ai.provider}")
@@ -1810,9 +1941,15 @@ class SlackTodoBot:
 
             # Log the raw response for debugging
             logger.info(f"OpenAI response type: {type(response)}")
-            logger.info(f"OpenAI response content: {response.content if hasattr(response, 'content') else str(response)}")
+            logger.info(
+                f"OpenAI response content: {response.content if hasattr(response, 'content') else str(response)}"
+            )
 
-            joke_text = response.content.strip() if hasattr(response, 'content') else str(response).strip()
+            joke_text = (
+                response.content.strip()
+                if hasattr(response, "content")
+                else str(response).strip()
+            )
 
             # Validate we got a response
             if not joke_text:
@@ -1847,7 +1984,7 @@ class SlackTodoBot:
                 "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
                 "I told my computer I needed a break, and now it won't stop sending me Kit-Kats. 🍫",
                 "Why did the scarecrow win an award? He was outstanding in his field! 🌾",
-                "What did the ocean say to the beach? Nothing, it just waved! 🌊"
+                "What did the ocean say to the beach? Nothing, it just waved! 🌊",
             ]
             return f"💔 AI couldn't think of a joke, so here's a classic:\n\n{random.choice(fallback_jokes)}"
 
@@ -1856,36 +1993,35 @@ class SlackTodoBot:
         blocks = [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "💡 Learning Tracker Help"
-                }
+                "text": {"type": "plain_text", "text": "💡 Learning Tracker Help"},
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": "*Save and Share Team Learnings*\n\n"
-                           "`/learning <text>` - Save a new learning\n"
-                           "`/learning list [category]` - List recent learnings\n"
-                           "`/learning search <term>` - Search learnings\n"
-                           "`/learning stats` - View statistics\n"
-                           "`/learning categories` - List all categories\n"
-                           "`/learning help` - Show this help\n\n"
-                           "*Examples:*\n"
-                           "• `/learning Always test edge cases in production-like environment`\n"
-                           "• `/learning Document API changes in PR description #technical`\n"
-                           "• `/learning list technical` - List technical learnings\n"
-                           "• `/learning search API` - Search for API-related learnings"
-                }
+                    "`/learning <text>` - Save a new learning\n"
+                    "`/learning list [category]` - List recent learnings\n"
+                    "`/learning search <term>` - Search learnings\n"
+                    "`/learning stats` - View statistics\n"
+                    "`/learning categories` - List all categories\n"
+                    "`/learning help` - Show this help\n\n"
+                    "*Examples:*\n"
+                    "• `/learning Always test edge cases in production-like environment`\n"
+                    "• `/learning Document API changes in PR description #technical`\n"
+                    "• `/learning list technical` - List technical learnings\n"
+                    "• `/learning search API` - Search for API-related learnings",
+                },
             },
             {
                 "type": "context",
-                "elements": [{
-                    "type": "plain_text",
-                    "text": "💡 Pro tip: Add #category to categorize your learning (optional)"
-                }]
-            }
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": "💡 Pro tip: Add #category to categorize your learning (optional)",
+                    }
+                ],
+            },
         ]
 
         return {"blocks": blocks}
@@ -1905,10 +2041,11 @@ class SlackTodoBot:
 
             # Check for #category tag
             import re
-            category_match = re.search(r'#(\w+)', text)
+
+            category_match = re.search(r"#(\w+)", text)
             if category_match:
                 category = category_match.group(1).lower()
-                content = text.replace(f'#{category_match.group(1)}', '').strip()
+                content = text.replace(f"#{category_match.group(1)}", "").strip()
 
             # Create the learning with mapped user ID if available
             learning = self.learning_manager.create_learning(
@@ -1916,15 +2053,15 @@ class SlackTodoBot:
                 submitted_by=user_name,
                 submitted_by_id=str(app_user_id) if app_user_id else None,
                 category=category,
-                source=f'slack - {user_name}'  # Store name in source for UI display
+                source=f"slack - {user_name}",  # Store name in source for UI display
             )
 
             # Format response
             category_str = f" [{category}]" if category else ""
             return {
                 "text": f"✅ Learning saved{category_str}!\n\n"
-                       f"💡 *{content}*\n"
-                       f"_ID: {learning.id}_"
+                f"💡 *{content}*\n"
+                f"_ID: {learning.id}_"
             }
 
         except Exception as e:
@@ -1934,65 +2071,54 @@ class SlackTodoBot:
     def _list_learnings(self, category: str = None) -> Dict[str, Any]:
         """List recent learnings."""
         try:
-            learnings = self.learning_manager.get_learnings(
-                limit=10,
-                category=category
-            )
+            learnings = self.learning_manager.get_learnings(limit=10, category=category)
 
             if not learnings:
                 if category:
                     return {"text": f"No learnings found in category: {category}"}
                 else:
-                    return {"text": "No learnings found yet. Start adding some with `/learning`!"}
+                    return {
+                        "text": "No learnings found yet. Start adding some with `/learning`!"
+                    }
 
             title = f"💡 Recent Learnings" + (f" [{category}]" if category else "")
 
-            blocks = [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": title
-                    }
-                }
-            ]
+            blocks = [{"type": "header", "text": {"type": "plain_text", "text": title}}]
 
             # Add learning sections
             for learning in learnings:
                 category_str = f" `{learning.category}`" if learning.category else ""
-                date_str = learning.created_at.strftime('%m/%d')
+                date_str = learning.created_at.strftime("%m/%d")
 
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"• *{learning.content}*{category_str}\n"
-                               f"  _by {learning.submitted_by} on {date_str}_"
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"• *{learning.content}*{category_str}\n"
+                            f"  _by {learning.submitted_by} on {date_str}_",
+                        },
                     }
-                })
+                )
 
             # Add action buttons
-            blocks.append({
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "🌐 View All"
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "🌐 View All"},
+                            "url": f"{settings.web.base_url}/learnings",
                         },
-                        "url": f"{settings.web.base_url}/learnings"
-                    },
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "➕ Add Learning"
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "➕ Add Learning"},
+                            "action_id": "add_learning_button",
                         },
-                        "action_id": "add_learning_button"
-                    }
-                ]
-            })
+                    ],
+                }
+            )
 
             return {"blocks": blocks}
 
@@ -2004,8 +2130,7 @@ class SlackTodoBot:
         """Search learnings by content."""
         try:
             learnings = self.learning_manager.search_learnings(
-                search_term=search_term,
-                limit=10
+                search_term=search_term, limit=10
             )
 
             if not learnings:
@@ -2016,24 +2141,26 @@ class SlackTodoBot:
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": f"🔍 Search Results for '{search_term}'"
-                    }
+                        "text": f"🔍 Search Results for '{search_term}'",
+                    },
                 }
             ]
 
             # Add learning sections
             for learning in learnings:
                 category_str = f" `{learning.category}`" if learning.category else ""
-                date_str = learning.created_at.strftime('%m/%d')
+                date_str = learning.created_at.strftime("%m/%d")
 
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"• *{learning.content}*{category_str}\n"
-                               f"  _by {learning.submitted_by} on {date_str}_"
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"• *{learning.content}*{category_str}\n"
+                            f"  _by {learning.submitted_by} on {date_str}_",
+                        },
                     }
-                })
+                )
 
             return {"blocks": blocks}
 
@@ -2049,44 +2176,40 @@ class SlackTodoBot:
             blocks = [
                 {
                     "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "📊 Learning Statistics"
-                    }
+                    "text": {"type": "plain_text", "text": "📊 Learning Statistics"},
                 },
                 {
                     "type": "section",
                     "fields": [
                         {
                             "type": "mrkdwn",
-                            "text": f"*💡 Total Learnings:*\n{stats['total']}"
+                            "text": f"*💡 Total Learnings:*\n{stats['total']}",
+                        },
+                        {"type": "mrkdwn", "text": f"*📅 Today:*\n{stats['today']}"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*📆 This Week:*\n{stats['this_week']}",
                         },
                         {
                             "type": "mrkdwn",
-                            "text": f"*📅 Today:*\n{stats['today']}"
+                            "text": f"*🏷️ Categories:*\n{stats['categories_count']}",
                         },
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*📆 This Week:*\n{stats['this_week']}"
-                        },
-                        {
-                            "type": "mrkdwn",
-                            "text": f"*🏷️ Categories:*\n{stats['categories_count']}"
-                        }
-                    ]
-                }
+                    ],
+                },
             ]
 
             # Add top categories if any
-            if stats['categories']:
-                categories_text = ", ".join(stats['categories'][:5])
-                blocks.append({
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*Top Categories:* {categories_text}"
+            if stats["categories"]:
+                categories_text = ", ".join(stats["categories"][:5])
+                blocks.append(
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"*Top Categories:* {categories_text}",
+                        },
                     }
-                })
+                )
 
             return {"blocks": blocks}
 
@@ -2100,32 +2223,30 @@ class SlackTodoBot:
             categories = self.learning_manager.get_categories()
 
             if not categories:
-                return {"text": "No categories found yet. Add categories to learnings with #category"}
+                return {
+                    "text": "No categories found yet. Add categories to learnings with #category"
+                }
 
             categories_text = "\n".join([f"• `{cat}`" for cat in categories])
 
             blocks = [
                 {
                     "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "🏷️ Learning Categories"
-                    }
+                    "text": {"type": "plain_text", "text": "🏷️ Learning Categories"},
                 },
                 {
                     "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": categories_text
-                    }
+                    "text": {"type": "mrkdwn", "text": categories_text},
                 },
                 {
                     "type": "context",
-                    "elements": [{
-                        "type": "plain_text",
-                        "text": f"Total: {len(categories)} categories"
-                    }]
-                }
+                    "elements": [
+                        {
+                            "type": "plain_text",
+                            "text": f"Total: {len(categories)} categories",
+                        }
+                    ],
+                },
             ]
 
             return {"blocks": blocks}
@@ -2139,37 +2260,38 @@ class SlackTodoBot:
         blocks = [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "💬 Feedback Tracker Help"
-                }
+                "text": {"type": "plain_text", "text": "💬 Feedback Tracker Help"},
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": "*Save Private Feedback for Later*\n\n"
-                           "`/feedforward <text>` - Save feedback without a recipient\n"
-                           "`/feedforward @user <text>` - Save feedback for a specific person\n"
-                           "`/feedforward help` - Show this help\n\n"
-                           "*Examples:*\n"
-                           "• `/feedforward Great job on the presentation!` - General feedback\n"
-                           "• `/feedforward @johndoe Excellent work on the API refactor` - Feedback for John\n\n"
-                           "*Note:* All feedback is private to you. Only you can see it."
-                }
+                    "`/feedforward <text>` - Save feedback without a recipient\n"
+                    "`/feedforward @user <text>` - Save feedback for a specific person\n"
+                    "`/feedforward help` - Show this help\n\n"
+                    "*Examples:*\n"
+                    "• `/feedforward Great job on the presentation!` - General feedback\n"
+                    "• `/feedforward @johndoe Excellent work on the API refactor` - Feedback for John\n\n"
+                    "*Note:* All feedback is private to you. Only you can see it.",
+                },
             },
             {
                 "type": "context",
-                "elements": [{
-                    "type": "plain_text",
-                    "text": "💡 Tip: Use the web dashboard to view and manage your saved feedback"
-                }]
-            }
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": "💡 Tip: Use the web dashboard to view and manage your saved feedback",
+                    }
+                ],
+            },
         ]
 
         return {"blocks": blocks}
 
-    def _create_feedback(self, user_id: str, recipient: Optional[str], content: str) -> Dict[str, Any]:
+    def _create_feedback(
+        self, user_id: str, recipient: Optional[str], content: str
+    ) -> Dict[str, Any]:
         """Create a new feedback item from Slack command."""
         try:
             from src.models import FeedbackItem
@@ -2196,7 +2318,7 @@ class SlackTodoBot:
 
             # Create the feedback
             feedback_id = str(uuid.uuid4())
-            feedback_status = 'draft'
+            feedback_status = "draft"
 
             feedback = FeedbackItem(
                 id=feedback_id,
@@ -2205,11 +2327,12 @@ class SlackTodoBot:
                 content=content,
                 status=feedback_status,
                 created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                updated_at=datetime.utcnow(),
             )
 
             # Add to database
             from src.utils.database import session_scope
+
             with session_scope() as db_session:
                 db_session.add(feedback)
                 db_session.commit()
@@ -2218,9 +2341,9 @@ class SlackTodoBot:
             recipient_str = f" for *{recipient}*" if recipient else ""
             return {
                 "text": f"✅ Feedback saved{recipient_str}! 🔒 (Private to you)\n\n"
-                       f"💬 *{content}*\n\n"
-                       f"_ID: {feedback_id[:8]} | Status: {feedback_status}_\n"
-                       f"💡 View all your feedback at {settings.web.base_url}/feedback"
+                f"💬 *{content}*\n\n"
+                f"_ID: {feedback_id[:8]} | Status: {feedback_status}_\n"
+                f"💡 View all your feedback at {settings.web.base_url}/feedback"
             }
 
         except Exception as e:
@@ -2231,7 +2354,9 @@ class SlackTodoBot:
         """Validate that a Slack user exists."""
         try:
             response = self.client.users_info(user=user_id)
-            return response.get("ok", False) and not response.get("user", {}).get("deleted", False)
+            return response.get("ok", False) and not response.get("user", {}).get(
+                "deleted", False
+            )
         except SlackApiError:
             return False
 
@@ -2240,44 +2365,45 @@ class SlackTodoBot:
         blocks = [
             {
                 "type": "header",
-                "text": {
-                    "type": "plain_text",
-                    "text": "🔍 Context Search Help"
-                }
+                "text": {"type": "plain_text", "text": "🔍 Context Search Help"},
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
                     "text": "*Find Historical Context Across All Sources*\n\n"
-                           "`/find-context <topic>` - Search with default 90-day window\n"
-                           "`/find-context <topic> --days N` - Search with custom timeframe\n"
-                           "`/find-context <topic> --project PROJ` - Filter by project\n\n"
-                           "*Sources Searched:*\n"
-                           "• 💬 Slack messages (channels bot is in)\n"
-                           "• 🎙️ Fireflies meeting transcripts\n"
-                           "• 📋 Jira issues and comments\n"
-                           "• 🔧 GitHub PRs and commits\n"
-                           "• 📝 Notion pages and docs\n\n"
-                           "*Examples:*\n"
-                           "• `/find-context authentication flow` - Find context about auth\n"
-                           "• `/find-context payment gateway --days=180` - Search last 6 months\n"
-                           "• `/find-context fulfillment --project=BERNS` - Berns project only\n"
-                           "• `/find-context API refactor --days 30 --project ETHEL` - Recent, specific project"
-                }
+                    "`/find-context <topic>` - Search with default 90-day window\n"
+                    "`/find-context <topic> --days N` - Search with custom timeframe\n"
+                    "`/find-context <topic> --project PROJ` - Filter by project\n\n"
+                    "*Sources Searched:*\n"
+                    "• 💬 Slack messages (channels bot is in)\n"
+                    "• 🎙️ Fireflies meeting transcripts\n"
+                    "• 📋 Jira issues and comments\n"
+                    "• 🔧 GitHub PRs and commits\n"
+                    "• 📝 Notion pages and docs\n\n"
+                    "*Examples:*\n"
+                    "• `/find-context authentication flow` - Find context about auth\n"
+                    "• `/find-context payment gateway --days=180` - Search last 6 months\n"
+                    "• `/find-context fulfillment --project=BERNS` - Berns project only\n"
+                    "• `/find-context API refactor --days 30 --project ETHEL` - Recent, specific project",
+                },
             },
             {
                 "type": "context",
-                "elements": [{
-                    "type": "plain_text",
-                    "text": "💡 Results include AI-generated summary, key people, and timeline"
-                }]
-            }
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": "💡 Results include AI-generated summary, key people, and timeline",
+                    }
+                ],
+            },
         ]
 
         return {"blocks": blocks}
 
-    def _find_context(self, user_id: str, query: str, days: int, project: Optional[str] = None) -> Dict[str, Any]:
+    def _find_context(
+        self, user_id: str, query: str, days: int, project: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Execute context search and format results."""
         try:
             import asyncio
@@ -2290,25 +2416,31 @@ class SlackTodoBot:
             search_service = ContextSearchService()
 
             # Perform search (use slack detail level for optimal Slack formatting and length)
-            results = asyncio.run(search_service.search(
-                query=query,
-                days_back=days,
-                user_id=app_user_id,
-                detail_level="slack",
-                project=project
-            ))
+            results = asyncio.run(
+                search_service.search(
+                    query=query,
+                    days_back=days,
+                    user_id=app_user_id,
+                    detail_level="slack",
+                    project=project,
+                )
+            )
 
             # Debug logging
             logger.info(f"🔍 Search completed for '{query}':")
-            logger.info(f"  - Results found: {len(results.results) if results.results else 0}")
+            logger.info(
+                f"  - Results found: {len(results.results) if results.results else 0}"
+            )
             logger.info(f"  - Has summary: {bool(results.summary)}")
-            logger.info(f"  - Has citations: {bool(getattr(results, 'citations', None))}")
+            logger.info(
+                f"  - Has citations: {bool(getattr(results, 'citations', None))}"
+            )
             logger.info(f"  - Has tldr: {bool(getattr(results, 'tldr', None))}")
 
             if not results.results:
                 return {
                     "text": f"🔍 No results found for *{query}* in the last {days} days.\n"
-                           f"Try expanding the search window or using different keywords."
+                    f"Try expanding the search window or using different keywords."
                 }
 
             # Build response blocks
@@ -2320,13 +2452,7 @@ class SlackTodoBot:
             header_text = " ".join(header_parts)
 
             blocks = [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": header_text
-                    }
-                }
+                {"type": "header", "text": {"type": "plain_text", "text": header_text}}
             ]
 
             # Add AI summary (flexible format - AI decides structure)
@@ -2347,13 +2473,13 @@ class SlackTodoBot:
 
                     while len(remaining) > MAX_BLOCK_LENGTH:
                         # Find last word boundary before limit
-                        split_pos = remaining[:MAX_BLOCK_LENGTH].rfind('\n\n')
+                        split_pos = remaining[:MAX_BLOCK_LENGTH].rfind("\n\n")
                         if split_pos == -1:
-                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind('\n')
+                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind("\n")
                         if split_pos == -1:
-                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind('. ')
+                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind(". ")
                         if split_pos == -1:
-                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind(' ')
+                            split_pos = remaining[:MAX_BLOCK_LENGTH].rfind(" ")
                         if split_pos == -1:
                             split_pos = MAX_BLOCK_LENGTH
 
@@ -2363,25 +2489,25 @@ class SlackTodoBot:
                     if remaining:
                         parts.append(remaining)
 
-                    logger.info(f"📝 Split summary into {len(parts)} blocks (total: {len(formatted_summary)} chars)")
+                    logger.info(
+                        f"📝 Split summary into {len(parts)} blocks (total: {len(formatted_summary)} chars)"
+                    )
 
                     # Add all parts as separate text blocks
                     for part in parts:
-                        blocks.append({
-                            "type": "section",
-                            "text": {
-                                "type": "mrkdwn",
-                                "text": part
+                        blocks.append(
+                            {
+                                "type": "section",
+                                "text": {"type": "mrkdwn", "text": part},
                             }
-                        })
+                        )
                 else:
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": formatted_summary
+                    blocks.append(
+                        {
+                            "type": "section",
+                            "text": {"type": "mrkdwn", "text": formatted_summary},
                         }
-                    })
+                    )
 
             # Add divider before footer
             blocks.append({"type": "divider"})
@@ -2393,104 +2519,106 @@ class SlackTodoBot:
                 source_counts[result.source] = source_counts.get(result.source, 0) + 1
 
             # Count citations for display
-            citations = getattr(results, 'citations', []) or []
+            citations = getattr(results, "citations", []) or []
             stats_text = f"Found {total_results} results"
             stats_parts = []
-            if source_counts.get('slack'):
+            if source_counts.get("slack"):
                 stats_parts.append(f"{source_counts['slack']} Slack")
-            if source_counts.get('fireflies'):
+            if source_counts.get("fireflies"):
                 stats_parts.append(f"{source_counts['fireflies']} Fireflies")
-            if source_counts.get('jira'):
+            if source_counts.get("jira"):
                 stats_parts.append(f"{source_counts['jira']} Jira")
-            if source_counts.get('github'):
+            if source_counts.get("github"):
                 stats_parts.append(f"{source_counts['github']} GitHub")
-            if source_counts.get('notion'):
+            if source_counts.get("notion"):
                 stats_parts.append(f"{source_counts['notion']} Notion")
             if stats_parts:
                 stats_text += f": {', '.join(stats_parts)}"
             stats_text += f" • {len(citations)} sources with citations"
 
-            blocks.append({
-                "type": "context",
-                "elements": [{
-                    "type": "plain_text",
-                    "text": stats_text
-                }]
-            })
+            blocks.append(
+                {
+                    "type": "context",
+                    "elements": [{"type": "plain_text", "text": stats_text}],
+                }
+            )
 
             # Add interactive follow-up buttons
             blocks.append({"type": "divider"})
 
             # Store search context for follow-ups (using database session storage)
             import hashlib
-            session_id = hashlib.md5(f"{user_id}:{query}:{int(time.time())}".encode()).hexdigest()[:12]
+
+            session_id = hashlib.md5(
+                f"{user_id}:{query}:{int(time.time())}".encode()
+            ).hexdigest()[:12]
 
             # Store session in database (TTL: 1 hour)
             session_data = {
-                'query': query,
-                'results': results,
-                'user_id': user_id,
-                'created_at': time.time(),
-                'days': days
+                "query": query,
+                "results": results,
+                "user_id": user_id,
+                "created_at": time.time(),
+                "days": days,
             }
 
             success = self.session_manager.set(session_id, session_data)
             if not success:
-                logger.warning(f"Failed to store session {session_id} in database - buttons may not work")
+                logger.warning(
+                    f"Failed to store session {session_id} in database - buttons may not work"
+                )
             else:
-                logger.info(f"Stored session {session_id} in database for user {user_id}")
+                logger.info(
+                    f"Stored session {session_id} in database for user {user_id}"
+                )
 
-            blocks.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*🎯 What would you like to explore?*"
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*🎯 What would you like to explore?*",
+                    },
                 }
-            })
+            )
 
-            blocks.append({
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "📚 Show Sources"
+            blocks.append(
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "📚 Show Sources"},
+                            "value": f"show_sources:{session_id}",
+                            "action_id": "context_show_sources",
+                            "style": "primary",
                         },
-                        "value": f"show_sources:{session_id}",
-                        "action_id": "context_show_sources",
-                        "style": "primary"
-                    },
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "💡 All Quotes"
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "💡 All Quotes"},
+                            "value": f"show_quotes:{session_id}",
+                            "action_id": "context_show_quotes",
                         },
-                        "value": f"show_quotes:{session_id}",
-                        "action_id": "context_show_quotes"
-                    },
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "🔄 Expand Search"
+                        {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "🔄 Expand Search"},
+                            "value": f"expand_search:{session_id}",
+                            "action_id": "context_expand_search",
                         },
-                        "value": f"expand_search:{session_id}",
-                        "action_id": "context_expand_search"
-                    }
-                ]
-            })
+                    ],
+                }
+            )
 
             return {"blocks": blocks}
 
         except Exception as e:
             logger.error(f"Error executing context search: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
             return {
                 "text": f"❌ Error executing search: {str(e)}\n"
-                       f"Please try again or contact support if the issue persists."
+                f"Please try again or contact support if the issue persists."
             }
 
     def _format_summary_for_slack(self, summary: str) -> str:
@@ -2503,13 +2631,13 @@ class SlackTodoBot:
             Formatted summary with better paragraph spacing
         """
         # Split by double newlines first (if AI already formatted well)
-        if '\n\n' in summary:
+        if "\n\n" in summary:
             # AI already added paragraph breaks - just clean up
-            paragraphs = [p.strip() for p in summary.split('\n\n') if p.strip()]
-            return '\n\n'.join(paragraphs)
+            paragraphs = [p.strip() for p in summary.split("\n\n") if p.strip()]
+            return "\n\n".join(paragraphs)
 
         # Otherwise split by single newlines and group
-        lines = [line.strip() for line in summary.split('\n') if line.strip()]
+        lines = [line.strip() for line in summary.split("\n") if line.strip()]
 
         # Group consecutive non-empty lines into paragraphs
         # (Assume each sentence ending with period is part of same paragraph)
@@ -2523,27 +2651,28 @@ class SlackTodoBot:
 
         if current_para:
             # Join everything with single space, then split by double spaces
-            full_text = ' '.join(current_para)
+            full_text = " ".join(current_para)
             # Normalize spacing
             import re
-            full_text = re.sub(r'\s+', ' ', full_text)
+
+            full_text = re.sub(r"\s+", " ", full_text)
             # Split into sentences (rough heuristic)
-            sentences = re.split(r'(\. )', full_text)
+            sentences = re.split(r"(\. )", full_text)
 
             # Group sentences into paragraphs of ~3-5 sentences
             para = []
             for i, part in enumerate(sentences):
                 para.append(part)
                 # Every ~4 sentences or at period boundary, make new paragraph
-                if part == '. ' and len(para) >= 8:  # ~4 sentences (text + period)
-                    paragraphs.append(''.join(para).strip())
+                if part == ". " and len(para) >= 8:  # ~4 sentences (text + period)
+                    paragraphs.append("".join(para).strip())
                     para = []
 
             if para:
-                paragraphs.append(''.join(para).strip())
+                paragraphs.append("".join(para).strip())
 
         # Join with double newlines for Slack spacing
-        return '\n\n'.join(paragraphs) if paragraphs else summary
+        return "\n\n".join(paragraphs) if paragraphs else summary
 
     def _replace_slack_user_ids(self, text: str) -> str:
         """Replace Slack user IDs with user names.
@@ -2557,7 +2686,7 @@ class SlackTodoBot:
         import re
 
         # Find all Slack user mentions: <@U12345>
-        user_id_pattern = r'<@(U[A-Z0-9]+)>'
+        user_id_pattern = r"<@(U[A-Z0-9]+)>"
         matches = re.findall(user_id_pattern, text)
 
         if not matches:
@@ -2567,10 +2696,15 @@ class SlackTodoBot:
         for user_id in set(matches):  # Use set to avoid duplicate API calls
             try:
                 response = self.client.users_info(user=user_id)
-                if response.get('ok') and response.get('user'):
-                    user = response['user']
-                    display_name = user.get('profile', {}).get('display_name') or user.get('real_name') or user.get('name') or user_id
-                    text = text.replace(f'<@{user_id}>', display_name)
+                if response.get("ok") and response.get("user"):
+                    user = response["user"]
+                    display_name = (
+                        user.get("profile", {}).get("display_name")
+                        or user.get("real_name")
+                        or user.get("name")
+                        or user_id
+                    )
+                    text = text.replace(f"<@{user_id}>", display_name)
             except Exception as e:
                 logger.warning(f"Failed to fetch user info for {user_id}: {e}")
                 # Leave the user ID as-is if we can't fetch the name

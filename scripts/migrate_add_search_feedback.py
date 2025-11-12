@@ -71,13 +71,15 @@ def migrate():
 
             expansions = []
             for original, expanded, exp_type in synonyms:
-                expansions.append(QueryExpansion(
-                    original_term=original.lower(),
-                    expanded_term=expanded.lower(),
-                    expansion_type=exp_type,
-                    confidence_score=1.0,
-                    is_active=True
-                ))
+                expansions.append(
+                    QueryExpansion(
+                        original_term=original.lower(),
+                        expanded_term=expanded.lower(),
+                        expansion_type=exp_type,
+                        confidence_score=1.0,
+                        is_active=True,
+                    )
+                )
 
             session.add_all(expansions)
             session.commit()

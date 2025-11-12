@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 bind = f"0.0.0.0:{os.getenv('PORT', '8080')}"
 workers = 4
 timeout = 120
-worker_class = 'sync'
+worker_class = "sync"
 
 # Logging
-loglevel = 'info'
-accesslog = '-'
-errorlog = '-'
+loglevel = "info"
+accesslog = "-"
+errorlog = "-"
 
 
 def post_worker_init(worker):
@@ -33,7 +33,7 @@ def post_worker_init(worker):
         from urllib.parse import urlparse
 
         # Get database connection
-        database_url = os.getenv('DATABASE_URL', 'postgresql://localhost/agent_pm')
+        database_url = os.getenv("DATABASE_URL", "postgresql://localhost/agent_pm")
 
         # Parse database URL
         parsed = urlparse(database_url)
@@ -44,7 +44,7 @@ def post_worker_init(worker):
             port=parsed.port or 5432,
             user=parsed.username,
             password=parsed.password,
-            database=parsed.path.lstrip('/')
+            database=parsed.path.lstrip("/"),
         )
         conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
         cursor = conn.cursor()
@@ -56,8 +56,12 @@ def post_worker_init(worker):
 
         if acquired:
             logger.info(f"✓ Worker {worker.pid} acquired PostgreSQL advisory lock")
-            logger.info(f"ℹ️  Old scheduler DISABLED - all scheduled tasks now run via Celery Beat")
-            logger.info(f"ℹ️  See src/tasks/celery_app.py for current Celery Beat schedule")
+            logger.info(
+                f"ℹ️  Old scheduler DISABLED - all scheduled tasks now run via Celery Beat"
+            )
+            logger.info(
+                f"ℹ️  See src/tasks/celery_app.py for current Celery Beat schedule"
+            )
 
             # Store connection in worker to keep lock alive (for future use if needed)
             worker.scheduler_db_conn = conn
@@ -73,9 +77,13 @@ def post_worker_init(worker):
             # from src.services.scheduler import start_scheduler
             # start_scheduler()
 
-            logger.info(f"✓ Worker {worker.pid} initialized (scheduler runs in Celery Beat)")
+            logger.info(
+                f"✓ Worker {worker.pid} initialized (scheduler runs in Celery Beat)"
+            )
         else:
-            logger.info(f"Worker {worker.pid} - scheduler already running in another worker")
+            logger.info(
+                f"Worker {worker.pid} - scheduler already running in another worker"
+            )
             cursor.close()
             conn.close()
 
@@ -86,7 +94,10 @@ def post_worker_init(worker):
         if worker.age == 0:
             try:
                 from src.services.scheduler import start_scheduler
-                logger.info(f"Starting scheduler in worker {worker.pid} (fallback mode)")
+
+                logger.info(
+                    f"Starting scheduler in worker {worker.pid} (fallback mode)"
+                )
                 start_scheduler()
             except Exception as e2:
                 logger.error(f"Failed to start scheduler: {e2}")
@@ -107,13 +118,17 @@ def worker_exit(server, worker):
 
             # Release the PostgreSQL advisory lock if we hold it
             try:
-                if hasattr(worker, 'scheduler_db_cursor') and hasattr(worker, 'scheduler_db_conn'):
+                if hasattr(worker, "scheduler_db_cursor") and hasattr(
+                    worker, "scheduler_db_conn"
+                ):
                     cursor = worker.scheduler_db_cursor
                     conn = worker.scheduler_db_conn
 
                     # Release advisory lock
                     cursor.execute("SELECT pg_advisory_unlock(987654321)")
-                    logger.info(f"Released PostgreSQL advisory lock from worker {worker.pid}")
+                    logger.info(
+                        f"Released PostgreSQL advisory lock from worker {worker.pid}"
+                    )
 
                     cursor.close()
                     conn.close()

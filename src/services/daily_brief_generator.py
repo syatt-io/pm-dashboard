@@ -26,7 +26,9 @@ class DailyBriefGenerator:
         self.db = db
         self.notification_manager = NotificationManager(settings)
 
-    def generate_brief_for_user(self, user: User, insights: List[ProactiveInsight]) -> Dict[str, Any]:
+    def generate_brief_for_user(
+        self, user: User, insights: List[ProactiveInsight]
+    ) -> Dict[str, Any]:
         """Generate daily brief for a user.
 
         Args:
@@ -38,33 +40,37 @@ class DailyBriefGenerator:
         """
         if not insights:
             return {
-                'has_content': False,
-                'slack_text': None,
-                'email_html': None,
-                'email_subject': None
+                "has_content": False,
+                "slack_text": None,
+                "email_html": None,
+                "email_subject": None,
             }
 
         # Group insights by severity
-        critical = [i for i in insights if i.severity == 'critical']
-        warning = [i for i in insights if i.severity == 'warning']
-        info = [i for i in insights if i.severity == 'info']
+        critical = [i for i in insights if i.severity == "critical"]
+        warning = [i for i in insights if i.severity == "warning"]
+        info = [i for i in insights if i.severity == "info"]
 
         # Limit to top 5 insights (prevent overwhelm)
         top_insights = (critical + warning + info)[:5]
 
         # Generate Slack format
-        slack_text = self._format_slack_brief(user, top_insights, critical, warning, info)
+        slack_text = self._format_slack_brief(
+            user, top_insights, critical, warning, info
+        )
 
         # Generate Email format
-        email_html = self._format_email_brief(user, top_insights, critical, warning, info)
+        email_html = self._format_email_brief(
+            user, top_insights, critical, warning, info
+        )
         email_subject = f"🌅 Daily Brief - {len(top_insights)} insight{'s' if len(top_insights) != 1 else ''} for you"
 
         return {
-            'has_content': True,
-            'slack_text': slack_text,
-            'email_html': email_html,
-            'email_subject': email_subject,
-            'insight_count': len(top_insights)
+            "has_content": True,
+            "slack_text": slack_text,
+            "email_html": email_html,
+            "email_subject": email_subject,
+            "insight_count": len(top_insights),
         }
 
     def _format_slack_brief(
@@ -73,7 +79,7 @@ class DailyBriefGenerator:
         top_insights: List[ProactiveInsight],
         critical: List[ProactiveInsight],
         warning: List[ProactiveInsight],
-        info: List[ProactiveInsight]
+        info: List[ProactiveInsight],
     ) -> str:
         """Format brief for Slack delivery.
 
@@ -87,7 +93,9 @@ class DailyBriefGenerator:
         Returns:
             Formatted Slack message
         """
-        lines = [f"🌅 *Good morning, {user.name.split()[0]}!* Here's what you need to know:\n"]
+        lines = [
+            f"🌅 *Good morning, {user.name.split()[0]}!* Here's what you need to know:\n"
+        ]
 
         # Critical section
         if critical:
@@ -111,7 +119,11 @@ class DailyBriefGenerator:
                 lines.append(f"  _{insight.description}_\n")
 
         # Footer
-        dashboard_url = f"{settings.app.base_url}/insights" if hasattr(settings.app, 'base_url') else None
+        dashboard_url = (
+            f"{settings.app.base_url}/insights"
+            if hasattr(settings.app, "base_url")
+            else None
+        )
         if dashboard_url:
             lines.append(f"\n<{dashboard_url}|View details in dashboard>")
 
@@ -123,7 +135,7 @@ class DailyBriefGenerator:
         top_insights: List[ProactiveInsight],
         critical: List[ProactiveInsight],
         warning: List[ProactiveInsight],
-        info: List[ProactiveInsight]
+        info: List[ProactiveInsight],
     ) -> str:
         """Format brief for email delivery.
 
@@ -164,7 +176,9 @@ class DailyBriefGenerator:
             <body>
                 <div class="container">
                     <div class="header">
-                        <h1>🌅 Good Morning, """ + user.name.split()[0] + """!</h1>
+                        <h1>🌅 Good Morning, """
+            + user.name.split()[0]
+            + """!</h1>
                         <p>Here's what you need to know today</p>
                     </div>
                     <div class="content">
@@ -175,38 +189,49 @@ class DailyBriefGenerator:
         if critical:
             html_parts.append('<h2 style="color: #dc3545;">🔴 Critical</h2>')
             for insight in critical:
-                html_parts.append(f'''
+                html_parts.append(
+                    f"""
                     <div class="insight critical">
                         <div class="insight-title">{insight.title}</div>
                         <div class="insight-desc">{insight.description}</div>
                     </div>
-                ''')
+                """
+                )
 
         # Warning insights
         if warning:
             html_parts.append('<h2 style="color: #ffc107;">🟡 Warning</h2>')
             for insight in warning:
-                html_parts.append(f'''
+                html_parts.append(
+                    f"""
                     <div class="insight warning">
                         <div class="insight-title">{insight.title}</div>
                         <div class="insight-desc">{insight.description}</div>
                     </div>
-                ''')
+                """
+                )
 
         # Info insights
         if info:
             html_parts.append('<h2 style="color: #17a2b8;">ℹ️ Info</h2>')
             for insight in info:
-                html_parts.append(f'''
+                html_parts.append(
+                    f"""
                     <div class="insight info">
                         <div class="insight-title">{insight.title}</div>
                         <div class="insight-desc">{insight.description}</div>
                     </div>
-                ''')
+                """
+                )
 
         # Footer
-        dashboard_url = f"{settings.app.base_url}/insights" if hasattr(settings.app, 'base_url') else "#"
-        html_parts.append(f'''
+        dashboard_url = (
+            f"{settings.app.base_url}/insights"
+            if hasattr(settings.app, "base_url")
+            else "#"
+        )
+        html_parts.append(
+            f"""
                     <div style="text-align: center; margin-top: 20px;">
                         <a href="{dashboard_url}" class="button">View Dashboard</a>
                     </div>
@@ -220,7 +245,8 @@ class DailyBriefGenerator:
             </div>
             </body>
             </html>
-        ''')
+        """
+        )
 
         return "".join(html_parts)
 
@@ -234,15 +260,17 @@ class DailyBriefGenerator:
         Returns:
             Dictionary with delivery status per channel
         """
-        if not brief['has_content']:
-            return {'slack': False, 'email': False}
+        if not brief["has_content"]:
+            return {"slack": False, "email": False}
 
-        results = {'slack': False, 'email': False}
+        results = {"slack": False, "email": False}
 
         # Get user preferences
-        prefs = self.db.query(UserNotificationPreferences).filter(
-            UserNotificationPreferences.user_id == user.id
-        ).first()
+        prefs = (
+            self.db.query(UserNotificationPreferences)
+            .filter(UserNotificationPreferences.user_id == user.id)
+            .first()
+        )
 
         # If no preferences set, use defaults (Slack enabled, Email disabled)
         deliver_slack = prefs.daily_brief_slack if prefs else True
@@ -253,13 +281,17 @@ class DailyBriefGenerator:
             try:
                 # Run async method synchronously
                 result = asyncio.run(
-                    self.notification_manager._send_slack_dm(user.slack_user_id, brief['slack_text'])
+                    self.notification_manager._send_slack_dm(
+                        user.slack_user_id, brief["slack_text"]
+                    )
                 )
-                results['slack'] = result.get('success', False)
-                if results['slack']:
+                results["slack"] = result.get("success", False)
+                if results["slack"]:
                     logger.info(f"Delivered Slack brief to user {user.id}")
                 else:
-                    logger.error(f"Failed to deliver Slack brief to user {user.id}: {result.get('error')}")
+                    logger.error(
+                        f"Failed to deliver Slack brief to user {user.id}: {result.get('error')}"
+                    )
             except Exception as e:
                 logger.error(f"Error delivering Slack brief to user {user.id}: {e}")
 
@@ -278,28 +310,36 @@ class DailyBriefGenerator:
                 smtp_config = self.notification_manager.smtp_config
                 if smtp_config:
                     msg = MIMEMultipart("alternative")
-                    msg["Subject"] = brief['email_subject']
-                    msg["From"] = f"{smtp_config['from_name']} <{smtp_config['from_email']}>"
+                    msg["Subject"] = brief["email_subject"]
+                    msg["From"] = (
+                        f"{smtp_config['from_name']} <{smtp_config['from_email']}>"
+                    )
                     msg["To"] = user.email
 
-                    part = MIMEText(brief['email_html'], "html")
+                    part = MIMEText(brief["email_html"], "html")
                     msg.attach(part)
 
-                    with smtplib.SMTP(smtp_config["host"], smtp_config["port"]) as server:
+                    with smtplib.SMTP(
+                        smtp_config["host"], smtp_config["port"]
+                    ) as server:
                         server.starttls()
                         server.login(smtp_config["user"], smtp_config["password"])
                         server.send_message(msg)
 
-                    results['email'] = True
+                    results["email"] = True
                     logger.info(f"Delivered email brief to user {user.id}")
                 else:
-                    logger.warning(f"SMTP not configured, cannot send email to user {user.id}")
+                    logger.warning(
+                        f"SMTP not configured, cannot send email to user {user.id}"
+                    )
             except Exception as e:
                 logger.error(f"Error delivering email brief to user {user.id}: {e}")
 
         return results
 
-    def mark_insights_delivered(self, insights: List[ProactiveInsight], via_slack: bool, via_email: bool):
+    def mark_insights_delivered(
+        self, insights: List[ProactiveInsight], via_slack: bool, via_email: bool
+    ):
         """Mark insights as delivered.
 
         Args:
@@ -331,11 +371,11 @@ def send_daily_briefs() -> Dict[str, Any]:
     from src.services.insight_detector import InsightDetector
 
     stats = {
-        'users_processed': 0,
-        'briefs_sent_slack': 0,
-        'briefs_sent_email': 0,
-        'total_insights_delivered': 0,
-        'errors': []
+        "users_processed": 0,
+        "briefs_sent_slack": 0,
+        "briefs_sent_email": 0,
+        "total_insights_delivered": 0,
+        "errors": [],
     }
 
     db = next(get_db())
@@ -358,7 +398,7 @@ def send_daily_briefs() -> Dict[str, Any]:
                 generator = DailyBriefGenerator(db)
                 brief = generator.generate_brief_for_user(user, insights)
 
-                if not brief['has_content']:
+                if not brief["has_content"]:
                     continue
 
                 # Deliver brief
@@ -367,28 +407,30 @@ def send_daily_briefs() -> Dict[str, Any]:
                 # Mark insights as delivered
                 generator.mark_insights_delivered(
                     insights,
-                    via_slack=delivery_results['slack'],
-                    via_email=delivery_results['email']
+                    via_slack=delivery_results["slack"],
+                    via_email=delivery_results["email"],
                 )
 
                 # Update stats
-                if delivery_results['slack']:
-                    stats['briefs_sent_slack'] += 1
-                if delivery_results['email']:
-                    stats['briefs_sent_email'] += 1
-                stats['total_insights_delivered'] += len(insights)
-                stats['users_processed'] += 1
+                if delivery_results["slack"]:
+                    stats["briefs_sent_slack"] += 1
+                if delivery_results["email"]:
+                    stats["briefs_sent_email"] += 1
+                stats["total_insights_delivered"] += len(insights)
+                stats["users_processed"] += 1
 
             except Exception as e:
-                logger.error(f"Error sending brief to user {user.id}: {e}", exc_info=True)
-                stats['errors'].append(f"User {user.id}: {str(e)}")
+                logger.error(
+                    f"Error sending brief to user {user.id}: {e}", exc_info=True
+                )
+                stats["errors"].append(f"User {user.id}: {str(e)}")
                 continue
 
         logger.info(f"Daily brief delivery complete: {stats}")
 
     except Exception as e:
         logger.error(f"Error in daily brief job: {e}", exc_info=True)
-        stats['errors'].append(str(e))
+        stats["errors"].append(str(e))
     finally:
         db.close()
 

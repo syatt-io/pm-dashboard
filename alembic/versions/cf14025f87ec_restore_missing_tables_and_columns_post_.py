@@ -5,6 +5,7 @@ Revises: def376e3c089
 Create Date: 2025-11-10 08:24:34.889774
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +13,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'cf14025f87ec'
-down_revision: Union[str, Sequence[str], None] = 'def376e3c089'
+revision: str = "cf14025f87ec"
+down_revision: Union[str, Sequence[str], None] = "def376e3c089"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -31,18 +32,21 @@ def upgrade() -> None:
     ensures consistency for new environments.
     """
     # Create vector-sync-status table if it doesn't exist
-    op.execute("""
+    op.execute(
+        """
         CREATE TABLE IF NOT EXISTS "vector-sync-status" (
             source TEXT NOT NULL PRIMARY KEY,
             last_sync TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    """
+    )
 
     # Add cumulative_hours to projects table if it doesn't exist
     # Using raw SQL with IF NOT EXISTS check
-    op.execute("""
+    op.execute(
+        """
         DO $$
         BEGIN
             IF NOT EXISTS (
@@ -52,10 +56,12 @@ def upgrade() -> None:
                 ALTER TABLE projects ADD COLUMN cumulative_hours NUMERIC(10, 2) DEFAULT 0;
             END IF;
         END $$;
-    """)
+    """
+    )
 
     # Ensure other critical columns exist in projects table
-    op.execute("""
+    op.execute(
+        """
         DO $$
         BEGIN
             -- project_work_type
@@ -122,7 +128,8 @@ def upgrade() -> None:
                 ALTER TABLE projects ADD COLUMN launch_date DATE;
             END IF;
         END $$;
-    """)
+    """
+    )
 
 
 def downgrade() -> None:
@@ -135,7 +142,8 @@ def downgrade() -> None:
     op.execute('DROP TABLE IF EXISTS "vector-sync-status"')
 
     # Remove columns from projects table
-    op.execute("""
+    op.execute(
+        """
         ALTER TABLE projects
         DROP COLUMN IF EXISTS cumulative_hours,
         DROP COLUMN IF EXISTS launch_date,
@@ -146,4 +154,5 @@ def downgrade() -> None:
         DROP COLUMN IF EXISTS retainer_hours,
         DROP COLUMN IF EXISTS total_hours,
         DROP COLUMN IF EXISTS project_work_type
-    """)
+    """
+    )

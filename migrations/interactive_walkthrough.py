@@ -12,7 +12,7 @@ def simulate_interactive_decisions():
     """Simulate the interactive decision-making process."""
 
     print("🎭 INTERACTIVE MODE WALKTHROUGH")
-    print("="*50)
+    print("=" * 50)
     print("This simulates the decisions you would make in interactive mode\n")
 
     # Mock decisions for each action item
@@ -27,27 +27,22 @@ def simulate_interactive_decisions():
                 "assignee": "Mike Samimi",
                 "priority": "High",
                 "jira_project": "SNUGGLE",
-                "issue_type": "Task"
-            }
+                "issue_type": "Task",
+            },
         },
         {
             "action": "Investigate Partial Fulfillments",
             "assignee": "Jessica Dutton",
             "user_choice": "jira",
             "reasoning": "Feature investigation needs proper tracking",
-            "modifications": {
-                "jira_project": "SNUGGLE",
-                "issue_type": "Story"
-            }
+            "modifications": {"jira_project": "SNUGGLE", "issue_type": "Story"},
         },
         {
             "action": "Follow up on UI updates",
             "assignee": "Mike Samimi",
             "user_choice": "todo",
             "reasoning": "Simple follow-up, doesn't need formal ticket",
-            "modifications": {
-                "due_date": "2025-09-25"
-            }
+            "modifications": {"due_date": "2025-09-25"},
         },
         {
             "action": "Investigate Special Order App",
@@ -57,18 +52,16 @@ def simulate_interactive_decisions():
             "modifications": {
                 "priority": "High",
                 "jira_project": "SNUGGLE",
-                "issue_type": "Bug"
-            }
+                "issue_type": "Bug",
+            },
         },
         {
             "action": "Follow up on Registry Report",
             "assignee": "Mike Samimi",
             "user_choice": "todo",
             "reasoning": "Status check, better as TODO",
-            "modifications": {
-                "due_date": "2025-09-24"
-            }
-        }
+            "modifications": {"due_date": "2025-09-24"},
+        },
     ]
 
     print("👤 USER DECISIONS SIMULATION:")
@@ -83,49 +76,49 @@ def simulate_interactive_decisions():
         print(f"   👤 User chooses: {decision['user_choice'].upper()}")
         print(f"   💭 Reasoning: {decision['reasoning']}")
 
-        if decision['user_choice'] == 'jira':
+        if decision["user_choice"] == "jira":
             jira_count += 1
-            mods = decision.get('modifications', {})
+            mods = decision.get("modifications", {})
             if mods:
                 print(f"   ✏️  Modifications:")
                 for key, value in mods.items():
                     print(f"      • {key}: {value}")
         else:
             todo_count += 1
-            mods = decision.get('modifications', {})
+            mods = decision.get("modifications", {})
             if mods:
                 print(f"   ✏️  Modifications:")
                 for key, value in mods.items():
                     print(f"      • {key}: {value}")
 
-    print(f"\n" + "="*50)
+    print(f"\n" + "=" * 50)
     print("📊 FINAL CONFIRMATION")
-    print("="*50)
+    print("=" * 50)
 
     print(f"\n✅ Will create {jira_count} Jira tickets:")
     for decision in decisions:
-        if decision['user_choice'] == 'jira':
-            mods = decision.get('modifications', {})
-            title = mods.get('title', decision['action'])
-            project = mods.get('jira_project', 'PM')
-            assignee = mods.get('assignee', decision['assignee'])
-            issue_type = mods.get('issue_type', 'Task')
+        if decision["user_choice"] == "jira":
+            mods = decision.get("modifications", {})
+            title = mods.get("title", decision["action"])
+            project = mods.get("jira_project", "PM")
+            assignee = mods.get("assignee", decision["assignee"])
+            issue_type = mods.get("issue_type", "Task")
             print(f"   • [{project}] {title} ({issue_type}) → {assignee}")
 
     print(f"\n📝 Will add {todo_count} TODO items:")
     for decision in decisions:
-        if decision['user_choice'] == 'todo':
-            mods = decision.get('modifications', {})
-            title = mods.get('title', decision['action'])
-            due = mods.get('due_date', 'No due date')
-            assignee = mods.get('assignee', decision['assignee'])
+        if decision["user_choice"] == "todo":
+            mods = decision.get("modifications", {})
+            title = mods.get("title", decision["action"])
+            due = mods.get("due_date", "No due date")
+            assignee = mods.get("assignee", decision["assignee"])
             print(f"   • {title} → {assignee} (Due: {due})")
 
     print(f"\n👤 User confirms: ✅ YES, proceed with creation")
 
-    print(f"\n" + "="*50)
+    print(f"\n" + "=" * 50)
     print("🚀 SIMULATED EXECUTION")
-    print("="*50)
+    print("=" * 50)
 
     print("\n✅ Results:")
     print("   • 3 Jira tickets created successfully")
@@ -134,18 +127,18 @@ def simulate_interactive_decisions():
     print("   • Meeting marked as processed")
 
     return {
-        'jira_tickets': jira_count,
-        'todo_items': todo_count,
-        'decisions': decisions
+        "jira_tickets": jira_count,
+        "todo_items": todo_count,
+        "decisions": decisions,
     }
 
 
 async def show_actual_vs_interactive():
     """Compare automated vs interactive processing."""
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔄 AUTOMATED vs INTERACTIVE COMPARISON")
-    print("="*60)
+    print("=" * 60)
 
     # Get real analysis
     fireflies = FirefliesClient(settings.fireflies.api_key)
@@ -155,16 +148,14 @@ async def show_actual_vs_interactive():
     snuggle_meeting = None
 
     for meeting in meetings:
-        if "snuggle" in meeting.get('title', '').lower():
+        if "snuggle" in meeting.get("title", "").lower():
             snuggle_meeting = meeting
             break
 
     if snuggle_meeting:
-        transcript = fireflies.get_meeting_transcript(snuggle_meeting['id'])
+        transcript = fireflies.get_meeting_transcript(snuggle_meeting["id"])
         analysis = analyzer.analyze_transcript(
-            transcript.transcript,
-            snuggle_meeting['title'],
-            transcript.date
+            transcript.transcript, snuggle_meeting["title"], transcript.date
         )
 
         print("\n🤖 AUTOMATED MODE (what agent would do automatically):")
@@ -196,9 +187,9 @@ if __name__ == "__main__":
     # Show comparison
     asyncio.run(show_actual_vs_interactive())
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🎯 HOW TO USE INTERACTIVE MODE")
-    print("="*60)
+    print("=" * 60)
     print("\n1. Run: python main_interactive.py")
     print("2. Select meeting from list (or use --meeting-id)")
     print("3. Review AI analysis and action items")

@@ -19,22 +19,26 @@ sys.path.insert(0, str(project_root))
 import logging
 from datetime import datetime, timezone
 from src.utils.database import get_db
-from src.models import User, ProactiveInsight, UserNotificationPreferences, UserWatchedProject
+from src.models import (
+    User,
+    ProactiveInsight,
+    UserNotificationPreferences,
+    UserWatchedProject,
+)
 from src.services.insight_detector import InsightDetector, detect_insights_for_all_users
 from src.services.daily_brief_generator import DailyBriefGenerator, send_daily_briefs
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
 def test_database_connection():
     """Test database connection and models."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 1: Database Connection")
-    print("="*60)
+    print("=" * 60)
 
     db = next(get_db())
     try:
@@ -60,9 +64,9 @@ def test_database_connection():
 
 def test_insight_detection(user_id=None):
     """Test insight detection for a specific user or all users."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 2: Insight Detection")
-    print("="*60)
+    print("=" * 60)
 
     db = next(get_db())
     try:
@@ -80,7 +84,9 @@ def test_insight_detection(user_id=None):
 
             print(f"✓ Detected {len(insights)} insights:")
             for insight in insights:
-                print(f"  - [{insight.severity.upper()}] {insight.insight_type}: {insight.title}")
+                print(
+                    f"  - [{insight.severity.upper()}] {insight.insight_type}: {insight.title}"
+                )
 
             if insights:
                 # Store insights
@@ -95,9 +101,9 @@ def test_insight_detection(user_id=None):
             print(f"✓ Detected {stats['insights_detected']} insights")
             print(f"✓ Stored {stats['insights_stored']} insights")
 
-            if stats['errors']:
+            if stats["errors"]:
                 print(f"✗ Errors occurred:")
-                for error in stats['errors']:
+                for error in stats["errors"]:
                     print(f"  - {error}")
 
         return True
@@ -111,9 +117,9 @@ def test_insight_detection(user_id=None):
 
 def test_brief_generation(user_id):
     """Test brief generation for a specific user."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 3: Brief Generation")
-    print("="*60)
+    print("=" * 60)
 
     db = next(get_db())
     try:
@@ -141,7 +147,7 @@ def test_brief_generation(user_id):
                 description="This is a test insight for brief generation",
                 severity="info",
                 metadata_json={"test": True},
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(timezone.utc),
             )
             db.add(test_insight)
             db.commit()
@@ -151,12 +157,12 @@ def test_brief_generation(user_id):
         generator = DailyBriefGenerator(db)
         brief = generator.generate_brief_for_user(user, insights)
 
-        if brief['has_content']:
+        if brief["has_content"]:
             print("✓ Brief generated successfully")
             print(f"  Insight count: {brief['insight_count']}")
             print(f"  Subject: {brief['email_subject']}")
             print(f"\n--- Slack Preview (first 200 chars) ---")
-            print(brief['slack_text'][:200] + "...")
+            print(brief["slack_text"][:200] + "...")
         else:
             print("✗ Brief generation returned no content")
             return False
@@ -172,9 +178,9 @@ def test_brief_generation(user_id):
 
 def test_brief_delivery(user_id, test_email_only=True):
     """Test brief delivery (with option to test email only to avoid spamming Slack)."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 4: Brief Delivery")
-    print("="*60)
+    print("=" * 60)
 
     db = next(get_db())
     try:
@@ -197,14 +203,16 @@ def test_brief_delivery(user_id, test_email_only=True):
         generator = DailyBriefGenerator(db)
         brief = generator.generate_brief_for_user(user, insights)
 
-        if not brief['has_content']:
+        if not brief["has_content"]:
             print("✗ No brief content to deliver")
             return False
 
         # Temporarily modify preferences for testing if needed
-        prefs = db.query(UserNotificationPreferences).filter(
-            UserNotificationPreferences.user_id == user.id
-        ).first()
+        prefs = (
+            db.query(UserNotificationPreferences)
+            .filter(UserNotificationPreferences.user_id == user.id)
+            .first()
+        )
 
         original_slack = None
         if test_email_only and prefs:
@@ -221,11 +229,9 @@ def test_brief_delivery(user_id, test_email_only=True):
         print(f"  Email: {'✓' if results['email'] else '✗'}")
 
         # Mark as delivered if any channel succeeded
-        if results['slack'] or results['email']:
+        if results["slack"] or results["email"]:
             generator.mark_insights_delivered(
-                insights,
-                via_slack=results['slack'],
-                via_email=results['email']
+                insights, via_slack=results["slack"], via_email=results["email"]
             )
             print(f"✓ Marked {len(insights)} insights as delivered")
 
@@ -245,9 +251,9 @@ def test_brief_delivery(user_id, test_email_only=True):
 
 def test_full_pipeline(user_id):
     """Test the full pipeline: detect → generate → deliver."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("TEST 5: Full Pipeline")
-    print("="*60)
+    print("=" * 60)
 
     print("Running full pipeline test...")
 
@@ -269,15 +275,17 @@ def test_full_pipeline(user_id):
 
 def cleanup_test_insights():
     """Clean up test insights created during testing."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("CLEANUP: Removing Test Insights")
-    print("="*60)
+    print("=" * 60)
 
     db = next(get_db())
     try:
-        test_insights = db.query(ProactiveInsight).filter(
-            ProactiveInsight.id.like('test-insight-%')
-        ).all()
+        test_insights = (
+            db.query(ProactiveInsight)
+            .filter(ProactiveInsight.id.like("test-insight-%"))
+            .all()
+        )
 
         count = len(test_insights)
         for insight in test_insights:
@@ -299,17 +307,23 @@ def main():
     """Main test runner."""
     import argparse
 
-    parser = argparse.ArgumentParser(description='Test Proactive Insights (Phase 3.1)')
-    parser.add_argument('--user-id', type=int, help='User ID to test with')
-    parser.add_argument('--test', choices=['all', 'db', 'detect', 'generate', 'deliver', 'pipeline'],
-                      default='all', help='Which test to run')
-    parser.add_argument('--cleanup', action='store_true', help='Clean up test data after running')
+    parser = argparse.ArgumentParser(description="Test Proactive Insights (Phase 3.1)")
+    parser.add_argument("--user-id", type=int, help="User ID to test with")
+    parser.add_argument(
+        "--test",
+        choices=["all", "db", "detect", "generate", "deliver", "pipeline"],
+        default="all",
+        help="Which test to run",
+    )
+    parser.add_argument(
+        "--cleanup", action="store_true", help="Clean up test data after running"
+    )
 
     args = parser.parse_args()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("PHASE 3.1: PROACTIVE INSIGHTS TEST SUITE")
-    print("="*60)
+    print("=" * 60)
 
     # Get first active user if no user_id provided
     if not args.user_id:
@@ -327,37 +341,37 @@ def main():
 
     success = True
 
-    if args.test == 'all':
+    if args.test == "all":
         success = (
-            test_database_connection() and
-            test_insight_detection(args.user_id) and
-            test_brief_generation(args.user_id) and
-            test_brief_delivery(args.user_id, test_email_only=True) and
-            test_full_pipeline(args.user_id)
+            test_database_connection()
+            and test_insight_detection(args.user_id)
+            and test_brief_generation(args.user_id)
+            and test_brief_delivery(args.user_id, test_email_only=True)
+            and test_full_pipeline(args.user_id)
         )
-    elif args.test == 'db':
+    elif args.test == "db":
         success = test_database_connection()
-    elif args.test == 'detect':
+    elif args.test == "detect":
         success = test_insight_detection(args.user_id)
-    elif args.test == 'generate':
+    elif args.test == "generate":
         success = test_brief_generation(args.user_id)
-    elif args.test == 'deliver':
+    elif args.test == "deliver":
         success = test_brief_delivery(args.user_id, test_email_only=False)
-    elif args.test == 'pipeline':
+    elif args.test == "pipeline":
         success = test_full_pipeline(args.user_id)
 
     if args.cleanup:
         cleanup_test_insights()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     if success:
         print("✓ ALL TESTS PASSED")
     else:
         print("✗ SOME TESTS FAILED")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     return 0 if success else 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

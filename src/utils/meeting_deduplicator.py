@@ -19,10 +19,10 @@ class MeetingDeduplicator:
 
     def __init__(self):
         self.stats = {
-            'total': 0,
-            'exact_duplicates_removed': 0,
-            'fuzzy_duplicates_removed': 0,
-            'final_count': 0
+            "total": 0,
+            "exact_duplicates_removed": 0,
+            "fuzzy_duplicates_removed": 0,
+            "final_count": 0,
         }
 
     def deduplicate(self, meetings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -38,24 +38,28 @@ class MeetingDeduplicator:
         if not meetings:
             return []
 
-        self.stats['total'] = len(meetings)
+        self.stats["total"] = len(meetings)
         logger.info(f"Starting deduplication for {len(meetings)} meetings")
 
         # Phase 1: Remove exact duplicates by ID
         unique_by_id = self._remove_exact_duplicates(meetings)
-        self.stats['exact_duplicates_removed'] = len(meetings) - len(unique_by_id)
+        self.stats["exact_duplicates_removed"] = len(meetings) - len(unique_by_id)
 
-        if self.stats['exact_duplicates_removed'] > 0:
-            logger.info(f"Removed {self.stats['exact_duplicates_removed']} exact duplicate(s) by ID")
+        if self.stats["exact_duplicates_removed"] > 0:
+            logger.info(
+                f"Removed {self.stats['exact_duplicates_removed']} exact duplicate(s) by ID"
+            )
 
         # Phase 2: Remove fuzzy duplicates
         final_meetings = self._remove_fuzzy_duplicates(unique_by_id)
-        self.stats['fuzzy_duplicates_removed'] = len(unique_by_id) - len(final_meetings)
+        self.stats["fuzzy_duplicates_removed"] = len(unique_by_id) - len(final_meetings)
 
-        if self.stats['fuzzy_duplicates_removed'] > 0:
-            logger.info(f"Removed {self.stats['fuzzy_duplicates_removed']} fuzzy duplicate(s)")
+        if self.stats["fuzzy_duplicates_removed"] > 0:
+            logger.info(
+                f"Removed {self.stats['fuzzy_duplicates_removed']} fuzzy duplicate(s)"
+            )
 
-        self.stats['final_count'] = len(final_meetings)
+        self.stats["final_count"] = len(final_meetings)
 
         logger.info(
             f"Deduplication complete: {self.stats['total']} → {self.stats['final_count']} "
@@ -65,7 +69,9 @@ class MeetingDeduplicator:
 
         return final_meetings
 
-    def _remove_exact_duplicates(self, meetings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _remove_exact_duplicates(
+        self, meetings: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Remove meetings with duplicate Fireflies IDs, keeping the most complete one.
 
@@ -79,7 +85,7 @@ class MeetingDeduplicator:
         unique_meetings = []
 
         for meeting in meetings:
-            meeting_id = meeting.get('id')
+            meeting_id = meeting.get("id")
             if not meeting_id:
                 # No ID, keep it (shouldn't happen but be defensive)
                 unique_meetings.append(meeting)
@@ -97,7 +103,9 @@ class MeetingDeduplicator:
 
         return unique_meetings
 
-    def _remove_fuzzy_duplicates(self, meetings: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _remove_fuzzy_duplicates(
+        self, meetings: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Remove near-duplicate meetings using fuzzy matching.
 
@@ -167,16 +175,16 @@ class MeetingDeduplicator:
             True if meetings are similar, False otherwise
         """
         # Title matching (case-insensitive, normalized whitespace)
-        title1 = ' '.join(str(m1.get('title', '')).lower().split())
-        title2 = ' '.join(str(m2.get('title', '')).lower().split())
+        title1 = " ".join(str(m1.get("title", "")).lower().split())
+        title2 = " ".join(str(m2.get("title", "")).lower().split())
 
         if title1 != title2:
             return False
 
         # Date matching (within 5 minutes = 300 seconds)
         try:
-            date1 = m1.get('date')
-            date2 = m2.get('date')
+            date1 = m1.get("date")
+            date2 = m2.get("date")
 
             if date1 is None or date2 is None:
                 return False
@@ -202,8 +210,8 @@ class MeetingDeduplicator:
 
         # Duration matching (within 10%)
         try:
-            dur1 = m1.get('duration')
-            dur2 = m2.get('duration')
+            dur1 = m1.get("duration")
+            dur2 = m2.get("duration")
 
             if dur1 is None or dur2 is None:
                 # If both missing, consider it a match (already matched by title + date)
@@ -290,25 +298,27 @@ class MeetingDeduplicator:
         score = 0.0
 
         # Transcript completeness (highest priority)
-        sentences = meeting.get('sentences', [])
+        sentences = meeting.get("sentences", [])
         if sentences:
             sentence_count = len(sentences) if isinstance(sentences, list) else 0
             score += sentence_count * 1.0
         else:
             # If no sentences in this object, check if it has transcript data flag
             # (full transcript might be loaded separately)
-            if meeting.get('has_transcript', False):
+            if meeting.get("has_transcript", False):
                 score += 100.0
 
         # Participant count (second priority)
-        participants = meeting.get('participants', [])
+        participants = meeting.get("participants", [])
         if participants:
-            participant_count = len(participants) if isinstance(participants, list) else 0
+            participant_count = (
+                len(participants) if isinstance(participants, list) else 0
+            )
             score += participant_count * 50.0
 
         # Recency (third priority, small weight)
         try:
-            date = meeting.get('date')
+            date = meeting.get("date")
             if date:
                 if isinstance(date, datetime):
                     timestamp = date.timestamp()

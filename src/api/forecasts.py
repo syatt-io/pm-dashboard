@@ -12,11 +12,11 @@ import io
 
 logger = logging.getLogger(__name__)
 
-forecasts_bp = Blueprint('forecasts', __name__, url_prefix='/api/forecasts')
+forecasts_bp = Blueprint("forecasts", __name__, url_prefix="/api/forecasts")
 forecasting_service = ForecastingService()
 
 
-@forecasts_bp.route('/calculate', methods=['POST'])
+@forecasts_bp.route("/calculate", methods=["POST"])
 def calculate_forecast():
     """
     Calculate a forecast based on project characteristics.
@@ -35,64 +35,80 @@ def calculate_forecast():
         data = request.json
 
         # Validate required fields
-        required_fields = ['be_integrations', 'custom_theme', 'custom_designs', 'ux_research', 'teams_selected', 'estimated_months']
+        required_fields = [
+            "be_integrations",
+            "custom_theme",
+            "custom_designs",
+            "ux_research",
+            "teams_selected",
+            "estimated_months",
+        ]
         for field in required_fields:
             if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+                return jsonify({"error": f"Missing required field: {field}"}), 400
 
         # Calculate forecast
         forecast_result = forecasting_service.calculate_forecast(
-            be_integrations=data['be_integrations'],
-            custom_theme=data['custom_theme'],
-            custom_designs=data['custom_designs'],
-            ux_research=data['ux_research'],
-            teams_selected=data['teams_selected'],
-            estimated_months=data['estimated_months']
+            be_integrations=data["be_integrations"],
+            custom_theme=data["custom_theme"],
+            custom_designs=data["custom_designs"],
+            ux_research=data["ux_research"],
+            teams_selected=data["teams_selected"],
+            estimated_months=data["estimated_months"],
         )
 
         return jsonify(forecast_result), 200
 
     except Exception as e:
         logger.error(f"Error calculating forecast: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@forecasts_bp.route('', methods=['GET'])
+@forecasts_bp.route("", methods=["GET"])
 def list_forecasts():
     """List all saved forecasts."""
     try:
         session = get_session()
-        forecasts = session.query(EpicForecast).order_by(EpicForecast.created_at.desc()).all()
+        forecasts = (
+            session.query(EpicForecast).order_by(EpicForecast.created_at.desc()).all()
+        )
 
-        return jsonify({
-            'forecasts': [
+        return (
+            jsonify(
                 {
-                    'id': f.id,
-                    'project_key': f.project_key,
-                    'epic_name': f.epic_name,
-                    'total_hours': f.total_hours,
-                    'estimated_months': f.estimated_months,
-                    'teams_selected': f.teams_selected,
-                    'characteristics': {
-                        'be_integrations': f.be_integrations,
-                        'custom_theme': f.custom_theme,
-                        'custom_designs': f.custom_designs,
-                        'ux_research': f.ux_research
-                    },
-                    'created_at': f.created_at.isoformat() if f.created_at else None
+                    "forecasts": [
+                        {
+                            "id": f.id,
+                            "project_key": f.project_key,
+                            "epic_name": f.epic_name,
+                            "total_hours": f.total_hours,
+                            "estimated_months": f.estimated_months,
+                            "teams_selected": f.teams_selected,
+                            "characteristics": {
+                                "be_integrations": f.be_integrations,
+                                "custom_theme": f.custom_theme,
+                                "custom_designs": f.custom_designs,
+                                "ux_research": f.ux_research,
+                            },
+                            "created_at": (
+                                f.created_at.isoformat() if f.created_at else None
+                            ),
+                        }
+                        for f in forecasts
+                    ]
                 }
-                for f in forecasts
-            ]
-        }), 200
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error listing forecasts: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 
-@forecasts_bp.route('', methods=['POST'])
+@forecasts_bp.route("", methods=["POST"])
 def save_forecast():
     """
     Save a new forecast.
@@ -117,37 +133,37 @@ def save_forecast():
         session = get_session()
 
         forecast = EpicForecast(
-            project_key=data['project_key'],
-            epic_name=data['epic_name'],
-            epic_description=data.get('epic_description'),
-            be_integrations=data['be_integrations'],
-            custom_theme=data['custom_theme'],
-            custom_designs=data['custom_designs'],
-            ux_research=data['ux_research'],
-            teams_selected=data['teams_selected'],
-            estimated_months=data['estimated_months'],
-            forecast_data=data['forecast_data'],
-            total_hours=data['total_hours'],
-            created_by=data.get('created_by')
+            project_key=data["project_key"],
+            epic_name=data["epic_name"],
+            epic_description=data.get("epic_description"),
+            be_integrations=data["be_integrations"],
+            custom_theme=data["custom_theme"],
+            custom_designs=data["custom_designs"],
+            ux_research=data["ux_research"],
+            teams_selected=data["teams_selected"],
+            estimated_months=data["estimated_months"],
+            forecast_data=data["forecast_data"],
+            total_hours=data["total_hours"],
+            created_by=data.get("created_by"),
         )
 
         session.add(forecast)
         session.commit()
 
-        return jsonify({
-            'id': forecast.id,
-            'message': 'Forecast saved successfully'
-        }), 201
+        return (
+            jsonify({"id": forecast.id, "message": "Forecast saved successfully"}),
+            201,
+        )
 
     except Exception as e:
         logger.error(f"Error saving forecast: {e}")
         session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 
-@forecasts_bp.route('/<int:forecast_id>', methods=['GET'])
+@forecasts_bp.route("/<int:forecast_id>", methods=["GET"])
 def get_forecast(forecast_id):
     """Get a specific forecast by ID."""
     try:
@@ -155,35 +171,44 @@ def get_forecast(forecast_id):
         forecast = session.query(EpicForecast).filter_by(id=forecast_id).first()
 
         if not forecast:
-            return jsonify({'error': 'Forecast not found'}), 404
+            return jsonify({"error": "Forecast not found"}), 404
 
-        return jsonify({
-            'id': forecast.id,
-            'project_key': forecast.project_key,
-            'epic_name': forecast.epic_name,
-            'epic_description': forecast.epic_description,
-            'characteristics': {
-                'be_integrations': forecast.be_integrations,
-                'custom_theme': forecast.custom_theme,
-                'custom_designs': forecast.custom_designs,
-                'ux_research': forecast.ux_research
-            },
-            'teams_selected': forecast.teams_selected,
-            'estimated_months': forecast.estimated_months,
-            'forecast_data': forecast.forecast_data,
-            'total_hours': forecast.total_hours,
-            'created_at': forecast.created_at.isoformat() if forecast.created_at else None,
-            'updated_at': forecast.updated_at.isoformat() if forecast.updated_at else None
-        }), 200
+        return (
+            jsonify(
+                {
+                    "id": forecast.id,
+                    "project_key": forecast.project_key,
+                    "epic_name": forecast.epic_name,
+                    "epic_description": forecast.epic_description,
+                    "characteristics": {
+                        "be_integrations": forecast.be_integrations,
+                        "custom_theme": forecast.custom_theme,
+                        "custom_designs": forecast.custom_designs,
+                        "ux_research": forecast.ux_research,
+                    },
+                    "teams_selected": forecast.teams_selected,
+                    "estimated_months": forecast.estimated_months,
+                    "forecast_data": forecast.forecast_data,
+                    "total_hours": forecast.total_hours,
+                    "created_at": (
+                        forecast.created_at.isoformat() if forecast.created_at else None
+                    ),
+                    "updated_at": (
+                        forecast.updated_at.isoformat() if forecast.updated_at else None
+                    ),
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error getting forecast: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 
-@forecasts_bp.route('/<int:forecast_id>', methods=['PUT'])
+@forecasts_bp.route("/<int:forecast_id>", methods=["PUT"])
 def update_forecast(forecast_id):
     """Update an existing forecast."""
     try:
@@ -193,29 +218,29 @@ def update_forecast(forecast_id):
         forecast = session.query(EpicForecast).filter_by(id=forecast_id).first()
 
         if not forecast:
-            return jsonify({'error': 'Forecast not found'}), 404
+            return jsonify({"error": "Forecast not found"}), 404
 
         # Update fields
-        if 'epic_name' in data:
-            forecast.epic_name = data['epic_name']
-        if 'epic_description' in data:
-            forecast.epic_description = data['epic_description']
-        if 'project_key' in data:
-            forecast.project_key = data['project_key']
+        if "epic_name" in data:
+            forecast.epic_name = data["epic_name"]
+        if "epic_description" in data:
+            forecast.epic_description = data["epic_description"]
+        if "project_key" in data:
+            forecast.project_key = data["project_key"]
 
         session.commit()
 
-        return jsonify({'message': 'Forecast updated successfully'}), 200
+        return jsonify({"message": "Forecast updated successfully"}), 200
 
     except Exception as e:
         logger.error(f"Error updating forecast: {e}")
         session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 
-@forecasts_bp.route('/<int:forecast_id>', methods=['DELETE'])
+@forecasts_bp.route("/<int:forecast_id>", methods=["DELETE"])
 def delete_forecast(forecast_id):
     """Delete a forecast."""
     try:
@@ -223,57 +248,51 @@ def delete_forecast(forecast_id):
         forecast = session.query(EpicForecast).filter_by(id=forecast_id).first()
 
         if not forecast:
-            return jsonify({'error': 'Forecast not found'}), 404
+            return jsonify({"error": "Forecast not found"}), 404
 
         session.delete(forecast)
         session.commit()
 
-        return jsonify({'message': 'Forecast deleted successfully'}), 200
+        return jsonify({"message": "Forecast deleted successfully"}), 200
 
     except Exception as e:
         logger.error(f"Error deleting forecast: {e}")
         session.rollback()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
 
 
-@forecasts_bp.route('/baselines', methods=['GET'])
+@forecasts_bp.route("/baselines", methods=["GET"])
 def get_baselines():
     """Get baseline hours for all teams based on integration requirement."""
     try:
-        be_integrations = request.args.get('be_integrations', 'false').lower() == 'true'
+        be_integrations = request.args.get("be_integrations", "false").lower() == "true"
 
         baselines = forecasting_service.get_baseline_info(be_integrations)
-        baseline_set = 'with_integration' if be_integrations else 'no_integration'
+        baseline_set = "with_integration" if be_integrations else "no_integration"
 
-        return jsonify({
-            'baseline_set': baseline_set,
-            'baselines': baselines
-        }), 200
+        return jsonify({"baseline_set": baseline_set, "baselines": baselines}), 200
 
     except Exception as e:
         logger.error(f"Error getting baselines: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@forecasts_bp.route('/lifecycle/<team>', methods=['GET'])
+@forecasts_bp.route("/lifecycle/<team>", methods=["GET"])
 def get_lifecycle(team):
     """Get lifecycle percentages for a specific team."""
     try:
         lifecycle = forecasting_service.get_lifecycle_info(team)
 
-        return jsonify({
-            'team': team,
-            'lifecycle': lifecycle
-        }), 200
+        return jsonify({"team": team, "lifecycle": lifecycle}), 200
 
     except Exception as e:
         logger.error(f"Error getting lifecycle info: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@forecasts_bp.route('/calculate-from-total', methods=['POST'])
+@forecasts_bp.route("/calculate-from-total", methods=["POST"])
 def calculate_from_total_hours():
     """
     Calculate team distribution from total hours budget.
@@ -296,33 +315,41 @@ def calculate_from_total_hours():
         data = request.json
 
         # Validate required fields
-        required_fields = ['total_hours', 'be_integrations', 'custom_theme', 'custom_designs', 'ux_research', 'teams_selected', 'estimated_months']
+        required_fields = [
+            "total_hours",
+            "be_integrations",
+            "custom_theme",
+            "custom_designs",
+            "ux_research",
+            "teams_selected",
+            "estimated_months",
+        ]
         for field in required_fields:
             if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+                return jsonify({"error": f"Missing required field: {field}"}), 400
 
         # Calculate distribution
         result = forecasting_service.calculate_from_total_hours(
-            total_hours=data['total_hours'],
-            be_integrations=data['be_integrations'],
-            custom_theme=data['custom_theme'],
-            custom_designs=data['custom_designs'],
-            ux_research=data['ux_research'],
-            teams_selected=data['teams_selected'],
-            estimated_months=data['estimated_months'],
-            extensive_customizations=data.get('extensive_customizations', 1),
-            project_oversight=data.get('project_oversight', 3),
-            start_date=data.get('start_date')
+            total_hours=data["total_hours"],
+            be_integrations=data["be_integrations"],
+            custom_theme=data["custom_theme"],
+            custom_designs=data["custom_designs"],
+            ux_research=data["ux_research"],
+            teams_selected=data["teams_selected"],
+            estimated_months=data["estimated_months"],
+            extensive_customizations=data.get("extensive_customizations", 1),
+            project_oversight=data.get("project_oversight", 3),
+            start_date=data.get("start_date"),
         )
 
         return jsonify(result), 200
 
     except Exception as e:
         logger.error(f"Error calculating team distribution: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@forecasts_bp.route('/export-combined-forecast', methods=['POST'])
+@forecasts_bp.route("/export-combined-forecast", methods=["POST"])
 def export_combined_forecast():
     """
     Export combined project forecast (team distribution + epic schedule) as CSV.
@@ -349,30 +376,38 @@ def export_combined_forecast():
         data = request.json
 
         # Validate required fields
-        required_fields = ['total_hours', 'be_integrations', 'custom_theme', 'custom_designs',
-                          'ux_research', 'teams_selected', 'estimated_months', 'start_date']
+        required_fields = [
+            "total_hours",
+            "be_integrations",
+            "custom_theme",
+            "custom_designs",
+            "ux_research",
+            "teams_selected",
+            "estimated_months",
+            "start_date",
+        ]
         for field in required_fields:
             if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+                return jsonify({"error": f"Missing required field: {field}"}), 400
 
         # Get team distribution data
         team_result = forecasting_service.calculate_from_total_hours(
-            total_hours=data['total_hours'],
-            be_integrations=data['be_integrations'],
-            custom_theme=data['custom_theme'],
-            custom_designs=data['custom_designs'],
-            ux_research=data['ux_research'],
-            teams_selected=data['teams_selected'],
-            estimated_months=data['estimated_months'],
-            extensive_customizations=data.get('extensive_customizations', 1),
-            project_oversight=data.get('project_oversight', 3)
+            total_hours=data["total_hours"],
+            be_integrations=data["be_integrations"],
+            custom_theme=data["custom_theme"],
+            custom_designs=data["custom_designs"],
+            ux_research=data["ux_research"],
+            teams_selected=data["teams_selected"],
+            estimated_months=data["estimated_months"],
+            extensive_customizations=data.get("extensive_customizations", 1),
+            project_oversight=data.get("project_oversight", 3),
         )
 
         # Get epic schedule data
         epic_schedule = generate_project_schedule(
-            total_hours=data['total_hours'],
-            duration_months=data['estimated_months'],
-            start_date=data['start_date']
+            total_hours=data["total_hours"],
+            duration_months=data["estimated_months"],
+            start_date=data["start_date"],
         )
 
         # Create CSV in memory
@@ -380,91 +415,104 @@ def export_combined_forecast():
         writer = csv.writer(output)
 
         # Section 1: Project Summary
-        writer.writerow(['PROJECT FORECAST SUMMARY'])
-        writer.writerow([''])
-        writer.writerow(['Total Hours', data['total_hours']])
-        writer.writerow(['Duration (Months)', data['estimated_months']])
-        writer.writerow(['Start Date', data['start_date']])
-        writer.writerow([''])
-        writer.writerow(['Project Characteristics'])
-        writer.writerow(['Backend Integrations', data['be_integrations']])
-        writer.writerow(['Custom Theme', data['custom_theme']])
-        writer.writerow(['Custom Designs', data['custom_designs']])
-        writer.writerow(['UX Research', data['ux_research']])
-        writer.writerow(['Extensive Customizations', data.get('extensive_customizations', 1)])
-        writer.writerow([''])
-        writer.writerow([''])
+        writer.writerow(["PROJECT FORECAST SUMMARY"])
+        writer.writerow([""])
+        writer.writerow(["Total Hours", data["total_hours"]])
+        writer.writerow(["Duration (Months)", data["estimated_months"]])
+        writer.writerow(["Start Date", data["start_date"]])
+        writer.writerow([""])
+        writer.writerow(["Project Characteristics"])
+        writer.writerow(["Backend Integrations", data["be_integrations"]])
+        writer.writerow(["Custom Theme", data["custom_theme"]])
+        writer.writerow(["Custom Designs", data["custom_designs"]])
+        writer.writerow(["UX Research", data["ux_research"]])
+        writer.writerow(
+            ["Extensive Customizations", data.get("extensive_customizations", 1)]
+        )
+        writer.writerow([""])
+        writer.writerow([""])
 
         # Section 2: Team Distribution
-        writer.writerow(['TEAM DISTRIBUTION'])
-        writer.writerow([''])
-        writer.writerow(['Team', 'Total Hours', 'Percentage'])
-        for team_data in team_result['teams']:
-            writer.writerow([
-                team_data['team'],
-                team_data['total_hours'],
-                f"{team_data['percentage']}%"
-            ])
-        writer.writerow([''])
-        writer.writerow([''])
+        writer.writerow(["TEAM DISTRIBUTION"])
+        writer.writerow([""])
+        writer.writerow(["Team", "Total Hours", "Percentage"])
+        for team_data in team_result["teams"]:
+            writer.writerow(
+                [
+                    team_data["team"],
+                    team_data["total_hours"],
+                    f"{team_data['percentage']}%",
+                ]
+            )
+        writer.writerow([""])
+        writer.writerow([""])
 
         # Section 3: Team Monthly Breakdown
-        writer.writerow(['TEAM MONTHLY BREAKDOWN'])
-        writer.writerow([''])
-        for team_data in team_result['teams']:
-            writer.writerow([f"{team_data['team']} ({team_data['total_hours']}h total)"])
-            writer.writerow(['Month', 'Phase', 'Hours'])
-            for month_data in team_data['monthly_breakdown']:
-                writer.writerow([
-                    f"Month {month_data['month']}",
-                    month_data['phase'],
-                    month_data['hours']
-                ])
-            writer.writerow([''])
-        writer.writerow([''])
+        writer.writerow(["TEAM MONTHLY BREAKDOWN"])
+        writer.writerow([""])
+        for team_data in team_result["teams"]:
+            writer.writerow(
+                [f"{team_data['team']} ({team_data['total_hours']}h total)"]
+            )
+            writer.writerow(["Month", "Phase", "Hours"])
+            for month_data in team_data["monthly_breakdown"]:
+                writer.writerow(
+                    [
+                        f"Month {month_data['month']}",
+                        month_data["phase"],
+                        month_data["hours"],
+                    ]
+                )
+            writer.writerow([""])
+        writer.writerow([""])
 
         # Section 4: Epic Schedule Breakdown
-        writer.writerow(['EPIC SCHEDULE BREAKDOWN'])
-        writer.writerow([''])
+        writer.writerow(["EPIC SCHEDULE BREAKDOWN"])
+        writer.writerow([""])
 
         # Epic schedule header
-        header_row = ['Epic', 'Temporal Pattern', 'Total Hours']
-        start_date_obj = datetime.strptime(data['start_date'], '%Y-%m-%d')
-        for i in range(data['estimated_months']):
+        header_row = ["Epic", "Temporal Pattern", "Total Hours"]
+        start_date_obj = datetime.strptime(data["start_date"], "%Y-%m-%d")
+        for i in range(data["estimated_months"]):
             month_date = start_date_obj + relativedelta(months=i)
-            header_row.append(month_date.strftime('%b %Y'))
+            header_row.append(month_date.strftime("%b %Y"))
         writer.writerow(header_row)
 
         # Epic schedule data
-        for epic in epic_schedule.get('epics', []):
+        for epic in epic_schedule.get("epics", []):
             row = [
-                epic['name'],
-                epic.get('temporal_pattern', 'Even'),
-                epic['total_hours']
+                epic["name"],
+                epic.get("temporal_pattern", "Even"),
+                epic["total_hours"],
             ]
-            for month_hours in epic['monthly_hours']:
+            for month_hours in epic["monthly_hours"]:
                 row.append(month_hours)
             writer.writerow(row)
 
-        writer.writerow([''])
-        writer.writerow(['Total Hours', epic_schedule.get('total_hours', data['total_hours'])])
+        writer.writerow([""])
+        writer.writerow(
+            ["Total Hours", epic_schedule.get("total_hours", data["total_hours"])]
+        )
 
         # Create response
         output.seek(0)
         response = make_response(output.getvalue())
-        response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = f'attachment; filename=project_forecast_{data["start_date"]}.csv'
+        response.headers["Content-Type"] = "text/csv"
+        response.headers["Content-Disposition"] = (
+            f'attachment; filename=project_forecast_{data["start_date"]}.csv'
+        )
 
         return response
 
     except Exception as e:
         logger.error(f"Error exporting combined forecast: {e}")
         import traceback
+
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@forecasts_bp.route('/match-jira-epics', methods=['POST'])
+@forecasts_bp.route("/match-jira-epics", methods=["POST"])
 def match_jira_epics():
     """
     Fuzzy match forecast epic names to existing Jira epics.
@@ -501,25 +549,28 @@ def match_jira_epics():
         data = request.json
 
         # Validate required fields
-        if 'project_key' not in data or 'epic_names' not in data:
-            return jsonify({'error': 'Missing required fields: project_key, epic_names'}), 400
+        if "project_key" not in data or "epic_names" not in data:
+            return (
+                jsonify({"error": "Missing required fields: project_key, epic_names"}),
+                400,
+            )
 
-        project_key = data['project_key']
-        epic_names = data['epic_names']
+        project_key = data["project_key"]
+        epic_names = data["epic_names"]
 
         if not isinstance(epic_names, list) or len(epic_names) == 0:
-            return jsonify({'error': 'epic_names must be a non-empty list'}), 400
+            return jsonify({"error": "epic_names must be a non-empty list"}), 400
 
         # Initialize Jira client
         jira_client = JiraMCPClient(
             jira_url=config.JIRA_URL,
             username=config.JIRA_USERNAME,
-            api_token=config.JIRA_API_TOKEN
+            api_token=config.JIRA_API_TOKEN,
         )
 
         # Search for existing epics in Jira project
         async def search_epics():
-            jql = f'project = {project_key} AND type = Epic ORDER BY created DESC'
+            jql = f"project = {project_key} AND type = Epic ORDER BY created DESC"
             return await jira_client.search_tickets(jql=jql, max_results=200)
 
         # Run async search
@@ -531,12 +582,14 @@ def match_jira_epics():
         # Extract epic names from Jira
         jira_epic_list = []
         for epic in jira_epics:
-            fields = epic.get('fields', {})
-            jira_epic_list.append({
-                'key': epic.get('key'),
-                'name': fields.get('summary', ''),
-                'status': fields.get('status', {}).get('name', 'Unknown')
-            })
+            fields = epic.get("fields", {})
+            jira_epic_list.append(
+                {
+                    "key": epic.get("key"),
+                    "name": fields.get("summary", ""),
+                    "status": fields.get("status", {}).get("name", "Unknown"),
+                }
+            )
 
         # Perform fuzzy matching for each forecast epic
         matches = []
@@ -545,40 +598,39 @@ def match_jira_epics():
 
             for jira_epic in jira_epic_list:
                 # Calculate fuzzy match score
-                score = fuzz.ratio(epic_name.lower(), jira_epic['name'].lower())
+                score = fuzz.ratio(epic_name.lower(), jira_epic["name"].lower())
 
                 # Only include matches with score >= 60 (configurable threshold)
                 if score >= 60:
-                    suggestions.append({
-                        'key': jira_epic['key'],
-                        'name': jira_epic['name'],
-                        'score': score,
-                        'status': jira_epic['status']
-                    })
+                    suggestions.append(
+                        {
+                            "key": jira_epic["key"],
+                            "name": jira_epic["name"],
+                            "score": score,
+                            "status": jira_epic["status"],
+                        }
+                    )
 
             # Sort suggestions by score (highest first)
-            suggestions.sort(key=lambda x: x['score'], reverse=True)
+            suggestions.sort(key=lambda x: x["score"], reverse=True)
 
             # Limit to top 5 suggestions
-            matches.append({
-                'forecast_epic': epic_name,
-                'suggestions': suggestions[:5]
-            })
+            matches.append({"forecast_epic": epic_name, "suggestions": suggestions[:5]})
 
-        return jsonify({
-            'success': True,
-            'project_key': project_key,
-            'matches': matches
-        }), 200
+        return (
+            jsonify({"success": True, "project_key": project_key, "matches": matches}),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error matching Jira epics: {e}")
         import traceback
+
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@forecasts_bp.route('/export-to-jira', methods=['POST'])
+@forecasts_bp.route("/export-to-jira", methods=["POST"])
 def export_to_jira():
     """
     Export forecast epics to Jira with mapping to existing or new epics.
@@ -619,20 +671,23 @@ def export_to_jira():
         data = request.json
 
         # Validate required fields
-        if 'project_key' not in data or 'epics' not in data:
-            return jsonify({'error': 'Missing required fields: project_key, epics'}), 400
+        if "project_key" not in data or "epics" not in data:
+            return (
+                jsonify({"error": "Missing required fields: project_key, epics"}),
+                400,
+            )
 
-        project_key = data['project_key']
-        epics = data['epics']
+        project_key = data["project_key"]
+        epics = data["epics"]
 
         if not isinstance(epics, list) or len(epics) == 0:
-            return jsonify({'error': 'epics must be a non-empty list'}), 400
+            return jsonify({"error": "epics must be a non-empty list"}), 400
 
         # Initialize Jira client
         jira_client = JiraMCPClient(
             jira_url=config.JIRA_URL,
             username=config.JIRA_USERNAME,
-            api_token=config.JIRA_API_TOKEN
+            api_token=config.JIRA_API_TOKEN,
         )
 
         results = []
@@ -641,97 +696,119 @@ def export_to_jira():
         async def process_epics():
             for epic_data in epics:
                 try:
-                    epic_name = epic_data.get('name')
-                    action = epic_data.get('action', 'create')
+                    epic_name = epic_data.get("name")
+                    action = epic_data.get("action", "create")
 
                     if not epic_name:
-                        results.append({
-                            'epic_name': 'Unknown',
-                            'action': 'failed',
-                            'error': 'Epic name is required'
-                        })
+                        results.append(
+                            {
+                                "epic_name": "Unknown",
+                                "action": "failed",
+                                "error": "Epic name is required",
+                            }
+                        )
                         continue
 
-                    if action == 'link':
+                    if action == "link":
                         # Link to existing epic
-                        existing_key = epic_data.get('existing_epic_key')
+                        existing_key = epic_data.get("existing_epic_key")
                         if not existing_key:
-                            results.append({
-                                'epic_name': epic_name,
-                                'action': 'failed',
-                                'error': 'existing_epic_key is required for link action'
-                            })
+                            results.append(
+                                {
+                                    "epic_name": epic_name,
+                                    "action": "failed",
+                                    "error": "existing_epic_key is required for link action",
+                                }
+                            )
                             continue
 
                         # Verify epic exists and optionally update estimate
                         epic = await jira_client.get_ticket(existing_key)
-                        if epic.get('success') is False:
-                            results.append({
-                                'epic_name': epic_name,
-                                'action': 'failed',
-                                'error': f'Epic {existing_key} not found'
-                            })
+                        if epic.get("success") is False:
+                            results.append(
+                                {
+                                    "epic_name": epic_name,
+                                    "action": "failed",
+                                    "error": f"Epic {existing_key} not found",
+                                }
+                            )
                             continue
 
                         # Optionally update story points if provided
-                        if 'story_points' in epic_data:
+                        if "story_points" in epic_data:
                             await jira_client.update_ticket(
                                 existing_key,
-                                {'customfield_10016': epic_data['story_points']}  # Story points field
+                                {
+                                    "customfield_10016": epic_data["story_points"]
+                                },  # Story points field
                             )
 
-                        results.append({
-                            'epic_name': epic_name,
-                            'action': 'linked',
-                            'epic_key': existing_key
-                        })
+                        results.append(
+                            {
+                                "epic_name": epic_name,
+                                "action": "linked",
+                                "epic_key": existing_key,
+                            }
+                        )
 
-                    elif action == 'create':
+                    elif action == "create":
                         # Create new epic
-                        description = epic_data.get('description', '')
-                        estimated_hours = epic_data.get('estimated_hours', 0)
-                        story_points = epic_data.get('story_points')
+                        description = epic_data.get("description", "")
+                        estimated_hours = epic_data.get("estimated_hours", 0)
+                        story_points = epic_data.get("story_points")
 
                         # Build description with hours estimate
-                        full_description = f"{description}\n\nEstimated Hours: {estimated_hours}h"
+                        full_description = (
+                            f"{description}\n\nEstimated Hours: {estimated_hours}h"
+                        )
 
                         ticket = JiraTicket(
                             project_key=project_key,
                             summary=epic_name,
                             description=full_description,
-                            issue_type='Epic',
-                            story_points=story_points
+                            issue_type="Epic",
+                            story_points=story_points,
                         )
 
                         result = await jira_client.create_ticket(ticket)
 
-                        if result.get('success'):
-                            results.append({
-                                'epic_name': epic_name,
-                                'action': 'created',
-                                'epic_key': result.get('key')
-                            })
+                        if result.get("success"):
+                            results.append(
+                                {
+                                    "epic_name": epic_name,
+                                    "action": "created",
+                                    "epic_key": result.get("key"),
+                                }
+                            )
                         else:
-                            results.append({
-                                'epic_name': epic_name,
-                                'action': 'failed',
-                                'error': result.get('error', 'Unknown error')
-                            })
+                            results.append(
+                                {
+                                    "epic_name": epic_name,
+                                    "action": "failed",
+                                    "error": result.get("error", "Unknown error"),
+                                }
+                            )
 
                     else:
-                        results.append({
-                            'epic_name': epic_name,
-                            'action': 'failed',
-                            'error': f'Invalid action: {action}. Must be "create" or "link"'
-                        })
+                        results.append(
+                            {
+                                "epic_name": epic_name,
+                                "action": "failed",
+                                "error": f'Invalid action: {action}. Must be "create" or "link"',
+                            }
+                        )
 
                 except Exception as e:
-                    logger.error(f"Error processing epic {epic_data.get('name', 'Unknown')}: {e}")
-                    results.append({
-                        'epic_name': epic_data.get('name', 'Unknown'),
-                        'action': 'failed',
-                        'error': str(e)
-                    })
+                    logger.error(
+                        f"Error processing epic {epic_data.get('name', 'Unknown')}: {e}"
+                    )
+                    results.append(
+                        {
+                            "epic_name": epic_data.get("name", "Unknown"),
+                            "action": "failed",
+                            "error": str(e),
+                        }
+                    )
 
         # Run async processing
         loop = asyncio.new_event_loop()
@@ -740,22 +817,24 @@ def export_to_jira():
         loop.close()
 
         # Check if all succeeded
-        all_success = all(r['action'] in ['created', 'linked'] for r in results)
+        all_success = all(r["action"] in ["created", "linked"] for r in results)
 
-        return jsonify({
-            'success': all_success,
-            'project_key': project_key,
-            'results': results
-        }), 200
+        return (
+            jsonify(
+                {"success": all_success, "project_key": project_key, "results": results}
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error exporting to Jira: {e}")
         import traceback
+
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-@forecasts_bp.route('/epic-monthly-breakdown', methods=['POST'])
+@forecasts_bp.route("/epic-monthly-breakdown", methods=["POST"])
 def epic_monthly_breakdown():
     """
     Calculate epic-by-epic monthly hour breakdown for project forecasting.
@@ -793,32 +872,37 @@ def epic_monthly_breakdown():
     try:
         data = request.json
 
-        if 'epics' not in data or not data['epics']:
-            return jsonify({'error': 'Missing or empty epics list'}), 400
+        if "epics" not in data or not data["epics"]:
+            return jsonify({"error": "Missing or empty epics list"}), 400
 
         # Validate epic data
-        required_fields = ['name', 'estimated_hours', 'estimated_months', 'teams_selected']
-        for epic in data['epics']:
+        required_fields = [
+            "name",
+            "estimated_hours",
+            "estimated_months",
+            "teams_selected",
+        ]
+        for epic in data["epics"]:
             for field in required_fields:
                 if field not in epic:
-                    return jsonify({'error': f'Epic missing required field: {field}'}), 400
+                    return (
+                        jsonify({"error": f"Epic missing required field: {field}"}),
+                        400,
+                    )
 
         # Get project start date if provided
-        project_start_date = data.get('project_start_date')
+        project_start_date = data.get("project_start_date")
 
         # Calculate breakdown
         breakdown = forecasting_service.get_epic_monthly_breakdown(
-            epics=data['epics'],
-            project_start_date=project_start_date
+            epics=data["epics"], project_start_date=project_start_date
         )
 
-        return jsonify({
-            'success': True,
-            'breakdown': breakdown
-        }), 200
+        return jsonify({"success": True, "breakdown": breakdown}), 200
 
     except Exception as e:
         logger.error(f"Error calculating epic monthly breakdown: {e}")
         import traceback
+
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({"error": str(e)}), 500

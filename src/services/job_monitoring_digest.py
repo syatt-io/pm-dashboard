@@ -17,7 +17,7 @@ from src.config.job_monitoring_config import (
     get_job_config,
     get_all_categories,
     JOBS,
-    ALERT_CONFIG
+    ALERT_CONFIG,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,9 +35,7 @@ class JobMonitoringDigestService:
         self.db_session = db_session
 
     def generate_daily_digest(
-        self,
-        hours_back: int = 24,
-        include_successful: bool = True
+        self, hours_back: int = 24, include_successful: bool = True
     ) -> Dict[str, Any]:
         """Generate daily digest report for the last N hours.
 
@@ -56,19 +54,28 @@ class JobMonitoringDigestService:
         cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours_back)
 
         # Query all executions in the time window
-        executions = self.db_session.query(JobExecution).filter(
-            JobExecution.started_at >= cutoff_time
-        ).order_by(JobExecution.started_at.desc()).all()
+        executions = (
+            self.db_session.query(JobExecution)
+            .filter(JobExecution.started_at >= cutoff_time)
+            .order_by(JobExecution.started_at.desc())
+            .all()
+        )
 
-        logger.info(f"Generating digest for {len(executions)} executions from last {hours_back} hours")
+        logger.info(
+            f"Generating digest for {len(executions)} executions from last {hours_back} hours"
+        )
 
         # Calculate overall statistics
         total_executions = len(executions)
-        successful = sum(1 for e in executions if e.status == 'success')
-        failed = sum(1 for e in executions if e.status in ('failed', 'timeout', 'cancelled'))
-        running = sum(1 for e in executions if e.status == 'running')
+        successful = sum(1 for e in executions if e.status == "success")
+        failed = sum(
+            1 for e in executions if e.status in ("failed", "timeout", "cancelled")
+        )
+        running = sum(1 for e in executions if e.status == "running")
 
-        success_rate = (successful / total_executions * 100) if total_executions > 0 else 0
+        success_rate = (
+            (successful / total_executions * 100) if total_executions > 0 else 0
+        )
 
         # Group by category
         by_category = self._group_by_category(executions)
@@ -80,29 +87,33 @@ class JobMonitoringDigestService:
         slow_jobs = self._get_slow_jobs(executions)
 
         # Generate recommendations
-        recommendations = self._generate_recommendations(failures, slow_jobs, success_rate)
+        recommendations = self._generate_recommendations(
+            failures, slow_jobs, success_rate
+        )
 
         # Build digest
         digest = {
-            'summary': {
-                'period_hours': hours_back,
-                'period_start': cutoff_time.isoformat(),
-                'period_end': datetime.now(timezone.utc).isoformat(),
-                'total_executions': total_executions,
-                'successful': successful,
-                'failed': failed,
-                'running': running,
-                'success_rate': round(success_rate, 1)
+            "summary": {
+                "period_hours": hours_back,
+                "period_start": cutoff_time.isoformat(),
+                "period_end": datetime.now(timezone.utc).isoformat(),
+                "total_executions": total_executions,
+                "successful": successful,
+                "failed": failed,
+                "running": running,
+                "success_rate": round(success_rate, 1),
             },
-            'by_category': by_category,
-            'failures': failures if failures else [],
-            'slow_jobs': slow_jobs if slow_jobs else [],
-            'recommendations': recommendations
+            "by_category": by_category,
+            "failures": failures if failures else [],
+            "slow_jobs": slow_jobs if slow_jobs else [],
+            "recommendations": recommendations,
         }
 
         return digest
 
-    def _group_by_category(self, executions: List[JobExecution]) -> Dict[str, Dict[str, Any]]:
+    def _group_by_category(
+        self, executions: List[JobExecution]
+    ) -> Dict[str, Dict[str, Any]]:
         """Group executions by job category with statistics.
 
         Args:
@@ -111,37 +122,40 @@ class JobMonitoringDigestService:
         Returns:
             Dict mapping category name to statistics
         """
-        category_stats = defaultdict(lambda: {
-            'total': 0,
-            'successful': 0,
-            'failed': 0,
-            'running': 0,
-            'jobs': set()
-        })
+        category_stats = defaultdict(
+            lambda: {
+                "total": 0,
+                "successful": 0,
+                "failed": 0,
+                "running": 0,
+                "jobs": set(),
+            }
+        )
 
         for execution in executions:
             category = execution.job_category
             stats = category_stats[category]
 
-            stats['total'] += 1
-            stats['jobs'].add(execution.job_name)
+            stats["total"] += 1
+            stats["jobs"].add(execution.job_name)
 
-            if execution.status == 'success':
-                stats['successful'] += 1
-            elif execution.status in ('failed', 'timeout', 'cancelled'):
-                stats['failed'] += 1
-            elif execution.status == 'running':
-                stats['running'] += 1
+            if execution.status == "success":
+                stats["successful"] += 1
+            elif execution.status in ("failed", "timeout", "cancelled"):
+                stats["failed"] += 1
+            elif execution.status == "running":
+                stats["running"] += 1
 
         # Convert sets to counts and calculate success rates
         result = {}
         for category, stats in category_stats.items():
-            stats['unique_jobs'] = len(stats['jobs'])
-            del stats['jobs']  # Remove set before returning
+            stats["unique_jobs"] = len(stats["jobs"])
+            del stats["jobs"]  # Remove set before returning
 
-            stats['success_rate'] = (
-                round(stats['successful'] / stats['total'] * 100, 1)
-                if stats['total'] > 0 else 0
+            stats["success_rate"] = (
+                round(stats["successful"] / stats["total"] * 100, 1)
+                if stats["total"] > 0
+                else 0
             )
 
             result[category] = stats
@@ -160,7 +174,7 @@ class JobMonitoringDigestService:
         failures = []
 
         for execution in executions:
-            if execution.status not in ('failed', 'timeout', 'cancelled'):
+            if execution.status not in ("failed", "timeout", "cancelled"):
                 continue
 
             # Get job config for priority
@@ -169,30 +183,32 @@ class JobMonitoringDigestService:
                 priority = job_config.priority
                 alert_on_failure = job_config.alert_on_failure
             except KeyError:
-                priority = 'normal'
+                priority = "normal"
                 alert_on_failure = False
 
             failure = {
-                'job_name': execution.job_name,
-                'category': execution.job_category,
-                'priority': priority,
-                'status': execution.status,
-                'started_at': execution.started_at.isoformat(),
-                'duration_seconds': execution.duration_seconds,
-                'error_message': execution.error_message[:500] if execution.error_message else None,
-                'retry_count': execution.retry_count,
-                'task_id': execution.task_id,
-                'alert_on_failure': alert_on_failure
+                "job_name": execution.job_name,
+                "category": execution.job_category,
+                "priority": priority,
+                "status": execution.status,
+                "started_at": execution.started_at.isoformat(),
+                "duration_seconds": execution.duration_seconds,
+                "error_message": (
+                    execution.error_message[:500] if execution.error_message else None
+                ),
+                "retry_count": execution.retry_count,
+                "task_id": execution.task_id,
+                "alert_on_failure": alert_on_failure,
             }
 
             failures.append(failure)
 
         # Sort by priority (critical first) then by time
-        priority_order = {'critical': 0, 'high': 1, 'normal': 2, 'low': 3}
-        failures.sort(key=lambda f: (
-            priority_order.get(f['priority'], 4),
-            f['started_at']
-        ), reverse=True)
+        priority_order = {"critical": 0, "high": 1, "normal": 2, "low": 3}
+        failures.sort(
+            key=lambda f: (priority_order.get(f["priority"], 4), f["started_at"]),
+            reverse=True,
+        )
 
         return failures
 
@@ -208,7 +224,7 @@ class JobMonitoringDigestService:
         slow_jobs = []
 
         for execution in executions:
-            if execution.status != 'success' or not execution.duration_seconds:
+            if execution.status != "success" or not execution.duration_seconds:
                 continue
 
             try:
@@ -218,20 +234,22 @@ class JobMonitoringDigestService:
                 continue
 
             # Check if job took longer than expected
-            threshold = ALERT_CONFIG.get('slow_job_threshold', 1.5)
+            threshold = ALERT_CONFIG.get("slow_job_threshold", 1.5)
             if execution.duration_seconds > (expected_duration * threshold):
                 slow_job = {
-                    'job_name': execution.job_name,
-                    'category': execution.job_category,
-                    'expected_duration': expected_duration,
-                    'actual_duration': execution.duration_seconds,
-                    'slowdown_factor': round(execution.duration_seconds / expected_duration, 1),
-                    'started_at': execution.started_at.isoformat()
+                    "job_name": execution.job_name,
+                    "category": execution.job_category,
+                    "expected_duration": expected_duration,
+                    "actual_duration": execution.duration_seconds,
+                    "slowdown_factor": round(
+                        execution.duration_seconds / expected_duration, 1
+                    ),
+                    "started_at": execution.started_at.isoformat(),
                 }
                 slow_jobs.append(slow_job)
 
         # Sort by slowdown factor (worst first)
-        slow_jobs.sort(key=lambda j: j['slowdown_factor'], reverse=True)
+        slow_jobs.sort(key=lambda j: j["slowdown_factor"], reverse=True)
 
         return slow_jobs
 
@@ -239,7 +257,7 @@ class JobMonitoringDigestService:
         self,
         failures: List[Dict[str, Any]],
         slow_jobs: List[Dict[str, Any]],
-        success_rate: float
+        success_rate: float,
     ) -> List[str]:
         """Generate actionable recommendations based on job execution data.
 
@@ -254,7 +272,7 @@ class JobMonitoringDigestService:
         recommendations = []
 
         # Critical failures
-        critical_failures = [f for f in failures if f['priority'] == 'critical']
+        critical_failures = [f for f in failures if f["priority"] == "critical"]
         if critical_failures:
             recommendations.append(
                 f"🚨 {len(critical_failures)} CRITICAL job(s) failed - immediate attention required"
@@ -269,11 +287,15 @@ class JobMonitoringDigestService:
         # Repeated failures
         failure_counts = defaultdict(int)
         for failure in failures:
-            failure_counts[failure['job_name']] += 1
+            failure_counts[failure["job_name"]] += 1
 
-        repeat_offenders = {job: count for job, count in failure_counts.items() if count >= 2}
+        repeat_offenders = {
+            job: count for job, count in failure_counts.items() if count >= 2
+        }
         if repeat_offenders:
-            jobs_list = ', '.join(f"{job} ({count}x)" for job, count in repeat_offenders.items())
+            jobs_list = ", ".join(
+                f"{job} ({count}x)" for job, count in repeat_offenders.items()
+            )
             recommendations.append(
                 f"🔁 Repeated failures detected: {jobs_list} - may indicate systemic issue"
             )
@@ -288,7 +310,9 @@ class JobMonitoringDigestService:
 
         # All good
         if not recommendations and success_rate == 100:
-            recommendations.append("✅ All jobs executed successfully within expected timeframes")
+            recommendations.append(
+                "✅ All jobs executed successfully within expected timeframes"
+            )
 
         return recommendations
 
@@ -301,11 +325,11 @@ class JobMonitoringDigestService:
         Returns:
             HTML email body string
         """
-        summary = digest['summary']
-        by_category = digest['by_category']
-        failures = digest['failures']
-        slow_jobs = digest['slow_jobs']
-        recommendations = digest['recommendations']
+        summary = digest["summary"]
+        by_category = digest["by_category"]
+        failures = digest["failures"]
+        slow_jobs = digest["slow_jobs"]
+        recommendations = digest["recommendations"]
 
         # Build HTML email
         html = f"""
@@ -405,9 +429,17 @@ class JobMonitoringDigestService:
             <tbody>
 """
             for failure in failures:
-                priority_class = f"priority-{failure['priority']}" if failure['priority'] in ['critical', 'high'] else ""
+                priority_class = (
+                    f"priority-{failure['priority']}"
+                    if failure["priority"] in ["critical", "high"]
+                    else ""
+                )
                 badge_class = f"badge-{failure['priority']}"
-                error_msg = failure['error_message'][:100] if failure['error_message'] else 'N/A'
+                error_msg = (
+                    failure["error_message"][:100]
+                    if failure["error_message"]
+                    else "N/A"
+                )
 
                 html += f"""
                 <tr class="{priority_class}">
@@ -514,11 +546,11 @@ class JobMonitoringDigestService:
         Returns:
             Slack-formatted markdown string
         """
-        summary = digest['summary']
-        by_category = digest['by_category']
-        failures = digest['failures']
-        slow_jobs = digest['slow_jobs']
-        recommendations = digest['recommendations']
+        summary = digest["summary"]
+        by_category = digest["by_category"]
+        failures = digest["failures"]
+        slow_jobs = digest["slow_jobs"]
+        recommendations = digest["recommendations"]
 
         # Build Slack message
         message = f"""*📊 Job Monitoring Daily Digest*
@@ -543,9 +575,19 @@ _{summary['period_start'][:10]} to {summary['period_end'][:10]} ({summary['perio
         if failures:
             message += f"*❌ Failed Jobs ({len(failures)}):*\n"
             for failure in failures[:5]:  # Show top 5
-                priority_emoji = "🚨" if failure['priority'] == 'critical' else "⚠️" if failure['priority'] == 'high' else "ℹ️"
-                error_msg = failure['error_message'][:100] if failure['error_message'] else 'N/A'
-                message += f"{priority_emoji} `{failure['job_name']}` - {failure['status']}\n"
+                priority_emoji = (
+                    "🚨"
+                    if failure["priority"] == "critical"
+                    else "⚠️" if failure["priority"] == "high" else "ℹ️"
+                )
+                error_msg = (
+                    failure["error_message"][:100]
+                    if failure["error_message"]
+                    else "N/A"
+                )
+                message += (
+                    f"{priority_emoji} `{failure['job_name']}` - {failure['status']}\n"
+                )
                 message += f"   _{error_msg}_\n"
 
             if len(failures) > 5:

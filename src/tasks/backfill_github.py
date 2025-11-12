@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
 # Add project root to path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 sys.path.insert(0, project_root)
 
 from src.integrations.github_client import GitHubClient
@@ -27,12 +27,12 @@ from src.services.vector_ingest import VectorIngestService
 
 # Load environment variables
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ async def backfill_github_prs(
     days_back: int = 730,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-    repos: Optional[List[str]] = None
+    repos: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Backfill GitHub pull requests into Pinecone vector database.
@@ -73,7 +73,7 @@ async def backfill_github_prs(
         organization=os.getenv("GITHUB_ORGANIZATION", ""),
         app_id=os.getenv("GITHUB_APP_ID", ""),
         private_key=os.getenv("GITHUB_APP_PRIVATE_KEY", ""),
-        installation_id=os.getenv("GITHUB_APP_INSTALLATION_ID", "")
+        installation_id=os.getenv("GITHUB_APP_INSTALLATION_ID", ""),
     )
     vector_service = VectorIngestService()
 
@@ -81,13 +81,13 @@ async def backfill_github_prs(
     if from_date and to_date:
         start_date_str = from_date
         end_date_str = to_date
-        start_date = datetime.strptime(from_date, '%Y-%m-%d')
-        end_date = datetime.strptime(to_date, '%Y-%m-%d')
+        start_date = datetime.strptime(from_date, "%Y-%m-%d")
+        end_date = datetime.strptime(to_date, "%Y-%m-%d")
     else:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days_back)
-        start_date_str = start_date.strftime('%Y-%m-%d')
-        end_date_str = end_date.strftime('%Y-%m-%d')
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
 
     logger.info(f"Date range: {start_date_str} to {end_date_str}")
     logger.info(f"Days span: {(end_date - start_date).days}")
@@ -103,14 +103,14 @@ async def backfill_github_prs(
 
     # Statistics
     stats = {
-        'success': True,
-        'repos_processed': 0,
-        'repos_with_prs': 0,
-        'total_prs_found': 0,
-        'total_prs_ingested': 0,
-        'errors': [],
-        'start_time': start_time,
-        'date_range': f"{start_date_str} to {end_date_str}"
+        "success": True,
+        "repos_processed": 0,
+        "repos_with_prs": 0,
+        "total_prs_found": 0,
+        "total_prs_ingested": 0,
+        "errors": [],
+        "start_time": start_time,
+        "date_range": f"{start_date_str} to {end_date_str}",
     }
 
     # Process each repository
@@ -128,41 +128,44 @@ async def backfill_github_prs(
                 repo_name=repo_name,
                 start_date=start_date_str,
                 end_date=end_date_str,
-                state='all'  # Get both open and closed PRs
+                state="all",  # Get both open and closed PRs
             )
 
             if not prs:
                 logger.info(f"✓ No PRs found for {repo_name} in date range")
-                stats['repos_processed'] += 1
+                stats["repos_processed"] += 1
                 time.sleep(DELAY_BETWEEN_REPOS)
                 continue
 
             logger.info(f"Found {len(prs)} PRs in {repo_name}")
-            stats['total_prs_found'] += len(prs)
-            stats['repos_with_prs'] += 1
+            stats["total_prs_found"] += len(prs)
+            stats["repos_with_prs"] += 1
 
             # Process PRs in batches
             for batch_start in range(0, len(prs), BATCH_SIZE):
-                batch = prs[batch_start:batch_start + BATCH_SIZE]
+                batch = prs[batch_start : batch_start + BATCH_SIZE]
                 batch_num = (batch_start // BATCH_SIZE) + 1
                 total_batches = (len(prs) + BATCH_SIZE - 1) // BATCH_SIZE
 
-                logger.info(f"  Processing batch {batch_num}/{total_batches} ({len(batch)} PRs)...")
+                logger.info(
+                    f"  Processing batch {batch_num}/{total_batches} ({len(batch)} PRs)..."
+                )
 
                 # Ingest batch into vector database
                 ingested_count = vector_service.ingest_github_prs(
-                    prs=batch,
-                    repo_name=repo_name
+                    prs=batch, repo_name=repo_name
                 )
 
-                stats['total_prs_ingested'] += ingested_count
-                logger.info(f"  ✓ Ingested {ingested_count}/{len(batch)} PRs from batch {batch_num}")
+                stats["total_prs_ingested"] += ingested_count
+                logger.info(
+                    f"  ✓ Ingested {ingested_count}/{len(batch)} PRs from batch {batch_num}"
+                )
 
                 # Rate limiting between batches
                 if batch_start + BATCH_SIZE < len(prs):
                     time.sleep(DELAY_BETWEEN_BATCHES)
 
-            stats['repos_processed'] += 1
+            stats["repos_processed"] += 1
             logger.info(f"✓ Completed {repo_name}: {len(prs)} PRs processed")
 
             # Rate limiting between repositories
@@ -173,14 +176,14 @@ async def backfill_github_prs(
         except Exception as e:
             error_msg = f"Error processing repository {repo_name}: {str(e)}"
             logger.error(error_msg)
-            stats['errors'].append(error_msg)
-            stats['repos_processed'] += 1
+            stats["errors"].append(error_msg)
+            stats["repos_processed"] += 1
             continue
 
     # Calculate final statistics
     elapsed_time = time.time() - start_time
-    stats['elapsed_time'] = elapsed_time
-    stats['elapsed_time_formatted'] = f"{elapsed_time / 60:.1f} minutes"
+    stats["elapsed_time"] = elapsed_time
+    stats["elapsed_time_formatted"] = f"{elapsed_time / 60:.1f} minutes"
 
     # Print summary
     logger.info("=" * 80)
@@ -193,9 +196,9 @@ async def backfill_github_prs(
     logger.info(f"Total PRs ingested: {stats['total_prs_ingested']}")
     logger.info(f"Elapsed time: {stats['elapsed_time_formatted']}")
 
-    if stats['errors']:
+    if stats["errors"]:
         logger.warning(f"\n⚠️  Errors encountered: {len(stats['errors'])}")
-        for error in stats['errors'][:5]:  # Show first 5 errors
+        for error in stats["errors"][:5]:  # Show first 5 errors
             logger.warning(f"  - {error}")
     else:
         logger.info("\n✅ No errors encountered")
@@ -208,52 +211,53 @@ async def backfill_github_prs(
 def main():
     """Main entry point for CLI execution."""
     parser = argparse.ArgumentParser(
-        description='Backfill GitHub pull requests into Pinecone vector database'
+        description="Backfill GitHub pull requests into Pinecone vector database"
     )
     parser.add_argument(
-        '--days',
+        "--days",
         type=int,
         default=730,
-        help='Number of days to look back (default: 730 = 2 years)'
+        help="Number of days to look back (default: 730 = 2 years)",
     )
     parser.add_argument(
-        '--from-date',
+        "--from-date",
         type=str,
-        help='Start date in YYYY-MM-DD format (overrides --days)'
+        help="Start date in YYYY-MM-DD format (overrides --days)",
     )
     parser.add_argument(
-        '--to-date',
-        type=str,
-        help='End date in YYYY-MM-DD format (defaults to today)'
+        "--to-date", type=str, help="End date in YYYY-MM-DD format (defaults to today)"
     )
     parser.add_argument(
-        '--repos',
+        "--repos",
         type=str,
-        nargs='+',
-        help='Specific repositories to process (format: owner/repo). If not provided, processes all accessible repos'
+        nargs="+",
+        help="Specific repositories to process (format: owner/repo). If not provided, processes all accessible repos",
     )
 
     args = parser.parse_args()
 
     # Validate date arguments
     if args.from_date and not args.to_date:
-        parser.error('--to-date is required when using --from-date')
+        parser.error("--to-date is required when using --from-date")
 
     # Run backfill
     import asyncio
-    stats = asyncio.run(backfill_github_prs(
-        days_back=args.days,
-        from_date=args.from_date,
-        to_date=args.to_date,
-        repos=args.repos
-    ))
+
+    stats = asyncio.run(
+        backfill_github_prs(
+            days_back=args.days,
+            from_date=args.from_date,
+            to_date=args.to_date,
+            repos=args.repos,
+        )
+    )
 
     # Exit with appropriate code
-    if stats['success'] and not stats['errors']:
+    if stats["success"] and not stats["errors"]:
         sys.exit(0)
     else:
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -10,17 +10,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils.database import get_engine
 from sqlalchemy import text
 
+
 def add_subs_keywords():
     """Add keywords for SUBS (Snuggle Bugz) project."""
 
-    keywords = [
-        'snuggle',
-        'bugz',
-        'snugglebugz',
-        'snugglebug',
-        'baby',
-        'store'
-    ]
+    keywords = ["snuggle", "bugz", "snugglebugz", "snugglebug", "baby", "store"]
 
     engine = get_engine()
 
@@ -38,14 +32,17 @@ def add_subs_keywords():
         # Add keywords
         for keyword in keywords:
             conn.execute(
-                text("INSERT INTO project_keywords (project_key, keyword) VALUES (:key, :keyword)"),
-                {"key": "SUBS", "keyword": keyword.lower()}
+                text(
+                    "INSERT INTO project_keywords (project_key, keyword) VALUES (:key, :keyword)"
+                ),
+                {"key": "SUBS", "keyword": keyword.lower()},
             )
             print(f"   Added keyword: {keyword}")
 
         conn.commit()
         print(f"\n✅ Successfully added {len(keywords)} keywords for SUBS project")
         print(f"📋 Keywords: {', '.join(keywords)}")
+
 
 if __name__ == "__main__":
     add_subs_keywords()

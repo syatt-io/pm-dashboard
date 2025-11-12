@@ -3,6 +3,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.services.vector_search import VectorSearchService
@@ -10,6 +11,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def debug_snuggle_meetings():
     """Search for meetings with 'snuggle' in title without project filter."""
@@ -30,10 +32,10 @@ def debug_snuggle_meetings():
         query="snuggle bugz weekly syatt",
         top_k=50,
         days_back=365,
-        user_email="mike.samimi@syatt.io"
+        user_email="mike.samimi@syatt.io",
     )
 
-    fireflies_results = [r for r in results if r.source == 'fireflies']
+    fireflies_results = [r for r in results if r.source == "fireflies"]
 
     print(f"✅ Total results: {len(results)}")
     print(f"📧 Fireflies results: {len(fireflies_results)}")
@@ -60,10 +62,10 @@ def debug_snuggle_meetings():
         top_k=50,
         days_back=365,
         user_email="mike.samimi@syatt.io",
-        project_key="SUBS"
+        project_key="SUBS",
     )
 
-    fireflies_results2 = [r for r in results2 if r.source == 'fireflies']
+    fireflies_results2 = [r for r in results2 if r.source == "fireflies"]
 
     print(f"✅ Total results: {len(results2)}")
     print(f"📧 Fireflies results: {len(fireflies_results2)}")
@@ -76,6 +78,7 @@ def debug_snuggle_meetings():
             print(f"      Score: {result.relevance_score:.3f}")
     else:
         print("\n⚠️  No Fireflies meetings found with project filter")
+
 
 if __name__ == "__main__":
     debug_snuggle_meetings()

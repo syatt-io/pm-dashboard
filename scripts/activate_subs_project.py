@@ -9,6 +9,7 @@ from src.utils.database import get_engine
 from sqlalchemy import text
 from datetime import datetime
 
+
 def activate_subs():
     """Activate SUBS project in database."""
     engine = get_engine()
@@ -32,12 +33,14 @@ def activate_subs():
             if not is_active:
                 print("⚠️  SUBS is NOT active. Activating now...")
                 conn.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE projects
                         SET is_active = true, updated_at = :updated_at
                         WHERE key = 'SUBS'
-                    """),
-                    {"updated_at": datetime.now()}
+                    """
+                    ),
+                    {"updated_at": datetime.now()},
                 )
                 conn.commit()
                 print("✅ SUBS has been activated!\n")
@@ -49,17 +52,19 @@ def activate_subs():
 
             # Insert with minimal columns
             conn.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO projects (key, name, is_active, created_at, updated_at)
                     VALUES (:key, :name, :is_active, :created_at, :updated_at)
-                """),
+                """
+                ),
                 {
                     "key": "SUBS",
                     "name": "Snuggle Bugz - Shopify",
                     "is_active": True,
                     "created_at": datetime.now(),
-                    "updated_at": datetime.now()
-                }
+                    "updated_at": datetime.now(),
+                },
             )
             conn.commit()
             print("✅ SUBS project has been created and activated!\n")
@@ -86,6 +91,7 @@ def activate_subs():
 
     print("\n✅ SUBS is confirmed active and ready for backfill!")
     return True
+
 
 if __name__ == "__main__":
     try:

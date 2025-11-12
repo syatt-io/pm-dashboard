@@ -17,17 +17,17 @@ def run_migration():
     engine = get_engine()
 
     # Detect database type
-    if 'postgresql' in str(engine.url):
+    if "postgresql" in str(engine.url):
         migration_files = [
-            project_root / 'migrations' / 'create_project_keywords_table_postgres.sql',
-            project_root / 'migrations' / 'fix_project_keywords_columns.sql'
+            project_root / "migrations" / "create_project_keywords_table_postgres.sql",
+            project_root / "migrations" / "fix_project_keywords_columns.sql",
         ]
-        db_type = 'PostgreSQL'
+        db_type = "PostgreSQL"
     else:
         migration_files = [
-            project_root / 'migrations' / 'create_project_keywords_table.sql'
+            project_root / "migrations" / "create_project_keywords_table.sql"
         ]
-        db_type = 'SQLite'
+        db_type = "SQLite"
 
     print(f"Running migrations for {db_type}...")
 
@@ -36,13 +36,13 @@ def run_migration():
         print(f"Migration file: {migration_file}")
 
         # Read migration SQL
-        with open(migration_file, 'r') as f:
+        with open(migration_file, "r") as f:
             sql = f.read()
 
         # Execute migration
         with engine.begin() as conn:
             # Split by semicolons and execute each statement
-            for statement in sql.split(';'):
+            for statement in sql.split(";"):
                 statement = statement.strip()
                 if statement:
                     try:
@@ -50,12 +50,19 @@ def run_migration():
                     except Exception as e:
                         # Ignore "already exists" errors and privilege errors for indexes
                         error_str = str(e).lower()
-                        if 'already exists' in error_str or 'duplicate' in error_str:
+                        if "already exists" in error_str or "duplicate" in error_str:
                             print(f"⏭️  Skipping (already exists): {statement[:50]}...")
-                        elif 'insufficientprivilege' in error_str and 'index' in statement.lower():
-                            print(f"⏭️  Skipping (index already exists, insufficient privilege to recreate): {statement[:50]}...")
-                        elif 'infailedsqltransaction' in error_str:
-                            print(f"⏭️  Skipping (transaction failed, likely already exists): {statement[:50]}...")
+                        elif (
+                            "insufficientprivilege" in error_str
+                            and "index" in statement.lower()
+                        ):
+                            print(
+                                f"⏭️  Skipping (index already exists, insufficient privilege to recreate): {statement[:50]}..."
+                            )
+                        elif "infailedsqltransaction" in error_str:
+                            print(
+                                f"⏭️  Skipping (transaction failed, likely already exists): {statement[:50]}..."
+                            )
                         else:
                             print(f"❌ Error: {e}")
                             raise
@@ -63,5 +70,5 @@ def run_migration():
     print("✅ Migration completed successfully!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_migration()

@@ -2,6 +2,7 @@
 
 This ensures sessions work across multiple Gunicorn workers.
 """
+
 import json
 import logging
 import os
@@ -23,23 +24,27 @@ class RedisSessionManager:
             redis_url: Redis connection URL (defaults to REDIS_URL env var)
             ttl_seconds: Session time-to-live in seconds (default: 1 hour)
         """
-        self.redis_url = redis_url or os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.ttl = ttl_seconds
         self._client = None
 
         # Try to connect, but don't fail if Redis is unavailable
         try:
             self._connect()
-            logger.info(f"Redis session manager initialized: {self._mask_url(self.redis_url)}")
+            logger.info(
+                f"Redis session manager initialized: {self._mask_url(self.redis_url)}"
+            )
         except Exception as e:
-            logger.warning(f"Redis connection failed (will fall back to in-memory): {e}")
+            logger.warning(
+                f"Redis connection failed (will fall back to in-memory): {e}"
+            )
 
     def _mask_url(self, url: str) -> str:
         """Mask password in Redis URL for logging."""
-        if '@' in url and '://' in url:
-            protocol, rest = url.split('://', 1)
-            if '@' in rest:
-                auth, host = rest.rsplit('@', 1)
+        if "@" in url and "://" in url:
+            protocol, rest = url.split("://", 1)
+            if "@" in rest:
+                auth, host = rest.rsplit("@", 1)
                 return f"{protocol}://***:***@{host}"
         return url
 
@@ -52,7 +57,7 @@ class RedisSessionManager:
                 socket_connect_timeout=5,
                 socket_timeout=5,
                 retry_on_timeout=True,
-                health_check_interval=30
+                health_check_interval=30,
             )
             # Test connection
             self._client.ping()
@@ -130,7 +135,9 @@ class RedisSessionManager:
 
             key = self._get_key(session_id)
             deleted = self._client.delete(key)
-            logger.debug(f"Deleted session {session_id} from Redis (existed: {deleted > 0})")
+            logger.debug(
+                f"Deleted session {session_id} from Redis (existed: {deleted > 0})"
+            )
             return deleted > 0
 
         except Exception as e:
@@ -182,7 +189,7 @@ class RedisSessionManager:
             keys = self._client.keys(pattern)
             # Extract session IDs from keys
             prefix = "slack_session:"
-            session_ids = [k.decode('utf-8').replace(prefix, '') for k in keys]
+            session_ids = [k.decode("utf-8").replace(prefix, "") for k in keys]
             return session_ids
 
         except Exception as e:

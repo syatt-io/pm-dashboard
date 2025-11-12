@@ -14,7 +14,7 @@ import asyncio
 from typing import Dict, Any, List, Optional
 
 # Add project root to path
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ async def backfill_jira_issues(
     days_back: int = 1,
     resume: bool = True,
     project_filter: Optional[List[str]] = None,
-    active_only: bool = True
+    active_only: bool = True,
 ) -> Dict[str, Any]:
     """
     Backfill Jira issues using the V2 disk-caching pattern.
@@ -47,21 +47,27 @@ async def backfill_jira_issues(
     See: scripts/backfill_jira_standalone_v2.py for implementation details
     See: docs/BACKFILL_BEST_PRACTICES.md for V2 pattern documentation
     """
-    logger.info(f"🔄 Starting Jira backfill (V2 pattern): days={days_back}, active_only={active_only}, resume={resume}")
+    logger.info(
+        f"🔄 Starting Jira backfill (V2 pattern): days={days_back}, active_only={active_only}, resume={resume}"
+    )
 
     try:
         # Import the V2 backfill function
-        from scripts.backfill_jira_standalone_v2 import backfill_jira_issues as v2_backfill
+        from scripts.backfill_jira_standalone_v2 import (
+            backfill_jira_issues as v2_backfill,
+        )
 
         # Call the V2 implementation
         result = await v2_backfill(
             days_back=days_back,
             resume=resume,
             project_filter=project_filter,
-            active_only=active_only
+            active_only=active_only,
         )
 
-        logger.info(f"✅ Jira backfill completed: {result.get('issues_ingested', 0)} issues ingested")
+        logger.info(
+            f"✅ Jira backfill completed: {result.get('issues_ingested', 0)} issues ingested"
+        )
         return result
 
     except Exception as e:
@@ -70,7 +76,7 @@ async def backfill_jira_issues(
             "success": False,
             "error": str(e),
             "issues_found": 0,
-            "issues_ingested": 0
+            "issues_ingested": 0,
         }
 
 

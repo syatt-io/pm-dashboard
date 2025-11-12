@@ -18,7 +18,7 @@ from typing import Dict, List
 import logging
 
 # Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from dotenv import load_dotenv
 from pinecone import Pinecone
@@ -26,8 +26,7 @@ from pinecone import Pinecone
 load_dotenv()
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -37,8 +36,8 @@ class PineconeHoursAnalyzer:
 
     def __init__(self):
         """Initialize Pinecone client."""
-        api_key = os.getenv('PINECONE_API_KEY')
-        index_name = os.getenv('PINECONE_INDEX_NAME', 'agent-pm-context')
+        api_key = os.getenv("PINECONE_API_KEY")
+        index_name = os.getenv("PINECONE_INDEX_NAME", "agent-pm-context")
 
         if not api_key:
             raise ValueError("PINECONE_API_KEY environment variable is required")
@@ -48,10 +47,7 @@ class PineconeHoursAnalyzer:
         logger.info(f"Connected to Pinecone index: {index_name}")
 
     def query_tempo_worklogs(
-        self,
-        project_keys: List[str],
-        start_date: str,
-        end_date: str
+        self, project_keys: List[str], start_date: str, end_date: str
     ) -> List[Dict]:
         """
         Query Pinecone for Tempo worklogs.
@@ -68,12 +64,14 @@ class PineconeHoursAnalyzer:
 
         # Convert dates to Unix timestamps for Pinecone query
         start_timestamp = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp())
-        end_timestamp = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp()) + 86399  # End of day
+        end_timestamp = (
+            int(datetime.strptime(end_date, "%Y-%m-%d").timestamp()) + 86399
+        )  # End of day
 
         # Build filter
         filter_dict = {
             "source": "tempo",
-            "timestamp_epoch": {"$gte": start_timestamp, "$lte": end_timestamp}
+            "timestamp_epoch": {"$gte": start_timestamp, "$lte": end_timestamp},
         }
 
         if project_keys:
@@ -86,10 +84,10 @@ class PineconeHoursAnalyzer:
                 vector=[0.0] * 1536,  # Dummy vector
                 filter=filter_dict,
                 top_k=10000,  # Max allowed
-                include_metadata=True
+                include_metadata=True,
             )
 
-            matches = results.get('matches', [])
+            matches = results.get("matches", [])
             logger.info(f"Retrieved {len(matches)} worklogs from Pinecone")
 
             # Extract metadata
@@ -101,8 +99,7 @@ class PineconeHoursAnalyzer:
             raise
 
     def analyze_worklogs(
-        self,
-        worklogs: List[Dict]
+        self, worklogs: List[Dict]
     ) -> Dict[str, Dict[str, Dict[str, float]]]:
         """
         Analyze worklogs grouped by project, epic, and month.
@@ -125,21 +122,21 @@ class PineconeHoursAnalyzer:
         for worklog in worklogs:
             try:
                 # Get project key
-                project_key = worklog.get('project_key')
+                project_key = worklog.get("project_key")
                 if not project_key:
                     skipped += 1
                     continue
 
                 # Get epic key (stored directly in Pinecone metadata)
-                epic_key = worklog.get('epic_key', 'No Epic')
+                epic_key = worklog.get("epic_key", "No Epic")
 
                 # Get epic summary if available
-                epic_summary = worklog.get('epic_summary', '')
-                if epic_key and epic_key != 'No Epic' and epic_summary:
+                epic_summary = worklog.get("epic_summary", "")
+                if epic_key and epic_key != "No Epic" and epic_summary:
                     epic_summaries[epic_key] = epic_summary
 
                 # Get date
-                date_str = worklog.get('date')
+                date_str = worklog.get("date")
                 if not date_str:
                     skipped += 1
                     continue
@@ -148,7 +145,7 @@ class PineconeHoursAnalyzer:
                 month_key = worklog_date.strftime("%Y-%m")
 
                 # Get hours
-                hours = worklog.get('hours_logged', 0)
+                hours = worklog.get("hours_logged", 0)
 
                 # Add to results
                 results[project_key][month_key][epic_key] += hours
@@ -169,7 +166,7 @@ class PineconeHoursAnalyzer:
     def print_report(
         self,
         results: Dict[str, Dict[str, Dict[str, float]]],
-        format_type: str = "table"
+        format_type: str = "table",
     ):
         """
         Print analysis results in various formats.
@@ -180,6 +177,7 @@ class PineconeHoursAnalyzer:
         """
         if format_type == "json":
             import json
+
             print(json.dumps(results, indent=2))
             return
 
@@ -189,7 +187,7 @@ class PineconeHoursAnalyzer:
                 for month, epics in sorted(months.items()):
                     for epic, hours in sorted(epics.items()):
                         epic_summary = self.epic_summaries.get(epic, "")
-                        print(f"{project},{month},{epic},\"{epic_summary}\",{hours:.2f}")
+                        print(f'{project},{month},{epic},"{epic_summary}",{hours:.2f}')
             return
 
         # Table format (default)
@@ -205,9 +203,7 @@ class PineconeHoursAnalyzer:
             months = results[project]
 
             # Calculate totals
-            project_total = sum(
-                sum(epics.values()) for epics in months.values()
-            )
+            project_total = sum(sum(epics.values()) for epics in months.values())
 
             print(f"\n   Total Hours: {project_total:.2f}h")
 
@@ -228,9 +224,13 @@ class PineconeHoursAnalyzer:
                     percentage = (hours / month_total * 100) if month_total > 0 else 0
 
                     if epic_summary:
-                        print(f"      🎯 {epic_key}: {hours:6.2f}h ({percentage:5.1f}%) - {epic_summary}")
+                        print(
+                            f"      🎯 {epic_key}: {hours:6.2f}h ({percentage:5.1f}%) - {epic_summary}"
+                        )
                     else:
-                        print(f"      🎯 {epic_key}: {hours:6.2f}h ({percentage:5.1f}%)")
+                        print(
+                            f"      🎯 {epic_key}: {hours:6.2f}h ({percentage:5.1f}%)"
+                        )
 
         print("\n" + "=" * 100)
         print("SUMMARY")
@@ -249,7 +249,9 @@ class PineconeHoursAnalyzer:
                 all_epics.update(epics.keys())
             num_epics = len(all_epics)
 
-            print(f"| {project:7} | {total_hours:11.2f} | {num_months:6} | {num_epics:5} |")
+            print(
+                f"| {project:7} | {total_hours:11.2f} | {num_months:6} | {num_epics:5} |"
+            )
 
 
 def main():
@@ -267,38 +269,30 @@ Examples:
 
   # Export to CSV
   python scripts/analyze_hours_pinecone.py --projects COOP --months 12 --format csv > coop_pinecone.csv
-        """
+        """,
     )
 
     parser.add_argument(
-        '--projects',
-        nargs='+',
-        help='Project keys to analyze (e.g., COOP BEVS). If not specified, analyze all'
+        "--projects",
+        nargs="+",
+        help="Project keys to analyze (e.g., COOP BEVS). If not specified, analyze all",
     )
     parser.add_argument(
-        '--months',
-        type=int,
-        help='Number of months back to analyze (from today)'
+        "--months", type=int, help="Number of months back to analyze (from today)"
     )
     parser.add_argument(
-        '--start-date',
-        help='Start date in YYYY-MM-DD format (overrides --months)'
+        "--start-date", help="Start date in YYYY-MM-DD format (overrides --months)"
     )
     parser.add_argument(
-        '--end-date',
-        help='End date in YYYY-MM-DD format (defaults to today)'
+        "--end-date", help="End date in YYYY-MM-DD format (defaults to today)"
     )
     parser.add_argument(
-        '--format',
-        choices=['table', 'csv', 'json'],
-        default='table',
-        help='Output format (default: table)'
+        "--format",
+        choices=["table", "csv", "json"],
+        default="table",
+        help="Output format (default: table)",
     )
-    parser.add_argument(
-        '--debug',
-        action='store_true',
-        help='Enable debug logging'
-    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     args = parser.parse_args()
 
@@ -309,7 +303,9 @@ Examples:
     if args.start_date:
         start_date = args.start_date
     elif args.months:
-        start_date = (datetime.now() - timedelta(days=args.months * 30)).strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=args.months * 30)).strftime(
+            "%Y-%m-%d"
+        )
     else:
         parser.error("Must specify --months or --start-date")
 
@@ -326,9 +322,7 @@ Examples:
         logger.info(f"Date range: {start_date} to {end_date}")
 
         worklogs = analyzer.query_tempo_worklogs(
-            project_keys=project_keys,
-            start_date=start_date,
-            end_date=end_date
+            project_keys=project_keys, start_date=start_date, end_date=end_date
         )
 
         results = analyzer.analyze_worklogs(worklogs)
@@ -337,6 +331,7 @@ Examples:
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

@@ -46,9 +46,7 @@ class TempoSyncJob:
             session.close()
 
     def update_project_hours(
-        self,
-        current_month_hours: Dict[str, float],
-        cumulative_hours: Dict[str, float]
+        self, current_month_hours: Dict[str, float], cumulative_hours: Dict[str, float]
     ) -> Dict[str, int]:
         """
         Update project hours in database.
@@ -77,21 +75,21 @@ class TempoSyncJob:
 
                 # Update cumulative hours in projects table
                 session.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE projects
                         SET cumulative_hours = :cumulative,
                             updated_at = NOW()
                         WHERE key = :project_key
-                    """),
-                    {
-                        "cumulative": cumulative,
-                        "project_key": project_key
-                    }
+                    """
+                    ),
+                    {"cumulative": cumulative, "project_key": project_key},
                 )
 
                 # Upsert current month hours into project_monthly_forecast
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO project_monthly_forecast
                             (project_key, month_year, actual_monthly_hours, updated_at)
                         VALUES
@@ -100,12 +98,13 @@ class TempoSyncJob:
                         DO UPDATE SET
                             actual_monthly_hours = :actual_hours,
                             updated_at = NOW()
-                    """),
+                    """
+                    ),
                     {
                         "project_key": project_key,
                         "month_year": current_month,
-                        "actual_hours": current
-                    }
+                        "actual_hours": current,
+                    },
                 )
 
                 updated_count += 1
@@ -115,12 +114,14 @@ class TempoSyncJob:
                 )
 
             session.commit()
-            logger.info(f"Successfully updated {updated_count} projects, skipped {skipped_count}")
+            logger.info(
+                f"Successfully updated {updated_count} projects, skipped {skipped_count}"
+            )
 
             return {
                 "updated": updated_count,
                 "skipped": skipped_count,
-                "total": len(active_projects)
+                "total": len(active_projects),
             }
 
         except Exception as e:
@@ -151,7 +152,9 @@ class TempoSyncJob:
 
             # Update database
             logger.info("Updating database...")
-            update_stats = self.update_project_hours(current_month_hours, cumulative_hours)
+            update_stats = self.update_project_hours(
+                current_month_hours, cumulative_hours
+            )
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
@@ -164,7 +167,7 @@ class TempoSyncJob:
                 "projects_updated": update_stats["updated"],
                 "projects_skipped": update_stats["skipped"],
                 "total_projects": update_stats["total"],
-                "unique_projects_tracked": len(current_month_hours)
+                "unique_projects_tracked": len(current_month_hours),
             }
 
             logger.info(f"Tempo sync job completed successfully in {duration:.2f}s")
@@ -183,7 +186,7 @@ class TempoSyncJob:
                 "start_time": start_time.isoformat(),
                 "end_time": end_time.isoformat(),
                 "duration_seconds": duration,
-                "error": str(e)
+                "error": str(e),
             }
 
 
@@ -202,7 +205,7 @@ def run_tempo_sync():
             "error": str(e),
             "start_time": datetime.now().isoformat(),
             "end_time": datetime.now().isoformat(),
-            "duration_seconds": 0
+            "duration_seconds": 0,
         }
 
 
@@ -210,7 +213,7 @@ if __name__ == "__main__":
     # Allow running job manually for testing
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     print("Running Tempo sync job manually...")

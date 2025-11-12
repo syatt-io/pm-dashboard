@@ -5,13 +5,19 @@ from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.models import Base, ProactiveInsight, User, UserNotificationPreferences, MeetingMetadata
+from src.models import (
+    Base,
+    ProactiveInsight,
+    User,
+    UserNotificationPreferences,
+    MeetingMetadata,
+)
 
 
 @pytest.fixture
 def db_session():
     """Create in-memory database session for testing."""
-    engine = create_engine('sqlite:///:memory:', echo=False)
+    engine = create_engine("sqlite:///:memory:", echo=False)
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
@@ -29,7 +35,7 @@ def test_user(db_session):
         name="Test User",
         google_id="test-google-id-123",
         is_active=True,
-        slack_user_id="U12345"
+        slack_user_id="U12345",
     )
     db_session.add(user)
     db_session.commit()
@@ -47,14 +53,16 @@ def test_proactive_insight_creation(db_session, test_user):
         description="This is a test insight",
         severity="warning",
         metadata_json={"pr_number": 123, "days_open": 5},
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
 
     db_session.add(insight)
     db_session.commit()
 
     # Query it back
-    retrieved = db_session.query(ProactiveInsight).filter_by(id="test-insight-1").first()
+    retrieved = (
+        db_session.query(ProactiveInsight).filter_by(id="test-insight-1").first()
+    )
     assert retrieved is not None
     assert retrieved.title == "Test Insight"
     assert retrieved.severity == "warning"
@@ -73,7 +81,7 @@ def test_proactive_insight_to_dict(db_session, test_user):
         description="Budget exceeded",
         severity="critical",
         metadata_json={"budget_used_pct": 95.5},
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
 
     db_session.add(insight)
@@ -81,11 +89,11 @@ def test_proactive_insight_to_dict(db_session, test_user):
 
     # Test to_dict
     data = insight.to_dict()
-    assert data['id'] == "test-insight-2"
-    assert data['insight_type'] == "budget_alert"
-    assert data['severity'] == "critical"
-    assert 'metadata' in data  # Should use 'metadata' key (not insight_metadata)
-    assert data['metadata']['budget_used_pct'] == 95.5
+    assert data["id"] == "test-insight-2"
+    assert data["insight_type"] == "budget_alert"
+    assert data["severity"] == "critical"
+    assert "metadata" in data  # Should use 'metadata' key (not insight_metadata)
+    assert data["metadata"]["budget_used_pct"] == 95.5
 
 
 def test_user_notification_preferences_creation(db_session, test_user):
@@ -97,14 +105,18 @@ def test_user_notification_preferences_creation(db_session, test_user):
         enable_stale_pr_alerts=True,
         enable_budget_alerts=True,
         daily_brief_time="09:00",
-        timezone="America/New_York"
+        timezone="America/New_York",
     )
 
     db_session.add(prefs)
     db_session.commit()
 
     # Query it back
-    retrieved = db_session.query(UserNotificationPreferences).filter_by(user_id=test_user.id).first()
+    retrieved = (
+        db_session.query(UserNotificationPreferences)
+        .filter_by(user_id=test_user.id)
+        .first()
+    )
     assert retrieved is not None
     assert retrieved.daily_brief_slack is True
     assert retrieved.daily_brief_email is False
@@ -120,7 +132,7 @@ def test_user_notification_preferences_to_dict(db_session, test_user):
         enable_stale_pr_alerts=False,
         enable_budget_alerts=True,
         daily_brief_time="10:00",
-        timezone="UTC"
+        timezone="UTC",
     )
 
     db_session.add(prefs)
@@ -128,10 +140,10 @@ def test_user_notification_preferences_to_dict(db_session, test_user):
 
     # Test to_dict
     data = prefs.to_dict()
-    assert data['daily_brief_slack'] is False
-    assert data['daily_brief_email'] is True
-    assert data['enable_stale_pr_alerts'] is False
-    assert data['daily_brief_time'] == "10:00"
+    assert data["daily_brief_slack"] is False
+    assert data["daily_brief_email"] is True
+    assert data["enable_stale_pr_alerts"] is False
+    assert data["daily_brief_time"] == "10:00"
 
 
 def test_meeting_metadata_creation(db_session):
@@ -143,14 +155,18 @@ def test_meeting_metadata_creation(db_session):
         project_key="TEST",
         recurrence_pattern="weekly",
         last_occurrence=datetime.now(timezone.utc),
-        participants=["user1@example.com", "user2@example.com"]
+        participants=["user1@example.com", "user2@example.com"],
     )
 
     db_session.add(metadata)
     db_session.commit()
 
     # Query it back
-    retrieved = db_session.query(MeetingMetadata).filter_by(meeting_title="Sprint Planning").first()
+    retrieved = (
+        db_session.query(MeetingMetadata)
+        .filter_by(meeting_title="Sprint Planning")
+        .first()
+    )
     assert retrieved is not None
     assert retrieved.meeting_title == "Sprint Planning"
     assert retrieved.normalized_title == "sprint planning"
@@ -166,7 +182,9 @@ def test_meeting_metadata_normalize_title():
     result = MeetingMetadata.normalize_title("Sprint Planning - Q1 2024")
     assert result == "sprint planning - q1 2024" or result == "sprint planning - q1"
 
-    assert MeetingMetadata.normalize_title("Daily Standup (Team A)").startswith("daily standup")
+    assert MeetingMetadata.normalize_title("Daily Standup (Team A)").startswith(
+        "daily standup"
+    )
 
     # Times are removed
     assert "11:00" not in MeetingMetadata.normalize_title("Meeting 11:00 AM")
@@ -194,7 +212,7 @@ def test_insight_dismissal(db_session, test_user):
         title="PR Needs Review",
         description="PR #123 needs review",
         severity="info",
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
 
     db_session.add(insight)
@@ -206,7 +224,9 @@ def test_insight_dismissal(db_session, test_user):
     db_session.commit()
 
     # Verify
-    retrieved = db_session.query(ProactiveInsight).filter_by(id="test-insight-3").first()
+    retrieved = (
+        db_session.query(ProactiveInsight).filter_by(id="test-insight-3").first()
+    )
     assert retrieved.dismissed_at is not None
     # SQLite may strip timezone info, just check it's not None
     assert isinstance(retrieved.dismissed_at, datetime)
@@ -222,7 +242,7 @@ def test_insight_action_taken(db_session, test_user):
         title="Budget Alert",
         description="Budget exceeded",
         severity="warning",
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
 
     db_session.add(insight)
@@ -235,7 +255,9 @@ def test_insight_action_taken(db_session, test_user):
     db_session.commit()
 
     # Verify
-    retrieved = db_session.query(ProactiveInsight).filter_by(id="test-insight-4").first()
+    retrieved = (
+        db_session.query(ProactiveInsight).filter_by(id="test-insight-4").first()
+    )
     assert retrieved.acted_on_at is not None
     assert retrieved.action_taken == "created_ticket"
 
@@ -250,7 +272,7 @@ def test_insight_delivery_tracking(db_session, test_user):
         title="PR Needs Review",
         description="PR #456 needs review",
         severity="info",
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(timezone.utc),
     )
 
     db_session.add(insight)
@@ -267,6 +289,8 @@ def test_insight_delivery_tracking(db_session, test_user):
     db_session.commit()
 
     # Verify
-    retrieved = db_session.query(ProactiveInsight).filter_by(id="test-insight-5").first()
+    retrieved = (
+        db_session.query(ProactiveInsight).filter_by(id="test-insight-5").first()
+    )
     assert retrieved.delivered_via_slack is not None
     assert retrieved.delivered_via_email is not None

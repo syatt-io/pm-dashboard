@@ -7,6 +7,7 @@ This service handles the core escalation logic:
 4. Records all actions in audit trail
 5. Respects user preferences and rate limits
 """
+
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
@@ -30,7 +31,7 @@ class AutoEscalationService:
         self,
         db: Session,
         slack_client: Optional[WebClient] = None,
-        github_client: Optional[GitHubClient] = None
+        github_client: Optional[GitHubClient] = None,
     ):
         """Initialize auto-escalation service.
 
@@ -48,7 +49,7 @@ class AutoEscalationService:
             organization=settings.github.organization,
             app_id=settings.github.app_id,
             private_key=settings.github.private_key,
-            installation_id=settings.github.installation_id
+            installation_id=settings.github.installation_id,
         )
         self.channel_validator = ChannelSafetyValidator(db)
 
@@ -61,49 +62,48 @@ class AutoEscalationService:
         logger.info("Starting auto-escalation check...")
 
         stats = {
-            'total_checked': 0,
-            'escalations_performed': 0,
-            'dm_sent': 0,
-            'channel_posts': 0,
-            'github_comments': 0,
-            'errors': 0,
-            'skipped_no_prefs': 0,
-            'skipped_disabled': 0,
+            "total_checked": 0,
+            "escalations_performed": 0,
+            "dm_sent": 0,
+            "channel_posts": 0,
+            "github_comments": 0,
+            "errors": 0,
+            "skipped_no_prefs": 0,
+            "skipped_disabled": 0,
         }
 
         try:
             # Get all active (non-dismissed, non-acted-on) insights
             active_insights = self._get_active_insights()
-            stats['total_checked'] = len(active_insights)
+            stats["total_checked"] = len(active_insights)
 
             logger.info(f"Found {len(active_insights)} active insights to check")
 
             for insight in active_insights:
                 try:
                     result = self._process_insight_escalation(insight)
-                    if result['escalated']:
-                        stats['escalations_performed'] += 1
-                        stats['dm_sent'] += result.get('dm_sent', 0)
-                        stats['channel_posts'] += result.get('channel_posts', 0)
-                        stats['github_comments'] += result.get('github_comments', 0)
-                    elif result.get('skipped_reason') == 'no_prefs':
-                        stats['skipped_no_prefs'] += 1
-                    elif result.get('skipped_reason') == 'disabled':
-                        stats['skipped_disabled'] += 1
+                    if result["escalated"]:
+                        stats["escalations_performed"] += 1
+                        stats["dm_sent"] += result.get("dm_sent", 0)
+                        stats["channel_posts"] += result.get("channel_posts", 0)
+                        stats["github_comments"] += result.get("github_comments", 0)
+                    elif result.get("skipped_reason") == "no_prefs":
+                        stats["skipped_no_prefs"] += 1
+                    elif result.get("skipped_reason") == "disabled":
+                        stats["skipped_disabled"] += 1
 
                 except Exception as e:
                     logger.error(
-                        f"Error processing insight {insight.id}: {e}",
-                        exc_info=True
+                        f"Error processing insight {insight.id}: {e}", exc_info=True
                     )
-                    stats['errors'] += 1
+                    stats["errors"] += 1
 
             logger.info(f"Escalation check complete: {stats}")
             return stats
 
         except Exception as e:
             logger.error(f"Critical error in escalation check: {e}", exc_info=True)
-            stats['errors'] += 1
+            stats["errors"] += 1
             return stats
 
     def _get_active_insights(self) -> List[ProactiveInsight]:
@@ -112,16 +112,18 @@ class AutoEscalationService:
         Returns:
             List of active ProactiveInsight objects
         """
-        return self.db.query(ProactiveInsight).filter(
-            ProactiveInsight.dismissed_at.is_(None),
-            ProactiveInsight.acted_on_at.is_(None),
-            ProactiveInsight.insight_type == 'stale_pr'  # Start with stale PRs only
-        ).all()
+        return (
+            self.db.query(ProactiveInsight)
+            .filter(
+                ProactiveInsight.dismissed_at.is_(None),
+                ProactiveInsight.acted_on_at.is_(None),
+                ProactiveInsight.insight_type
+                == "stale_pr",  # Start with stale PRs only
+            )
+            .all()
+        )
 
-    def _process_insight_escalation(
-        self,
-        insight: ProactiveInsight
-    ) -> Dict[str, Any]:
+    def _process_insight_escalation(self, insight: ProactiveInsight) -> Dict[str, Any]:
         """Process escalation for a single insight.
 
         Args:
@@ -131,24 +133,26 @@ class AutoEscalationService:
             Dict with escalation results
         """
         result = {
-            'escalated': False,
-            'dm_sent': 0,
-            'channel_posts': 0,
-            'github_comments': 0,
-            'skipped_reason': None
+            "escalated": False,
+            "dm_sent": 0,
+            "channel_posts": 0,
+            "github_comments": 0,
+            "skipped_reason": None,
         }
 
         # Get user preferences
-        prefs = self.db.query(EscalationPreferences).filter_by(
-            user_id=insight.user_id
-        ).first()
+        prefs = (
+            self.db.query(EscalationPreferences)
+            .filter_by(user_id=insight.user_id)
+            .first()
+        )
 
         if not prefs:
             logger.debug(
                 f"No escalation preferences for user {insight.user_id}, "
                 f"skipping insight {insight.id}"
             )
-            result['skipped_reason'] = 'no_prefs'
+            result["skipped_reason"] = "no_prefs"
             return result
 
         if not prefs.enable_auto_escalation:
@@ -156,7 +160,7 @@ class AutoEscalationService:
                 f"Auto-escalation disabled for user {insight.user_id}, "
                 f"skipping insight {insight.id}"
             )
-            result['skipped_reason'] = 'disabled'
+            result["skipped_reason"] = "disabled"
             return result
 
         # Determine escalation level based on age
@@ -209,7 +213,7 @@ class AutoEscalationService:
         insight.last_escalated_at = datetime.now(timezone.utc)
         self.db.commit()
 
-        result['escalated'] = True
+        result["escalated"] = True
         result.update(escalation_results)
         return result
 
@@ -227,9 +231,7 @@ class AutoEscalationService:
         return dt
 
     def _determine_escalation_level(
-        self,
-        days_old: int,
-        prefs: EscalationPreferences
+        self, days_old: int, prefs: EscalationPreferences
     ) -> int:
         """Determine appropriate escalation level based on age.
 
@@ -250,10 +252,7 @@ class AutoEscalationService:
             return 0  # No escalation yet
 
     def _execute_escalation(
-        self,
-        insight: ProactiveInsight,
-        target_level: int,
-        prefs: EscalationPreferences
+        self, insight: ProactiveInsight, target_level: int, prefs: EscalationPreferences
     ) -> Dict[str, int]:
         """Execute escalation actions based on level and preferences.
 
@@ -265,11 +264,7 @@ class AutoEscalationService:
         Returns:
             Dict with counts of actions taken
         """
-        results = {
-            'dm_sent': 0,
-            'channel_posts': 0,
-            'github_comments': 0
-        }
+        results = {"dm_sent": 0, "channel_posts": 0, "github_comments": 0}
 
         # Get user info
         user = self.db.query(User).filter_by(id=insight.user_id).first()
@@ -280,25 +275,22 @@ class AutoEscalationService:
         # Level 1: DM to user
         if target_level >= 1 and prefs.enable_dm_escalation:
             if self._send_dm_escalation(insight, user, target_level):
-                results['dm_sent'] = 1
+                results["dm_sent"] = 1
 
         # Level 2: Post to channel
         if target_level >= 2 and prefs.enable_channel_escalation:
             if self._send_channel_escalation(insight, user, target_level):
-                results['channel_posts'] = 1
+                results["channel_posts"] = 1
 
         # Level 3: GitHub PR comment
         if target_level >= 3 and prefs.enable_github_escalation:
             if self._send_github_escalation(insight, user, target_level):
-                results['github_comments'] = 1
+                results["github_comments"] = 1
 
         return results
 
     def _send_dm_escalation(
-        self,
-        insight: ProactiveInsight,
-        user: User,
-        level: int
+        self, insight: ProactiveInsight, user: User, level: int
     ) -> bool:
         """Send DM escalation notification to user.
 
@@ -311,17 +303,15 @@ class AutoEscalationService:
             True if successful, False otherwise
         """
         if not user.slack_user_id:
-            logger.warning(
-                f"User {user.id} has no slack_user_id, cannot send DM"
-            )
+            logger.warning(f"User {user.id} has no slack_user_id, cannot send DM")
             self._record_escalation(
                 insight,
-                'dm',
+                "dm",
                 level,
-                user.slack_user_id or 'unknown',
+                user.slack_user_id or "unknown",
                 None,
                 False,
-                "User has no slack_user_id"
+                "User has no slack_user_id",
             )
             return False
 
@@ -332,20 +322,11 @@ class AutoEscalationService:
             message = self._build_dm_message(insight, days_old, level)
 
             # Send DM via Slack WebClient
-            self.slack_client.chat_postMessage(
-                channel=user.slack_user_id,
-                text=message
-            )
+            self.slack_client.chat_postMessage(channel=user.slack_user_id, text=message)
 
             # Record success
             self._record_escalation(
-                insight,
-                'dm',
-                level,
-                user.slack_user_id,
-                message,
-                True,
-                None
+                insight, "dm", level, user.slack_user_id, message, True, None
             )
 
             logger.info(
@@ -357,24 +338,15 @@ class AutoEscalationService:
         except Exception as e:
             logger.error(
                 f"Error sending DM escalation for insight {insight.id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             self._record_escalation(
-                insight,
-                'dm',
-                level,
-                user.slack_user_id,
-                None,
-                False,
-                str(e)
+                insight, "dm", level, user.slack_user_id, None, False, str(e)
             )
             return False
 
     def _send_channel_escalation(
-        self,
-        insight: ProactiveInsight,
-        user: User,
-        level: int
+        self, insight: ProactiveInsight, user: User, level: int
     ) -> bool:
         """Send channel escalation notification.
 
@@ -405,12 +377,12 @@ class AutoEscalationService:
             )
             self._record_escalation(
                 insight,
-                'channel',
+                "channel",
                 level,
                 f"project:{insight.project_key}",
                 None,
                 False,
-                "No safe channels configured for project"
+                "No safe channels configured for project",
             )
             return False
 
@@ -424,20 +396,11 @@ class AutoEscalationService:
             message = self._build_channel_message(insight, user, days_old, level)
 
             # Send to channel via Slack WebClient
-            self.slack_client.chat_postMessage(
-                channel=channel_id,
-                text=message
-            )
+            self.slack_client.chat_postMessage(channel=channel_id, text=message)
 
             # Record success
             self._record_escalation(
-                insight,
-                'channel',
-                level,
-                channel_id,
-                message,
-                True,
-                None
+                insight, "channel", level, channel_id, message, True, None
             )
 
             logger.info(
@@ -449,24 +412,15 @@ class AutoEscalationService:
         except Exception as e:
             logger.error(
                 f"Error posting channel escalation for insight {insight.id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             self._record_escalation(
-                insight,
-                'channel',
-                level,
-                channel_id,
-                None,
-                False,
-                str(e)
+                insight, "channel", level, channel_id, None, False, str(e)
             )
             return False
 
     def _send_github_escalation(
-        self,
-        insight: ProactiveInsight,
-        user: User,
-        level: int
+        self, insight: ProactiveInsight, user: User, level: int
     ) -> bool:
         """Send GitHub PR comment escalation.
 
@@ -480,7 +434,7 @@ class AutoEscalationService:
         """
         # Extract PR URL from insight metadata
         metadata = insight.metadata_json or {}
-        pr_url = metadata.get('pr_url') or metadata.get('url')
+        pr_url = metadata.get("pr_url") or metadata.get("url")
 
         if not pr_url:
             logger.warning(
@@ -489,12 +443,12 @@ class AutoEscalationService:
             )
             self._record_escalation(
                 insight,
-                'github_comment',
+                "github_comment",
                 level,
-                'no_pr_url',
+                "no_pr_url",
                 None,
                 False,
-                "No PR URL found in insight metadata"
+                "No PR URL found in insight metadata",
             )
             return False
 
@@ -509,13 +463,7 @@ class AutoEscalationService:
 
             # Record success
             self._record_escalation(
-                insight,
-                'github_comment',
-                level,
-                pr_url,
-                comment,
-                True,
-                None
+                insight, "github_comment", level, pr_url, comment, True, None
             )
 
             logger.info(
@@ -527,24 +475,21 @@ class AutoEscalationService:
         except Exception as e:
             logger.error(
                 f"Error adding GitHub comment for insight {insight.id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             self._record_escalation(
                 insight,
-                'github_comment',
+                "github_comment",
                 level,
-                pr_url or 'unknown',
+                pr_url or "unknown",
                 None,
                 False,
-                str(e)
+                str(e),
             )
             return False
 
     def _build_dm_message(
-        self,
-        insight: ProactiveInsight,
-        days_old: int,
-        level: int
+        self, insight: ProactiveInsight, days_old: int, level: int
     ) -> str:
         """Build DM escalation message.
 
@@ -557,12 +502,12 @@ class AutoEscalationService:
             Message text
         """
         severity_emoji = {
-            'info': ':information_source:',
-            'warning': ':warning:',
-            'critical': ':rotating_light:'
+            "info": ":information_source:",
+            "warning": ":warning:",
+            "critical": ":rotating_light:",
         }
 
-        emoji = severity_emoji.get(insight.severity, ':bell:')
+        emoji = severity_emoji.get(insight.severity, ":bell:")
         urgency = "CRITICAL" if level >= 3 else "URGENT" if level >= 2 else "REMINDER"
 
         message = f"{emoji} *{urgency}: {insight.title}*\n\n"
@@ -571,20 +516,16 @@ class AutoEscalationService:
 
         if insight.metadata_json:
             metadata = insight.metadata_json
-            if metadata.get('pr_url'):
+            if metadata.get("pr_url"):
                 message += f":link: PR: {metadata['pr_url']}\n"
-            if metadata.get('project_key'):
+            if metadata.get("project_key"):
                 message += f":file_folder: Project: {metadata['project_key']}\n"
 
         message += f"\n_Escalation Level {level}/3_"
         return message
 
     def _build_channel_message(
-        self,
-        insight: ProactiveInsight,
-        user: User,
-        days_old: int,
-        level: int
+        self, insight: ProactiveInsight, user: User, days_old: int, level: int
     ) -> str:
         """Build channel escalation message.
 
@@ -598,12 +539,12 @@ class AutoEscalationService:
             Message text
         """
         severity_emoji = {
-            'info': ':information_source:',
-            'warning': ':warning:',
-            'critical': ':rotating_light:'
+            "info": ":information_source:",
+            "warning": ":warning:",
+            "critical": ":rotating_light:",
         }
 
-        emoji = severity_emoji.get(insight.severity, ':bell:')
+        emoji = severity_emoji.get(insight.severity, ":bell:")
         urgency = "CRITICAL" if level >= 3 else "URGENT" if level >= 2 else "REMINDER"
 
         user_mention = f"<@{user.slack_user_id}>" if user.slack_user_id else user.email
@@ -615,19 +556,16 @@ class AutoEscalationService:
 
         if insight.metadata_json:
             metadata = insight.metadata_json
-            if metadata.get('pr_url'):
+            if metadata.get("pr_url"):
                 message += f":link: PR: {metadata['pr_url']}\n"
-            if metadata.get('project_key'):
+            if metadata.get("project_key"):
                 message += f":file_folder: Project: {metadata['project_key']}\n"
 
         message += f"\n_Escalation Level {level}/3 - Auto-escalated_"
         return message
 
     def _build_github_comment(
-        self,
-        insight: ProactiveInsight,
-        days_old: int,
-        level: int
+        self, insight: ProactiveInsight, days_old: int, level: int
     ) -> str:
         """Build GitHub PR comment.
 
@@ -640,9 +578,9 @@ class AutoEscalationService:
             Comment text
         """
         urgency = (
-            "🚨 **CRITICAL**" if level >= 3
-            else "⚠️ **URGENT**" if level >= 2
-            else "📌 **REMINDER**"
+            "🚨 **CRITICAL**"
+            if level >= 3
+            else "⚠️ **URGENT**" if level >= 2 else "📌 **REMINDER**"
         )
 
         comment = f"{urgency}: This PR has been waiting for **{days_old} days**.\n\n"
@@ -659,7 +597,7 @@ class AutoEscalationService:
         target: str,
         message: Optional[str],
         success: bool,
-        error_message: Optional[str]
+        error_message: Optional[str],
     ) -> None:
         """Record escalation action in audit trail.
 
@@ -681,7 +619,7 @@ class AutoEscalationService:
                 message_sent=message,
                 success=success,
                 error_message=error_message,
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(timezone.utc),
             )
             self.db.add(history)
             self.db.commit()
@@ -689,6 +627,6 @@ class AutoEscalationService:
         except Exception as e:
             logger.error(
                 f"Error recording escalation history for insight {insight.id}: {e}",
-                exc_info=True
+                exc_info=True,
             )
             self.db.rollback()

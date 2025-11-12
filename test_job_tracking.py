@@ -14,7 +14,7 @@ from src.config.job_monitoring_config import (
     get_job_config,
     get_critical_jobs,
     should_send_immediate_alert,
-    get_job_stats
+    get_job_stats,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 def test_config_module():
     """Test job monitoring configuration module."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 1: Job Monitoring Configuration")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     # Test get_job_config
     try:
@@ -60,9 +60,9 @@ def test_config_module():
 
 def test_tracker_success():
     """Test JobExecutionTracker with successful execution."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 2: JobExecutionTracker - Successful Execution")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     db = next(get_db())
 
@@ -73,7 +73,7 @@ def test_tracker_success():
             job_name="ingest-slack-daily",
             task_id="test-task-success-123",
             worker_name="test-worker",
-            celery_queue="default"
+            celery_queue="default",
         )
 
         # Start tracking
@@ -84,11 +84,7 @@ def test_tracker_success():
         print(f"   Started at: {execution.started_at}")
 
         # Simulate successful work
-        result_data = {
-            "success": True,
-            "channels_processed": 5,
-            "total_ingested": 150
-        }
+        result_data = {"success": True, "channels_processed": 5, "total_ingested": 150}
         tracker.set_result(result_data)
 
         # Complete tracking
@@ -103,6 +99,7 @@ def test_tracker_success():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -111,18 +108,16 @@ def test_tracker_success():
 
 def test_tracker_failure():
     """Test JobExecutionTracker with failed execution."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 3: JobExecutionTracker - Failed Execution")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     db = next(get_db())
 
     try:
         # Create tracker
         tracker = JobExecutionTracker(
-            db_session=db,
-            job_name="ingest-jira-daily",
-            task_id="test-task-failure-456"
+            db_session=db, job_name="ingest-jira-daily", task_id="test-task-failure-456"
         )
 
         # Start tracking
@@ -145,6 +140,7 @@ def test_tracker_failure():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -153,9 +149,9 @@ def test_tracker_failure():
 
 def test_tracker_context_manager():
     """Test JobExecutionTracker context manager."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 4: JobExecutionTracker - Context Manager")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     db = next(get_db())
 
@@ -164,7 +160,7 @@ def test_tracker_context_manager():
         tracker = JobExecutionTracker(
             db_session=db,
             job_name="ingest-notion-daily",
-            task_id="test-task-context-789"
+            task_id="test-task-context-789",
         )
 
         with tracker:
@@ -181,7 +177,7 @@ def test_tracker_context_manager():
         tracker2 = JobExecutionTracker(
             db_session=db,
             job_name="ingest-fireflies-daily",
-            task_id="test-task-context-error-101"
+            task_id="test-task-context-error-101",
         )
 
         try:
@@ -198,6 +194,7 @@ def test_tracker_context_manager():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -206,9 +203,9 @@ def test_tracker_context_manager():
 
 def test_query_helpers():
     """Test query helper functions."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 5: Query Helper Functions")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     db = next(get_db())
 
@@ -217,7 +214,9 @@ def test_query_helpers():
         failures = get_recent_failures(db, limit=5)
         print(f"✅ Found {len(failures)} recent failures:")
         for failure in failures[:3]:
-            print(f"   - {failure.job_name} (ID: {failure.id}, Status: {failure.status})")
+            print(
+                f"   - {failure.job_name} (ID: {failure.id}, Status: {failure.status})"
+            )
             print(f"     Started: {failure.started_at}")
             if failure.error_message:
                 print(f"     Error: {failure.error_message[:100]}")
@@ -231,6 +230,7 @@ def test_query_helpers():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -247,7 +247,7 @@ def main():
         test_tracker_success,
         test_tracker_failure,
         test_tracker_context_manager,
-        test_query_helpers
+        test_query_helpers,
     ]
 
     results = []
@@ -260,9 +260,9 @@ def main():
             results.append((test_func.__name__, False))
 
     # Print summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST SUMMARY")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     passed = sum(1 for _, result in results if result)
     total = len(results)

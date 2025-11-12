@@ -8,6 +8,7 @@ import sys
 
 BASE_URL = "https://agent-pm-tsbbb.ondigitalocean.app"
 
+
 def test_health_check():
     """Test the health endpoint."""
     try:
@@ -22,12 +23,15 @@ def test_health_check():
         print(f"❌ Health check failed: {e}")
         return False
 
+
 def test_watched_projects():
     """Test the watched projects endpoint."""
     try:
         response = requests.get(f"{BASE_URL}/api/watched-projects", timeout=10)
         if response.status_code in [200, 401]:  # 401 is OK if not authenticated
-            print(f"✅ Watched projects endpoint responding (Status: {response.status_code})")
+            print(
+                f"✅ Watched projects endpoint responding (Status: {response.status_code})"
+            )
             return True
         else:
             print(f"❌ Watched projects failed: Status {response.status_code}")
@@ -37,6 +41,7 @@ def test_watched_projects():
         print(f"❌ Watched projects failed: {e}")
         return False
 
+
 def test_fireflies_validate():
     """Test the Fireflies API key validation endpoint."""
     try:
@@ -45,10 +50,12 @@ def test_fireflies_validate():
             f"{BASE_URL}/api/user/fireflies-key/validate",
             json={"api_key": "test_key_12345"},
             headers={"Content-Type": "application/json"},
-            timeout=10
+            timeout=10,
         )
         if response.status_code in [200, 400, 401, 403]:
-            print(f"✅ Fireflies validation endpoint responding (Status: {response.status_code})")
+            print(
+                f"✅ Fireflies validation endpoint responding (Status: {response.status_code})"
+            )
             return True
         else:
             print(f"❌ Fireflies validation failed: Status {response.status_code}")
@@ -58,12 +65,15 @@ def test_fireflies_validate():
         print(f"❌ Fireflies validation failed: {e}")
         return False
 
+
 def test_jira_projects():
     """Test the Jira projects endpoint."""
     try:
         response = requests.get(f"{BASE_URL}/api/jira/projects", timeout=10)
         if response.status_code in [200, 401]:  # 401 is OK if not authenticated
-            print(f"✅ Jira projects endpoint responding (Status: {response.status_code})")
+            print(
+                f"✅ Jira projects endpoint responding (Status: {response.status_code})"
+            )
             return True
         else:
             print(f"❌ Jira projects failed: Status {response.status_code}")
@@ -71,6 +81,7 @@ def test_jira_projects():
     except Exception as e:
         print(f"❌ Jira projects failed: {e}")
         return False
+
 
 def run_all_tests():
     """Run all production tests."""
@@ -82,7 +93,7 @@ def run_all_tests():
         ("Health Check", test_health_check),
         ("Watched Projects", test_watched_projects),
         ("Fireflies Validation", test_fireflies_validate),
-        ("Jira Projects", test_jira_projects)
+        ("Jira Projects", test_jira_projects),
     ]
 
     results = []
@@ -112,6 +123,7 @@ def run_all_tests():
     print(f"{'='*60}\n")
 
     return failed == 0
+
 
 if __name__ == "__main__":
     success = run_all_tests()

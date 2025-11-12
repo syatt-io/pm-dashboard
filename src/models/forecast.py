@@ -10,7 +10,7 @@ from src.models import Base
 class EpicForecast(Base):
     """Stores epic forecasts with project characteristics and team hour estimates."""
 
-    __tablename__ = 'epic_forecasts'
+    __tablename__ = "epic_forecasts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -29,7 +29,9 @@ class EpicForecast(Base):
     estimated_months = Column(Integer, nullable=False)
 
     # Team selections (which teams are needed)
-    teams_selected = Column(JSON, nullable=False)  # e.g., ["FE Devs", "BE Devs", "Design"]
+    teams_selected = Column(
+        JSON, nullable=False
+    )  # e.g., ["FE Devs", "BE Devs", "Design"]
 
     # Forecast results (JSON structure with month-by-month breakdown)
     forecast_data = Column(JSON, nullable=False)

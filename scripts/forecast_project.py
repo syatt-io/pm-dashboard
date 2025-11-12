@@ -31,9 +31,9 @@ class ProjectForecaster:
 
     # Project size tiers (based on historical data)
     SIZE_TIERS = {
-        'small': {'threshold': 900, 'burn_rate': 118.65, 'months': 8},
-        'medium': {'threshold': 1400, 'burn_rate': 87.52, 'months': 12},
-        'large': {'threshold': float('inf'), 'burn_rate': 136.64, 'months': 12}
+        "small": {"threshold": 900, "burn_rate": 118.65, "months": 8},
+        "medium": {"threshold": 1400, "burn_rate": 87.52, "months": 12},
+        "large": {"threshold": float("inf"), "burn_rate": 136.64, "months": 12},
     }
 
     PM_OVERHEAD = 0.25  # 25% overhead for project management
@@ -65,7 +65,9 @@ class ProjectForecaster:
         # Try fuzzy match (contains)
         for key, baseline in self.baselines.items():
             if normalized in key or key in normalized:
-                logger.warning(f"Fuzzy matched '{epic_name}' to '{baseline.epic_category}'")
+                logger.warning(
+                    f"Fuzzy matched '{epic_name}' to '{baseline.epic_category}'"
+                )
                 return baseline
 
         return None
@@ -77,39 +79,41 @@ class ProjectForecaster:
         if not baseline:
             # Custom epic - no baseline available
             return {
-                'epic': epic_name,
-                'hours': None,
-                'variance_level': 'custom',
-                'confidence': 'low',
-                'note': 'No historical data - requires custom scoping'
+                "epic": epic_name,
+                "hours": None,
+                "variance_level": "custom",
+                "confidence": "low",
+                "note": "No historical data - requires custom scoping",
             }
 
         # Use recommended estimate based on variance level
         hours = baseline.get_recommended_estimate()
 
         return {
-            'epic': epic_name,
-            'matched_category': baseline.epic_category,
-            'hours': hours,
-            'variance_level': baseline.variance_level,
-            'confidence': 'high' if baseline.variance_level == 'low' else 'medium',
-            'range': f"{baseline.min_hours:.1f}-{baseline.max_hours:.1f}h",
-            'project_count': baseline.project_count
+            "epic": epic_name,
+            "matched_category": baseline.epic_category,
+            "hours": hours,
+            "variance_level": baseline.variance_level,
+            "confidence": "high" if baseline.variance_level == "low" else "medium",
+            "range": f"{baseline.min_hours:.1f}-{baseline.max_hours:.1f}h",
+            "project_count": baseline.project_count,
         }
 
     def classify_project_size(self, total_hours: float) -> str:
         """Classify project as small/medium/large."""
-        if total_hours < self.SIZE_TIERS['small']['threshold']:
-            return 'small'
-        elif total_hours < self.SIZE_TIERS['medium']['threshold']:
-            return 'medium'
+        if total_hours < self.SIZE_TIERS["small"]["threshold"]:
+            return "small"
+        elif total_hours < self.SIZE_TIERS["medium"]["threshold"]:
+            return "medium"
         else:
-            return 'large'
+            return "large"
 
-    def generate_burn_rate_schedule(self, total_hours: float, project_size: str) -> List[Dict]:
+    def generate_burn_rate_schedule(
+        self, total_hours: float, project_size: str
+    ) -> List[Dict]:
         """Generate month-by-month burn rate projection."""
         tier = self.SIZE_TIERS[project_size]
-        months = tier['months']
+        months = tier["months"]
 
         # Distribution pattern: heavier in early/mid months, lighter at end
         # Early phase: 130%, Mid phase: 100%, Late phase: 70%
@@ -134,11 +138,13 @@ class ProjectForecaster:
             month_hours = (weight / total_weight) * total_hours
             cumulative += month_hours
 
-            schedule.append({
-                'month': month,
-                'hours': round(month_hours, 1),
-                'cumulative': round(cumulative, 1)
-            })
+            schedule.append(
+                {
+                    "month": month,
+                    "hours": round(month_hours, 1),
+                    "cumulative": round(cumulative, 1),
+                }
+            )
 
         return schedule
 
@@ -161,12 +167,12 @@ class ProjectForecaster:
             estimate = self.get_epic_estimate(epic)
             epic_estimates.append(estimate)
 
-            if estimate['hours'] is None:
+            if estimate["hours"] is None:
                 custom_epics.append(epic)
             else:
-                dev_hours += estimate['hours']
+                dev_hours += estimate["hours"]
 
-                if estimate['variance_level'] == 'high':
+                if estimate["variance_level"] == "high":
                     high_risk_epics.append(epic)
 
         # Add PM overhead
@@ -179,44 +185,43 @@ class ProjectForecaster:
 
         # Calculate confidence interval (±20% for medium confidence, ±30% for low)
         if custom_epics or len(high_risk_epics) > len(epic_list) * 0.3:
-            confidence = 'low'
+            confidence = "low"
             margin = 0.30
         elif high_risk_epics:
-            confidence = 'medium'
+            confidence = "medium"
             margin = 0.20
         else:
-            confidence = 'high'
+            confidence = "high"
             margin = 0.10
 
         return {
-            'summary': {
-                'total_epics': len(epic_list),
-                'matched_epics': len(epic_list) - len(custom_epics),
-                'custom_epics': len(custom_epics),
-                'development_hours': round(dev_hours, 1),
-                'pm_overhead_hours': round(pm_hours, 1),
-                'total_hours': round(total_hours, 1),
-                'confidence': confidence,
-                'range_low': round(total_hours * (1 - margin), 1),
-                'range_high': round(total_hours * (1 + margin), 1)
+            "summary": {
+                "total_epics": len(epic_list),
+                "matched_epics": len(epic_list) - len(custom_epics),
+                "custom_epics": len(custom_epics),
+                "development_hours": round(dev_hours, 1),
+                "pm_overhead_hours": round(pm_hours, 1),
+                "total_hours": round(total_hours, 1),
+                "confidence": confidence,
+                "range_low": round(total_hours * (1 - margin), 1),
+                "range_high": round(total_hours * (1 + margin), 1),
             },
-            'timeline': {
-                'project_size': project_size,
-                'estimated_months': self.SIZE_TIERS[project_size]['months'],
-                'avg_burn_rate': round(total_hours / self.SIZE_TIERS[project_size]['months'], 1)
+            "timeline": {
+                "project_size": project_size,
+                "estimated_months": self.SIZE_TIERS[project_size]["months"],
+                "avg_burn_rate": round(
+                    total_hours / self.SIZE_TIERS[project_size]["months"], 1
+                ),
             },
-            'burn_schedule': burn_schedule,
-            'epic_breakdown': epic_estimates,
-            'risks': {
-                'custom_epics': custom_epics,
-                'high_risk_epics': high_risk_epics
-            }
+            "burn_schedule": burn_schedule,
+            "epic_breakdown": epic_estimates,
+            "risks": {"custom_epics": custom_epics, "high_risk_epics": high_risk_epics},
         }
 
     def print_forecast(self, forecast: Dict):
         """Pretty print forecast results."""
-        summary = forecast['summary']
-        timeline = forecast['timeline']
+        summary = forecast["summary"]
+        timeline = forecast["timeline"]
 
         print("\n" + "=" * 80)
         print("PROJECT FORECAST")
@@ -227,7 +232,9 @@ class ProjectForecaster:
         print(f"{'Development Hours:':<40} {summary['development_hours']:.1f}h")
         print(f"{'PM Overhead (25%):':<40} {summary['pm_overhead_hours']:.1f}h")
         print(f"{'TOTAL HOURS:':<40} {summary['total_hours']:.1f}h")
-        print(f"{'Confidence Interval:':<40} {summary['range_low']:.1f}h - {summary['range_high']:.1f}h")
+        print(
+            f"{'Confidence Interval:':<40} {summary['range_low']:.1f}h - {summary['range_high']:.1f}h"
+        )
         print(f"{'Confidence Level:':<40} {summary['confidence'].upper()}")
 
         print(f"\n{'TIMELINE':<40} {'Value'}")
@@ -238,33 +245,39 @@ class ProjectForecaster:
 
         print(f"\n{'EPIC BREAKDOWN':<30} {'Hours':<10} {'Confidence':<12} {'Variance'}")
         print("-" * 80)
-        for epic in forecast['epic_breakdown']:
-            hours = f"{epic['hours']:.1f}h" if epic['hours'] else "TBD"
-            print(f"{epic['epic']:<30} {hours:<10} {epic['confidence']:<12} {epic['variance_level']}")
+        for epic in forecast["epic_breakdown"]:
+            hours = f"{epic['hours']:.1f}h" if epic["hours"] else "TBD"
+            print(
+                f"{epic['epic']:<30} {hours:<10} {epic['confidence']:<12} {epic['variance_level']}"
+            )
 
-        if forecast['risks']['custom_epics']:
+        if forecast["risks"]["custom_epics"]:
             print(f"\n⚠️  CUSTOM EPICS (require detailed scoping):")
-            for epic in forecast['risks']['custom_epics']:
+            for epic in forecast["risks"]["custom_epics"]:
                 print(f"   - {epic}")
 
-        if forecast['risks']['high_risk_epics']:
+        if forecast["risks"]["high_risk_epics"]:
             print(f"\n⚠️  HIGH RISK EPICS (high variance - add buffer):")
-            for epic in forecast['risks']['high_risk_epics']:
+            for epic in forecast["risks"]["high_risk_epics"]:
                 print(f"   - {epic}")
 
         print(f"\n{'BURN RATE SCHEDULE':<15} {'Hours':<10} {'Cumulative'}")
         print("-" * 80)
-        for month in forecast['burn_schedule']:
-            print(f"Month {month['month']:<10} {month['hours']:<10.1f} {month['cumulative']:.1f}h")
+        for month in forecast["burn_schedule"]:
+            print(
+                f"Month {month['month']:<10} {month['hours']:<10.1f} {month['cumulative']:.1f}h"
+            )
 
         print("=" * 80 + "\n")
 
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description='Forecast project hours and timeline')
-    parser.add_argument('--epics', type=str, help='Comma-separated list of epic names')
-    parser.add_argument('--epics-file', type=Path, help='File containing epic names (one per line)')
+    parser = argparse.ArgumentParser(description="Forecast project hours and timeline")
+    parser.add_argument("--epics", type=str, help="Comma-separated list of epic names")
+    parser.add_argument(
+        "--epics-file", type=Path, help="File containing epic names (one per line)"
+    )
 
     args = parser.parse_args()
 
@@ -273,7 +286,7 @@ def main():
 
     # Parse epic list
     if args.epics:
-        epic_list = [e.strip() for e in args.epics.split(',')]
+        epic_list = [e.strip() for e in args.epics.split(",")]
     else:
         with open(args.epics_file) as f:
             epic_list = [line.strip() for line in f if line.strip()]

@@ -7,6 +7,7 @@ to add the new project_tags field based on keyword matching.
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.integrations.fireflies import FirefliesClient
@@ -16,6 +17,7 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def reingest_fireflies():
     """Re-ingest all Fireflies meetings to add project tags."""
@@ -44,9 +46,11 @@ def reingest_fireflies():
         for i, meeting in enumerate(meetings, 1):
             try:
                 if i % 10 == 0:
-                    logger.info(f"   Progress: {i}/{len(meetings)} transcripts fetched...")
+                    logger.info(
+                        f"   Progress: {i}/{len(meetings)} transcripts fetched..."
+                    )
 
-                transcript = fireflies_client.get_meeting_transcript(meeting['id'])
+                transcript = fireflies_client.get_meeting_transcript(meeting["id"])
                 if transcript:
                     # get_meeting_transcript now returns dict with proper sharing settings
                     transcripts.append(transcript)
@@ -63,13 +67,18 @@ def reingest_fireflies():
 
         # Re-ingest with new project_tags field
         logger.info("📊 Re-ingesting into Pinecone with project tags...")
-        total_ingested = ingest_service.ingest_fireflies_transcripts(transcripts=transcripts)
+        total_ingested = ingest_service.ingest_fireflies_transcripts(
+            transcripts=transcripts
+        )
 
-        logger.info(f"✅ Successfully re-ingested {total_ingested} transcripts with project tags!")
+        logger.info(
+            f"✅ Successfully re-ingested {total_ingested} transcripts with project tags!"
+        )
 
     except Exception as e:
         logger.error(f"Re-ingestion failed: {e}")
         raise
+
 
 if __name__ == "__main__":
     reingest_fireflies()

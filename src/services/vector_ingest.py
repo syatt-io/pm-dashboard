@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VectorDocument:
     """A document to be ingested into the vector database."""
+
     id: str  # Unique identifier
     source: str  # slack, fireflies, jira, notion
     title: str
@@ -47,7 +48,9 @@ class VectorIngestService:
             from pinecone import Pinecone, ServerlessSpec
 
             if not self.settings.pinecone.api_key:
-                logger.warning("Pinecone API key not configured - vector search disabled")
+                logger.warning(
+                    "Pinecone API key not configured - vector search disabled"
+                )
                 return
 
             # Initialize Pinecone
@@ -57,7 +60,7 @@ class VectorIngestService:
 
             # Check if index exists, create if not
             existing_indexes = pc.list_indexes()
-            index_exists = any(idx['name'] == index_name for idx in existing_indexes)
+            index_exists = any(idx["name"] == index_name for idx in existing_indexes)
 
             if not index_exists:
                 logger.info(f"Creating Pinecone index: {index_name}")
@@ -66,9 +69,8 @@ class VectorIngestService:
                     dimension=self.settings.pinecone.dimension,
                     metric=self.settings.pinecone.metric,
                     spec=ServerlessSpec(
-                        cloud='aws',
-                        region=self.settings.pinecone.environment
-                    )
+                        cloud="aws", region=self.settings.pinecone.environment
+                    ),
                 )
 
             # Connect to index
@@ -96,8 +98,7 @@ class VectorIngestService:
 
         try:
             response = self.openai_client.embeddings.create(
-                model="text-embedding-3-small",
-                input=text
+                model="text-embedding-3-small", input=text
             )
             return response.data[0].embedding
 
@@ -136,8 +137,7 @@ class VectorIngestService:
         try:
             # Single API call for up to 2048 texts!
             response = self.openai_client.embeddings.create(
-                model="text-embedding-3-small",
-                input=valid_texts
+                model="text-embedding-3-small", input=valid_texts
             )
 
             # Map embeddings back to original positions
@@ -156,7 +156,7 @@ class VectorIngestService:
         self,
         documents: List[VectorDocument],
         batch_size: int = 100,
-        embedding_batch_size: int = 2000  # OpenAI supports up to 2048 per request!
+        embedding_batch_size: int = 2000,  # OpenAI supports up to 2048 per request!
     ) -> int:
         """Upsert documents into Pinecone in batches with OPTIMIZED batch embedding generation.
 
@@ -186,14 +186,18 @@ class VectorIngestService:
         all_valid_docs = []
         total_batches = (total_docs + embedding_batch_size - 1) // embedding_batch_size
 
-        logger.info(f"🚀 Processing {total_batches} batches of up to {embedding_batch_size} embeddings each (FAST MODE)...")
+        logger.info(
+            f"🚀 Processing {total_batches} batches of up to {embedding_batch_size} embeddings each (FAST MODE)..."
+        )
 
         for batch_idx in range(0, total_docs, embedding_batch_size):
             batch_end = min(batch_idx + embedding_batch_size, total_docs)
             batch = documents[batch_idx:batch_end]
             batch_num = (batch_idx // embedding_batch_size) + 1
 
-            logger.info(f"🔄 Batch {batch_num}/{total_batches}: Generating {len(batch)} embeddings in ONE API call...")
+            logger.info(
+                f"🔄 Batch {batch_num}/{total_batches}: Generating {len(batch)} embeddings in ONE API call..."
+            )
 
             try:
                 # Collect texts to embed (skip docs that already have embeddings)
@@ -226,10 +230,14 @@ class VectorIngestService:
                     else:
                         failed_in_batch += 1
 
-                logger.info(f"✅ Batch {batch_num}/{total_batches} complete: {valid_in_batch} valid, {failed_in_batch} failed")
+                logger.info(
+                    f"✅ Batch {batch_num}/{total_batches} complete: {valid_in_batch} valid, {failed_in_batch} failed"
+                )
 
             except Exception as e:
-                logger.error(f"❌ Error processing batch {batch_num}/{total_batches}: {e}")
+                logger.error(
+                    f"❌ Error processing batch {batch_num}/{total_batches}: {e}"
+                )
                 # Try to salvage what we can from this batch
                 for doc in batch:
                     if doc.embedding:
@@ -237,18 +245,24 @@ class VectorIngestService:
                 continue
 
         if not all_valid_docs:
-            logger.warning("No valid documents to upsert (all failed embedding generation)")
+            logger.warning(
+                "No valid documents to upsert (all failed embedding generation)"
+            )
             return 0
 
-        logger.info(f"✅ Generated {len(all_valid_docs)}/{total_docs} embeddings successfully")
+        logger.info(
+            f"✅ Generated {len(all_valid_docs)}/{total_docs} embeddings successfully"
+        )
 
         # Upsert valid documents to Pinecone in batches
-        logger.info(f"📤 Upserting {len(all_valid_docs)} documents to Pinecone in batches of {batch_size}...")
+        logger.info(
+            f"📤 Upserting {len(all_valid_docs)} documents to Pinecone in batches of {batch_size}..."
+        )
         upserted = 0
         total_batches = (len(all_valid_docs) + batch_size - 1) // batch_size
 
         for i in range(0, len(all_valid_docs), batch_size):
-            batch = all_valid_docs[i:i + batch_size]
+            batch = all_valid_docs[i : i + batch_size]
             batch_num = (i // batch_size) + 1
 
             try:
@@ -259,7 +273,9 @@ class VectorIngestService:
                     metadata = {
                         "source": doc.source,
                         "title": doc.title[:500],  # Truncate title
-                        "content_preview": doc.content[:500]  # Reduced from 1000 to 500
+                        "content_preview": doc.content[
+                            :500
+                        ],  # Reduced from 1000 to 500
                     }
 
                     # Add other metadata fields with truncation
@@ -277,17 +293,18 @@ class VectorIngestService:
 
                     # Estimate metadata size (rough calculation)
                     import json
+
                     metadata_size = len(json.dumps(metadata))
                     if metadata_size > 35000:  # Leave 5KB buffer under 40KB limit
-                        logger.warning(f"⚠️  Metadata for {doc.id} is {metadata_size} bytes, truncating content_preview")
+                        logger.warning(
+                            f"⚠️  Metadata for {doc.id} is {metadata_size} bytes, truncating content_preview"
+                        )
                         # Further reduce content_preview if still too large
                         metadata["content_preview"] = doc.content[:200]
 
-                    vectors.append({
-                        "id": doc.id,
-                        "values": doc.embedding,
-                        "metadata": metadata
-                    })
+                    vectors.append(
+                        {"id": doc.id, "values": doc.embedding, "metadata": metadata}
+                    )
 
                 # Upsert to Pinecone (using empty namespace to match query behavior)
                 response = self.pinecone_index.upsert(vectors=vectors, namespace="")
@@ -299,23 +316,32 @@ class VectorIngestService:
                     logger.info(f"🔍 DEBUG: Response attributes: {dir(response)}")
 
                 # Validate response
-                if hasattr(response, 'upserted_count'):
+                if hasattr(response, "upserted_count"):
                     actual_upserted = response.upserted_count
                     if actual_upserted != len(vectors):
-                        logger.error(f"❌ Pinecone upsert mismatch! Sent {len(vectors)}, upserted {actual_upserted}")
+                        logger.error(
+                            f"❌ Pinecone upsert mismatch! Sent {len(vectors)}, upserted {actual_upserted}"
+                        )
                     upserted += actual_upserted
                 else:
                     # Fallback if response doesn't have upserted_count
                     logger.warning(f"⚠️  Response has no upserted_count attribute")
                     upserted += len(vectors)
 
-                logger.info(f"✅ Upserted batch {batch_num}/{total_batches}: {len(vectors)} vectors ({upserted}/{len(all_valid_docs)} total)")
+                logger.info(
+                    f"✅ Upserted batch {batch_num}/{total_batches}: {len(vectors)} vectors ({upserted}/{len(all_valid_docs)} total)"
+                )
 
             except Exception as e:
-                logger.error(f"❌ Error upserting batch {batch_num}/{total_batches}: {e}", exc_info=True)
+                logger.error(
+                    f"❌ Error upserting batch {batch_num}/{total_batches}: {e}",
+                    exc_info=True,
+                )
                 continue
 
-        logger.info(f"✅ Successfully upserted {upserted}/{total_docs} documents to Pinecone")
+        logger.info(
+            f"✅ Successfully upserted {upserted}/{total_docs} documents to Pinecone"
+        )
         return upserted
 
     def ingest_slack_messages(
@@ -323,7 +349,7 @@ class VectorIngestService:
         messages: List[Dict[str, Any]],
         channel_id: str,
         channel_name: str,
-        is_private: bool = False
+        is_private: bool = False,
     ) -> int:
         """Ingest Slack messages into vector database.
 
@@ -343,7 +369,7 @@ class VectorIngestService:
         for msg in messages:
             try:
                 # Generate unique ID
-                ts = msg.get('ts', '')
+                ts = msg.get("ts", "")
                 doc_id = f"slack-{channel_id}-{ts}"
 
                 # Parse timestamp
@@ -351,28 +377,30 @@ class VectorIngestService:
                 msg_date = datetime.fromtimestamp(msg_ts)
 
                 # Get message text
-                text = msg.get('text', '')
+                text = msg.get("text", "")
                 if not text:
                     continue
 
                 # Create document
                 doc = VectorDocument(
                     id=doc_id,
-                    source='slack',
+                    source="slack",
                     title=f"#{channel_name}",
                     content=text,
                     metadata={
-                        'channel_id': channel_id,
-                        'channel_name': channel_name,
-                        'is_private': is_private,
-                        'user_id': msg.get('user', 'unknown'),
-                        'timestamp': msg_date.isoformat(),
-                        'timestamp_epoch': int(msg_date.timestamp()),  # Numeric for filtering
-                        'date': msg_date.strftime('%Y-%m-%d'),
-                        'permalink': msg.get('permalink', ''),
+                        "channel_id": channel_id,
+                        "channel_name": channel_name,
+                        "is_private": is_private,
+                        "user_id": msg.get("user", "unknown"),
+                        "timestamp": msg_date.isoformat(),
+                        "timestamp_epoch": int(
+                            msg_date.timestamp()
+                        ),  # Numeric for filtering
+                        "date": msg_date.strftime("%Y-%m-%d"),
+                        "permalink": msg.get("permalink", ""),
                         # No access_list needed - all users can see all Slack content
-                        'access_type': 'all'
-                    }
+                        "access_type": "all",
+                    },
                 )
 
                 documents.append(doc)
@@ -387,11 +415,7 @@ class VectorIngestService:
 
         return self.upsert_documents(documents)
 
-    def ingest_jira_issues(
-        self,
-        issues: List[Dict[str, Any]],
-        project_key: str
-    ) -> int:
+    def ingest_jira_issues(self, issues: List[Dict[str, Any]], project_key: str) -> int:
         """Ingest Jira issues into vector database.
 
         Per requirements: All Jira content accessible to all users - no permissions needed.
@@ -407,8 +431,8 @@ class VectorIngestService:
 
         for issue in issues:
             try:
-                issue_key = issue.get('key', '')
-                fields = issue.get('fields')
+                issue_key = issue.get("key", "")
+                fields = issue.get("fields")
 
                 # Skip issues without fields (API error or deleted issue)
                 if not fields:
@@ -419,8 +443,8 @@ class VectorIngestService:
                 doc_id = f"jira-{issue_key}"
 
                 # Get issue metadata
-                summary = fields.get('summary', '')
-                description = fields.get('description', '')
+                summary = fields.get("summary", "")
+                description = fields.get("description", "")
 
                 # Handle ADF format for description
                 if isinstance(description, dict):
@@ -429,24 +453,26 @@ class VectorIngestService:
                 # Check for parent/epic information to enrich child tickets
                 parent_info = ""
                 parent_key = None
-                parent = fields.get('parent')
+                parent = fields.get("parent")
                 if parent:
                     # This is a sub-task with a parent issue
-                    parent_key = parent.get('key', '')
-                    parent_fields = parent.get('fields', {})
-                    parent_summary = parent_fields.get('summary', '')
+                    parent_key = parent.get("key", "")
+                    parent_fields = parent.get("fields", {})
+                    parent_summary = parent_fields.get("summary", "")
                     if parent_key and parent_summary:
-                        parent_info = f"\n\nParent Issue: {parent_key} - {parent_summary}"
+                        parent_info = (
+                            f"\n\nParent Issue: {parent_key} - {parent_summary}"
+                        )
                         logger.debug(f"Adding parent info to {issue_key}: {parent_key}")
 
                 # Also check for epic link (can be in various fields depending on Jira config)
                 epic_info = ""
                 epic_key = None
                 # Try the newer 'epic' field first
-                epic = fields.get('epic')
+                epic = fields.get("epic")
                 if epic and isinstance(epic, dict):
-                    epic_key = epic.get('key', '')
-                    epic_summary = epic.get('summary', '') or epic.get('name', '')
+                    epic_key = epic.get("key", "")
+                    epic_summary = epic.get("summary", "") or epic.get("name", "")
                     if epic_key and epic_summary:
                         epic_info = f"\n\nEpic: {epic_key} - {epic_summary}"
                         logger.debug(f"Adding epic info to {issue_key}: {epic_key}")
@@ -454,55 +480,76 @@ class VectorIngestService:
                     # Fall back to checking common epic link custom field
                     # Epic links are often in customfield_10008, but can vary
                     for field_name, field_value in fields.items():
-                        if field_name.startswith('customfield_') and isinstance(field_value, dict):
+                        if field_name.startswith("customfield_") and isinstance(
+                            field_value, dict
+                        ):
                             # Check if this looks like an epic reference
-                            if field_value.get('key') and ('epic' in field_name.lower() or field_value.get('type') == 'Epic'):
-                                epic_key = field_value.get('key', '')
-                                epic_summary = field_value.get('summary', '') or field_value.get('name', '')
+                            if field_value.get("key") and (
+                                "epic" in field_name.lower()
+                                or field_value.get("type") == "Epic"
+                            ):
+                                epic_key = field_value.get("key", "")
+                                epic_summary = field_value.get(
+                                    "summary", ""
+                                ) or field_value.get("name", "")
                                 if epic_key and epic_summary:
                                     epic_info = f"\n\nEpic: {epic_key} - {epic_summary}"
-                                    logger.debug(f"Adding epic info to {issue_key}: {epic_key} (from {field_name})")
+                                    logger.debug(
+                                        f"Adding epic info to {issue_key}: {epic_key} (from {field_name})"
+                                    )
                                     break
 
                 # Combine summary + description + parent info + epic info
                 content = f"{summary}\n\n{description or ''}{parent_info}{epic_info}"
 
                 # Parse date
-                updated = fields.get('updated', '')
-                issue_date = datetime.fromisoformat(updated.replace('Z', '+00:00')) if updated else datetime.now()
+                updated = fields.get("updated", "")
+                issue_date = (
+                    datetime.fromisoformat(updated.replace("Z", "+00:00"))
+                    if updated
+                    else datetime.now()
+                )
 
                 # Create document with safe None checks
                 # Build metadata dict with optional parent/epic fields
                 metadata = {
-                    'issue_key': issue_key,
-                    'project_key': project_key,
-                    'issue_type': (fields.get('issuetype') or {}).get('name', 'Unknown'),
-                    'status': (fields.get('status') or {}).get('name', 'Unknown'),
-                    'priority': (fields.get('priority') or {}).get('name', 'Medium'),
-                    'assignee': (fields.get('assignee') or {}).get('displayName', 'Unassigned'),
-                    'reporter': (fields.get('reporter') or {}).get('displayName', 'Unknown'),
-                    'timestamp': issue_date.isoformat(),
-                    'timestamp_epoch': int(issue_date.timestamp()),  # Numeric for filtering
-                    'date': issue_date.strftime('%Y-%m-%d'),
-                    'url': f"{self.settings.jira.url}/browse/{issue_key}",
+                    "issue_key": issue_key,
+                    "project_key": project_key,
+                    "issue_type": (fields.get("issuetype") or {}).get(
+                        "name", "Unknown"
+                    ),
+                    "status": (fields.get("status") or {}).get("name", "Unknown"),
+                    "priority": (fields.get("priority") or {}).get("name", "Medium"),
+                    "assignee": (fields.get("assignee") or {}).get(
+                        "displayName", "Unassigned"
+                    ),
+                    "reporter": (fields.get("reporter") or {}).get(
+                        "displayName", "Unknown"
+                    ),
+                    "timestamp": issue_date.isoformat(),
+                    "timestamp_epoch": int(
+                        issue_date.timestamp()
+                    ),  # Numeric for filtering
+                    "date": issue_date.strftime("%Y-%m-%d"),
+                    "url": f"{self.settings.jira.url}/browse/{issue_key}",
                     # No access control needed - all users can see all Jira content
-                    'access_type': 'all'
+                    "access_type": "all",
                 }
 
                 # Add parent_key if exists (for subtasks)
                 if parent_key:
-                    metadata['parent_key'] = parent_key
+                    metadata["parent_key"] = parent_key
 
                 # Add epic_key if exists (for epic children)
                 if epic_key:
-                    metadata['epic_key'] = epic_key
+                    metadata["epic_key"] = epic_key
 
                 doc = VectorDocument(
                     id=doc_id,
-                    source='jira',
+                    source="jira",
                     title=f"{issue_key}: {summary}",
                     content=content,
-                    metadata=metadata
+                    metadata=metadata,
                 )
 
                 documents.append(doc)
@@ -518,9 +565,7 @@ class VectorIngestService:
         return self.upsert_documents(documents)
 
     def ingest_fireflies_transcripts(
-        self,
-        transcripts: List[Dict[str, Any]],
-        user_id: Optional[int] = None
+        self, transcripts: List[Dict[str, Any]], user_id: Optional[int] = None
     ) -> int:
         """Ingest Fireflies meeting transcripts into vector database.
 
@@ -538,33 +583,41 @@ class VectorIngestService:
 
         for transcript in transcripts:
             try:
-                meeting_id = transcript.get('id', '')
-                title = transcript.get('title', 'Untitled Meeting')
+                meeting_id = transcript.get("id", "")
+                title = transcript.get("title", "Untitled Meeting")
 
                 # Generate unique ID
                 doc_id = f"fireflies-{meeting_id}"
 
                 # Get transcript text
-                transcript_text = transcript.get('transcript', '')
+                transcript_text = transcript.get("transcript", "")
                 if not transcript_text:
                     continue
 
                 # Parse date
-                date_value = transcript.get('date')
+                date_value = transcript.get("date")
                 if isinstance(date_value, (int, float)) and date_value > 1000000000000:
                     meeting_date = datetime.fromtimestamp(date_value / 1000)
                 else:
-                    meeting_date = datetime.fromisoformat(str(date_value)) if date_value else datetime.now()
+                    meeting_date = (
+                        datetime.fromisoformat(str(date_value))
+                        if date_value
+                        else datetime.now()
+                    )
 
                 # Get attendees
-                attendees = transcript.get('attendees', [])
-                attendee_emails = [a.get('email', '') for a in attendees if isinstance(a, dict)]
-                attendee_names = [a.get('name', a) for a in attendees] if attendees else []
+                attendees = transcript.get("attendees", [])
+                attendee_emails = [
+                    a.get("email", "") for a in attendees if isinstance(a, dict)
+                ]
+                attendee_names = (
+                    [a.get("name", a) for a in attendees] if attendees else []
+                )
 
                 # Get sharing settings (new!)
-                sharing_settings = transcript.get('sharing_settings', {})
-                shared_with_emails = sharing_settings.get('shared_with', [])
-                is_public = sharing_settings.get('is_public', False)
+                sharing_settings = transcript.get("sharing_settings", {})
+                shared_with_emails = sharing_settings.get("shared_with", [])
+                is_public = sharing_settings.get("is_public", False)
 
                 # Build access list: attendees + people it's shared with
                 access_list = list(set(attendee_emails + shared_with_emails))
@@ -575,32 +628,36 @@ class VectorIngestService:
                 # Create document
                 doc = VectorDocument(
                     id=doc_id,
-                    source='fireflies',
+                    source="fireflies",
                     title=title,
                     content=f"{title}\n\n{transcript_text}",
                     metadata={
-                        'meeting_id': meeting_id,
-                        'title': title,
-                        'attendees': attendee_names,
-                        'attendee_emails': attendee_emails,
-                        'duration': transcript.get('duration', 0),
-                        'timestamp': meeting_date.isoformat(),
-                        'timestamp_epoch': int(meeting_date.timestamp()),  # Numeric for filtering
-                        'date': meeting_date.strftime('%Y-%m-%d'),
+                        "meeting_id": meeting_id,
+                        "title": title,
+                        "attendees": attendee_names,
+                        "attendee_emails": attendee_emails,
+                        "duration": transcript.get("duration", 0),
+                        "timestamp": meeting_date.isoformat(),
+                        "timestamp_epoch": int(
+                            meeting_date.timestamp()
+                        ),  # Numeric for filtering
+                        "date": meeting_date.strftime("%Y-%m-%d"),
                         # Access control based on sharing settings
-                        'access_type': 'public' if is_public else 'shared',
-                        'access_list': access_list,  # Attendees + shared users
-                        'shared_with': shared_with_emails,  # Explicitly shared
-                        'is_public': is_public,
+                        "access_type": "public" if is_public else "shared",
+                        "access_list": access_list,  # Attendees + shared users
+                        "shared_with": shared_with_emails,  # Explicitly shared
+                        "is_public": is_public,
                         # Project tags for filtering (based on keyword matching)
-                        'project_tags': project_tags if project_tags else []
-                    }
+                        "project_tags": project_tags if project_tags else [],
+                    },
                 )
 
                 documents.append(doc)
 
             except Exception as e:
-                logger.error(f"Error processing Fireflies transcript {transcript.get('id')}: {e}")
+                logger.error(
+                    f"Error processing Fireflies transcript {transcript.get('id')}: {e}"
+                )
                 continue
 
         if not documents:
@@ -610,9 +667,7 @@ class VectorIngestService:
         return self.upsert_documents(documents)
 
     def ingest_notion_pages(
-        self,
-        pages: List[Dict[str, Any]],
-        full_content_map: Dict[str, str]
+        self, pages: List[Dict[str, Any]], full_content_map: Dict[str, str]
     ) -> int:
         """Ingest Notion pages into vector database.
 
@@ -627,42 +682,44 @@ class VectorIngestService:
 
         for page in pages:
             try:
-                page_id = page.get('id', '')
+                page_id = page.get("id", "")
 
                 # Get page title
-                properties = page.get('properties', {})
+                properties = page.get("properties", {})
                 title = "Untitled"
                 for prop_name, prop_data in properties.items():
-                    if prop_data.get('type') == 'title':
-                        title_arr = prop_data.get('title', [])
+                    if prop_data.get("type") == "title":
+                        title_arr = prop_data.get("title", [])
                         if title_arr:
-                            title = title_arr[0].get('plain_text', 'Untitled')
+                            title = title_arr[0].get("plain_text", "Untitled")
                             break
 
                 # Get full content from map
-                content = full_content_map.get(page_id, '')
+                content = full_content_map.get(page_id, "")
 
                 # Parse dates
-                created_time = page.get('created_time', '')
-                last_edited_time = page.get('last_edited_time', '')
+                created_time = page.get("created_time", "")
+                last_edited_time = page.get("last_edited_time", "")
 
                 page_date = datetime.now()
                 if last_edited_time:
                     try:
-                        page_date = datetime.fromisoformat(last_edited_time.replace('Z', '+00:00'))
+                        page_date = datetime.fromisoformat(
+                            last_edited_time.replace("Z", "+00:00")
+                        )
                     except:
                         pass
 
                 # Extract parent information for hierarchical filtering
-                parent = page.get('parent', {})
-                parent_type = parent.get('type', 'workspace')
+                parent = page.get("parent", {})
+                parent_type = parent.get("type", "workspace")
 
                 # Extract parent ID based on type
                 parent_id = None
-                if parent_type == 'page_id':
-                    parent_id = parent.get('page_id')
-                elif parent_type == 'database_id':
-                    parent_id = parent.get('database_id')
+                if parent_type == "page_id":
+                    parent_id = parent.get("page_id")
+                elif parent_type == "database_id":
+                    parent_id = parent.get("database_id")
                 # If workspace, parent_id remains None
 
                 # Generate unique ID
@@ -671,23 +728,23 @@ class VectorIngestService:
                 # Create document
                 doc = VectorDocument(
                     id=doc_id,
-                    source='notion',
+                    source="notion",
                     title=title,
                     content=content,
                     metadata={
-                        'page_id': page_id,
-                        'url': page.get('url', ''),
-                        'created_time': created_time,
-                        'last_edited_time': last_edited_time,
-                        'timestamp': page_date.isoformat(),
-                        'timestamp_epoch': int(page_date.timestamp()),
-                        'date': page_date.strftime('%Y-%m-%d'),
+                        "page_id": page_id,
+                        "url": page.get("url", ""),
+                        "created_time": created_time,
+                        "last_edited_time": last_edited_time,
+                        "timestamp": page_date.isoformat(),
+                        "timestamp_epoch": int(page_date.timestamp()),
+                        "date": page_date.strftime("%Y-%m-%d"),
                         # Parent hierarchy for filtering
-                        'parent_id': parent_id,
-                        'parent_type': parent_type,
+                        "parent_id": parent_id,
+                        "parent_type": parent_type,
                         # All Notion pages accessible to all users (no per-user permissions)
-                        'access_type': 'all'
-                    }
+                        "access_type": "all",
+                    },
                 )
 
                 documents.append(doc)
@@ -705,7 +762,7 @@ class VectorIngestService:
     def ingest_tempo_worklogs(
         self,
         worklogs: List[Dict[str, Any]],
-        tempo_client: Any  # TempoAPIClient instance
+        tempo_client: Any,  # TempoAPIClient instance
     ) -> int:
         """Ingest Tempo worklogs into vector database.
 
@@ -720,7 +777,7 @@ class VectorIngestService:
             Number of successfully ingested worklogs
         """
         documents = []
-        issue_pattern = re.compile(r'([A-Z]+-\d+)')
+        issue_pattern = re.compile(r"([A-Z]+-\d+)")
         skipped_count = 0
 
         logger.info(f"🔄 Processing {len(worklogs)} worklogs to build documents...")
@@ -728,18 +785,20 @@ class VectorIngestService:
         for idx, worklog in enumerate(worklogs):
             # Progress logging every 500 worklogs
             if (idx + 1) % 500 == 0:
-                logger.info(f"   Document building progress: {idx + 1}/{len(worklogs)} ({len(documents)} valid, {skipped_count} skipped)")
+                logger.info(
+                    f"   Document building progress: {idx + 1}/{len(worklogs)} ({len(documents)} valid, {skipped_count} skipped)"
+                )
 
             try:
                 # Get worklog metadata
-                worklog_id = worklog.get('tempoWorklogId', '')
-                description = worklog.get('description', '')
-                time_spent_seconds = worklog.get('timeSpentSeconds', 0)
+                worklog_id = worklog.get("tempoWorklogId", "")
+                description = worklog.get("description", "")
+                time_spent_seconds = worklog.get("timeSpentSeconds", 0)
                 hours_logged = time_spent_seconds / 3600
 
                 # Parse worklog date
-                start_date = worklog.get('startDate', '')  # Format: YYYY-MM-DD
-                start_time = worklog.get('startTime', '')  # Format: HH:MM:SS
+                start_date = worklog.get("startDate", "")  # Format: YYYY-MM-DD
+                start_time = worklog.get("startTime", "")  # Format: HH:MM:SS
 
                 # Combine date and time for timestamp
                 if start_date and start_time:
@@ -760,7 +819,7 @@ class VectorIngestService:
                     issue_key = issue_match.group(1)
                 else:
                     # Complete path: Jira API lookup
-                    issue_id = worklog.get('issue', {}).get('id')
+                    issue_id = worklog.get("issue", {}).get("id")
                     if issue_id:
                         issue_key = tempo_client.get_issue_key_from_jira(str(issue_id))
 
@@ -771,15 +830,19 @@ class VectorIngestService:
                     continue
 
                 # Extract project key from issue key
-                project_key = issue_key.split('-')[0]
+                project_key = issue_key.split("-")[0]
 
                 # Get user information
-                author = worklog.get('author', {})
-                author_account_id = author.get('accountId', '')
-                author_name = tempo_client.get_user_name(author_account_id) if author_account_id else 'Unknown'
+                author = worklog.get("author", {})
+                author_account_id = author.get("accountId", "")
+                author_name = (
+                    tempo_client.get_user_name(author_account_id)
+                    if author_account_id
+                    else "Unknown"
+                )
 
                 # Try to get email from author object (if available)
-                author_email = author.get('emailAddress', '') or author.get('email', '')
+                author_email = author.get("emailAddress", "") or author.get("email", "")
 
                 # Generate unique ID
                 doc_id = f"tempo-{worklog_id}"
@@ -793,52 +856,56 @@ class VectorIngestService:
                 # Create document
                 # Build metadata dict, excluding None values (Pinecone doesn't accept None)
                 metadata = {
-                    'worklog_id': worklog_id,
-                    'issue_key': issue_key,
-                    'project_key': project_key,
-                    'author_account_id': author_account_id,
-                    'author_name': author_name,
-                    'hours_logged': hours_logged,
-                    'worklog_date': start_date,
-                    'timestamp': worklog_date.isoformat(),
-                    'timestamp_epoch': int(worklog_date.timestamp()),
-                    'date': worklog_date.strftime('%Y-%m-%d'),
-                    'description': description,
+                    "worklog_id": worklog_id,
+                    "issue_key": issue_key,
+                    "project_key": project_key,
+                    "author_account_id": author_account_id,
+                    "author_name": author_name,
+                    "hours_logged": hours_logged,
+                    "worklog_date": start_date,
+                    "timestamp": worklog_date.isoformat(),
+                    "timestamp_epoch": int(worklog_date.timestamp()),
+                    "date": worklog_date.strftime("%Y-%m-%d"),
+                    "description": description,
                     # All Tempo data accessible to all users (same as Jira)
-                    'access_type': 'all'
+                    "access_type": "all",
                 }
 
                 # Only add author_email if it exists (Pinecone doesn't accept None)
                 if author_email:
-                    metadata['author_email'] = author_email
+                    metadata["author_email"] = author_email
 
                 doc = VectorDocument(
                     id=doc_id,
-                    source='tempo',
+                    source="tempo",
                     title=f"{issue_key}: {hours_logged:.1f}h by {author_name}",
                     content=content,
-                    metadata=metadata
+                    metadata=metadata,
                 )
 
                 documents.append(doc)
 
             except Exception as e:
-                logger.error(f"Error processing Tempo worklog {worklog.get('tempoWorklogId')}: {e}")
+                logger.error(
+                    f"Error processing Tempo worklog {worklog.get('tempoWorklogId')}: {e}"
+                )
                 skipped_count += 1
                 continue
 
         if not documents:
-            logger.warning(f"⚠️  No valid Tempo worklogs to ingest ({skipped_count} skipped)")
+            logger.warning(
+                f"⚠️  No valid Tempo worklogs to ingest ({skipped_count} skipped)"
+            )
             return 0
 
-        logger.info(f"✅ Built {len(documents)} valid documents ({skipped_count} skipped)")
+        logger.info(
+            f"✅ Built {len(documents)} valid documents ({skipped_count} skipped)"
+        )
         logger.info(f"📝 Ingesting {len(documents)} Tempo worklogs into Pinecone...")
         return self.upsert_documents(documents, batch_size=50)
 
     def ingest_github_prs(
-        self,
-        prs: List[Dict[str, Any]],
-        repo_name: Optional[str] = None
+        self, prs: List[Dict[str, Any]], repo_name: Optional[str] = None
     ) -> int:
         """Ingest GitHub pull requests into vector database.
 
@@ -854,17 +921,17 @@ class VectorIngestService:
 
         for pr in prs:
             try:
-                pr_number = pr.get('number')
-                pr_title = pr.get('title', '')
-                pr_body = pr.get('body', '') or ''
-                pr_state = pr.get('state', 'unknown')
-                pr_author = pr.get('author') or pr.get('user', 'unknown')
-                pr_url = pr.get('url', '')
-                pr_repo = pr.get('repo', repo_name or 'unknown')
+                pr_number = pr.get("number")
+                pr_title = pr.get("title", "")
+                pr_body = pr.get("body", "") or ""
+                pr_state = pr.get("state", "unknown")
+                pr_author = pr.get("author") or pr.get("user", "unknown")
+                pr_url = pr.get("url", "")
+                pr_repo = pr.get("repo", repo_name or "unknown")
 
-                created_at = pr.get('created_at', '')
-                updated_at = pr.get('updated_at', '')
-                merged_at = pr.get('merged_at')
+                created_at = pr.get("created_at", "")
+                updated_at = pr.get("updated_at", "")
+                merged_at = pr.get("merged_at")
 
                 # Skip PRs without essential data
                 if not pr_number or not pr_title:
@@ -881,14 +948,18 @@ class VectorIngestService:
                 if created_at:
                     try:
                         from datetime import datetime
-                        pr_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+
+                        pr_date = datetime.fromisoformat(
+                            created_at.replace("Z", "+00:00")
+                        )
                         timestamp_epoch = int(pr_date.timestamp())
                     except:
                         pass
 
                 # Extract linked Jira tickets from title and body
                 import re
-                jira_pattern = r'\b([A-Z]{2,}-\d+)\b'
+
+                jira_pattern = r"\b([A-Z]{2,}-\d+)\b"
                 linked_tickets = []
                 for text in [pr_title, pr_body]:
                     matches = re.findall(jira_pattern, text)
@@ -906,50 +977,57 @@ class VectorIngestService:
 
                 # Build metadata
                 metadata = {
-                    'pr_number': pr_number,
-                    'title': pr_title,
-                    'state': pr_state,
-                    'author': pr_author,
-                    'repo': pr_repo,
-                    'url': pr_url,
-                    'created_at': created_at,
-                    'updated_at': updated_at,
-                    'access_type': 'all'  # GitHub PRs accessible to all users
+                    "pr_number": pr_number,
+                    "title": pr_title,
+                    "state": pr_state,
+                    "author": pr_author,
+                    "repo": pr_repo,
+                    "url": pr_url,
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                    "access_type": "all",  # GitHub PRs accessible to all users
                 }
 
                 # Add optional fields if they exist
                 if merged_at:
-                    metadata['merged_at'] = merged_at
+                    metadata["merged_at"] = merged_at
                 if linked_tickets:
-                    metadata['linked_jira_tickets'] = ','.join(linked_tickets)
+                    metadata["linked_jira_tickets"] = ",".join(linked_tickets)
                 if pr_date:
-                    metadata['date'] = pr_date.strftime('%Y-%m-%d')
-                    metadata['timestamp'] = pr_date.isoformat()
+                    metadata["date"] = pr_date.strftime("%Y-%m-%d")
+                    metadata["timestamp"] = pr_date.isoformat()
                 if timestamp_epoch:
-                    metadata['timestamp_epoch'] = timestamp_epoch
+                    metadata["timestamp_epoch"] = timestamp_epoch
 
                 # Extract labels if present
-                labels = pr.get('labels', [])
+                labels = pr.get("labels", [])
                 if labels:
                     if isinstance(labels, list):
-                        label_names = [l.get('name', l) if isinstance(l, dict) else str(l) for l in labels]
-                        metadata['labels'] = ','.join(label_names)
+                        label_names = [
+                            l.get("name", l) if isinstance(l, dict) else str(l)
+                            for l in labels
+                        ]
+                        metadata["labels"] = ",".join(label_names)
 
                 doc = VectorDocument(
                     id=doc_id,
-                    source='github',
+                    source="github",
                     title=f"PR #{pr_number}: {pr_title}",
                     content=content,
-                    metadata=metadata
+                    metadata=metadata,
                 )
                 documents.append(doc)
 
             except Exception as e:
-                logger.error(f"Error processing GitHub PR {pr.get('number', 'unknown')}: {e}")
+                logger.error(
+                    f"Error processing GitHub PR {pr.get('number', 'unknown')}: {e}"
+                )
                 skipped_count += 1
                 continue
 
-        logger.info(f"✅ Built {len(documents)} valid documents ({skipped_count} skipped)")
+        logger.info(
+            f"✅ Built {len(documents)} valid documents ({skipped_count} skipped)"
+        )
         logger.info(f"📝 Ingesting {len(documents)} GitHub PRs into Pinecone...")
         return self.upsert_documents(documents, batch_size=100)
 
@@ -991,7 +1069,9 @@ class VectorIngestService:
                     for keyword in keywords:
                         if keyword in title_lower:
                             matched_projects.append(project_key)
-                            logger.debug(f"Matched '{title}' to project {project_key} via keyword '{keyword}'")
+                            logger.debug(
+                                f"Matched '{title}' to project {project_key} via keyword '{keyword}'"
+                            )
                             break  # Only add project once even if multiple keywords match
 
             return matched_projects
@@ -1008,17 +1088,17 @@ class VectorIngestService:
         text_parts = []
 
         # Handle different ADF node types
-        node_type = adf_content.get('type', '')
+        node_type = adf_content.get("type", "")
 
-        if node_type == 'text':
-            text_parts.append(adf_content.get('text', ''))
+        if node_type == "text":
+            text_parts.append(adf_content.get("text", ""))
 
         # Recurse into content array
-        if 'content' in adf_content and isinstance(adf_content['content'], list):
-            for child in adf_content['content']:
+        if "content" in adf_content and isinstance(adf_content["content"], list):
+            for child in adf_content["content"]:
                 text_parts.append(self._extract_text_from_adf(child))
 
-        return ' '.join(filter(None, text_parts)).strip()
+        return " ".join(filter(None, text_parts)).strip()
 
     def get_last_sync_timestamp(self, source: str) -> Optional[datetime]:
         """Get the last sync timestamp for a source from metadata.
@@ -1038,8 +1118,10 @@ class VectorIngestService:
             engine = get_engine()
             with engine.connect() as conn:
                 result = conn.execute(
-                    text("SELECT last_sync FROM vector_sync_status WHERE source = :source"),
-                    {"source": source}
+                    text(
+                        "SELECT last_sync FROM vector_sync_status WHERE source = :source"
+                    ),
+                    {"source": source},
                 )
                 row = result.fetchone()
                 if row:
@@ -1066,12 +1148,14 @@ class VectorIngestService:
             with engine.connect() as conn:
                 # Upsert sync status
                 conn.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO vector_sync_status (source, last_sync)
                         VALUES (:source, :timestamp)
                         ON CONFLICT (source) DO UPDATE SET last_sync = :timestamp
-                    """),
-                    {"source": source, "timestamp": timestamp.isoformat()}
+                    """
+                    ),
+                    {"source": source, "timestamp": timestamp.isoformat()},
                 )
                 conn.commit()
 

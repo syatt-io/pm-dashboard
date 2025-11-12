@@ -14,6 +14,7 @@ import asyncio
 
 # Add project root to path
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from src.tasks.backfill_jira import backfill_jira_issues

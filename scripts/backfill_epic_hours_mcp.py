@@ -22,7 +22,7 @@ from src.utils.database import get_session
 from sqlalchemy.dialects.postgresql import insert
 
 # Process RNWL for validation
-PROJECT_KEY = 'RNWL'
+PROJECT_KEY = "RNWL"
 
 
 def parse_mcp_tempo_output(output: str) -> list:
@@ -31,35 +31,35 @@ def parse_mcp_tempo_output(output: str) -> list:
 
     # Each worklog is on one line with pipe-separated fields
     # Format: TempoWorklogId: X | IssueKey: Y | IssueId: Z | Date: YYYY-MM-DD | Hours: H.HH | Description: ...
-    lines = output.strip().split('\n')
+    lines = output.strip().split("\n")
 
     for line in lines:
-        if not line.strip() or 'TempoWorklogId' not in line:
+        if not line.strip() or "TempoWorklogId" not in line:
             continue
 
         worklog = {}
 
         # Extract IssueKey
-        issue_key_match = re.search(r'IssueKey:\s*([A-Z]+-\d+)', line)
+        issue_key_match = re.search(r"IssueKey:\s*([A-Z]+-\d+)", line)
         if issue_key_match:
-            worklog['issue_key'] = issue_key_match.group(1)
+            worklog["issue_key"] = issue_key_match.group(1)
 
         # Extract Date
-        date_match = re.search(r'Date:\s*(\d{4}-\d{2}-\d{2})', line)
+        date_match = re.search(r"Date:\s*(\d{4}-\d{2}-\d{2})", line)
         if date_match:
-            worklog['date'] = date_match.group(1)
+            worklog["date"] = date_match.group(1)
 
         # Extract Hours
-        hours_match = re.search(r'Hours:\s*([\d.]+)', line)
+        hours_match = re.search(r"Hours:\s*([\d.]+)", line)
         if hours_match:
-            worklog['hours'] = float(hours_match.group(1))
+            worklog["hours"] = float(hours_match.group(1))
 
         # Extract Description (for epic info)
-        desc_match = re.search(r'Description:\s*(.+)$', line)
+        desc_match = re.search(r"Description:\s*(.+)$", line)
         if desc_match:
-            worklog['description'] = desc_match.group(1)
+            worklog["description"] = desc_match.group(1)
 
-        if worklog.get('issue_key') and worklog.get('hours'):
+        if worklog.get("issue_key") and worklog.get("hours"):
             worklogs.append(worklog)
 
     return worklogs
@@ -73,14 +73,15 @@ def backfill_with_mcp_tempo(project_key, session):
 
     # Use MCP Tempo tool to fetch worklogs (2023-present)
     print("Calling MCP Tempo tool...")
-    from src.services.project_activity_aggregator import mcp__Jira_Tempo__retrieveWorklogs
+    from src.services.project_activity_aggregator import (
+        mcp__Jira_Tempo__retrieveWorklogs,
+    )
 
-    start_date = '2023-01-01'
-    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = "2023-01-01"
+    end_date = datetime.now().strftime("%Y-%m-%d")
 
     raw_output = mcp__Jira_Tempo__retrieveWorklogs(
-        startDate=start_date,
-        endDate=end_date
+        startDate=start_date, endDate=end_date
     )
 
     print(f"✅ Received response from MCP Tempo")
@@ -91,16 +92,13 @@ def backfill_with_mcp_tempo(project_key, session):
 
     # Filter for target project
     project_worklogs = [
-        w for w in all_worklogs
-        if w['issue_key'].startswith(f"{project_key}-")
+        w for w in all_worklogs if w["issue_key"].startswith(f"{project_key}-")
     ]
     print(f"Found {len(project_worklogs):,} worklogs for {project_key}")
 
     # Group by epic → month → team (using Tempo API for epic/team lookup)
     tempo = TempoAPIClient()
-    epic_month_team_hours = defaultdict(
-        lambda: defaultdict(lambda: defaultdict(float))
-    )
+    epic_month_team_hours = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
 
     processed = 0
     skipped = 0
@@ -114,8 +112,8 @@ def backfill_with_mcp_tempo(project_key, session):
     team_map = {}
 
     for tw in tempo_worklogs:
-        issue = tw.get('issue', {})
-        issue_id = issue.get('id')
+        issue = tw.get("issue", {})
+        issue_id = issue.get("id")
         if not issue_id:
             continue
 
@@ -125,29 +123,29 @@ def backfill_with_mcp_tempo(project_key, session):
             continue
 
         # Get date
-        worklog_date = tw.get('startDate', '')[:10]
+        worklog_date = tw.get("startDate", "")[:10]
 
         # Get epic from attributes
         epic_key = None
-        attributes = tw.get('attributes', {})
+        attributes = tw.get("attributes", {})
         if attributes:
-            values = attributes.get('values', [])
+            values = attributes.get("values", [])
             for attr in values:
-                if attr.get('key') == '_Epic_':
-                    epic_key = attr.get('value')
+                if attr.get("key") == "_Epic_":
+                    epic_key = attr.get("value")
                     break
 
         if not epic_key:
-            epic_key = 'NO_EPIC'
+            epic_key = "NO_EPIC"
 
         # Get team
-        author = tw.get('author', {})
-        account_id = author.get('accountId')
-        team = 'Other'
+        author = tw.get("author", {})
+        account_id = author.get("accountId")
+        team = "Other"
         if account_id:
-            team = tempo.get_user_team(account_id) or 'Other'
-            if team == 'Unassigned':
-                team = 'Other'
+            team = tempo.get_user_team(account_id) or "Other"
+            if team == "Unassigned":
+                team = "Other"
 
         # Store mapping
         key = (issue_key, worklog_date)
@@ -159,18 +157,18 @@ def backfill_with_mcp_tempo(project_key, session):
     # Process MCP worklogs using the mappings
     print("\nProcessing worklogs with epic/team associations...")
     for worklog in project_worklogs:
-        issue_key = worklog['issue_key']
-        worklog_date_str = worklog['date']
-        hours = worklog['hours']
+        issue_key = worklog["issue_key"]
+        worklog_date_str = worklog["date"]
+        hours = worklog["hours"]
 
         # Parse date to get month
-        worklog_date = datetime.strptime(worklog_date_str, '%Y-%m-%d').date()
+        worklog_date = datetime.strptime(worklog_date_str, "%Y-%m-%d").date()
         month = date(worklog_date.year, worklog_date.month, 1)
 
         # Get epic and team from mappings
         key = (issue_key, worklog_date_str)
-        epic_key = epic_map.get(key, 'NO_EPIC')
-        team = team_map.get(key, 'Other')
+        epic_key = epic_map.get(key, "NO_EPIC")
+        team = team_map.get(key, "Other")
 
         # Accumulate
         epic_month_team_hours[epic_key][month][team] += hours
@@ -198,14 +196,14 @@ def backfill_with_mcp_tempo(project_key, session):
                         team=team,
                         hours=round(hours, 2),
                         created_at=datetime.now(),
-                        updated_at=datetime.now()
+                        updated_at=datetime.now(),
                     )
                     stmt = stmt.on_conflict_do_update(
-                        index_elements=['project_key', 'epic_key', 'month', 'team'],
+                        index_elements=["project_key", "epic_key", "month", "team"],
                         set_={
-                            'hours': stmt.excluded.hours,
-                            'updated_at': datetime.now()
-                        }
+                            "hours": stmt.excluded.hours,
+                            "updated_at": datetime.now(),
+                        },
                     )
                     session.execute(stmt)
                     records_inserted += 1
@@ -235,11 +233,12 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         session.rollback()
     finally:
         session.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

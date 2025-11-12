@@ -19,7 +19,8 @@ load_dotenv()
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-PROJECT_KEY = 'RNWL'
+PROJECT_KEY = "RNWL"
+
 
 def get_project_id_from_jira(project_key: str) -> str:
     """Get numeric project ID from Jira API using project key."""
@@ -33,10 +34,7 @@ def get_project_id_from_jira(project_key: str) -> str:
     # Setup Jira Basic Auth
     credentials = f"{jira_username}:{jira_token}"
     encoded_creds = base64.b64encode(credentials.encode()).decode()
-    headers = {
-        "Authorization": f"Basic {encoded_creds}",
-        "Accept": "application/json"
-    }
+    headers = {"Authorization": f"Basic {encoded_creds}", "Accept": "application/json"}
 
     print(f"\n📋 Step 1: Getting numeric project ID for '{project_key}' from Jira...")
     url = f"{jira_url}/rest/api/3/project/{project_key}"
@@ -71,12 +69,12 @@ def test_tempo_with_project_id(project_key: str, project_id: str):
     tempo_base_url = "https://api.tempo.io/4"
     tempo_headers = {
         "Authorization": f"Bearer {tempo_token}",
-        "Accept": "application/json"
+        "Accept": "application/json",
     }
 
     # Test with recent date range to keep results manageable
-    start_date = '2023-01-01'
-    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = "2023-01-01"
+    end_date = datetime.now().strftime("%Y-%m-%d")
 
     print(f"\n📊 Step 2: Testing Tempo API with project={project_id}...")
     print(f"   Date range: {start_date} to {end_date}")
@@ -86,7 +84,7 @@ def test_tempo_with_project_id(project_key: str, project_id: str):
         "from": start_date,
         "to": end_date,
         "limit": 5000,
-        "projectId": project_id  # Use 'projectId' parameter with NUMERIC ID
+        "projectId": project_id,  # Use 'projectId' parameter with NUMERIC ID
     }
 
     print(f"\n🔍 Request details:")
@@ -121,11 +119,17 @@ def test_tempo_with_project_id(project_key: str, project_id: str):
 
             # For verification, we'll check a sample
             if idx < 5:
-                sample_worklogs.append({
-                    "description": description[:80] + "..." if len(description) > 80 else description,
-                    "date": worklog.get("startDate", "")[:10],
-                    "hours": worklog.get("timeSpentSeconds", 0) / 3600
-                })
+                sample_worklogs.append(
+                    {
+                        "description": (
+                            description[:80] + "..."
+                            if len(description) > 80
+                            else description
+                        ),
+                        "date": worklog.get("startDate", "")[:10],
+                        "hours": worklog.get("timeSpentSeconds", 0) / 3600,
+                    }
+                )
 
         print(f"\n📝 Sample worklogs (first 5):")
         for i, wl in enumerate(sample_worklogs, 1):
@@ -170,9 +174,10 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

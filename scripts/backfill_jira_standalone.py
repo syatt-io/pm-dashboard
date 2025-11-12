@@ -11,7 +11,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 
 # Add parent directory to path
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 from src.services.vector_ingest import VectorIngestService
 from src.integrations.jira_mcp import JiraMCPClient
@@ -19,8 +19,7 @@ from config.settings import settings
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -40,15 +39,11 @@ async def get_all_projects(jira_client: JiraMCPClient) -> List[Dict[str, Any]]:
             f"{settings.jira.username}:{settings.jira.api_token}".encode()
         ).decode()
 
-        headers = {
-            "Authorization": f"Basic {auth}",
-            "Accept": "application/json"
-        }
+        headers = {"Authorization": f"Basic {auth}", "Accept": "application/json"}
 
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"{settings.jira.url}/rest/api/3/project",
-                headers=headers
+                f"{settings.jira.url}/rest/api/3/project", headers=headers
             ) as response:
                 if response.status == 200:
                     projects = await response.json()
@@ -56,7 +51,9 @@ async def get_all_projects(jira_client: JiraMCPClient) -> List[Dict[str, Any]]:
                     return projects
                 else:
                     error_text = await response.text()
-                    logger.error(f"❌ Failed to get projects: {response.status} - {error_text}")
+                    logger.error(
+                        f"❌ Failed to get projects: {response.status} - {error_text}"
+                    )
                     return []
     except Exception as e:
         logger.error(f"❌ Error getting projects: {e}")
@@ -65,7 +62,9 @@ async def get_all_projects(jira_client: JiraMCPClient) -> List[Dict[str, Any]]:
 
 async def backfill_jira_issues(days_back: int = 730) -> Dict[str, Any]:
     """Backfill all Jira issues from the last N days."""
-    logger.info(f"🔄 Starting Jira backfill ({days_back} days / ~{days_back/365:.1f} years)...")
+    logger.info(
+        f"🔄 Starting Jira backfill ({days_back} days / ~{days_back/365:.1f} years)..."
+    )
 
     # Initialize services
     try:
@@ -73,7 +72,7 @@ async def backfill_jira_issues(days_back: int = 730) -> Dict[str, Any]:
         jira_client = JiraMCPClient(
             jira_url=settings.jira.url,
             username=settings.jira.username,
-            api_token=settings.jira.api_token
+            api_token=settings.jira.api_token,
         )
         logger.info("✅ Initialized services")
     except Exception as e:
@@ -88,25 +87,29 @@ async def backfill_jira_issues(days_back: int = 730) -> Dict[str, Any]:
         return {"success": True, "issues_found": 0, "issues_ingested": 0}
 
     # Sort projects by key for consistent processing
-    projects.sort(key=lambda x: x.get('key', ''))
+    projects.sort(key=lambda x: x.get("key", ""))
 
     # Fetch issues for each project
     issues_all = []
     projects_with_issues = {}
 
     for i, project in enumerate(projects, 1):
-        project_key = project.get('key')
-        project_name = project.get('name')
+        project_key = project.get("key")
+        project_name = project.get("name")
 
         try:
             # Add delay between projects (except first one)
             if i > 1:
-                logger.info(f"   ⏱️  Waiting {DELAY_BETWEEN_PROJECTS}s before next project...")
+                logger.info(
+                    f"   ⏱️  Waiting {DELAY_BETWEEN_PROJECTS}s before next project..."
+                )
                 await asyncio.sleep(DELAY_BETWEEN_PROJECTS)
 
             # Query this specific project
             jql = f"project = {project_key} AND updated >= -{days_back}d ORDER BY updated DESC"
-            logger.info(f"[{i}/{len(projects)}] Fetching {project_key} ({project_name})...")
+            logger.info(
+                f"[{i}/{len(projects)}] Fetching {project_key} ({project_name})..."
+            )
 
             # Fetch all pages for this project
             project_issues = []
@@ -123,9 +126,9 @@ async def backfill_jira_issues(days_back: int = 730) -> Dict[str, Any]:
                         jql=jql,
                         max_results=BATCH_SIZE,
                         start_at=start_at,
-                        expand_comments=False
+                        expand_comments=False,
                     )
-                    issues_batch = result.get('issues', [])
+                    issues_batch = result.get("issues", [])
 
                     if not issues_batch:
                         break
@@ -144,42 +147,61 @@ async def backfill_jira_issues(days_back: int = 730) -> Dict[str, Any]:
             if project_issues:
                 issues_all.extend(project_issues)
                 projects_with_issues[project_key] = len(project_issues)
-                logger.info(f"   ✅ [{i}/{len(projects)}] {project_key}: {len(project_issues)} issues")
+                logger.info(
+                    f"   ✅ [{i}/{len(projects)}] {project_key}: {len(project_issues)} issues"
+                )
             else:
                 logger.info(f"   ⚪ [{i}/{len(projects)}] {project_key}: 0 issues")
 
         except Exception as e:
-            logger.error(f"   ❌ [{i}/{len(projects)}] Failed to fetch {project_key}: {e}")
+            logger.error(
+                f"   ❌ [{i}/{len(projects)}] Failed to fetch {project_key}: {e}"
+            )
             continue
 
-    logger.info(f"✅ Found {len(issues_all)} total issues across {len(projects_with_issues)} projects")
-    logger.info(f"📊 Projects with issues: {', '.join(f'{k} ({v})' for k, v in projects_with_issues.items())}")
+    logger.info(
+        f"✅ Found {len(issues_all)} total issues across {len(projects_with_issues)} projects"
+    )
+    logger.info(
+        f"📊 Projects with issues: {', '.join(f'{k} ({v})' for k, v in projects_with_issues.items())}"
+    )
 
     if not issues_all:
         logger.warning("⚠️  No issues found in any projects")
         return {"success": True, "issues_found": 0, "issues_ingested": 0}
 
     # Ingest into Pinecone
-    logger.info(f"📥 Ingesting {len(issues_all)} issues from {len(projects_with_issues)} projects into Pinecone...")
+    logger.info(
+        f"📥 Ingesting {len(issues_all)} issues from {len(projects_with_issues)} projects into Pinecone..."
+    )
 
     total_ingested = 0
     for i, (project_key, issue_count) in enumerate(projects_with_issues.items(), 1):
         try:
             # Get issues for this project
-            project_issues = [issue for issue in issues_all if issue.get('key', '').startswith(f"{project_key}-")]
+            project_issues = [
+                issue
+                for issue in issues_all
+                if issue.get("key", "").startswith(f"{project_key}-")
+            ]
 
             # Add delay between projects (except first one)
             if i > 1:
-                logger.info(f"   ⏱️  Waiting {DELAY_BETWEEN_PROJECTS}s before next project...")
+                logger.info(
+                    f"   ⏱️  Waiting {DELAY_BETWEEN_PROJECTS}s before next project..."
+                )
                 await asyncio.sleep(DELAY_BETWEEN_PROJECTS)
 
-            logger.info(f"[{i}/{len(projects_with_issues)}] Ingesting {len(project_issues)} issues from {project_key}...")
+            logger.info(
+                f"[{i}/{len(projects_with_issues)}] Ingesting {len(project_issues)} issues from {project_key}..."
+            )
             count = ingest_service.ingest_jira_issues(
-                issues=project_issues,
-                project_key=project_key
+                issues=project_issues, project_key=project_key
             )
             total_ingested += count
-            logger.info(f"✅ [{i}/{len(projects_with_issues)}] Ingested {count} issues from {project_key} (Total: {total_ingested}/{len(issues_all)})")
+            logger.info(
+                f"✅ [{i}/{len(projects_with_issues)}] Ingested {count} issues from {project_key} (Total: {total_ingested}/{len(issues_all)})"
+            )
         except Exception as e:
             logger.error(f"❌ Error ingesting {project_key}: {e}")
             continue
@@ -200,15 +222,20 @@ async def backfill_jira_issues(days_back: int = 730) -> Dict[str, Any]:
         "issues_ingested": total_ingested,
         "projects_processed": len(projects_with_issues),
         "days_back": days_back,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now().isoformat(),
     }
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Backfill Jira issues to Pinecone')
-    parser.add_argument('--days', type=int, default=730, help='Number of days to backfill (default: 730 / 2 years)')
+    parser = argparse.ArgumentParser(description="Backfill Jira issues to Pinecone")
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=730,
+        help="Number of days to backfill (default: 730 / 2 years)",
+    )
     args = parser.parse_args()
 
     result = asyncio.run(backfill_jira_issues(days_back=args.days))

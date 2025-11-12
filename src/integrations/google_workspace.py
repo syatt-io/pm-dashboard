@@ -22,9 +22,9 @@ class GoogleWorkspaceClient:
             oauth_token: Dictionary containing access_token, refresh_token, and token_uri
         """
         self.oauth_token = oauth_token
-        self.access_token = oauth_token.get('access_token')
-        self.refresh_token = oauth_token.get('refresh_token')
-        self.token_expiry = oauth_token.get('expiry')
+        self.access_token = oauth_token.get("access_token")
+        self.refresh_token = oauth_token.get("refresh_token")
+        self.token_expiry = oauth_token.get("expiry")
 
         if not self.access_token:
             raise ValueError("OAuth token must contain 'access_token'")
@@ -38,14 +38,14 @@ class GoogleWorkspaceClient:
                     "args": ["-y", "@modelcontextprotocol/server-gdrive"],
                     "env": {
                         "GOOGLE_ACCESS_TOKEN": self.access_token,
-                        "GOOGLE_REFRESH_TOKEN": self.refresh_token or ""
-                    }
+                        "GOOGLE_REFRESH_TOKEN": self.refresh_token or "",
+                    },
                 }
             }
         }
 
         # Create temp file
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
             json.dump(config, f)
             return f.name
 
@@ -67,21 +67,20 @@ class GoogleWorkspaceClient:
             # Note: This is a simplified example. In production, you'd use the MCP SDK
             # to properly interact with the MCP server
             cmd = [
-                'npx',
-                '-y',
-                '@modelcontextprotocol/inspector',
-                '--config', config_file,
-                '--server', 'google-drive',
-                '--tool', tool_name,
-                '--params', json.dumps(params)
+                "npx",
+                "-y",
+                "@modelcontextprotocol/inspector",
+                "--config",
+                config_file,
+                "--server",
+                "google-drive",
+                "--tool",
+                tool_name,
+                "--params",
+                json.dumps(params),
             ]
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
 
             if result.returncode != 0:
                 logger.error(f"MCP tool call failed: {result.stderr}")
@@ -95,7 +94,9 @@ class GoogleWorkspaceClient:
             except Exception as e:
                 logger.warning(f"Failed to delete temp config file: {e}")
 
-    def list_files(self, query: str = None, mime_type: str = None, limit: int = 10) -> List[Dict[str, Any]]:
+    def list_files(
+        self, query: str = None, mime_type: str = None, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """
         List files from Google Drive.
 
@@ -107,18 +108,16 @@ class GoogleWorkspaceClient:
         Returns:
             List of file metadata dictionaries
         """
-        params = {
-            'limit': limit
-        }
+        params = {"limit": limit}
 
         if query:
-            params['query'] = query
+            params["query"] = query
         if mime_type:
-            params['mimeType'] = mime_type
+            params["mimeType"] = mime_type
 
         try:
-            result = self._call_mcp_tool('list_files', params)
-            return result.get('files', [])
+            result = self._call_mcp_tool("list_files", params)
+            return result.get("files", [])
         except Exception as e:
             logger.error(f"Failed to list files: {e}")
             raise
@@ -133,12 +132,10 @@ class GoogleWorkspaceClient:
         Returns:
             Document content and metadata
         """
-        params = {
-            'document_id': document_id
-        }
+        params = {"document_id": document_id}
 
         try:
-            result = self._call_mcp_tool('read_document', params)
+            result = self._call_mcp_tool("read_document", params)
             return result
         except Exception as e:
             logger.error(f"Failed to read document {document_id}: {e}")
@@ -155,15 +152,13 @@ class GoogleWorkspaceClient:
         Returns:
             Sheet data and metadata
         """
-        params = {
-            'spreadsheet_id': spreadsheet_id
-        }
+        params = {"spreadsheet_id": spreadsheet_id}
 
         if range_name:
-            params['range'] = range_name
+            params["range"] = range_name
 
         try:
-            result = self._call_mcp_tool('read_sheet', params)
+            result = self._call_mcp_tool("read_sheet", params)
             return result
         except Exception as e:
             logger.error(f"Failed to read spreadsheet {spreadsheet_id}: {e}")
@@ -180,13 +175,10 @@ class GoogleWorkspaceClient:
         Returns:
             Created document metadata
         """
-        params = {
-            'title': title,
-            'content': content
-        }
+        params = {"title": title, "content": content}
 
         try:
-            result = self._call_mcp_tool('create_document', params)
+            result = self._call_mcp_tool("create_document", params)
             return result
         except Exception as e:
             logger.error(f"Failed to create document: {e}")
@@ -203,13 +195,10 @@ class GoogleWorkspaceClient:
         Returns:
             Updated document metadata
         """
-        params = {
-            'document_id': document_id,
-            'content': content
-        }
+        params = {"document_id": document_id, "content": content}
 
         try:
-            result = self._call_mcp_tool('update_document', params)
+            result = self._call_mcp_tool("update_document", params)
             return result
         except Exception as e:
             logger.error(f"Failed to update document {document_id}: {e}")
@@ -226,25 +215,20 @@ class GoogleWorkspaceClient:
         Returns:
             Created spreadsheet metadata
         """
-        params = {
-            'title': title
-        }
+        params = {"title": title}
 
         if data:
-            params['data'] = data
+            params["data"] = data
 
         try:
-            result = self._call_mcp_tool('create_sheet', params)
+            result = self._call_mcp_tool("create_sheet", params)
             return result
         except Exception as e:
             logger.error(f"Failed to create spreadsheet: {e}")
             raise
 
     def update_sheet(
-        self,
-        spreadsheet_id: str,
-        range_name: str,
-        values: List[List[Any]]
+        self, spreadsheet_id: str, range_name: str, values: List[List[Any]]
     ) -> Dict[str, Any]:
         """
         Update a Google Sheet.
@@ -258,13 +242,13 @@ class GoogleWorkspaceClient:
             Update response
         """
         params = {
-            'spreadsheet_id': spreadsheet_id,
-            'range': range_name,
-            'values': values
+            "spreadsheet_id": spreadsheet_id,
+            "range": range_name,
+            "values": values,
         }
 
         try:
-            result = self._call_mcp_tool('update_sheet', params)
+            result = self._call_mcp_tool("update_sheet", params)
             return result
         except Exception as e:
             logger.error(f"Failed to update spreadsheet {spreadsheet_id}: {e}")

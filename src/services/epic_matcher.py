@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 
 class EpicMatch(BaseModel):
     """Structured output for epic matching."""
-    suggested_epic_key: str = Field(description="The epic key that best matches the ticket")
+
+    suggested_epic_key: str = Field(
+        description="The epic key that best matches the ticket"
+    )
     confidence: float = Field(description="Confidence score between 0 and 1")
     reason: str = Field(description="Brief explanation for the match")
 
@@ -31,6 +34,7 @@ class EpicMatcher:
             self.llm = llm
         else:
             from src.processors.transcript_analyzer import TranscriptAnalyzer
+
             self.llm = TranscriptAnalyzer._default_llm()
 
         self.parser = JsonOutputParser(pydantic_object=EpicMatch)
@@ -40,7 +44,7 @@ class EpicMatcher:
         ticket_key: str,
         ticket_summary: str,
         ticket_description: Optional[str],
-        available_epics: List[Dict[str, str]]
+        available_epics: List[Dict[str, str]],
     ) -> Optional[Dict[str, Any]]:
         """
         Match a single ticket to the most appropriate epic using AI.
@@ -60,10 +64,12 @@ class EpicMatcher:
 
         try:
             # Build epic list for prompt
-            epic_list = "\n".join([
-                f"{i+1}. {epic['key']}: {epic['summary']}"
-                for i, epic in enumerate(available_epics)
-            ])
+            epic_list = "\n".join(
+                [
+                    f"{i+1}. {epic['key']}: {epic['summary']}"
+                    for i, epic in enumerate(available_epics)
+                ]
+            )
 
             # Build description text (handle both string and ADF dict formats)
             if ticket_description:
@@ -108,7 +114,7 @@ Return your suggestion as JSON."""
             # Call LLM
             messages = [
                 SystemMessage(content=system_prompt),
-                HumanMessage(content=human_prompt)
+                HumanMessage(content=human_prompt),
             ]
 
             response = self.llm.invoke(messages)
@@ -134,28 +140,32 @@ Return your suggestion as JSON."""
             result = json.loads(response_text)
 
             # Validate the suggested epic exists
-            suggested_key = result.get('suggested_epic_key')
-            if suggested_key not in [e['key'] for e in available_epics]:
-                logger.warning(f"AI suggested invalid epic key '{suggested_key}' for ticket {ticket_key}")
+            suggested_key = result.get("suggested_epic_key")
+            if suggested_key not in [e["key"] for e in available_epics]:
+                logger.warning(
+                    f"AI suggested invalid epic key '{suggested_key}' for ticket {ticket_key}"
+                )
                 return None
 
             # Return structured result
             return {
-                'ticket_key': ticket_key,
-                'suggested_epic_key': result['suggested_epic_key'],
-                'confidence': float(result['confidence']),
-                'reason': result['reason']
+                "ticket_key": ticket_key,
+                "suggested_epic_key": result["suggested_epic_key"],
+                "confidence": float(result["confidence"]),
+                "reason": result["reason"],
             }
 
         except Exception as e:
-            logger.error(f"Error matching ticket {ticket_key} to epic: {e}", exc_info=True)
+            logger.error(
+                f"Error matching ticket {ticket_key} to epic: {e}", exc_info=True
+            )
             return None
 
     def batch_match_tickets(
         self,
         tickets: List[Dict[str, Any]],
         available_epics: List[Dict[str, str]],
-        confidence_threshold: float = 0.5
+        confidence_threshold: float = 0.5,
     ) -> List[Dict[str, Any]]:
         """
         Match multiple tickets to epics in batch.
@@ -176,24 +186,28 @@ Return your suggestion as JSON."""
             logger.info(f"Matching ticket {i}/{len(tickets)}: {ticket['key']}")
 
             match_result = self.match_ticket_to_epic(
-                ticket_key=ticket['key'],
-                ticket_summary=ticket['summary'],
-                ticket_description=ticket.get('description'),
-                available_epics=available_epics
+                ticket_key=ticket["key"],
+                ticket_summary=ticket["summary"],
+                ticket_description=ticket.get("description"),
+                available_epics=available_epics,
             )
 
             if match_result:
                 # Enhance match result with summaries for better readability
-                match_result['ticket_summary'] = ticket['summary']
+                match_result["ticket_summary"] = ticket["summary"]
                 # Find the epic summary
                 epic_summary = next(
-                    (e['summary'] for e in available_epics if e['key'] == match_result['suggested_epic_key']),
-                    'Unknown Epic'
+                    (
+                        e["summary"]
+                        for e in available_epics
+                        if e["key"] == match_result["suggested_epic_key"]
+                    ),
+                    "Unknown Epic",
                 )
-                match_result['epic_summary'] = epic_summary
+                match_result["epic_summary"] = epic_summary
 
                 # Only add to results if confidence meets threshold
-                if match_result['confidence'] >= confidence_threshold:
+                if match_result["confidence"] >= confidence_threshold:
                     results.append(match_result)
                     logger.info(
                         f"  ✅ Matched to {match_result['suggested_epic_key']} "
@@ -206,25 +220,30 @@ Return your suggestion as JSON."""
                     )
             else:
                 # No match at all - add as failed match
-                results.append({
-                    'ticket_key': ticket['key'],
-                    'ticket_summary': ticket['summary'],
-                    'suggested_epic_key': 'NO_MATCH',
-                    'epic_summary': 'No suitable epic found',
-                    'confidence': 0.0,
-                    'reason': 'AI failed to find a suitable epic match for this ticket'
-                })
+                results.append(
+                    {
+                        "ticket_key": ticket["key"],
+                        "ticket_summary": ticket["summary"],
+                        "suggested_epic_key": "NO_MATCH",
+                        "epic_summary": "No suitable epic found",
+                        "confidence": 0.0,
+                        "reason": "AI failed to find a suitable epic match for this ticket",
+                    }
+                )
                 logger.warning(f"  ❌ Failed to match ticket {ticket['key']}")
 
         # Count matches by confidence level
-        above_threshold = sum(1 for r in results if r['confidence'] >= confidence_threshold)
-        logger.info(f"Batch matching complete: {len(results)} total tickets, {above_threshold} above confidence threshold")
+        above_threshold = sum(
+            1 for r in results if r["confidence"] >= confidence_threshold
+        )
+        logger.info(
+            f"Batch matching complete: {len(results)} total tickets, {above_threshold} above confidence threshold"
+        )
 
         return results
 
     def categorize_by_confidence(
-        self,
-        match_results: List[Dict[str, Any]]
+        self, match_results: List[Dict[str, Any]]
     ) -> Dict[str, List[Dict[str, Any]]]:
         """
         Categorize match results by confidence level.
@@ -235,19 +254,15 @@ Return your suggestion as JSON."""
         Returns:
             Dict with 'high', 'medium', 'low' keys containing categorized matches
         """
-        categorized = {
-            'high': [],    # 0.8+
-            'medium': [],  # 0.5-0.79
-            'low': []      # <0.5
-        }
+        categorized = {"high": [], "medium": [], "low": []}  # 0.8+  # 0.5-0.79  # <0.5
 
         for result in match_results:
-            confidence = result['confidence']
+            confidence = result["confidence"]
             if confidence >= 0.8:
-                categorized['high'].append(result)
+                categorized["high"].append(result)
             elif confidence >= 0.5:
-                categorized['medium'].append(result)
+                categorized["medium"].append(result)
             else:
-                categorized['low'].append(result)
+                categorized["low"].append(result)
 
         return categorized

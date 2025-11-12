@@ -25,8 +25,7 @@ from config.settings import settings
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ def backfill_tempo_worklogs(
     days_back: Optional[int] = None,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-    batch_id: Optional[str] = None
+    batch_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Backfill Tempo worklogs with checkpointing and verbose logging.
 
@@ -53,7 +52,9 @@ def backfill_tempo_worklogs(
     """
     # Calculate date range
     if from_date and to_date:
-        logger.info(f"🔄 Starting Tempo backfill for date range: {from_date} to {to_date}")
+        logger.info(
+            f"🔄 Starting Tempo backfill for date range: {from_date} to {to_date}"
+        )
     else:
         if days_back is None:
             days_back = 365
@@ -61,7 +62,9 @@ def backfill_tempo_worklogs(
         start_date = end_date - timedelta(days=days_back)
         from_date = start_date.strftime("%Y-%m-%d")
         to_date = end_date.strftime("%Y-%m-%d")
-        logger.info(f"🔄 Starting Tempo backfill ({days_back} days): {from_date} to {to_date}")
+        logger.info(
+            f"🔄 Starting Tempo backfill ({days_back} days): {from_date} to {to_date}"
+        )
 
     # Generate batch_id if not provided
     if not batch_id:
@@ -78,42 +81,49 @@ def backfill_tempo_worklogs(
         session = get_session()
 
         # Check if this batch was already completed
-        existing = session.query(BackfillProgress).filter_by(
-            source='tempo',
-            batch_id=batch_id,
-            status='completed'
-        ).first()
+        existing = (
+            session.query(BackfillProgress)
+            .filter_by(source="tempo", batch_id=batch_id, status="completed")
+            .first()
+        )
 
         if existing:
-            logger.warning(f"⚠️  Batch {batch_id} already completed on {existing.completed_at}")
-            logger.info(f"📊 Previous result: {existing.ingested_items} worklogs ingested")
+            logger.warning(
+                f"⚠️  Batch {batch_id} already completed on {existing.completed_at}"
+            )
+            logger.info(
+                f"📊 Previous result: {existing.ingested_items} worklogs ingested"
+            )
             session.close()
             return {
                 "success": True,
                 "already_completed": True,
                 "batch_id": batch_id,
-                "completed_at": existing.completed_at.isoformat() if existing.completed_at else None,
-                "ingested_items": existing.ingested_items
+                "completed_at": (
+                    existing.completed_at.isoformat() if existing.completed_at else None
+                ),
+                "ingested_items": existing.ingested_items,
             }
 
         # Create or update progress record
-        progress_record = session.query(BackfillProgress).filter_by(
-            source='tempo',
-            batch_id=batch_id
-        ).first()
+        progress_record = (
+            session.query(BackfillProgress)
+            .filter_by(source="tempo", batch_id=batch_id)
+            .first()
+        )
 
         if not progress_record:
             progress_record = BackfillProgress(
-                source='tempo',
+                source="tempo",
                 batch_id=batch_id,
                 start_date=from_date,
                 end_date=to_date,
-                status='running',
-                started_at=datetime.utcnow()
+                status="running",
+                started_at=datetime.utcnow(),
             )
             session.add(progress_record)
         else:
-            progress_record.status = 'running'
+            progress_record.status = "running"
             progress_record.started_at = datetime.utcnow()
             progress_record.error_message = None
 
@@ -136,7 +146,7 @@ def backfill_tempo_worklogs(
     except Exception as e:
         logger.error(f"❌ Failed to initialize services: {e}")
         if progress_record and session:
-            progress_record.status = 'failed'
+            progress_record.status = "failed"
             progress_record.error_message = f"Failed to initialize services: {e}"
             session.commit()
             session.close()
@@ -146,7 +156,9 @@ def backfill_tempo_worklogs(
     try:
         with engine.connect() as conn:
             result = conn.execute(
-                text("SELECT key, name FROM projects WHERE is_active = true ORDER BY key")
+                text(
+                    "SELECT key, name FROM projects WHERE is_active = true ORDER BY key"
+                )
             )
             active_projects = [(row[0], row[1]) for row in result]
 
@@ -155,7 +167,7 @@ def backfill_tempo_worklogs(
         if not active_projects:
             logger.warning("⚠️  No active projects found in database")
             if progress_record and session:
-                progress_record.status = 'completed'
+                progress_record.status = "completed"
                 progress_record.completed_at = datetime.utcnow()
                 session.commit()
                 session.close()
@@ -164,7 +176,7 @@ def backfill_tempo_worklogs(
     except Exception as e:
         logger.error(f"❌ Failed to get active projects: {e}")
         if progress_record and session:
-            progress_record.status = 'failed'
+            progress_record.status = "failed"
             progress_record.error_message = f"Failed to get active projects: {e}"
             session.commit()
             session.close()
@@ -185,7 +197,7 @@ def backfill_tempo_worklogs(
         if not all_worklogs:
             logger.warning("⚠️  No worklogs found in date range")
             if progress_record and session:
-                progress_record.status = 'completed'
+                progress_record.status = "completed"
                 progress_record.completed_at = datetime.utcnow()
                 session.commit()
                 session.close()
@@ -194,7 +206,7 @@ def backfill_tempo_worklogs(
     except Exception as e:
         logger.error(f"❌ Failed to fetch worklogs from Tempo: {e}")
         if progress_record and session:
-            progress_record.status = 'failed'
+            progress_record.status = "failed"
             progress_record.error_message = f"Failed to fetch worklogs: {e}"
             session.commit()
             session.close()
@@ -210,15 +222,19 @@ def backfill_tempo_worklogs(
         skipped_count = 0
 
         # Compile regex pattern once for performance
-        issue_pattern = re.compile(r'([A-Z]+-\d+)')
+        issue_pattern = re.compile(r"([A-Z]+-\d+)")
 
-        logger.info(f"🔍 Starting to filter {len(all_worklogs)} worklogs by active projects...")
+        logger.info(
+            f"🔍 Starting to filter {len(all_worklogs)} worklogs by active projects..."
+        )
 
         for idx, worklog in enumerate(all_worklogs):
             # Progress logging every 500 worklogs
             if (idx + 1) % 500 == 0:
-                logger.info(f"   Filtering progress: {idx + 1}/{len(all_worklogs)} worklogs processed... "
-                          f"(filtered: {len(filtered_worklogs)}, fast: {fast_path_count}, slow: {slow_path_count}, skipped: {skipped_count})")
+                logger.info(
+                    f"   Filtering progress: {idx + 1}/{len(all_worklogs)} worklogs processed... "
+                    f"(filtered: {len(filtered_worklogs)}, fast: {fast_path_count}, slow: {slow_path_count}, skipped: {skipped_count})"
+                )
 
                 # Update progress in database
                 if progress_record and session:
@@ -230,29 +246,33 @@ def backfill_tempo_worklogs(
 
             try:
                 # Extract project key from issue key in description or issue object
-                issue_id = worklog.get('issue', {}).get('id')
-                description = worklog.get('description', '')
+                issue_id = worklog.get("issue", {}).get("id")
+                description = worklog.get("description", "")
 
                 # Fast path: extract from description
                 issue_match = issue_pattern.search(description)
 
                 if issue_match:
                     issue_key = issue_match.group(1)
-                    project_key = issue_key.split('-')[0]
+                    project_key = issue_key.split("-")[0]
                     fast_path_count += 1
                 else:
                     # Complete path: resolve via Jira (will be cached)
                     if issue_id:
                         try:
-                            issue_key = tempo_client.get_issue_key_from_jira(str(issue_id))
+                            issue_key = tempo_client.get_issue_key_from_jira(
+                                str(issue_id)
+                            )
                             if issue_key:
-                                project_key = issue_key.split('-')[0]
+                                project_key = issue_key.split("-")[0]
                                 slow_path_count += 1
                             else:
                                 skipped_count += 1
                                 continue
                         except Exception as jira_err:
-                            logger.warning(f"Failed to resolve issue ID {issue_id}: {jira_err}")
+                            logger.warning(
+                                f"Failed to resolve issue ID {issue_id}: {jira_err}"
+                            )
                             skipped_count += 1
                             continue
                     else:
@@ -262,21 +282,29 @@ def backfill_tempo_worklogs(
                 # Only include worklogs for active projects
                 if project_key in active_project_keys:
                     filtered_worklogs.append(worklog)
-                    projects_with_worklogs[project_key] = projects_with_worklogs.get(project_key, 0) + 1
+                    projects_with_worklogs[project_key] = (
+                        projects_with_worklogs.get(project_key, 0) + 1
+                    )
 
             except Exception as worklog_err:
                 logger.warning(f"Error processing worklog {idx}: {worklog_err}")
                 skipped_count += 1
                 continue
 
-        logger.info(f"✅ Filtered to {len(filtered_worklogs)} worklogs from {len(projects_with_worklogs)} active projects")
-        logger.info(f"📊 Resolution stats: Fast path: {fast_path_count}, Slow path (Jira API): {slow_path_count}, Skipped: {skipped_count}")
-        logger.info(f"📊 Projects with worklogs: {', '.join(f'{k} ({v})' for k, v in sorted(projects_with_worklogs.items()))}")
+        logger.info(
+            f"✅ Filtered to {len(filtered_worklogs)} worklogs from {len(projects_with_worklogs)} active projects"
+        )
+        logger.info(
+            f"📊 Resolution stats: Fast path: {fast_path_count}, Slow path (Jira API): {slow_path_count}, Skipped: {skipped_count}"
+        )
+        logger.info(
+            f"📊 Projects with worklogs: {', '.join(f'{k} ({v})' for k, v in sorted(projects_with_worklogs.items()))}"
+        )
 
         if not filtered_worklogs:
             logger.warning("⚠️  No worklogs found for active projects")
             if progress_record and session:
-                progress_record.status = 'completed'
+                progress_record.status = "completed"
                 progress_record.completed_at = datetime.utcnow()
                 progress_record.ingested_items = 0
                 session.commit()
@@ -286,7 +314,7 @@ def backfill_tempo_worklogs(
     except Exception as e:
         logger.error(f"❌ Failed to filter worklogs: {e}", exc_info=True)
         if progress_record and session:
-            progress_record.status = 'failed'
+            progress_record.status = "failed"
             progress_record.error_message = f"Failed to filter worklogs: {e}"
             session.commit()
             session.close()
@@ -294,24 +322,31 @@ def backfill_tempo_worklogs(
 
     # Ingest into Pinecone
     try:
-        logger.info(f"📥 Starting ingestion of {len(filtered_worklogs)} worklogs into Pinecone...")
-        logger.info(f"⏱️  Estimated time: ~{len(filtered_worklogs) * 0.15:.0f} seconds (~{len(filtered_worklogs) * 0.15 / 60:.1f} minutes)")
+        logger.info(
+            f"📥 Starting ingestion of {len(filtered_worklogs)} worklogs into Pinecone..."
+        )
+        logger.info(
+            f"⏱️  Estimated time: ~{len(filtered_worklogs) * 0.15:.0f} seconds (~{len(filtered_worklogs) * 0.15 / 60:.1f} minutes)"
+        )
 
         # Ingest all worklogs in one call (batching and progress logging handled internally)
         count = ingest_service.ingest_tempo_worklogs(
-            worklogs=filtered_worklogs,
-            tempo_client=tempo_client
+            worklogs=filtered_worklogs, tempo_client=tempo_client
         )
 
-        logger.info(f"✅ Tempo backfill complete! Total ingested: {count} worklogs from {len(projects_with_worklogs)} active projects")
+        logger.info(
+            f"✅ Tempo backfill complete! Total ingested: {count} worklogs from {len(projects_with_worklogs)} active projects"
+        )
 
         # Log cache statistics
-        logger.info(f"📊 Issue resolution cache: {len(tempo_client.issue_cache)} entries")
+        logger.info(
+            f"📊 Issue resolution cache: {len(tempo_client.issue_cache)} entries"
+        )
         logger.info(f"📊 User name cache: {len(tempo_client.account_cache)} entries")
 
         # Update progress record as completed
         if progress_record and session:
-            progress_record.status = 'completed'
+            progress_record.status = "completed"
             progress_record.ingested_items = count
             progress_record.completed_at = datetime.utcnow()
             session.commit()
@@ -328,15 +363,15 @@ def backfill_tempo_worklogs(
             "date_range": f"{from_date} to {to_date}",
             "cache_stats": {
                 "issue_cache_entries": len(tempo_client.issue_cache),
-                "user_cache_entries": len(tempo_client.account_cache)
+                "user_cache_entries": len(tempo_client.account_cache),
             },
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
         logger.error(f"❌ Failed to ingest worklogs: {e}", exc_info=True)
         if progress_record and session:
-            progress_record.status = 'failed'
+            progress_record.status = "failed"
             progress_record.error_message = f"Failed to ingest: {e}"
             session.commit()
             session.close()
@@ -344,11 +379,20 @@ def backfill_tempo_worklogs(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Backfill Tempo worklogs into Pinecone')
-    parser.add_argument('--days-back', type=int, default=365, help='Number of days back to fetch (default: 365)')
-    parser.add_argument('--from-date', type=str, help='Start date in YYYY-MM-DD format')
-    parser.add_argument('--to-date', type=str, help='End date in YYYY-MM-DD format')
-    parser.add_argument('--batch-id', type=str, help='Optional batch identifier (e.g., "2024-01")')
+    parser = argparse.ArgumentParser(
+        description="Backfill Tempo worklogs into Pinecone"
+    )
+    parser.add_argument(
+        "--days-back",
+        type=int,
+        default=365,
+        help="Number of days back to fetch (default: 365)",
+    )
+    parser.add_argument("--from-date", type=str, help="Start date in YYYY-MM-DD format")
+    parser.add_argument("--to-date", type=str, help="End date in YYYY-MM-DD format")
+    parser.add_argument(
+        "--batch-id", type=str, help='Optional batch identifier (e.g., "2024-01")'
+    )
 
     args = parser.parse_args()
 
@@ -356,7 +400,7 @@ if __name__ == "__main__":
         days_back=args.days_back,
         from_date=args.from_date,
         to_date=args.to_date,
-        batch_id=args.batch_id
+        batch_id=args.batch_id,
     )
 
     if result.get("success"):

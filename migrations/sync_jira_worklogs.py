@@ -11,8 +11,23 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Projects to check
-PROJECTS = ['BEAU', 'RNWL', 'BEVS', 'ETHEL', 'SUBS', 'BEAN', 'SLABS', 'ECSC', 'SYDA',
-            'BIGO', 'BMBY', 'IRIS', 'RENW', 'TURK']
+PROJECTS = [
+    "BEAU",
+    "RNWL",
+    "BEVS",
+    "ETHEL",
+    "SUBS",
+    "BEAN",
+    "SLABS",
+    "ECSC",
+    "SYDA",
+    "BIGO",
+    "BMBY",
+    "IRIS",
+    "RENW",
+    "TURK",
+]
+
 
 async def get_worklogs_for_project(project_key):
     """Get worklogs for all issues in a project."""
@@ -22,7 +37,7 @@ async def get_worklogs_for_project(project_key):
     client = JiraMCPClient(
         jira_url=settings.jira.url,
         username=settings.jira.username,
-        api_token=settings.jira.api_token
+        api_token=settings.jira.api_token,
     )
 
     project_hours = defaultdict(float)
@@ -34,27 +49,29 @@ async def get_worklogs_for_project(project_key):
         logger.info(f"Found {len(issues)} issues in project {project_key}")
 
         for issue in issues:
-            issue_key = issue.get('key')
+            issue_key = issue.get("key")
 
             # Get worklogs for this issue
             try:
                 worklogs = await client.get_worklog(issue_key)
 
-                if worklogs and 'worklogs' in worklogs:
-                    for log in worklogs['worklogs']:
+                if worklogs and "worklogs" in worklogs:
+                    for log in worklogs["worklogs"]:
                         # Parse the date
-                        started = log.get('started', '')
+                        started = log.get("started", "")
                         if started:
                             # Extract date portion (YYYY-MM-DD)
                             date_str = started[:10]
                             try:
-                                log_date = datetime.strptime(date_str, '%Y-%m-%d')
+                                log_date = datetime.strptime(date_str, "%Y-%m-%d")
 
                                 # Check if it's September 2025
                                 if log_date.year == 2025 and log_date.month == 9:
-                                    hours = log.get('timeSpentSeconds', 0) / 3600
+                                    hours = log.get("timeSpentSeconds", 0) / 3600
                                     project_hours[project_key] += hours
-                                    logger.debug(f"Found September worklog for {issue_key}: {hours}h on {date_str}")
+                                    logger.debug(
+                                        f"Found September worklog for {issue_key}: {hours}h on {date_str}"
+                                    )
                             except ValueError:
                                 pass
             except Exception as e:
@@ -66,6 +83,7 @@ async def get_worklogs_for_project(project_key):
         await client.close()
 
     return project_hours
+
 
 async def sync_all_projects():
     """Sync worklogs for all projects."""
@@ -81,20 +99,24 @@ async def sync_all_projects():
 
     return all_hours
 
+
 def update_database(september_hours):
     """Update database with September hours from Jira."""
-    conn = sqlite3.connect('../database/pm_agent.db')
+    conn = sqlite3.connect("../database/pm_agent.db")
     cursor = conn.cursor()
 
     updated = 0
     for project_key, hours in september_hours.items():
         # Update the current_month_hours for September
-        cursor.execute("""
+        cursor.execute(
+            """
             UPDATE projects
             SET current_month_hours = ?,
                 updated_at = datetime('now')
             WHERE key = ?
-        """, (hours, project_key))
+        """,
+            (hours, project_key),
+        )
 
         if cursor.rowcount > 0:
             updated += 1
@@ -104,6 +126,7 @@ def update_database(september_hours):
     conn.close()
 
     return updated
+
 
 async def main():
     logger.info("Starting Jira worklog sync for September 2025...")
@@ -121,6 +144,7 @@ async def main():
         logger.info(f"\nUpdated {updated} projects in database")
     else:
         logger.info("No September hours found in Jira worklogs")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

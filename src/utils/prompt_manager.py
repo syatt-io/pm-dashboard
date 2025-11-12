@@ -21,17 +21,19 @@ class PromptManager:
         """
         if config_path is None:
             # Default to config/ai_prompts.yaml relative to project root
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            config_path = os.path.join(project_root, 'config', 'ai_prompts.yaml')
+            project_root = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            )
+            config_path = os.path.join(project_root, "config", "ai_prompts.yaml")
 
         self.config_path = config_path
         self.prompts = self._load_prompts()
-        self.settings = self.prompts.get('prompt_settings', {})
+        self.settings = self.prompts.get("prompt_settings", {})
 
     def _load_prompts(self) -> Dict[str, Any]:
         """Load prompts from the YAML configuration file."""
         try:
-            with open(self.config_path, 'r') as f:
+            with open(self.config_path, "r") as f:
                 prompts = yaml.safe_load(f)
                 logger.info(f"Successfully loaded prompts from {self.config_path}")
                 return prompts
@@ -49,23 +51,23 @@ class PromptManager:
         """Reload prompts from the configuration file."""
         logger.info("Reloading prompts configuration...")
         self.prompts = self._load_prompts()
-        self.settings = self.prompts.get('prompt_settings', {})
+        self.settings = self.prompts.get("prompt_settings", {})
 
     def get_meeting_analysis_prompts(self) -> Dict[str, str]:
         """Get all meeting analysis related prompts."""
-        return self.prompts.get('meeting_analysis', {})
+        return self.prompts.get("meeting_analysis", {})
 
     def get_slack_analysis_prompts(self) -> Dict[str, str]:
         """Get all Slack analysis related prompts."""
-        return self.prompts.get('slack_analysis', {})
+        return self.prompts.get("slack_analysis", {})
 
     def get_digest_prompts(self) -> Dict[str, str]:
         """Get all digest generation related prompts."""
-        return self.prompts.get('digest_generation', {})
+        return self.prompts.get("digest_generation", {})
 
     def get_context_search_prompts(self) -> Dict[str, str]:
         """Get all context search related prompts."""
-        return self.prompts.get('context_search', {})
+        return self.prompts.get("context_search", {})
 
     def get_prompt(self, category: str, prompt_key: str, default: str = "") -> str:
         """
@@ -119,36 +121,36 @@ class PromptManager:
     def _get_default_prompts(self) -> Dict[str, Any]:
         """Return default prompts as fallback."""
         return {
-            'meeting_analysis': {
-                'system_prompt': """You are an expert meeting analyst. Extract key information from meeting transcripts.""",
-                'action_items_prompt': """Extract action items from this meeting transcript.""",
-                'blockers_prompt': """Identify blockers and risks from this meeting.""",
-                'summary_prompt': """Create a concise meeting summary."""
+            "meeting_analysis": {
+                "system_prompt": """You are an expert meeting analyst. Extract key information from meeting transcripts.""",
+                "action_items_prompt": """Extract action items from this meeting transcript.""",
+                "blockers_prompt": """Identify blockers and risks from this meeting.""",
+                "summary_prompt": """Create a concise meeting summary.""",
             },
-            'slack_analysis': {
-                'discussions_prompt_template': """Analyze Slack discussions and extract key points."""
+            "slack_analysis": {
+                "discussions_prompt_template": """Analyze Slack discussions and extract key points."""
             },
-            'digest_generation': {
-                'system_message': """You are a project management assistant.""",
-                'insights_prompt_template': """Generate project insights from the provided data."""
+            "digest_generation": {
+                "system_message": """You are a project management assistant.""",
+                "insights_prompt_template": """Generate project insights from the provided data.""",
             },
-            'context_search': {
-                'system_message': """You are an expert technical analyst helping engineers understand project context.""",
-                'user_prompt_template': """Query: "{query}"\n{domain_context}\nSEARCH RESULTS:\n{context_text}\n\nSynthesize the results into a concise answer.""",
-                'domain_context_template': """\nDOMAIN CONTEXT:\nThis query relates to the "{project_key}" project. Related terms: {keywords_str}.\n""",
-                'detail_levels': {
-                    'brief': 'Keep your summary concise (100-200 words). Focus on the most critical information only.',
-                    'normal': 'Target 150-250 words. Be brief and direct - cut unnecessary words, get straight to the point.',
-                    'detailed': 'Be thorough but not verbose (400-600 words). Include relevant details but avoid wordiness.',
-                    'slack': 'CRITICAL: Maximum 2000 characters total. Target 200-300 words MAX. Be extremely concise.'
-                }
+            "context_search": {
+                "system_message": """You are an expert technical analyst helping engineers understand project context.""",
+                "user_prompt_template": """Query: "{query}"\n{domain_context}\nSEARCH RESULTS:\n{context_text}\n\nSynthesize the results into a concise answer.""",
+                "domain_context_template": """\nDOMAIN CONTEXT:\nThis query relates to the "{project_key}" project. Related terms: {keywords_str}.\n""",
+                "detail_levels": {
+                    "brief": "Keep your summary concise (100-200 words). Focus on the most critical information only.",
+                    "normal": "Target 150-250 words. Be brief and direct - cut unnecessary words, get straight to the point.",
+                    "detailed": "Be thorough but not verbose (400-600 words). Include relevant details but avoid wordiness.",
+                    "slack": "CRITICAL: Maximum 2000 characters total. Target 200-300 words MAX. Be extremely concise.",
+                },
             },
-            'prompt_settings': {
-                'summary_max_length': 500,
-                'transcript_max_chars': 8000,
-                'slack_messages_max_chars': 3000,
-                'max_key_discussions': 10
-            }
+            "prompt_settings": {
+                "summary_max_length": 500,
+                "transcript_max_chars": 8000,
+                "slack_messages_max_chars": 3000,
+                "max_key_discussions": 10,
+            },
         }
 
 

@@ -15,11 +15,11 @@ from config.settings import settings
 
 # Enable debug logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
+
 
 @pytest.mark.asyncio
 async def test_beauchamp_titles():
@@ -36,11 +36,7 @@ async def test_beauchamp_titles():
 
     # Perform search
     results = await search_service.search(
-        query=query,
-        days_back=30,
-        sources=['fireflies'],
-        user_id=1,
-        debug=True
+        query=query, days_back=30, sources=["fireflies"], user_id=1, debug=True
     )
 
     logger.info("=" * 80)
@@ -48,7 +44,7 @@ async def test_beauchamp_titles():
     logger.info("=" * 80)
 
     # Look for meetings with "Beauchamp" in the title
-    beauchamp_meetings = [r for r in results.results if 'beauchamp' in r.title.lower()]
+    beauchamp_meetings = [r for r in results.results if "beauchamp" in r.title.lower()]
 
     logger.info(f"\n📊 Meetings with 'Beauchamp' in title: {len(beauchamp_meetings)}")
     logger.info("=" * 80)
@@ -90,6 +86,7 @@ async def test_beauchamp_titles():
                 if embedding:
                     # Query Pinecone directly
                     from datetime import datetime, timedelta
+
                     cutoff = datetime.now() - timedelta(days=30)
 
                     results = vector_search.pinecone_index.query(
@@ -98,37 +95,46 @@ async def test_beauchamp_titles():
                         filter={
                             "$and": [
                                 {"source": "fireflies"},
-                                {"timestamp_epoch": {"$gte": int(cutoff.timestamp())}}
+                                {"timestamp_epoch": {"$gte": int(cutoff.timestamp())}},
                             ]
                         },
-                        include_metadata=True
+                        include_metadata=True,
                     )
 
                     # Look for Beauchamp in titles
                     beauchamp_in_pinecone = []
-                    for match in results.get('matches', []):
-                        metadata = match.get('metadata', {})
-                        title = metadata.get('title', '').lower()
-                        if 'beauchamp' in title:
-                            beauchamp_in_pinecone.append({
-                                'title': metadata.get('title'),
-                                'date': metadata.get('date'),
-                                'score': match.get('score'),
-                                'id': match.get('id')
-                            })
+                    for match in results.get("matches", []):
+                        metadata = match.get("metadata", {})
+                        title = metadata.get("title", "").lower()
+                        if "beauchamp" in title:
+                            beauchamp_in_pinecone.append(
+                                {
+                                    "title": metadata.get("title"),
+                                    "date": metadata.get("date"),
+                                    "score": match.get("score"),
+                                    "id": match.get("id"),
+                                }
+                            )
 
-                    logger.info(f"\n📊 Pinecone direct query found {len(beauchamp_in_pinecone)} Beauchamp meetings:")
+                    logger.info(
+                        f"\n📊 Pinecone direct query found {len(beauchamp_in_pinecone)} Beauchamp meetings:"
+                    )
 
                     if beauchamp_in_pinecone:
                         for i, meeting in enumerate(beauchamp_in_pinecone[:20], 1):
-                            logger.info(f"{i}. {meeting['title']} ({meeting['date']}) - Score: {meeting['score']:.3f}")
+                            logger.info(
+                                f"{i}. {meeting['title']} ({meeting['date']}) - Score: {meeting['score']:.3f}"
+                            )
                     else:
                         logger.error("❌ No Beauchamp meetings found in Pinecone!")
-                        logger.info("\nThis means the meetings haven't been indexed yet.")
+                        logger.info(
+                            "\nThis means the meetings haven't been indexed yet."
+                        )
                         logger.info("Run: POST /api/backfill/fireflies to index them.")
 
             except Exception as e:
                 logger.error(f"Error querying Pinecone directly: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(test_beauchamp_titles())

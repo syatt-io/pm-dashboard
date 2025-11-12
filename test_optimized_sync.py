@@ -18,7 +18,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from src.integrations.tempo import TempoAPIClient
 
-PROJECT_KEY = 'RNWL'
+PROJECT_KEY = "RNWL"
+
 
 def test_optimized_sync():
     """Test optimized sync with description extraction."""
@@ -29,11 +30,13 @@ def test_optimized_sync():
     tempo = TempoAPIClient()
 
     # Fetch worklogs (2023-present)
-    start_date = '2023-01-01'
-    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = "2023-01-01"
+    end_date = datetime.now().strftime("%Y-%m-%d")
 
     print(f"Fetching worklogs from {start_date} to {end_date}...")
-    print("(Note: project_key filter doesn't work server-side, still fetches all worklogs)")
+    print(
+        "(Note: project_key filter doesn't work server-side, still fetches all worklogs)"
+    )
 
     start_time = datetime.now()
     worklogs = tempo.get_worklogs(start_date, end_date, project_key=PROJECT_KEY)
@@ -45,7 +48,7 @@ def test_optimized_sync():
     print("Processing worklogs with OPTIMIZED approach (description extraction)...")
 
     # Issue key pattern: PROJECT-NUMBER (e.g., RNWL-123)
-    issue_pattern = re.compile(r'([A-Z]+-\d+)')
+    issue_pattern = re.compile(r"([A-Z]+-\d+)")
 
     fast_path_count = 0  # Issue key from description
     slow_path_count = 0  # Jira API lookup needed
@@ -53,22 +56,20 @@ def test_optimized_sync():
     processed = 0
     skipped = 0
 
-    epic_month_team_hours = defaultdict(
-        lambda: defaultdict(lambda: defaultdict(float))
-    )
+    epic_month_team_hours = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
 
     process_start = datetime.now()
 
     for idx, worklog in enumerate(worklogs):
-        issue = worklog.get('issue', {})
-        issue_id = issue.get('id')
+        issue = worklog.get("issue", {})
+        issue_id = issue.get("id")
         if not issue_id:
             skipped += 1
             continue
 
         # OPTIMIZED: Try description extraction FIRST
         issue_key = None
-        description = worklog.get('description', '')
+        description = worklog.get("description", "")
 
         # Fast path: Extract from description
         issue_match = issue_pattern.search(description)
@@ -85,7 +86,7 @@ def test_optimized_sync():
             continue
 
         # Filter for RNWL
-        project_key = issue_key.split('-')[0] if '-' in issue_key else None
+        project_key = issue_key.split("-")[0] if "-" in issue_key else None
         if not project_key or project_key != PROJECT_KEY:
             continue
 
@@ -93,46 +94,48 @@ def test_optimized_sync():
 
         # Get epic from Tempo attributes
         epic_key = None
-        attributes = worklog.get('attributes', {})
+        attributes = worklog.get("attributes", {})
         if attributes:
-            values = attributes.get('values', [])
+            values = attributes.get("values", [])
             for attr in values:
-                if attr.get('key') == '_Epic_':
-                    epic_key = attr.get('value')
+                if attr.get("key") == "_Epic_":
+                    epic_key = attr.get("value")
                     break
 
         if not epic_key:
-            epic_key = 'NO_EPIC'
+            epic_key = "NO_EPIC"
 
         # Get month
-        started = worklog.get('startDate')
+        started = worklog.get("startDate")
         if not started:
             skipped += 1
             continue
 
-        worklog_date = datetime.strptime(started[:10], '%Y-%m-%d').date()
+        worklog_date = datetime.strptime(started[:10], "%Y-%m-%d").date()
         month = date(worklog_date.year, worklog_date.month, 1)
 
         # Get hours
-        time_spent_seconds = worklog.get('timeSpentSeconds', 0)
+        time_spent_seconds = worklog.get("timeSpentSeconds", 0)
         hours = time_spent_seconds / 3600.0
 
         # Get team
-        author = worklog.get('author', {})
-        account_id = author.get('accountId')
+        author = worklog.get("author", {})
+        account_id = author.get("accountId")
         if account_id:
             team = tempo.get_user_team(account_id)
-            if not team or team == 'Unassigned':
-                team = 'Other'
+            if not team or team == "Unassigned":
+                team = "Other"
         else:
-            team = 'Other'
+            team = "Other"
 
         # Accumulate
         epic_month_team_hours[epic_key][month][team] += hours
         processed += 1
 
         if processed % 500 == 0:
-            print(f"  Processed {processed} RNWL worklogs... (fast: {fast_path_count}, slow: {slow_path_count})")
+            print(
+                f"  Processed {processed} RNWL worklogs... (fast: {fast_path_count}, slow: {slow_path_count})"
+            )
 
     process_duration = (datetime.now() - process_start).total_seconds()
 
@@ -146,8 +149,12 @@ def test_optimized_sync():
     print(f"Skipped: {skipped:,}\n")
 
     print(f"🚀 OPTIMIZATION METRICS:")
-    print(f"  Fast path (description): {fast_path_count:,} ({fast_path_count / len(worklogs) * 100:.1f}%)")
-    print(f"  Slow path (Jira API): {slow_path_count:,} ({slow_path_count / len(worklogs) * 100:.1f}%)")
+    print(
+        f"  Fast path (description): {fast_path_count:,} ({fast_path_count / len(worklogs) * 100:.1f}%)"
+    )
+    print(
+        f"  Slow path (Jira API): {slow_path_count:,} ({slow_path_count / len(worklogs) * 100:.1f}%)"
+    )
     print(f"  API calls avoided: {fast_path_count:,}")
     print(f"\n⏱️  PERFORMANCE:")
     print(f"  Fetch time: {fetch_duration:.1f}s")
@@ -157,8 +164,12 @@ def test_optimized_sync():
     # Estimate time saved
     if fast_path_count > 0:
         api_calls_saved = fast_path_count
-        time_saved = api_calls_saved * 0.1  # Each API call takes ~0.1s with rate limiting
-        print(f"  Estimated time saved: {time_saved / 60:.1f} minutes ({time_saved:.0f}s)")
+        time_saved = (
+            api_calls_saved * 0.1
+        )  # Each API call takes ~0.1s with rate limiting
+        print(
+            f"  Estimated time saved: {time_saved / 60:.1f} minutes ({time_saved:.0f}s)"
+        )
 
     # Show epic breakdown
     print(f"\n{'=' * 80}")
@@ -194,17 +205,17 @@ def test_optimized_sync():
     print(f"{'=' * 80}\n")
 
     # Check for NO_EPIC percentage
-    if 'NO_EPIC' in epic_month_team_hours:
+    if "NO_EPIC" in epic_month_team_hours:
         no_epic_hours = sum(
-            sum(teams.values()) for teams in epic_month_team_hours['NO_EPIC'].values()
+            sum(teams.values()) for teams in epic_month_team_hours["NO_EPIC"].values()
         )
         no_epic_pct = (no_epic_hours / total_hours * 100) if total_hours > 0 else 0
         print(f"⚠️  NO_EPIC: {no_epic_hours:,.1f} hours ({no_epic_pct:.1f}% of total)")
 
-    epics_with_data = len([e for e in epic_month_team_hours.keys() if e != 'NO_EPIC'])
+    epics_with_data = len([e for e in epic_month_team_hours.keys() if e != "NO_EPIC"])
     print(f"✅ Epics with data: {epics_with_data}")
     print()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_optimized_sync()

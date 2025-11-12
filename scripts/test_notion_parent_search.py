@@ -9,6 +9,7 @@ This script demonstrates:
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.services.vector_search import VectorSearchService
@@ -41,31 +42,25 @@ def test_parent_search():
         # Find a parent with multiple children (use the Projects database)
         parent_map = {}
         for page in pages:
-            parent = page.get('parent', {})
-            parent_type = parent.get('type', 'workspace')
+            parent = page.get("parent", {})
+            parent_type = parent.get("type", "workspace")
 
             parent_id = None
-            if parent_type == 'page_id':
-                parent_id = parent.get('page_id')
-            elif parent_type == 'database_id':
-                parent_id = parent.get('database_id')
+            if parent_type == "page_id":
+                parent_id = parent.get("page_id")
+            elif parent_type == "database_id":
+                parent_id = parent.get("database_id")
 
             if parent_id:
                 if parent_id not in parent_map:
-                    parent_map[parent_id] = {
-                        'type': parent_type,
-                        'children': []
-                    }
-                parent_map[parent_id]['children'].append({
-                    'id': page['id'],
-                    'title': notion_client.get_page_title(page)
-                })
+                    parent_map[parent_id] = {"type": parent_type, "children": []}
+                parent_map[parent_id]["children"].append(
+                    {"id": page["id"], "title": notion_client.get_page_title(page)}
+                )
 
         # Get the Projects database (most children)
         sorted_parents = sorted(
-            parent_map.items(),
-            key=lambda x: len(x[1]['children']),
-            reverse=True
+            parent_map.items(), key=lambda x: len(x[1]["children"]), reverse=True
         )
 
         if not sorted_parents:
@@ -74,10 +69,12 @@ def test_parent_search():
 
         # Use the parent with most children (Projects database)
         test_parent_id = sorted_parents[0][0]
-        test_parent_type = sorted_parents[0][1]['type']
-        test_children = sorted_parents[0][1]['children']
+        test_parent_type = sorted_parents[0][1]["type"]
+        test_children = sorted_parents[0][1]["children"]
 
-        logger.info(f"✅ Found test parent: {test_parent_id[:8]}... ({test_parent_type})")
+        logger.info(
+            f"✅ Found test parent: {test_parent_id[:8]}... ({test_parent_type})"
+        )
         logger.info(f"   └─ Has {len(test_children)} child pages\n")
 
         # Show some example child pages
@@ -99,13 +96,12 @@ def test_parent_search():
         logger.info("=" * 80)
 
         results_no_filter = vector_service.search(
-            query=test_query,
-            top_k=10,
-            days_back=90,
-            user_email="mike.samimi@syatt.io"
+            query=test_query, top_k=10, days_back=90, user_email="mike.samimi@syatt.io"
         )
 
-        notion_results_no_filter = [r for r in results_no_filter if r.source == 'notion']
+        notion_results_no_filter = [
+            r for r in results_no_filter if r.source == "notion"
+        ]
         logger.info(f"✅ Found {len(notion_results_no_filter)} Notion results\n")
 
         if notion_results_no_filter:
@@ -121,12 +117,16 @@ def test_parent_search():
         logger.info("=" * 80)
 
         # Simulate current filtering (get individual child IDs)
-        individual_page_ids = [child['id'] for child in test_children]
+        individual_page_ids = [child["id"] for child in test_children]
         logger.info(f"Filter: {len(individual_page_ids)} individual page IDs")
-        logger.info(f"Filter query: {{'page_id': {{'$in': [{individual_page_ids[0][:8]}..., ...]}}}}\n")
+        logger.info(
+            f"Filter query: {{'page_id': {{'$in': [{individual_page_ids[0][:8]}..., ...]}}}}\n"
+        )
 
         # Note: This would require custom filter - current implementation doesn't support it
-        logger.info("⚠️  Current implementation doesn't support arbitrary page_id filters")
+        logger.info(
+            "⚠️  Current implementation doesn't support arbitrary page_id filters"
+        )
         logger.info("    Would need to be implemented as project resource mapping\n")
 
         # ====================================================================
@@ -144,7 +144,9 @@ def test_parent_search():
         logger.info(f"  ]}}\n")
 
         logger.info("Benefits:")
-        logger.info(f"  ✅ Just 1 parent ID instead of {len(individual_page_ids)} individual IDs")
+        logger.info(
+            f"  ✅ Just 1 parent ID instead of {len(individual_page_ids)} individual IDs"
+        )
         logger.info(f"  ✅ Automatically includes new child pages (no manual updates)")
         logger.info(f"  ✅ Captures hierarchical relationships")
         logger.info(f"  ✅ More scalable for large workspaces\n")

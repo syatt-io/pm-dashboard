@@ -41,45 +41,61 @@ class HoursReportAgent:
         projects = []
 
         with engine.connect() as conn:
-            result = conn.execute(text("""
+            result = conn.execute(
+                text(
+                    """
                 SELECT p.key, p.name, pmf.forecasted_hours, p.is_active
                 FROM projects p
                 INNER JOIN project_monthly_forecast pmf
                     ON p.key = pmf.project_key
                     AND pmf.month_year = DATE_TRUNC('month', CURRENT_DATE)
                 WHERE p.is_active = 1 AND pmf.forecasted_hours > 0
-            """))
+            """
+                )
+            )
 
             for row in result:
-                projects.append({
-                    'key': row[0],
-                    'name': row[1],
-                    'forecasted_hours': float(row[2]),
-                    'is_active': bool(row[3])
-                })
+                projects.append(
+                    {
+                        "key": row[0],
+                        "name": row[1],
+                        "forecasted_hours": float(row[2]),
+                        "is_active": bool(row[3]),
+                    }
+                )
 
         return projects
 
     async def get_project_hours_this_month(self, project_key: str) -> float:
         """Get total hours logged for a project in the current month."""
         current_date = datetime.now()
-        start_of_month = current_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_of_month = current_date.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
         end_of_month = current_date
 
-        logger.info(f"Getting hours for project {project_key} from {start_of_month.strftime('%Y-%m-%d')} to {end_of_month.strftime('%Y-%m-%d')}")
+        logger.info(
+            f"Getting hours for project {project_key} from {start_of_month.strftime('%Y-%m-%d')} to {end_of_month.strftime('%Y-%m-%d')}"
+        )
 
         try:
             # Use Tempo MCP for accurate time tracking data
             logger.info(f"Using Tempo MCP API for project {project_key}")
-            return await self._get_hours_via_tempo_mcp(project_key, start_of_month, end_of_month)
+            return await self._get_hours_via_tempo_mcp(
+                project_key, start_of_month, end_of_month
+            )
 
         except Exception as e:
             logger.error(f"Error getting hours for project {project_key}: {e}")
             # Fallback to Jira search if Tempo fails
             logger.info(f"Falling back to Jira search API for project {project_key}")
-            return await self._get_hours_via_jira_search(project_key, start_of_month, end_of_month)
+            return await self._get_hours_via_jira_search(
+                project_key, start_of_month, end_of_month
+            )
 
-    async def _get_hours_via_jira_search(self, project_key: str, start_date: datetime, end_date: datetime) -> float:
+    async def _get_hours_via_jira_search(
+        self, project_key: str, start_date: datetime, end_date: datetime
+    ) -> float:
         """Fallback method to get hours via Jira issue search."""
         try:
             # Search for issues updated in the current month
@@ -87,44 +103,58 @@ class HoursReportAgent:
             logger.info(f"Jira search fallback for {project_key} with JQL: {jql}")
 
             issues = await self.jira_client.search_tickets(jql, max_results=1000)
-            logger.info(f"Jira search returned {len(issues)} issues for project {project_key}")
+            logger.info(
+                f"Jira search returned {len(issues)} issues for project {project_key}"
+            )
 
             total_hours = 0
             worklog_count = 0
             for issue in issues:
-                issue_key = issue.get('key', 'Unknown')
-                worklog = issue.get('fields', {}).get('worklog', {})
-                for log_entry in worklog.get('worklogs', []):
-                    log_date = datetime.strptime(log_entry['started'][:10], '%Y-%m-%d')
+                issue_key = issue.get("key", "Unknown")
+                worklog = issue.get("fields", {}).get("worklog", {})
+                for log_entry in worklog.get("worklogs", []):
+                    log_date = datetime.strptime(log_entry["started"][:10], "%Y-%m-%d")
                     if start_date <= log_date <= end_date:
-                        hours = log_entry.get('timeSpentSeconds', 0) / 3600
+                        hours = log_entry.get("timeSpentSeconds", 0) / 3600
                         total_hours += hours
                         worklog_count += 1
                         # Log first few worklogs for debugging
                         if worklog_count <= 5:
-                            logger.info(f"Sample worklog in {issue_key}: {log_entry.get('timeSpentSeconds', 0)} seconds = {hours} hours on {log_date.strftime('%Y-%m-%d')} by {log_entry.get('author', {}).get('displayName', 'Unknown')}")
+                            logger.info(
+                                f"Sample worklog in {issue_key}: {log_entry.get('timeSpentSeconds', 0)} seconds = {hours} hours on {log_date.strftime('%Y-%m-%d')} by {log_entry.get('author', {}).get('displayName', 'Unknown')}"
+                            )
                         else:
-                            logger.debug(f"Found worklog in {issue_key}: {log_entry.get('timeSpentSeconds', 0)} seconds = {hours} hours on {log_date.strftime('%Y-%m-%d')}")
+                            logger.debug(
+                                f"Found worklog in {issue_key}: {log_entry.get('timeSpentSeconds', 0)} seconds = {hours} hours on {log_date.strftime('%Y-%m-%d')}"
+                            )
 
-            logger.info(f"Jira search fallback for {project_key}: found {worklog_count} worklogs totaling {total_hours} hours")
+            logger.info(
+                f"Jira search fallback for {project_key}: found {worklog_count} worklogs totaling {total_hours} hours"
+            )
             return total_hours
 
         except Exception as e:
             logger.error(f"Error in fallback hours calculation for {project_key}: {e}")
             return 0.0
 
-    async def _get_hours_via_tempo_mcp(self, project_key: str, start_date: datetime, end_date: datetime) -> float:
+    async def _get_hours_via_tempo_mcp(
+        self, project_key: str, start_date: datetime, end_date: datetime
+    ) -> float:
         """Get hours using Tempo MCP API for accurate time tracking."""
         try:
             # We'll need to call the MCP function directly from the web interface layer
             # For now, raise an exception to trigger the fallback while we implement this properly
-            raise NotImplementedError("Tempo MCP integration needs to be called from the web interface layer")
+            raise NotImplementedError(
+                "Tempo MCP integration needs to be called from the web interface layer"
+            )
 
         except Exception as e:
             logger.error(f"Error in Tempo MCP hours calculation for {project_key}: {e}")
             raise  # Re-raise to trigger fallback
 
-    def calculate_usage_percentage(self, actual_hours: float, forecasted_hours: float, month_progress: float) -> float:
+    def calculate_usage_percentage(
+        self, actual_hours: float, forecasted_hours: float, month_progress: float
+    ) -> float:
         """Calculate the percentage of forecasted hours used."""
         if forecasted_hours <= 0:
             return 0.0
@@ -144,10 +174,15 @@ class HoursReportAgent:
 
         with engine.connect() as conn:
             # Get users who have selected this project
-            result = conn.execute(text("""
+            result = conn.execute(
+                text(
+                    """
                 SELECT email FROM user_preferences
                 WHERE json_extract(selected_projects, '$') LIKE :project_search
-            """), {"project_search": f'%"{project_key}"%'})
+            """
+                ),
+                {"project_search": f'%"{project_key}"%'},
+            )
 
             for row in result:
                 subscribers.append(row[0])
@@ -156,9 +191,9 @@ class HoursReportAgent:
 
     async def generate_project_report(self, project: Dict) -> Dict:
         """Generate a report for a single project."""
-        project_key = project['key']
-        project_name = project['name']
-        forecasted_hours = project['forecasted_hours']
+        project_key = project["key"]
+        project_name = project["name"]
+        forecasted_hours = project["forecasted_hours"]
 
         # Get actual hours for this month
         actual_hours = await self.get_project_hours_this_month(project_key)
@@ -167,7 +202,9 @@ class HoursReportAgent:
         month_progress = self.calculate_month_progress()
 
         # Calculate usage percentage
-        usage_percentage = self.calculate_usage_percentage(actual_hours, forecasted_hours, month_progress)
+        usage_percentage = self.calculate_usage_percentage(
+            actual_hours, forecasted_hours, month_progress
+        )
 
         # Calculate expected hours based on time passed
         expected_hours = forecasted_hours * month_progress
@@ -180,15 +217,15 @@ class HoursReportAgent:
             status = "under_utilized"
 
         return {
-            'project_key': project_key,
-            'project_name': project_name,
-            'forecasted_hours': forecasted_hours,
-            'actual_hours': actual_hours,
-            'expected_hours': expected_hours,
-            'usage_percentage': usage_percentage,
-            'month_progress': month_progress * 100,
-            'status': status,
-            'subscribers': self.get_project_subscribers(project_key)
+            "project_key": project_key,
+            "project_name": project_name,
+            "forecasted_hours": forecasted_hours,
+            "actual_hours": actual_hours,
+            "expected_hours": expected_hours,
+            "usage_percentage": usage_percentage,
+            "month_progress": month_progress * 100,
+            "status": status,
+            "subscribers": self.get_project_subscribers(project_key),
         }
 
     async def generate_weekly_reports(self) -> List[Dict]:
@@ -202,31 +239,35 @@ class HoursReportAgent:
             try:
                 report = await self.generate_project_report(project)
                 reports.append(report)
-                logger.info(f"Generated report for project {project['key']}: {report['usage_percentage']:.1f}% usage")
+                logger.info(
+                    f"Generated report for project {project['key']}: {report['usage_percentage']:.1f}% usage"
+                )
             except Exception as e:
-                logger.error(f"Error generating report for project {project['key']}: {e}")
+                logger.error(
+                    f"Error generating report for project {project['key']}: {e}"
+                )
 
         return reports
 
     def format_report_email(self, report: Dict) -> str:
         """Format a project report as an email body."""
-        project_name = report['project_name']
-        project_key = report['project_key']
-        usage_percentage = report['usage_percentage']
-        actual_hours = report['actual_hours']
-        forecasted_hours = report['forecasted_hours']
-        expected_hours = report['expected_hours']
-        month_progress = report['month_progress']
-        status = report['status']
+        project_name = report["project_name"]
+        project_key = report["project_key"]
+        usage_percentage = report["usage_percentage"]
+        actual_hours = report["actual_hours"]
+        forecasted_hours = report["forecasted_hours"]
+        expected_hours = report["expected_hours"]
+        month_progress = report["month_progress"]
+        status = report["status"]
 
         # Status emoji and message
         status_info = {
-            'on_track': {'emoji': '✅', 'message': 'On Track'},
-            'over_budget': {'emoji': '⚠️', 'message': 'Over Budget'},
-            'under_utilized': {'emoji': '📉', 'message': 'Under Utilized'}
+            "on_track": {"emoji": "✅", "message": "On Track"},
+            "over_budget": {"emoji": "⚠️", "message": "Over Budget"},
+            "under_utilized": {"emoji": "📉", "message": "Under Utilized"},
         }
 
-        status_display = status_info.get(status, {'emoji': '📊', 'message': 'Unknown'})
+        status_display = status_info.get(status, {"emoji": "📊", "message": "Unknown"})
 
         email_body = f"""
 <h2>{status_display['emoji']} {project_name} ({project_key}) - Weekly Hours Report</h2>
@@ -249,12 +290,12 @@ class HoursReportAgent:
 <h3>💡 Insights</h3>
 """
 
-        if status == 'over_budget':
+        if status == "over_budget":
             email_body += f"""
 <p style="color: #ff6b35;">🚨 <strong>Action Required:</strong> This project is using hours faster than expected.
 Consider reviewing scope or timeline to stay within budget.</p>
 """
-        elif status == 'under_utilized':
+        elif status == "under_utilized":
             email_body += f"""
 <p style="color: #ffa500;">⚠️ <strong>Note:</strong> This project appears to be under-utilized.
 Consider reallocating resources or reviewing project priorities.</p>
@@ -279,9 +320,11 @@ Generated on {datetime.now().strftime('%Y-%m-%d at %H:%M')}.</small></p>
         error_count = 0
 
         for report in reports:
-            subscribers = report['subscribers']
+            subscribers = report["subscribers"]
             if not subscribers:
-                logger.info(f"No subscribers for project {report['project_key']}, skipping email")
+                logger.info(
+                    f"No subscribers for project {report['project_key']}, skipping email"
+                )
                 continue
 
             try:
@@ -296,23 +339,31 @@ Generated on {datetime.now().strftime('%Y-%m-%d at %H:%M')}.</small></p>
                             to_email=email,
                             subject=email_subject,
                             body=email_body,
-                            is_html=True
+                            is_html=True,
                         )
                         sent_count += 1
-                        logger.info(f"Sent weekly report for {report['project_key']} to {email}")
+                        logger.info(
+                            f"Sent weekly report for {report['project_key']} to {email}"
+                        )
                     except Exception as e:
                         error_count += 1
-                        logger.error(f"Error sending email to {email} for project {report['project_key']}: {e}")
+                        logger.error(
+                            f"Error sending email to {email} for project {report['project_key']}: {e}"
+                        )
 
             except Exception as e:
                 error_count += 1
-                logger.error(f"Error sending reports for project {report['project_key']}: {e}")
+                logger.error(
+                    f"Error sending reports for project {report['project_key']}: {e}"
+                )
 
-        logger.info(f"Weekly reports completed: {sent_count} sent, {error_count} errors")
+        logger.info(
+            f"Weekly reports completed: {sent_count} sent, {error_count} errors"
+        )
 
         return {
-            'total_projects': len(reports),
-            'emails_sent': sent_count,
-            'errors': error_count,
-            'reports': reports
+            "total_projects": len(reports),
+            "emails_sent": sent_count,
+            "errors": error_count,
+            "reports": reports,
         }

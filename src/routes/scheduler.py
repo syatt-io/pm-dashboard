@@ -1,4 +1,5 @@
 """Scheduler and notification management routes."""
+
 from flask import Blueprint, jsonify, request
 import asyncio
 import logging
@@ -11,16 +12,17 @@ from src.services.auth import admin_required
 
 logger = logging.getLogger(__name__)
 
-scheduler_bp = Blueprint('scheduler', __name__, url_prefix='/api')
+scheduler_bp = Blueprint("scheduler", __name__, url_prefix="/api")
 
 
 def admin_or_api_key_required(f):
     """Decorator that allows either admin JWT auth or API key from environment."""
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # Check for API key in header
-        api_key = request.headers.get('X-Admin-Key')
-        admin_api_key = os.getenv('ADMIN_API_KEY')
+        api_key = request.headers.get("X-Admin-Key")
+        admin_api_key = os.getenv("ADMIN_API_KEY")
 
         if api_key and admin_api_key and api_key == admin_api_key:
             # Valid API key - proceed without JWT auth
@@ -35,6 +37,7 @@ def admin_or_api_key_required(f):
 # ============================================================================
 # Scheduler Management Routes
 # ============================================================================
+
 
 @scheduler_bp.route("/scheduler/start", methods=["POST"])
 def start_scheduler_api():
@@ -62,8 +65,10 @@ def scheduler_status():
     try:
         scheduler = get_scheduler()
         status = {
-            "running": scheduler is not None and scheduler.running if scheduler else False,
-            "active_jobs": len(schedule.jobs) if scheduler else 0
+            "running": (
+                scheduler is not None and scheduler.running if scheduler else False
+            ),
+            "active_jobs": len(schedule.jobs) if scheduler else 0,
         }
         return jsonify(status)
     except Exception as e:
@@ -73,6 +78,7 @@ def scheduler_status():
 # ============================================================================
 # Notification Trigger Routes
 # ============================================================================
+
 
 @scheduler_bp.route("/notifications/daily-digest", methods=["POST"])
 def trigger_daily_digest():
@@ -121,9 +127,9 @@ def send_custom_notification():
     """Send custom notification."""
     try:
         data = request.json or {}
-        assignee = data.get('assignee', '')
-        message = data.get('message', '')
-        priority = data.get('priority', 'normal')
+        assignee = data.get("assignee", "")
+        message = data.get("message", "")
+        priority = data.get("priority", "normal")
 
         if not assignee or not message:
             return jsonify({"error": "Assignee and message are required"}), 400
@@ -144,14 +150,14 @@ def trigger_hours_report():
     try:
         scheduler = get_scheduler()
         if not scheduler:
-            return jsonify({'success': False, 'error': 'Scheduler not running'}), 500
+            return jsonify({"success": False, "error": "Scheduler not running"}), 500
 
         asyncio.run(scheduler.send_weekly_hours_reports())
 
-        return jsonify({'success': True, 'message': 'Hours report sent successfully'})
+        return jsonify({"success": True, "message": "Hours report sent successfully"})
     except Exception as e:
         logger.error(f"Error triggering hours report: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @scheduler_bp.route("/scheduler/tempo-sync", methods=["POST"])
@@ -160,32 +166,34 @@ def trigger_tempo_sync():
     try:
         scheduler = get_scheduler()
         if not scheduler:
-            return jsonify({'success': False, 'error': 'Scheduler not running'}), 500
+            return jsonify({"success": False, "error": "Scheduler not running"}), 500
 
         # Run the sync
         scheduler.sync_tempo_hours()
 
-        return jsonify({'success': True, 'message': 'Tempo sync completed successfully'})
+        return jsonify(
+            {"success": True, "message": "Tempo sync completed successfully"}
+        )
     except Exception as e:
         logger.error(f"Error triggering Tempo sync: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============================================================================
 # Celery Task Trigger Routes (New Scheduler)
 # ============================================================================
 
+
 @scheduler_bp.route("/scheduler/celery/daily-digest", methods=["POST"])
 def trigger_celery_daily_digest():
     """Trigger daily digest via Celery task."""
     try:
         from src.tasks.celery_app import celery_app
-        task = celery_app.send_task('src.tasks.notification_tasks.send_daily_digest')
-        return jsonify({
-            "success": True,
-            "message": "Daily digest task queued",
-            "task_id": task.id
-        })
+
+        task = celery_app.send_task("src.tasks.notification_tasks.send_daily_digest")
+        return jsonify(
+            {"success": True, "message": "Daily digest task queued", "task_id": task.id}
+        )
     except Exception as e:
         logger.error(f"Error queuing daily digest: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -196,12 +204,17 @@ def trigger_celery_overdue_reminders():
     """Trigger overdue reminders via Celery task."""
     try:
         from src.tasks.celery_app import celery_app
-        task = celery_app.send_task('src.tasks.notification_tasks.send_overdue_reminders')
-        return jsonify({
-            "success": True,
-            "message": "Overdue reminders task queued",
-            "task_id": task.id
-        })
+
+        task = celery_app.send_task(
+            "src.tasks.notification_tasks.send_overdue_reminders"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": "Overdue reminders task queued",
+                "task_id": task.id,
+            }
+        )
     except Exception as e:
         logger.error(f"Error queuing overdue reminders: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -212,12 +225,17 @@ def trigger_celery_due_today():
     """Trigger due today reminders via Celery task."""
     try:
         from src.tasks.celery_app import celery_app
-        task = celery_app.send_task('src.tasks.notification_tasks.send_due_today_reminders')
-        return jsonify({
-            "success": True,
-            "message": "Due today reminders task queued",
-            "task_id": task.id
-        })
+
+        task = celery_app.send_task(
+            "src.tasks.notification_tasks.send_due_today_reminders"
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": "Due today reminders task queued",
+                "task_id": task.id,
+            }
+        )
     except Exception as e:
         logger.error(f"Error queuing due today reminders: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -228,12 +246,15 @@ def trigger_celery_weekly_summary():
     """Trigger weekly summary via Celery task."""
     try:
         from src.tasks.celery_app import celery_app
-        task = celery_app.send_task('src.tasks.notification_tasks.send_weekly_summary')
-        return jsonify({
-            "success": True,
-            "message": "Weekly summary task queued",
-            "task_id": task.id
-        })
+
+        task = celery_app.send_task("src.tasks.notification_tasks.send_weekly_summary")
+        return jsonify(
+            {
+                "success": True,
+                "message": "Weekly summary task queued",
+                "task_id": task.id,
+            }
+        )
     except Exception as e:
         logger.error(f"Error queuing weekly summary: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -253,13 +274,12 @@ def trigger_celery_tempo_sync():
     """
     try:
         from src.tasks.celery_app import celery_app
-        task = celery_app.send_task('src.tasks.notification_tasks.sync_tempo_hours')
+
+        task = celery_app.send_task("src.tasks.notification_tasks.sync_tempo_hours")
         logger.info(f"Tempo sync task queued successfully: {task.id}")
-        return jsonify({
-            "success": True,
-            "message": "Tempo sync task queued",
-            "task_id": task.id
-        })
+        return jsonify(
+            {"success": True, "message": "Tempo sync task queued", "task_id": task.id}
+        )
     except Exception as e:
         logger.error(f"Error queuing Tempo sync: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -284,18 +304,21 @@ def trigger_meeting_analysis_sync():
 
         if stats.get("success"):
             logger.info(f"Meeting analysis sync completed: {stats}")
-            return jsonify({
-                "success": True,
-                "message": "Meeting analysis sync completed",
-                **stats
-            })
+            return jsonify(
+                {"success": True, "message": "Meeting analysis sync completed", **stats}
+            )
         else:
             logger.error(f"Meeting analysis sync failed: {stats}")
-            return jsonify({
-                "success": False,
-                "error": stats.get("error", "Unknown error"),
-                **stats
-            }), 500
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": stats.get("error", "Unknown error"),
+                        **stats,
+                    }
+                ),
+                500,
+            )
 
     except Exception as e:
         logger.error(f"Error triggering meeting analysis sync: {e}", exc_info=True)
@@ -320,13 +343,16 @@ def trigger_celery_meeting_analysis_sync():
     """
     try:
         from src.tasks.celery_app import celery_app
-        task = celery_app.send_task('src.tasks.notification_tasks.analyze_meetings')
+
+        task = celery_app.send_task("src.tasks.notification_tasks.analyze_meetings")
         logger.info(f"Meeting analysis sync task queued successfully: {task.id}")
-        return jsonify({
-            "success": True,
-            "message": "Meeting analysis sync task queued",
-            "task_id": task.id
-        })
+        return jsonify(
+            {
+                "success": True,
+                "message": "Meeting analysis sync task queued",
+                "task_id": task.id,
+            }
+        )
     except Exception as e:
         logger.error(f"Error queuing meeting analysis sync: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -339,9 +365,15 @@ def trigger_all_celery_tasks():
         from src.tasks.celery_app import celery_app
 
         tasks = [
-            ('daily_digest', 'src.tasks.notification_tasks.send_daily_digest'),
-            ('overdue_reminders', 'src.tasks.notification_tasks.send_overdue_reminders'),
-            ('due_today_reminders', 'src.tasks.notification_tasks.send_due_today_reminders'),
+            ("daily_digest", "src.tasks.notification_tasks.send_daily_digest"),
+            (
+                "overdue_reminders",
+                "src.tasks.notification_tasks.send_overdue_reminders",
+            ),
+            (
+                "due_today_reminders",
+                "src.tasks.notification_tasks.send_due_today_reminders",
+            ),
         ]
 
         results = {}
@@ -349,11 +381,13 @@ def trigger_all_celery_tasks():
             task = celery_app.send_task(task_path)
             results[name] = task.id
 
-        return jsonify({
-            "success": True,
-            "message": "All notification tasks queued",
-            "task_ids": results
-        })
+        return jsonify(
+            {
+                "success": True,
+                "message": "All notification tasks queued",
+                "task_ids": results,
+            }
+        )
     except Exception as e:
         logger.error(f"Error queuing tasks: {e}")
         return jsonify({"success": False, "error": str(e)}), 500

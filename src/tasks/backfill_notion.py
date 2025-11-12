@@ -16,8 +16,7 @@ from config.settings import settings
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ def backfill_notion_pages(days_back: int = 2555):
             if i % 10 == 0:
                 logger.info(f"   Progress: {i}/{len(pages)} pages processed...")
 
-            page_id = page.get('id', '')
+            page_id = page.get("id", "")
             if page_id:
                 full_content = notion_client.get_full_page_content(page_id)
                 if full_content and full_content.strip():
@@ -79,10 +78,11 @@ def backfill_notion_pages(days_back: int = 2555):
     logger.info("📊 Ingesting into Pinecone...")
     try:
         total_ingested = ingest_service.ingest_notion_pages(
-            pages=pages,
-            full_content_map=full_content_map
+            pages=pages, full_content_map=full_content_map
         )
-        logger.info(f"✅ Notion backfill complete! Total ingested: {total_ingested} pages")
+        logger.info(
+            f"✅ Notion backfill complete! Total ingested: {total_ingested} pages"
+        )
         return 0
     except Exception as e:
         logger.error(f"❌ Failed to ingest pages: {e}")

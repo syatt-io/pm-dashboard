@@ -10,7 +10,16 @@ from typing import List, Dict, Any, Optional
 import schedule
 import time
 
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, JSON, Integer, text
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    DateTime,
+    Boolean,
+    JSON,
+    Integer,
+    text,
+)
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -25,7 +34,7 @@ from src.models.learning import Learning
 # Setup logging
 logging.basicConfig(
     level=getattr(logging, settings.agent.log_level),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -35,7 +44,8 @@ Base = declarative_base()
 
 class ProcessedMeeting(Base):
     """Database model for tracking processed meetings."""
-    __tablename__ = 'processed_meetings'
+
+    __tablename__ = "processed_meetings"
 
     meeting_id = Column(String, primary_key=True)
     title = Column(String)
@@ -53,19 +63,20 @@ class ProcessedMeeting(Base):
 
 class TodoItem(Base):
     """Database model for tracking TODOs."""
-    __tablename__ = 'todo_items'
+
+    __tablename__ = "todo_items"
 
     id = Column(String, primary_key=True)
     title = Column(String)
     description = Column(String)
     assignee = Column(String)
     due_date = Column(DateTime)
-    status = Column(String, default='pending')
+    status = Column(String, default="pending")
     ticket_key = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
     source_meeting_id = Column(String)
-    priority = Column(String, default='Medium')
+    priority = Column(String, default="Medium")
     project_key = Column(String)
     user_id = Column(Integer)  # App user ID who created this TODO
     source = Column(String)  # 'slack' or 'meeting_analysis'
@@ -73,12 +84,13 @@ class TodoItem(Base):
 
 class UserPreference(Base):
     """Database model for user project preferences."""
-    __tablename__ = 'user_preferences'
+
+    __tablename__ = "user_preferences"
 
     id = Column(String, primary_key=True)
     email = Column(String, unique=True, nullable=False)
     slack_username = Column(String)
-    notification_cadence = Column(String, default='daily')  # daily, weekly, monthly
+    notification_cadence = Column(String, default="daily")  # daily, weekly, monthly
     selected_projects = Column(JSON)  # List of Jira project keys
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
@@ -87,11 +99,14 @@ class UserPreference(Base):
 
 class ProjectChange(Base):
     """Database model for tracking Jira project changes."""
-    __tablename__ = 'project_changes'
+
+    __tablename__ = "project_changes"
 
     id = Column(String, primary_key=True)
     project_key = Column(String, nullable=False)
-    change_type = Column(String, nullable=False)  # created, updated, status_changed, assignee_changed, time_logged
+    change_type = Column(
+        String, nullable=False
+    )  # created, updated, status_changed, assignee_changed, time_logged
     ticket_key = Column(String, nullable=False)
     ticket_title = Column(String)
     old_value = Column(String)
@@ -107,7 +122,8 @@ class ProjectChange(Base):
 
 class MeetingProjectConnection(Base):
     """Database model for storing meeting-project relevance connections."""
-    __tablename__ = 'meeting_project_connections'
+
+    __tablename__ = "meeting_project_connections"
 
     id = Column(String, primary_key=True)
     meeting_id = Column(String, nullable=False)
@@ -120,7 +136,9 @@ class MeetingProjectConnection(Base):
     matching_factors = Column(JSON)  # List of factors that led to the connection
     created_at = Column(DateTime, default=datetime.utcnow)
     last_confirmed_at = Column(DateTime)  # When this connection was last verified
-    is_verified = Column(Boolean, default=False)  # Whether this connection has been manually verified
+    is_verified = Column(
+        Boolean, default=False
+    )  # Whether this connection has been manually verified
 
 
 class PMAgent:
@@ -132,7 +150,7 @@ class PMAgent:
         self.jira_client = JiraMCPClient(
             jira_url=settings.jira.url,
             username=settings.jira.username,
-            api_token=settings.jira.api_token
+            api_token=settings.jira.api_token,
         )
         self.analyzer = TranscriptAnalyzer()
         self.notifier = NotificationManager(settings.notifications)
@@ -154,21 +172,31 @@ class PMAgent:
                 # Check if we need to migrate slack_user_id to slack_username
                 try:
                     # Try to query the old column
-                    conn.execute(text("SELECT slack_user_id FROM user_preferences LIMIT 1"))
+                    conn.execute(
+                        text("SELECT slack_user_id FROM user_preferences LIMIT 1")
+                    )
 
                     # If we get here, the old column exists, so we need to migrate
                     logger.info("Migrating slack_user_id to slack_username...")
 
                     # Add new column
                     try:
-                        conn.execute(text("ALTER TABLE user_preferences ADD COLUMN slack_username TEXT"))
+                        conn.execute(
+                            text(
+                                "ALTER TABLE user_preferences ADD COLUMN slack_username TEXT"
+                            )
+                        )
                         conn.commit()
                     except Exception:
                         # Column might already exist
                         pass
 
                     # Copy data from old column to new column
-                    conn.execute(text("UPDATE user_preferences SET slack_username = slack_user_id WHERE slack_user_id IS NOT NULL"))
+                    conn.execute(
+                        text(
+                            "UPDATE user_preferences SET slack_username = slack_user_id WHERE slack_user_id IS NOT NULL"
+                        )
+                    )
                     conn.commit()
 
                     # Drop old column (SQLite doesn't support DROP COLUMN directly, so we'll leave it)
@@ -187,9 +215,11 @@ class PMAgent:
 
         try:
             # Get last processed meeting ID
-            last_processed = self.db_session.query(ProcessedMeeting).order_by(
-                ProcessedMeeting.processed_at.desc()
-            ).first()
+            last_processed = (
+                self.db_session.query(ProcessedMeeting)
+                .order_by(ProcessedMeeting.processed_at.desc())
+                .first()
+            )
             last_meeting_id = last_processed.meeting_id if last_processed else None
 
             # Fetch new meetings
@@ -202,8 +232,7 @@ class PMAgent:
         except Exception as e:
             logger.error(f"Error processing meetings: {e}")
             await self.notifier.send_urgent_notification(
-                "Meeting Processing Failed",
-                f"Failed to process meetings: {str(e)}"
+                "Meeting Processing Failed", f"Failed to process meetings: {str(e)}"
             )
 
     async def _process_single_meeting(self, meeting_data: Dict[str, Any]):
@@ -222,15 +251,12 @@ class PMAgent:
 
             # Analyze transcript
             analysis = self.analyzer.analyze_transcript(
-                transcript.transcript,
-                meeting_title,
-                transcript.date
+                transcript.transcript, meeting_title, transcript.date
             )
 
             # Create Jira tickets from action items
             tickets_created = await self._create_tickets_from_action_items(
-                analysis.action_items,
-                meeting_title
+                analysis.action_items, meeting_title
             )
 
             # Store TODOs in database
@@ -240,11 +266,13 @@ class PMAgent:
                     title=item.title,
                     description=item.description,
                     assignee=item.assignee,
-                    due_date=datetime.fromisoformat(item.due_date) if item.due_date else None,
+                    due_date=(
+                        datetime.fromisoformat(item.due_date) if item.due_date else None
+                    ),
                     source_meeting_id=meeting_id,
                     ticket_key=tickets_created.get(item.title),
                     project_key=settings.jira.default_project,  # Use the default project from settings
-                    source='meeting_analysis'  # Mark as meeting-created for visibility filtering
+                    source="meeting_analysis",  # Mark as meeting-created for visibility filtering
                 )
                 self.db_session.add(todo)
 
@@ -254,7 +282,7 @@ class PMAgent:
                 title=meeting_title,
                 date=transcript.date,
                 action_items=[item.dict() for item in analysis.action_items],
-                tickets_created=tickets_created
+                tickets_created=tickets_created,
             )
             self.db_session.add(processed)
             self.db_session.commit()
@@ -263,7 +291,7 @@ class PMAgent:
             await self.notifier.send_meeting_processed_notification(
                 meeting_title,
                 len(analysis.action_items),
-                list(tickets_created.values())
+                list(tickets_created.values()),
             )
 
             logger.info(f"Successfully processed meeting: {meeting_title}")
@@ -275,13 +303,14 @@ class PMAgent:
                 meeting_id=meeting_id,
                 title=meeting_title,
                 date=datetime.now(),
-                success=False
+                success=False,
             )
             self.db_session.add(processed)
             self.db_session.commit()
 
-    async def _create_tickets_from_action_items(self, action_items: List[ActionItem],
-                                               meeting_title: str) -> Dict[str, str]:
+    async def _create_tickets_from_action_items(
+        self, action_items: List[ActionItem], meeting_title: str
+    ) -> Dict[str, str]:
         """Create Jira tickets from action items."""
         tickets_created = {}
 
@@ -297,7 +326,7 @@ class PMAgent:
                         project_key=settings.jira.default_project,
                         assignee=item.assignee,
                         due_date=item.due_date,
-                        labels=["pm-agent", "auto-created"]
+                        labels=["pm-agent", "auto-created"],
                     )
 
                     # Create ticket
@@ -320,41 +349,74 @@ class PMAgent:
 
         try:
             # Get overdue TODOs
-            overdue = self.db_session.query(TodoItem).filter(
-                TodoItem.due_date < datetime.now(),
-                TodoItem.status != 'completed'
-            ).all()
+            overdue = (
+                self.db_session.query(TodoItem)
+                .filter(
+                    TodoItem.due_date < datetime.now(), TodoItem.status != "completed"
+                )
+                .all()
+            )
 
             # Get TODOs due today
             today_start = datetime.now().replace(hour=0, minute=0, second=0)
             today_end = today_start + timedelta(days=1)
-            due_today = self.db_session.query(TodoItem).filter(
-                TodoItem.due_date >= today_start,
-                TodoItem.due_date < today_end,
-                TodoItem.status != 'completed'
-            ).all()
+            due_today = (
+                self.db_session.query(TodoItem)
+                .filter(
+                    TodoItem.due_date >= today_start,
+                    TodoItem.due_date < today_end,
+                    TodoItem.status != "completed",
+                )
+                .all()
+            )
 
             # Get all pending TODOs
-            all_todos = self.db_session.query(TodoItem).filter(
-                TodoItem.status == 'pending'
-            ).limit(20).all()
+            all_todos = (
+                self.db_session.query(TodoItem)
+                .filter(TodoItem.status == "pending")
+                .limit(20)
+                .all()
+            )
 
             # Check Jira for overdue tickets
             async with self.jira_client as client:
-                jira_overdue = await client.get_overdue_tickets(settings.jira.default_project)
-                jira_due_soon = await client.get_tickets_due_soon(3, settings.jira.default_project)
+                jira_overdue = await client.get_overdue_tickets(
+                    settings.jira.default_project
+                )
+                jira_due_soon = await client.get_tickets_due_soon(
+                    3, settings.jira.default_project
+                )
 
             # Prepare digest data
-            overdue_items = [{"title": t.title, "assignee": t.assignee} for t in overdue]
-            overdue_items.extend([{"title": t.get("summary"), "assignee": t.get("assignee")} for t in jira_overdue])
+            overdue_items = [
+                {"title": t.title, "assignee": t.assignee} for t in overdue
+            ]
+            overdue_items.extend(
+                [
+                    {"title": t.get("summary"), "assignee": t.get("assignee")}
+                    for t in jira_overdue
+                ]
+            )
 
-            due_today_items = [{"title": t.title, "assignee": t.assignee} for t in due_today]
-            due_today_items.extend([{"title": t.get("summary"), "assignee": t.get("assignee")} for t in jira_due_soon])
+            due_today_items = [
+                {"title": t.title, "assignee": t.assignee} for t in due_today
+            ]
+            due_today_items.extend(
+                [
+                    {"title": t.get("summary"), "assignee": t.get("assignee")}
+                    for t in jira_due_soon
+                ]
+            )
 
-            todo_items = [{"title": t.title, "description": t.description[:100]} for t in all_todos]
+            todo_items = [
+                {"title": t.title, "description": t.description[:100]}
+                for t in all_todos
+            ]
 
             # Send digest
-            await self.notifier.send_daily_digest(todo_items, overdue_items, due_today_items)
+            await self.notifier.send_daily_digest(
+                todo_items, overdue_items, due_today_items
+            )
 
             logger.info("Daily digest sent successfully")
 
@@ -368,17 +430,25 @@ class PMAgent:
         try:
             # Check for items due within 2 hours
             urgent_deadline = datetime.now() + timedelta(hours=2)
-            urgent_todos = self.db_session.query(TodoItem).filter(
-                TodoItem.due_date <= urgent_deadline,
-                TodoItem.due_date > datetime.now(),
-                TodoItem.status != 'completed'
-            ).all()
+            urgent_todos = (
+                self.db_session.query(TodoItem)
+                .filter(
+                    TodoItem.due_date <= urgent_deadline,
+                    TodoItem.due_date > datetime.now(),
+                    TodoItem.status != "completed",
+                )
+                .all()
+            )
 
             for todo in urgent_todos:
                 await self.notifier.send_urgent_notification(
                     "TODO Due Soon",
                     f"Task '{todo.title}' is due at {todo.due_date.strftime('%I:%M %p')}",
-                    {"key": todo.ticket_key, "summary": todo.title, "assignee": todo.assignee}
+                    {
+                        "key": todo.ticket_key,
+                        "summary": todo.title,
+                        "assignee": todo.assignee,
+                    },
                 )
 
         except Exception as e:
@@ -399,12 +469,8 @@ class PMAgent:
         schedule.every().day.at("17:00").do(
             lambda: asyncio.run(self.send_daily_digest())
         )
-        schedule.every().hour.do(
-            lambda: asyncio.run(self.process_meetings())
-        )
-        schedule.every(30).minutes.do(
-            lambda: asyncio.run(self.check_urgent_items())
-        )
+        schedule.every().hour.do(lambda: asyncio.run(self.process_meetings()))
+        schedule.every(30).minutes.do(lambda: asyncio.run(self.check_urgent_items()))
 
         logger.info("PM Agent started - running on schedule")
         while True:
@@ -438,16 +504,24 @@ async def test_connections():
         results = await agent.notifier.test_channels()
         for channel, success in results.items():
             status = "✅" if success else "❌"
-            print(f"{status} {channel.capitalize()}: {'Connected' if success else 'Failed'}")
+            print(
+                f"{status} {channel.capitalize()}: {'Connected' if success else 'Failed'}"
+            )
     except Exception as e:
         print(f"❌ Notifications: Failed - {e}")
 
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="PM Agent - Autonomous Project Management Assistant")
-    parser.add_argument("--mode", choices=["development", "production", "test"], default="development",
-                       help="Run mode")
+    parser = argparse.ArgumentParser(
+        description="PM Agent - Autonomous Project Management Assistant"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["development", "production", "test"],
+        default="development",
+        help="Run mode",
+    )
     parser.add_argument("--once", action="store_true", help="Run once and exit")
     parser.add_argument("--test", action="store_true", help="Test connections")
 

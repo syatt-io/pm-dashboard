@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 
 def test_digest_generation():
     """Test digest generation with existing test data."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST: Job Monitoring Digest Generation")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     db = next(get_db())
 
@@ -31,43 +31,53 @@ def test_digest_generation():
         digest = digest_service.generate_daily_digest(hours_back=24)
 
         # Print summary
-        summary = digest['summary']
+        summary = digest["summary"]
         print("\n📊 SUMMARY:")
-        print(f"  Period: {summary['period_start'][:19]} to {summary['period_end'][:19]}")
+        print(
+            f"  Period: {summary['period_start'][:19]} to {summary['period_end'][:19]}"
+        )
         print(f"  Total Executions: {summary['total_executions']}")
         print(f"  Successful: {summary['successful']} ✅")
         print(f"  Failed: {summary['failed']} ❌")
         print(f"  Success Rate: {summary['success_rate']}%")
 
         # Print category breakdown
-        if digest['by_category']:
+        if digest["by_category"]:
             print("\n📁 BY CATEGORY:")
-            for category, stats in sorted(digest['by_category'].items()):
+            for category, stats in sorted(digest["by_category"].items()):
                 print(f"  {category}:")
-                print(f"    Total: {stats['total']}, Success: {stats['successful']}, Failed: {stats['failed']}")
+                print(
+                    f"    Total: {stats['total']}, Success: {stats['successful']}, Failed: {stats['failed']}"
+                )
                 print(f"    Success Rate: {stats['success_rate']}%")
 
         # Print failures
-        if digest['failures']:
+        if digest["failures"]:
             print(f"\n❌ FAILURES ({len(digest['failures'])}):")
-            for failure in digest['failures'][:5]:  # Show top 5
+            for failure in digest["failures"][:5]:  # Show top 5
                 print(f"  {failure['priority'].upper()} - {failure['job_name']}")
                 print(f"    Status: {failure['status']}")
-                error_msg = failure['error_message'][:100] if failure['error_message'] else 'N/A'
+                error_msg = (
+                    failure["error_message"][:100]
+                    if failure["error_message"]
+                    else "N/A"
+                )
                 print(f"    Error: {error_msg}")
 
         # Print slow jobs
-        if digest['slow_jobs']:
+        if digest["slow_jobs"]:
             print(f"\n🐌 SLOW JOBS ({len(digest['slow_jobs'])}):")
-            for slow_job in digest['slow_jobs']:
+            for slow_job in digest["slow_jobs"]:
                 print(f"  {slow_job['job_name']}")
-                print(f"    Expected: {slow_job['expected_duration']}s, Actual: {slow_job['actual_duration']}s")
+                print(
+                    f"    Expected: {slow_job['expected_duration']}s, Actual: {slow_job['actual_duration']}s"
+                )
                 print(f"    Slowdown: {slow_job['slowdown_factor']}x")
 
         # Print recommendations
-        if digest['recommendations']:
+        if digest["recommendations"]:
             print("\n💡 RECOMMENDATIONS:")
-            for rec in digest['recommendations']:
+            for rec in digest["recommendations"]:
                 print(f"  • {rec}")
 
         return digest, True
@@ -75,6 +85,7 @@ def test_digest_generation():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return None, False
     finally:
@@ -83,9 +94,9 @@ def test_digest_generation():
 
 def test_email_formatting(digest):
     """Test email HTML formatting."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST: Email HTML Formatting")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     db = next(get_db())
 
@@ -94,18 +105,26 @@ def test_email_formatting(digest):
         email_html = digest_service.format_email_body(digest)
 
         # Check HTML is generated
-        if '<html>' in email_html and '</html>' in email_html:
+        if "<html>" in email_html and "</html>" in email_html:
             print("✅ Email HTML generated successfully")
             print(f"   Length: {len(email_html)} characters")
 
             # Check key sections
             sections = [
-                ('Job Monitoring Daily Digest', 'Header'),
-                ('Total Executions', 'Summary metrics'),
-                ('Recommendations', 'Recommendations section'),
-                ('Failed Jobs', 'Failures section') if digest['failures'] else (None, None),
-                ('Slow Jobs', 'Slow jobs section') if digest['slow_jobs'] else (None, None),
-                ('Breakdown by Category', 'Category section')
+                ("Job Monitoring Daily Digest", "Header"),
+                ("Total Executions", "Summary metrics"),
+                ("Recommendations", "Recommendations section"),
+                (
+                    ("Failed Jobs", "Failures section")
+                    if digest["failures"]
+                    else (None, None)
+                ),
+                (
+                    ("Slow Jobs", "Slow jobs section")
+                    if digest["slow_jobs"]
+                    else (None, None)
+                ),
+                ("Breakdown by Category", "Category section"),
             ]
 
             missing_sections = []
@@ -119,7 +138,7 @@ def test_email_formatting(digest):
                 print(f"⚠️  Missing sections: {', '.join(missing_sections)}")
 
             # Optionally save to file for inspection
-            with open('/tmp/job_digest_email.html', 'w') as f:
+            with open("/tmp/job_digest_email.html", "w") as f:
                 f.write(email_html)
             print("   Saved sample to: /tmp/job_digest_email.html")
 
@@ -131,6 +150,7 @@ def test_email_formatting(digest):
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -139,9 +159,9 @@ def test_email_formatting(digest):
 
 def test_slack_formatting(digest):
     """Test Slack message formatting."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST: Slack Message Formatting")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     db = next(get_db())
 
@@ -156,12 +176,12 @@ def test_slack_formatting(digest):
 
             # Check key sections
             sections = [
-                ('Job Monitoring Daily Digest', 'Header'),
-                ('Summary:', 'Summary section'),
-                ('Recommendations:', 'Recommendations'),
-                ('Failed Jobs' if digest['failures'] else None, 'Failures'),
-                ('Slow Jobs' if digest['slow_jobs'] else None, 'Slow jobs'),
-                ('By Category:', 'Category breakdown')
+                ("Job Monitoring Daily Digest", "Header"),
+                ("Summary:", "Summary section"),
+                ("Recommendations:", "Recommendations"),
+                ("Failed Jobs" if digest["failures"] else None, "Failures"),
+                ("Slow Jobs" if digest["slow_jobs"] else None, "Slow jobs"),
+                ("By Category:", "Category breakdown"),
             ]
 
             missing_sections = []
@@ -190,6 +210,7 @@ def test_slack_formatting(digest):
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
     finally:
@@ -214,14 +235,14 @@ def main():
     success3 = test_slack_formatting(digest)
 
     # Print summary
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST SUMMARY")
-    print("="*70 + "\n")
+    print("=" * 70 + "\n")
 
     results = [
         ("Digest Generation", success1),
         ("Email Formatting", success2),
-        ("Slack Formatting", success3)
+        ("Slack Formatting", success3),
     ]
 
     passed = sum(1 for _, result in results if result)

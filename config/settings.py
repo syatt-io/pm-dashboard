@@ -11,6 +11,7 @@ load_dotenv()
 @dataclass
 class FirefliesConfig:
     """Fireflies.ai API configuration."""
+
     api_key: str
     base_url: str = "https://api.fireflies.ai/graphql"
 
@@ -18,6 +19,7 @@ class FirefliesConfig:
 @dataclass
 class JiraConfig:
     """Jira configuration for MCP integration."""
+
     url: str
     username: str
     api_token: str
@@ -27,6 +29,7 @@ class JiraConfig:
 @dataclass
 class NotificationConfig:
     """Notification settings for multiple channels."""
+
     slack_bot_token: Optional[str] = None
     slack_signing_secret: Optional[str] = None
     slack_channel: str = "#mikes-minion"
@@ -46,6 +49,7 @@ class NotificationConfig:
 @dataclass
 class SlackChatConfig:
     """Slack conversational chat feature configuration."""
+
     enabled: bool = False
     whitelisted_users: List[str] = None  # List of Slack user IDs
 
@@ -57,6 +61,7 @@ class SlackChatConfig:
 @dataclass
 class AIConfig:
     """AI model configuration."""
+
     api_key: str
     provider: str = "openai"  # "openai", "anthropic", or "google"
     model: str = "gpt-4"  # Default - override with provider-specific MODEL env var
@@ -67,6 +72,7 @@ class AIConfig:
 @dataclass
 class PineconeConfig:
     """Pinecone vector database configuration."""
+
     api_key: str
     environment: str
     index_name: str = "agent-pm-context"
@@ -77,6 +83,7 @@ class PineconeConfig:
 @dataclass
 class NotionConfig:
     """Notion API configuration."""
+
     api_key: str
 
 
@@ -88,6 +95,7 @@ class GitHubConfig:
     1. Personal Access Token (legacy): Set api_token
     2. GitHub App (recommended): Set app_id, private_key, installation_id
     """
+
     # Personal Access Token (legacy)
     api_token: str = ""
 
@@ -103,6 +111,7 @@ class GitHubConfig:
 @dataclass
 class WebConfig:
     """Web interface configuration."""
+
     base_url: str = "http://localhost:3030"
     port: int = 3030
     host: str = "127.0.0.1"
@@ -112,6 +121,7 @@ class WebConfig:
 @dataclass
 class AgentConfig:
     """Main agent configuration."""
+
     run_schedule: str = "0 8,17 * * *"  # Cron expression
     debug_mode: bool = False
     log_level: str = "INFO"
@@ -140,7 +150,9 @@ class Settings:
 
         return FirefliesConfig(
             api_key=api_key,
-            base_url=os.getenv("FIREFLIES_BASE_URL", "https://api.fireflies.ai/graphql")
+            base_url=os.getenv(
+                "FIREFLIES_BASE_URL", "https://api.fireflies.ai/graphql"
+            ),
         )
 
     @staticmethod
@@ -152,14 +164,17 @@ class Settings:
         if not all([jira_url, username, api_token]):
             # JIRA config is optional - warn but don't fail
             import warnings
-            warnings.warn("JIRA_URL, JIRA_USERNAME, and JIRA_API_TOKEN not set. JIRA integration will be disabled.")
+
+            warnings.warn(
+                "JIRA_URL, JIRA_USERNAME, and JIRA_API_TOKEN not set. JIRA integration will be disabled."
+            )
             return None
 
         return JiraConfig(
             url=jira_url,
             username=username,
             api_token=api_token,
-            default_project=os.getenv("JIRA_DEFAULT_PROJECT")
+            default_project=os.getenv("JIRA_DEFAULT_PROJECT"),
         )
 
     @staticmethod
@@ -183,13 +198,14 @@ class Settings:
                 private_key = private_key_env
             elif os.path.isfile(private_key_env):
                 # Path to PEM file
-                with open(private_key_env, 'r') as f:
+                with open(private_key_env, "r") as f:
                     private_key = f.read()
             else:
                 # Try to interpret as base64-encoded key (for environment variables)
                 import base64
+
                 try:
-                    private_key = base64.b64decode(private_key_env).decode('utf-8')
+                    private_key = base64.b64decode(private_key_env).decode("utf-8")
                 except Exception:
                     private_key = private_key_env  # Use as-is
 
@@ -201,7 +217,7 @@ class Settings:
             app_id=app_id,
             private_key=private_key,
             installation_id=installation_id,
-            organization=os.getenv("GITHUB_ORGANIZATION", "")
+            organization=os.getenv("GITHUB_ORGANIZATION", ""),
         )
 
     @staticmethod
@@ -221,7 +237,7 @@ class Settings:
             smtp_password=os.getenv("SMTP_PASSWORD") or None,
             teams_webhook_url=os.getenv("TEAMS_WEBHOOK_URL") or None,
             morning_digest_time=os.getenv("MORNING_DIGEST_TIME") or "08:00",
-            evening_digest_time=os.getenv("EVENING_DIGEST_TIME") or "17:00"
+            evening_digest_time=os.getenv("EVENING_DIGEST_TIME") or "17:00",
         )
 
     @staticmethod
@@ -231,12 +247,11 @@ class Settings:
 
         # Parse whitelisted users (comma-separated Slack user IDs)
         whitelist_str = os.getenv("SLACK_CHAT_WHITELISTED_USERS", "")
-        whitelisted_users = [uid.strip() for uid in whitelist_str.split(",") if uid.strip()]
+        whitelisted_users = [
+            uid.strip() for uid in whitelist_str.split(",") if uid.strip()
+        ]
 
-        return SlackChatConfig(
-            enabled=enabled,
-            whitelisted_users=whitelisted_users
-        )
+        return SlackChatConfig(enabled=enabled, whitelisted_users=whitelisted_users)
 
     @staticmethod
     def _load_ai_config() -> Optional[AIConfig]:
@@ -260,12 +275,18 @@ class Settings:
             model = os.getenv("GOOGLE_MODEL", "gemini-1.5-pro")
         else:
             import warnings
-            warnings.warn(f"Unsupported AI provider: {provider}. AI features will be disabled.")
+
+            warnings.warn(
+                f"Unsupported AI provider: {provider}. AI features will be disabled."
+            )
             return None
 
         if not api_key:
             import warnings
-            warnings.warn(f"{provider.upper()}_API_KEY not set in environment. AI features will be disabled.")
+
+            warnings.warn(
+                f"{provider.upper()}_API_KEY not set in environment. AI features will be disabled."
+            )
             return None
 
         return AIConfig(
@@ -273,7 +294,7 @@ class Settings:
             model=model,
             api_key=api_key,
             temperature=float(os.getenv("AI_TEMPERATURE", "0.3")),
-            max_tokens=int(os.getenv("AI_MAX_TOKENS", "2000"))
+            max_tokens=int(os.getenv("AI_MAX_TOKENS", "2000")),
         )
 
     @staticmethod
@@ -321,7 +342,7 @@ class Settings:
                     model=model,
                     api_key=api_key,
                     temperature=system_settings.ai_temperature,
-                    max_tokens=system_settings.ai_max_tokens
+                    max_tokens=system_settings.ai_max_tokens,
                 )
             finally:
                 session.close()
@@ -329,6 +350,7 @@ class Settings:
         except Exception as e:
             # If database doesn't exist or table doesn't exist yet, return None to fallback to env
             import logging
+
             logger = logging.getLogger(__name__)
             logger.debug(f"Could not load AI config from database: {e}")
             return None
@@ -337,8 +359,11 @@ class Settings:
         """Reload AI configuration from database (for dynamic updates)."""
         self.ai = self._load_ai_config()
         import logging
+
         logger = logging.getLogger(__name__)
-        logger.info(f"AI config reloaded: provider={self.ai.provider}, model={self.ai.model}")
+        logger.info(
+            f"AI config reloaded: provider={self.ai.provider}, model={self.ai.model}"
+        )
 
     @classmethod
     def get_fresh_ai_config(cls) -> AIConfig:
@@ -355,7 +380,7 @@ class Settings:
             run_schedule=os.getenv("AGENT_RUN_SCHEDULE", "0 8,17 * * *"),
             debug_mode=os.getenv("DEBUG_MODE", "false").lower() == "true",
             log_level=os.getenv("LOG_LEVEL", "INFO"),
-            database_url=os.getenv("DATABASE_URL", "sqlite:///database/pm_agent.db")
+            database_url=os.getenv("DATABASE_URL", "sqlite:///database/pm_agent.db"),
         )
 
     @staticmethod
@@ -364,7 +389,7 @@ class Settings:
             base_url=os.getenv("WEB_BASE_URL", "http://localhost:3030"),
             port=int(os.getenv("WEB_PORT", "3030")),
             host=os.getenv("WEB_HOST", "127.0.0.1"),
-            debug=os.getenv("WEB_DEBUG", "true").lower() == "true"
+            debug=os.getenv("WEB_DEBUG", "true").lower() == "true",
         )
 
     @staticmethod
@@ -372,17 +397,14 @@ class Settings:
         api_key = os.getenv("PINECONE_API_KEY")
         if not api_key:
             # Pinecone is optional - if not configured, vector search won't be available
-            return PineconeConfig(
-                api_key="",
-                environment=""
-            )
+            return PineconeConfig(api_key="", environment="")
 
         return PineconeConfig(
             api_key=api_key,
             environment=os.getenv("PINECONE_ENVIRONMENT", "us-east-1-aws"),
             index_name=os.getenv("PINECONE_INDEX_NAME", "agent-pm-context"),
             dimension=int(os.getenv("PINECONE_DIMENSION", "1536")),
-            metric=os.getenv("PINECONE_METRIC", "cosine")
+            metric=os.getenv("PINECONE_METRIC", "cosine"),
         )
 
     @staticmethod

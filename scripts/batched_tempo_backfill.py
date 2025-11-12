@@ -74,15 +74,8 @@ def trigger_backfill_chunk(from_date: str, to_date: str, batch_id: str) -> dict:
         API response dict
     """
     url = f"{API_URL}/api/backfill/tempo"
-    params = {
-        "from_date": from_date,
-        "to_date": to_date,
-        "batch_id": batch_id
-    }
-    headers = {
-        "X-Admin-Key": ADMIN_API_KEY,
-        "Content-Type": "application/json"
-    }
+    params = {"from_date": from_date, "to_date": to_date, "batch_id": batch_id}
+    headers = {"X-Admin-Key": ADMIN_API_KEY, "Content-Type": "application/json"}
 
     print(f"🚀 Triggering backfill: {batch_id}")
     print(f"   Date range: {from_date} to {to_date}")

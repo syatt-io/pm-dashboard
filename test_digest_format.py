@@ -17,35 +17,35 @@ mock_todos = [
         title="Update API documentation",
         description="Add examples for new endpoints and update parameter descriptions",
         assignee="John Doe",
-        project_key="SUBS"
+        project_key="SUBS",
     ),
     TodoItem(
         id="2",
         title="Fix login bug",
         description="Users are getting 401 errors on login",
         assignee="Jane Smith",
-        project_key="SUBS"
+        project_key="SUBS",
     ),
     TodoItem(
         id="3",
         title="Review PR #123",
         description="Code review for authentication feature",
         assignee="John Doe",
-        project_key="SATG"
+        project_key="SATG",
     ),
     TodoItem(
         id="4",
         title="Database migration",
         description="Add indexes for performance improvement on user queries",
         assignee="Bob Johnson",
-        project_key="SATG"
+        project_key="SATG",
     ),
     TodoItem(
         id="5",
         title="Update dependencies",
         description=None,
         assignee=None,
-        project_key=None
+        project_key=None,
     ),
 ]
 
@@ -71,7 +71,11 @@ for project in sorted(todos_by_project.keys()):
         assignee = todo.assignee or "Unassigned"
         body += f"• {todo.title}"
         if todo.description:
-            desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+            desc = (
+                todo.description[:50] + "..."
+                if len(todo.description) > 50
+                else todo.description
+            )
             body += f" - {desc}"
         body += f" ({assignee})\n"
     body += "\n"
@@ -99,7 +103,11 @@ for project in sorted(todos_by_project.keys()):
         assignee = todo.assignee or "Unassigned"
         body += f"• {todo.title}"
         if todo.description:
-            desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+            desc = (
+                todo.description[:50] + "..."
+                if len(todo.description) > 50
+                else todo.description
+            )
             body += f" - {desc}"
         body += f" ({assignee})\n"
     body += "\n"

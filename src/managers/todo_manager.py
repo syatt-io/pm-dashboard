@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TodoSummary:
     """Summary statistics for TODO items."""
+
     total: int
     overdue: int
     due_today: int
@@ -33,6 +34,7 @@ class TodoManager:
     def __init__(self):
         """Initialize TODO manager."""
         from src.utils.database import get_engine
+
         self.engine = get_engine()  # Use centralized engine with proper pool settings
 
         # Try to create tables, but don't fail if we don't have permissions
@@ -40,7 +42,9 @@ class TodoManager:
             Base.metadata.create_all(self.engine)
             logger.info("Database tables created successfully")
         except Exception as e:
-            logger.warning(f"Could not create database tables (may already exist or lack permissions): {e}")
+            logger.warning(
+                f"Could not create database tables (may already exist or lack permissions): {e}"
+            )
             # Continue anyway - tables may already exist
 
         Session = sessionmaker(bind=self.engine)
@@ -50,16 +54,19 @@ class TodoManager:
     def get_active_todos(self, assignee: str = None, limit: int = 50) -> List[TodoItem]:
         """Get active TODO items."""
         query = self.session.query(TodoItem).filter(
-            TodoItem.status.in_(['pending', 'in_progress'])
+            TodoItem.status.in_(["pending", "in_progress"])
         )
 
         if assignee:
             query = query.filter(TodoItem.assignee == assignee)
 
-        return query.order_by(
-            TodoItem.due_date.asc().nullslast(),
-            TodoItem.created_at.desc()
-        ).limit(limit).all()
+        return (
+            query.order_by(
+                TodoItem.due_date.asc().nullslast(), TodoItem.created_at.desc()
+            )
+            .limit(limit)
+            .all()
+        )
 
     def get_todo(self, todo_id: str) -> Optional[TodoItem]:
         """Get a single TODO by ID."""
@@ -70,8 +77,7 @@ class TodoManager:
         now = datetime.now()
         query = self.session.query(TodoItem).filter(
             and_(
-                TodoItem.status.in_(['pending', 'in_progress']),
-                TodoItem.due_date < now
+                TodoItem.status.in_(["pending", "in_progress"]), TodoItem.due_date < now
             )
         )
 
@@ -87,9 +93,9 @@ class TodoManager:
 
         query = self.session.query(TodoItem).filter(
             and_(
-                TodoItem.status.in_(['pending', 'in_progress']),
+                TodoItem.status.in_(["pending", "in_progress"]),
                 TodoItem.due_date >= now,
-                TodoItem.due_date <= future
+                TodoItem.due_date <= future,
             )
         )
 
@@ -106,40 +112,52 @@ class TodoManager:
         week_end = now + timedelta(days=7)
 
         # Active todos
-        active_todos = self.session.query(TodoItem).filter(
-            TodoItem.status.in_(['pending', 'in_progress'])
-        ).all()
+        active_todos = (
+            self.session.query(TodoItem)
+            .filter(TodoItem.status.in_(["pending", "in_progress"]))
+            .all()
+        )
 
         # Overdue
         overdue = len([t for t in active_todos if t.due_date and t.due_date < now])
 
         # Due today
-        due_today = len([t for t in active_todos
-                        if t.due_date and today_start <= t.due_date < today_end])
+        due_today = len(
+            [
+                t
+                for t in active_todos
+                if t.due_date and today_start <= t.due_date < today_end
+            ]
+        )
 
         # Due this week
-        due_week = len([t for t in active_todos
-                       if t.due_date and now <= t.due_date <= week_end])
+        due_week = len(
+            [t for t in active_todos if t.due_date and now <= t.due_date <= week_end]
+        )
 
         # Completed today
-        completed_today = self.session.query(TodoItem).filter(
-            and_(
-                TodoItem.status == 'completed',
-                TodoItem.updated_at >= today_start,
-                TodoItem.updated_at < today_end
+        completed_today = (
+            self.session.query(TodoItem)
+            .filter(
+                and_(
+                    TodoItem.status == "completed",
+                    TodoItem.updated_at >= today_start,
+                    TodoItem.updated_at < today_end,
+                )
             )
-        ).count()
+            .count()
+        )
 
         # By assignee
         by_assignee = {}
         for todo in active_todos:
-            assignee = todo.assignee or 'Unassigned'
+            assignee = todo.assignee or "Unassigned"
             by_assignee[assignee] = by_assignee.get(assignee, 0) + 1
 
         # By priority
-        by_priority = {'High': 0, 'Medium': 0, 'Low': 0}
+        by_priority = {"High": 0, "Medium": 0, "Low": 0}
         for todo in active_todos:
-            priority = getattr(todo, 'priority', 'Medium') or 'Medium'
+            priority = getattr(todo, "priority", "Medium") or "Medium"
             if priority in by_priority:
                 by_priority[priority] += 1
 
@@ -150,17 +168,19 @@ class TodoManager:
             due_this_week=due_week,
             completed_today=completed_today,
             by_assignee=by_assignee,
-            by_priority=by_priority
+            by_priority=by_priority,
         )
 
-    def complete_todo(self, todo_id: str, completed_by: str = None, notes: str = None) -> bool:
+    def complete_todo(
+        self, todo_id: str, completed_by: str = None, notes: str = None
+    ) -> bool:
         """Mark a TODO as complete."""
         try:
             todo = self.session.query(TodoItem).filter_by(id=todo_id).first()
             if not todo:
                 return False
 
-            todo.status = 'completed'
+            todo.status = "completed"
             todo.updated_at = datetime.now()
 
             # Add completion notes if provided
@@ -188,10 +208,17 @@ class TodoManager:
                 return False
 
             # Update allowed fields
-            allowed_fields = ['title', 'description', 'assignee', 'due_date', 'status', 'project_key']
+            allowed_fields = [
+                "title",
+                "description",
+                "assignee",
+                "due_date",
+                "status",
+                "project_key",
+            ]
             for field, value in updates.items():
                 if field in allowed_fields and hasattr(todo, field):
-                    if field == 'due_date' and isinstance(value, str):
+                    if field == "due_date" and isinstance(value, str):
                         value = datetime.fromisoformat(value) if value else None
                     setattr(todo, field, value)
 
@@ -252,14 +279,20 @@ class TodoManager:
         user_todos = self.get_active_todos(assignee=assignee)
 
         return {
-            'overdue': [t for t in user_todos if t.due_date and t.due_date < datetime.now()],
-            'due_today': [t for t in user_todos if self._is_due_today(t)],
-            'due_soon': [t for t in user_todos if self._is_due_soon(t, days=3)],
-            'other': [t for t in user_todos if not (
-                (t.due_date and t.due_date < datetime.now()) or
-                self._is_due_today(t) or
-                self._is_due_soon(t, days=3)
-            )]
+            "overdue": [
+                t for t in user_todos if t.due_date and t.due_date < datetime.now()
+            ],
+            "due_today": [t for t in user_todos if self._is_due_today(t)],
+            "due_soon": [t for t in user_todos if self._is_due_soon(t, days=3)],
+            "other": [
+                t
+                for t in user_todos
+                if not (
+                    (t.due_date and t.due_date < datetime.now())
+                    or self._is_due_today(t)
+                    or self._is_due_soon(t, days=3)
+                )
+            ],
         }
 
     async def send_daily_todo_digest(self, assignee: str = None):
@@ -279,14 +312,14 @@ class TodoManager:
         # Group by assignee
         by_assignee = {}
         for todo in overdue_todos:
-            assignee = todo.assignee or 'Unassigned'
+            assignee = todo.assignee or "Unassigned"
             if assignee not in by_assignee:
                 by_assignee[assignee] = []
             by_assignee[assignee].append(todo)
 
         # Send individual reminders
         for assignee, todos in by_assignee.items():
-            if assignee != 'Unassigned':
+            if assignee != "Unassigned":
                 await self._send_overdue_reminder(assignee, todos)
 
     def _is_due_today(self, todo: TodoItem) -> bool:
@@ -309,7 +342,7 @@ class TodoManager:
         notification = NotificationContent(
             title="TODO Completed",
             body=f"✅ *{todo.title}* completed by {completed_by or todo.assignee}",
-            priority="normal"
+            priority="normal",
         )
         await self.notifier.send_notification(notification, channels=["slack"])
 
@@ -322,30 +355,28 @@ class TodoManager:
 
         body = f"📋 *Daily TODO Digest for {assignee}*\n\n"
 
-        if todos['overdue']:
+        if todos["overdue"]:
             body += f"🚨 *{len(todos['overdue'])} Overdue Items*\n"
-            for todo in todos['overdue'][:3]:
+            for todo in todos["overdue"][:3]:
                 body += f"  • {todo.title}\n"
-            if len(todos['overdue']) > 3:
+            if len(todos["overdue"]) > 3:
                 body += f"  • ... and {len(todos['overdue']) - 3} more\n"
             body += "\n"
 
-        if todos['due_today']:
+        if todos["due_today"]:
             body += f"📅 *{len(todos['due_today'])} Due Today*\n"
-            for todo in todos['due_today']:
+            for todo in todos["due_today"]:
                 body += f"  • {todo.title}\n"
             body += "\n"
 
-        if todos['due_soon']:
+        if todos["due_soon"]:
             body += f"⏰ *{len(todos['due_soon'])} Due This Week*\n"
-            for todo in todos['due_soon'][:3]:
+            for todo in todos["due_soon"][:3]:
                 days_left = (todo.due_date - datetime.now()).days
                 body += f"  • {todo.title} (in {days_left} days)\n"
 
         notification = NotificationContent(
-            title=f"TODO Digest - {assignee}",
-            body=body,
-            priority="normal"
+            title=f"TODO Digest - {assignee}", body=body, priority="normal"
         )
         await self.notifier.send_notification(notification, channels=["slack"])
 
@@ -364,9 +395,7 @@ class TodoManager:
                 body += f"  • {assignee}: {count} items\n"
 
         notification = NotificationContent(
-            title="Team TODO Summary",
-            body=body,
-            priority="normal"
+            title="Team TODO Summary", body=body, priority="normal"
         )
         await self.notifier.send_notification(notification, channels=["slack"])
 
@@ -384,15 +413,13 @@ class TodoManager:
         body += f"\n💡 Use the TODO dashboard to update or complete these items."
 
         notification = NotificationContent(
-            title="Overdue TODO Reminder",
-            body=body,
-            priority="high"
+            title="Overdue TODO Reminder", body=body, priority="high"
         )
         await self.notifier.send_notification(notification, channels=["slack"])
 
     def __del__(self):
         """Close database session."""
-        if hasattr(self, 'session'):
+        if hasattr(self, "session"):
             self.session.close()
 
 

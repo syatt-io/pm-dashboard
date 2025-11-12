@@ -42,25 +42,28 @@ class TodoScheduler:
             try:
                 self.slack_bot = SlackTodoBot(
                     bot_token=settings.notifications.slack_bot_token,
-                    signing_secret=getattr(settings.notifications, 'slack_signing_secret', 'dummy_secret')
+                    signing_secret=getattr(
+                        settings.notifications, "slack_signing_secret", "dummy_secret"
+                    ),
                 )
             except Exception as e:
                 logger.warning(f"Could not initialize Slack bot for scheduler: {e}")
 
         # Initialize hours report agent
         try:
+
             async def create_jira_client():
                 return JiraMCPClient(
                     jira_url=settings.jira.url,
                     username=settings.jira.username,
-                    api_token=settings.jira.api_token
+                    api_token=settings.jira.api_token,
                 )
 
             # Create a mock client for sync initialization
             self.hours_report_agent = HoursReportAgent(
                 jira_client=None,  # Will be created in async context
                 notification_manager=self.notifier,
-                database_url=settings.agent.database_url
+                database_url=settings.agent.database_url,
             )
         except Exception as e:
             logger.warning(f"Could not initialize hours report agent: {e}")
@@ -73,21 +76,33 @@ class TodoScheduler:
         schedule.every().day.at("09:00").do(self._run_async, self.send_daily_digest)
 
         # Overdue reminders at 10 AM and 2 PM
-        schedule.every().day.at("10:00").do(self._run_async, self.send_overdue_reminders)
-        schedule.every().day.at("14:00").do(self._run_async, self.send_overdue_reminders)
+        schedule.every().day.at("10:00").do(
+            self._run_async, self.send_overdue_reminders
+        )
+        schedule.every().day.at("14:00").do(
+            self._run_async, self.send_overdue_reminders
+        )
 
         # Due today reminders at 9:30 AM
-        schedule.every().day.at("09:30").do(self._run_async, self.send_due_today_reminders)
+        schedule.every().day.at("09:30").do(
+            self._run_async, self.send_due_today_reminders
+        )
 
         # Weekly summary on Mondays at 9 AM
-        schedule.every().monday.at("09:00").do(self._run_async, self.send_weekly_summary)
+        schedule.every().monday.at("09:00").do(
+            self._run_async, self.send_weekly_summary
+        )
 
         # Weekly hours reports on Mondays at 10 AM
-        schedule.every().monday.at("10:00").do(self._run_async, self.send_weekly_hours_reports)
+        schedule.every().monday.at("10:00").do(
+            self._run_async, self.send_weekly_hours_reports
+        )
 
         # Check for urgent items every 2 hours during work hours
         for hour in [9, 11, 13, 15, 17]:
-            schedule.every().day.at(f"{hour:02d}:00").do(self._run_async, self.check_urgent_items)
+            schedule.every().day.at(f"{hour:02d}:00").do(
+                self._run_async, self.check_urgent_items
+            )
 
         # Tempo hours sync at 4 AM EST (9 AM UTC)
         # Note: This runs at 9 AM UTC which is 4 AM EST (during DST) or 10 AM UTC for standard time
@@ -106,7 +121,9 @@ class TodoScheduler:
         #
         # These tasks now run via Celery Beat with better reliability, auto-retry, and monitoring.
 
-        logger.info("⚠️  Python scheduler is DEPRECATED - all tasks now run via Celery Beat")
+        logger.info(
+            "⚠️  Python scheduler is DEPRECATED - all tasks now run via Celery Beat"
+        )
 
     def _run_async(self, async_func, *args, **kwargs):
         """Run async function in event loop."""
@@ -164,27 +181,39 @@ class TodoScheduler:
 
             opted_in_users = []
             with session_scope() as db_session:
-                opted_in_users = db_session.query(User).filter(
-                    User.notify_daily_todo_digest == True,
-                    User.slack_user_id.isnot(None)
-                ).all()
+                opted_in_users = (
+                    db_session.query(User)
+                    .filter(
+                        User.notify_daily_todo_digest == True,
+                        User.slack_user_id.isnot(None),
+                    )
+                    .all()
+                )
 
                 # Detach users from session to use them outside the context
                 for user in opted_in_users:
                     db_session.expunge(user)
 
-            logger.info(f"Found {len(opted_in_users)} users opted in for daily TODO digest")
+            logger.info(
+                f"Found {len(opted_in_users)} users opted in for daily TODO digest"
+            )
 
             # Send individual DMs to opted-in users
             for user in opted_in_users:
                 try:
                     # Filter TODOs for this specific user
-                    user_todos = [todo for todo in active_todos if todo.assignee == user.email or todo.assignee == user.name]
+                    user_todos = [
+                        todo
+                        for todo in active_todos
+                        if todo.assignee == user.email or todo.assignee == user.name
+                    ]
 
                     if not user_todos:
                         # Send "no todos" message to user
                         user_body = f"📋 *Daily TODO Digest - {datetime.now().strftime('%B %d, %Y')}*\n\n"
-                        user_body += "🎉 No active TODOs assigned to you today! Great job!"
+                        user_body += (
+                            "🎉 No active TODOs assigned to you today! Great job!"
+                        )
                     else:
                         # Group user's TODOs by project
                         todos_by_project = {}
@@ -206,20 +235,27 @@ class TodoScheduler:
                                 user_body += f"• {todo.title}"
                                 if todo.description:
                                     # Truncate description to 50 chars
-                                    desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+                                    desc = (
+                                        todo.description[:50] + "..."
+                                        if len(todo.description) > 50
+                                        else todo.description
+                                    )
                                     user_body += f" - {desc}"
                                 user_body += "\n"
                             user_body += "\n"
 
                     # Send DM to user
                     await self.notifier._send_slack_dm(
-                        slack_user_id=user.slack_user_id,
-                        message=user_body
+                        slack_user_id=user.slack_user_id, message=user_body
                     )
-                    logger.info(f"Sent daily digest DM to user {user.email} ({len(user_todos)} TODOs)")
+                    logger.info(
+                        f"Sent daily digest DM to user {user.email} ({len(user_todos)} TODOs)"
+                    )
 
                 except Exception as user_error:
-                    logger.error(f"Error sending daily digest to user {user.email}: {user_error}")
+                    logger.error(
+                        f"Error sending daily digest to user {user.email}: {user_error}"
+                    )
 
             # CHANNEL BROADCAST DISABLED - DM-only by design
             # Notifications are now sent ONLY as DMs to opted-in users (via notify_daily_todo_digest preference)
@@ -270,7 +306,9 @@ class TodoScheduler:
             # # Send to all channels (system-wide)
             # await self.notifier.send_notification(content, channels=["slack"])
 
-            logger.info(f"Daily digest sent: {len(active_todos)} active TODOs, {len(opted_in_users)} users notified")
+            logger.info(
+                f"Daily digest sent: {len(active_todos)} active TODOs, {len(opted_in_users)} users notified"
+            )
 
         except Exception as e:
             logger.error(f"Error sending daily digest: {e}")
@@ -287,14 +325,14 @@ class TodoScheduler:
             # Group by assignee
             by_assignee = {}
             for todo in overdue_todos:
-                assignee = todo.assignee or 'Unassigned'
+                assignee = todo.assignee or "Unassigned"
                 if assignee not in by_assignee:
                     by_assignee[assignee] = []
                 by_assignee[assignee].append(todo)
 
             # Send individual reminders
             for assignee, todos in by_assignee.items():
-                if assignee == 'Unassigned':
+                if assignee == "Unassigned":
                     continue
 
                 await self.todo_manager._send_overdue_reminder(assignee, todos)
@@ -310,9 +348,7 @@ class TodoScheduler:
                     body += f"• {todo.title} - {days_overdue} days ({todo.assignee or 'Unassigned'})\n"
 
                 content = NotificationContent(
-                    title="Team Overdue Alert",
-                    body=body,
-                    priority="high"
+                    title="Team Overdue Alert", body=body, priority="high"
                 )
 
                 await self.notifier.send_notification(content, channels=["slack"])
@@ -344,14 +380,14 @@ class TodoScheduler:
             # Group by assignee
             by_assignee = {}
             for todo in due_today:
-                assignee = todo.assignee or 'Unassigned'
+                assignee = todo.assignee or "Unassigned"
                 if assignee not in by_assignee:
                     by_assignee[assignee] = []
                 by_assignee[assignee].append(todo)
 
             # Send individual reminders
             for assignee, todos in by_assignee.items():
-                if assignee == 'Unassigned':
+                if assignee == "Unassigned":
                     continue
 
                 body = f"📅 *Items Due Today for {assignee}*\n\n"
@@ -363,9 +399,7 @@ class TodoScheduler:
                 body += f"\n💡 Use the TODO dashboard to manage these items."
 
                 content = NotificationContent(
-                    title="TODOs Due Today",
-                    body=body,
-                    priority="normal"
+                    title="TODOs Due Today", body=body, priority="normal"
                 )
 
                 await self.notifier.send_notification(content, channels=["slack"])
@@ -387,16 +421,22 @@ class TodoScheduler:
 
             # Get completed items from last week
             from main import TodoItem
-            completed_last_week = self.todo_manager.session.query(TodoItem).filter(
-                TodoItem.status == 'completed',
-                TodoItem.updated_at >= week_start
-            ).all()
+
+            completed_last_week = (
+                self.todo_manager.session.query(TodoItem)
+                .filter(
+                    TodoItem.status == "completed", TodoItem.updated_at >= week_start
+                )
+                .all()
+            )
 
             body = f"📊 *Weekly TODO Summary - Week of {week_start.strftime('%B %d, %Y')}*\n\n"
 
             # Show completed items grouped by project
             if completed_last_week:
-                body += f"*✅ Completed Last Week ({len(completed_last_week)} items):*\n\n"
+                body += (
+                    f"*✅ Completed Last Week ({len(completed_last_week)} items):*\n\n"
+                )
                 completed_by_project = {}
                 for todo in completed_last_week:
                     project = todo.project_key or "No Project"
@@ -429,7 +469,11 @@ class TodoScheduler:
                         assignee = todo.assignee or "Unassigned"
                         body += f"• {todo.title}"
                         if todo.description:
-                            desc = todo.description[:50] + "..." if len(todo.description) > 50 else todo.description
+                            desc = (
+                                todo.description[:50] + "..."
+                                if len(todo.description) > 50
+                                else todo.description
+                            )
                             body += f" - {desc}"
                         body += f" ({assignee})\n"
                     body += "\n"
@@ -438,9 +482,7 @@ class TodoScheduler:
                 body += "🎉 No TODOs to report! Great job team!\n"
 
             content = NotificationContent(
-                title="Weekly TODO Summary",
-                body=body,
-                priority="normal"
+                title="Weekly TODO Summary", body=body, priority="normal"
             )
 
             await self.notifier.send_notification(content, channels=["slack", "email"])
@@ -456,8 +498,9 @@ class TodoScheduler:
             # Check for high priority overdue items
             overdue_todos = self.todo_manager.get_overdue_todos()
             urgent_items = [
-                todo for todo in overdue_todos
-                if getattr(todo, 'priority', 'Medium') == 'High'
+                todo
+                for todo in overdue_todos
+                if getattr(todo, "priority", "Medium") == "High"
                 and (datetime.now() - todo.due_date).days >= 1
             ]
 
@@ -478,12 +521,14 @@ class TodoScheduler:
             content = NotificationContent(
                 title="URGENT: High Priority Items Overdue",
                 body=body,
-                priority="urgent"
+                priority="urgent",
             )
 
             await self.notifier.send_notification(content, channels=["slack", "email"])
 
-            logger.warning(f"Urgent alert sent for {len(urgent_items)} high-priority overdue items")
+            logger.warning(
+                f"Urgent alert sent for {len(urgent_items)} high-priority overdue items"
+            )
 
         except Exception as e:
             logger.error(f"Error checking urgent items: {e}")
@@ -494,7 +539,7 @@ class TodoScheduler:
             content = NotificationContent(
                 title="TODO Completed! 🎉",
                 body=f"✅ *{todo_title}* completed by {assignee}\n\nGreat work!",
-                priority="normal"
+                priority="normal",
             )
 
             await self.notifier.send_notification(content, channels=["slack"])
@@ -502,13 +547,13 @@ class TodoScheduler:
         except Exception as e:
             logger.error(f"Error sending completion celebration: {e}")
 
-    async def send_custom_reminder(self, assignee: str, message: str, priority: str = "normal"):
+    async def send_custom_reminder(
+        self, assignee: str, message: str, priority: str = "normal"
+    ):
         """Send custom reminder to specific user."""
         try:
             content = NotificationContent(
-                title=f"Reminder for {assignee}",
-                body=message,
-                priority=priority
+                title=f"Reminder for {assignee}", body=message, priority=priority
             )
 
             await self.notifier.send_notification(content, channels=["slack"])
@@ -519,7 +564,9 @@ class TodoScheduler:
     async def send_weekly_hours_reports(self):
         """Send weekly hours tracking reports for all active projects."""
         if not self.hours_report_agent:
-            logger.warning("Hours report agent not initialized, skipping weekly reports")
+            logger.warning(
+                "Hours report agent not initialized, skipping weekly reports"
+            )
             return
 
         try:
@@ -529,7 +576,7 @@ class TodoScheduler:
             async with JiraMCPClient(
                 jira_url=settings.jira.url,
                 username=settings.jira.username,
-                api_token=settings.jira.api_token
+                api_token=settings.jira.api_token,
             ) as jira_client:
                 # Update the agent's jira client
                 self.hours_report_agent.jira_client = jira_client
@@ -537,21 +584,31 @@ class TodoScheduler:
                 # Generate and send reports
                 result = await self.hours_report_agent.send_weekly_reports()
 
-                logger.info(f"Weekly hours reports completed: {result['emails_sent']} emails sent for {result['total_projects']} projects")
+                logger.info(
+                    f"Weekly hours reports completed: {result['emails_sent']} emails sent for {result['total_projects']} projects"
+                )
 
                 # Send summary to team if there were any reports
-                if result['total_projects'] > 0:
+                if result["total_projects"] > 0:
                     summary_body = f"📊 *Weekly Hours Reports Summary*\n\n"
                     summary_body += f"• Reports generated for {result['total_projects']} active projects\n"
-                    summary_body += f"• {result['emails_sent']} notification emails sent\n"
+                    summary_body += (
+                        f"• {result['emails_sent']} notification emails sent\n"
+                    )
 
-                    if result['errors'] > 0:
+                    if result["errors"] > 0:
                         summary_body += f"• ⚠️ {result['errors']} errors occurred\n"
 
                     # Add project status overview
-                    on_track = sum(1 for r in result['reports'] if r['status'] == 'on_track')
-                    over_budget = sum(1 for r in result['reports'] if r['status'] == 'over_budget')
-                    under_utilized = sum(1 for r in result['reports'] if r['status'] == 'under_utilized')
+                    on_track = sum(
+                        1 for r in result["reports"] if r["status"] == "on_track"
+                    )
+                    over_budget = sum(
+                        1 for r in result["reports"] if r["status"] == "over_budget"
+                    )
+                    under_utilized = sum(
+                        1 for r in result["reports"] if r["status"] == "under_utilized"
+                    )
 
                     summary_body += f"\n📈 *Project Status Overview:*\n"
                     summary_body += f"• ✅ On Track: {on_track}\n"
@@ -560,14 +617,14 @@ class TodoScheduler:
 
                     if over_budget > 0:
                         summary_body += f"\n🚨 *Projects requiring attention:*\n"
-                        for report in result['reports']:
-                            if report['status'] == 'over_budget':
+                        for report in result["reports"]:
+                            if report["status"] == "over_budget":
                                 summary_body += f"• {report['project_name']}: {report['usage_percentage']:.1f}% usage\n"
 
                     content = NotificationContent(
                         title="Weekly Hours Reports Summary",
                         body=summary_body,
-                        priority="normal"
+                        priority="normal",
                     )
 
                     await self.notifier.send_notification(content, channels=["slack"])
@@ -594,38 +651,51 @@ class TodoScheduler:
                 summary_body = f"✅ *Tempo Hours Sync Completed*\n\n"
                 summary_body += f"• Projects Updated: {stats['projects_updated']}\n"
                 summary_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
-                summary_body += f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                summary_body += (
+                    f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                )
 
-                if stats.get('unique_projects_tracked', 0) > 0:
+                if stats.get("unique_projects_tracked", 0) > 0:
                     summary_body += f"• Unique Projects Tracked: {stats['unique_projects_tracked']}\n"
 
                 # Add project hours summary if available
                 if project_summary:
-                    summary_body += f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary:*\n"
+                    summary_body += (
+                        f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary:*\n"
+                    )
 
                     for project in project_summary:
-                        status_emoji = project['emoji']
-                        summary_body += f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
+                        status_emoji = project["emoji"]
+                        summary_body += (
+                            f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
+                        )
 
-                        if project['forecasted_hours'] > 0:
-                            summary_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
-                            summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                        if project["forecasted_hours"] > 0:
+                            summary_body += (
+                                f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
+                            )
+                            summary_body += (
+                                f"  • Actual: {project['actual_hours']:.1f}h\n"
+                            )
                             summary_body += f"  • Usage: {project['percentage']:.1f}%\n"
                         else:
                             # No forecast - just show actual hours
-                            summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                            summary_body += (
+                                f"  • Actual: {project['actual_hours']:.1f}h\n"
+                            )
                             summary_body += f"  • (No forecast set)\n"
 
                 # Only send notification if in production
                 import os
-                flask_env = os.getenv('FLASK_ENV')
-                logger.info(f"FLASK_ENV={flask_env}, checking if should send notification...")
-                if flask_env == 'production':
+
+                flask_env = os.getenv("FLASK_ENV")
+                logger.info(
+                    f"FLASK_ENV={flask_env}, checking if should send notification..."
+                )
+                if flask_env == "production":
                     logger.info("Sending Tempo sync notification to Slack...")
                     content = NotificationContent(
-                        title="Tempo Hours Sync",
-                        body=summary_body,
-                        priority="normal"
+                        title="Tempo Hours Sync", body=summary_body, priority="normal"
                     )
                     try:
                         # CHANNEL BROADCAST DISABLED - DM-only by design
@@ -642,16 +712,22 @@ class TodoScheduler:
 
                         opted_in_users = []
                         with session_scope() as db_session:
-                            opted_in_users = db_session.query(User).filter(
-                                User.notify_project_hours_forecast == True,
-                                User.slack_user_id.isnot(None)
-                            ).all()
+                            opted_in_users = (
+                                db_session.query(User)
+                                .filter(
+                                    User.notify_project_hours_forecast == True,
+                                    User.slack_user_id.isnot(None),
+                                )
+                                .all()
+                            )
 
                             # Detach users from session to use them outside the context
                             for user in opted_in_users:
                                 db_session.expunge(user)
 
-                        logger.info(f"Found {len(opted_in_users)} users opted in for project hours forecast")
+                        logger.info(
+                            f"Found {len(opted_in_users)} users opted in for project hours forecast"
+                        )
 
                         # Send DMs to opted-in users
                         async def send_dms():
@@ -659,21 +735,32 @@ class TodoScheduler:
                                 try:
                                     await self.notifier._send_slack_dm(
                                         slack_user_id=user.slack_user_id,
-                                        message=summary_body
+                                        message=summary_body,
                                     )
-                                    logger.info(f"Sent project hours forecast DM to user {user.email}")
+                                    logger.info(
+                                        f"Sent project hours forecast DM to user {user.email}"
+                                    )
                                 except Exception as user_error:
-                                    logger.error(f"Error sending project hours forecast to user {user.email}: {user_error}")
+                                    logger.error(
+                                        f"Error sending project hours forecast to user {user.email}: {user_error}"
+                                    )
 
                         asyncio.run(send_dms())
-                        logger.info(f"✅ Sent project hours forecast to {len(opted_in_users)} users")
+                        logger.info(
+                            f"✅ Sent project hours forecast to {len(opted_in_users)} users"
+                        )
 
                     except Exception as notif_error:
-                        logger.error(f"❌ Failed to send Tempo sync notification: {notif_error}", exc_info=True)
+                        logger.error(
+                            f"❌ Failed to send Tempo sync notification: {notif_error}",
+                            exc_info=True,
+                        )
                         # Re-raise to ensure Celery task is marked as failed
                         raise
                 else:
-                    logger.info(f"Skipping notification (not in production, FLASK_ENV={flask_env})")
+                    logger.info(
+                        f"Skipping notification (not in production, FLASK_ENV={flask_env})"
+                    )
             else:
                 error_msg = stats.get("error", "Unknown error")
                 logger.error(f"Tempo sync failed: {error_msg}")
@@ -703,16 +790,22 @@ class TodoScheduler:
 
             # Send critical error notification
             import os
-            if os.getenv('FLASK_ENV') == 'production':
+
+            if os.getenv("FLASK_ENV") == "production":
                 try:
                     content = NotificationContent(
                         title="🚨 Tempo Hours Sync Critical Error",
                         body=f"Critical error occurred during Tempo sync:\n\n{str(e)}\n\nPlease check logs immediately.",
-                        priority="urgent"
+                        priority="urgent",
                     )
-                    asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
+                    asyncio.run(
+                        self.notifier.send_notification(content, channels=["slack"])
+                    )
                 except Exception as notif_error:
-                    logger.error(f"❌ Failed to send critical error notification: {notif_error}", exc_info=True)
+                    logger.error(
+                        f"❌ Failed to send critical error notification: {notif_error}",
+                        exc_info=True,
+                    )
 
             # Re-raise exception to ensure Celery task is marked as failed
             raise
@@ -725,7 +818,9 @@ class TodoScheduler:
         See: src.tasks.notification_tasks.run_time_tracking_compliance
         This method is kept for manual/API-triggered execution only.
         """
-        logger.warning("⚠️  DEPRECATED: run_time_tracking_compliance should use Celery task instead")
+        logger.warning(
+            "⚠️  DEPRECATED: run_time_tracking_compliance should use Celery task instead"
+        )
         try:
             logger.info("Starting scheduled Time Tracking Compliance check")
             stats = run_time_tracking_compliance()
@@ -750,7 +845,9 @@ class TodoScheduler:
         See: src.tasks.notification_tasks.run_monthly_epic_reconciliation
         This method is kept for manual/API-triggered execution only.
         """
-        logger.warning("⚠️  DEPRECATED: run_monthly_reconciliation should use Celery task instead")
+        logger.warning(
+            "⚠️  DEPRECATED: run_monthly_reconciliation should use Celery task instead"
+        )
         from datetime import datetime
 
         # Only run on the 3rd of the month (allows time for hours to be logged after month-end)
@@ -762,7 +859,7 @@ class TodoScheduler:
             stats = run_monthly_epic_reconciliation()
 
             if stats.get("success"):
-                epic_assoc = stats.get('epic_association', {})
+                epic_assoc = stats.get("epic_association", {})
                 logger.info(
                     f"Monthly Epic Reconciliation completed: "
                     f"{stats.get('projects_analyzed', 0)} projects, {stats.get('epics_processed', 0)} epics analyzed, "
@@ -772,7 +869,9 @@ class TodoScheduler:
                     f"in {stats['duration_seconds']:.2f}s"
                 )
             else:
-                logger.error(f"Monthly Epic Reconciliation failed: {stats.get('error')}")
+                logger.error(
+                    f"Monthly Epic Reconciliation failed: {stats.get('error')}"
+                )
 
         except Exception as e:
             logger.error(f"Error running Monthly Epic Reconciliation: {e}")
@@ -788,7 +887,9 @@ class TodoScheduler:
             current_month = datetime(now.year, now.month, 1).date()
 
             with engine.connect() as conn:
-                result = conn.execute(text("""
+                result = conn.execute(
+                    text(
+                        """
                     SELECT
                         p.key,
                         p.name,
@@ -804,7 +905,10 @@ class TodoScheduler:
                             OR pmf.forecasted_hours > 0
                         )
                     ORDER BY p.name
-                """), {"current_month": current_month})
+                """
+                    ),
+                    {"current_month": current_month},
+                )
 
                 projects = []
                 for row in result:
@@ -828,14 +932,16 @@ class TodoScheduler:
                             percentage = 0
                             emoji = "⚪"  # White - no forecast
 
-                        projects.append({
-                            'key': row[0],
-                            'name': row[1],
-                            'forecasted_hours': forecasted,
-                            'actual_hours': actual,
-                            'percentage': percentage,
-                            'emoji': emoji
-                        })
+                        projects.append(
+                            {
+                                "key": row[0],
+                                "name": row[1],
+                                "forecasted_hours": forecasted,
+                                "actual_hours": actual,
+                                "percentage": percentage,
+                                "emoji": emoji,
+                            }
+                        )
 
                 return projects
 
@@ -851,27 +957,28 @@ class TodoScheduler:
         See: src.tasks.notification_tasks.detect_proactive_insights
         This method is kept for manual/API-triggered execution only.
         """
-        logger.warning("⚠️  DEPRECATED: detect_proactive_insights should use Celery task instead")
+        logger.warning(
+            "⚠️  DEPRECATED: detect_proactive_insights should use Celery task instead"
+        )
         try:
             logger.info("Running proactive insight detection")
             stats = detect_insights_for_all_users()
             logger.info(f"Insight detection complete: {stats}")
 
             # Send Slack notification if enabled
-            if stats['insights_detected'] > 0 and self.slack_bot:
+            if stats["insights_detected"] > 0 and self.slack_bot:
                 message = (
                     f"🔍 *Proactive Insight Detection Complete*\n\n"
                     f"• Users processed: {stats['users_processed']}\n"
                     f"• Insights detected: {stats['insights_detected']}\n"
                     f"• Insights stored: {stats['insights_stored']}\n"
                 )
-                if stats['errors']:
+                if stats["errors"]:
                     message += f"• Errors: {len(stats['errors'])}\n"
 
                 try:
                     self.slack_bot.post_message(
-                        channel=settings.notifications.slack_channel,
-                        text=message
+                        channel=settings.notifications.slack_channel, text=message
                     )
                 except Exception as e:
                     logger.error(f"Error sending Slack notification: {e}")
@@ -887,14 +994,18 @@ class TodoScheduler:
         See: src.tasks.notification_tasks.send_daily_briefs
         This method is kept for manual/API-triggered execution only.
         """
-        logger.warning("⚠️  DEPRECATED: send_proactive_briefs should use Celery task instead")
+        logger.warning(
+            "⚠️  DEPRECATED: send_proactive_briefs should use Celery task instead"
+        )
         try:
             logger.info("Running daily brief delivery")
             stats = send_daily_briefs()
             logger.info(f"Daily brief delivery complete: {stats}")
 
             # Send Slack notification if enabled
-            if (stats['briefs_sent_slack'] > 0 or stats['briefs_sent_email'] > 0) and self.slack_bot:
+            if (
+                stats["briefs_sent_slack"] > 0 or stats["briefs_sent_email"] > 0
+            ) and self.slack_bot:
                 message = (
                     f"📬 *Daily Brief Delivery Complete*\n\n"
                     f"• Users processed: {stats['users_processed']}\n"
@@ -902,13 +1013,12 @@ class TodoScheduler:
                     f"• Briefs sent via Email: {stats['briefs_sent_email']}\n"
                     f"• Total insights delivered: {stats['total_insights_delivered']}\n"
                 )
-                if stats['errors']:
+                if stats["errors"]:
                     message += f"• Errors: {len(stats['errors'])}\n"
 
                 try:
                     self.slack_bot.post_message(
-                        channel=settings.notifications.slack_channel,
-                        text=message
+                        channel=settings.notifications.slack_channel, text=message
                     )
                 except Exception as e:
                     logger.error(f"Error sending Slack notification: {e}")
@@ -924,7 +1034,9 @@ class TodoScheduler:
         See: src.tasks.notification_tasks.run_auto_escalation
         This method is kept for manual/API-triggered execution only.
         """
-        logger.warning("⚠️  DEPRECATED: run_auto_escalation should use Celery task instead")
+        logger.warning(
+            "⚠️  DEPRECATED: run_auto_escalation should use Celery task instead"
+        )
         try:
             logger.info("Running auto-escalation check")
 
@@ -937,7 +1049,7 @@ class TodoScheduler:
             logger.info(f"Auto-escalation check complete: {stats}")
 
             # Send Slack notification if escalations were performed
-            if stats['escalations_performed'] > 0 and self.slack_bot:
+            if stats["escalations_performed"] > 0 and self.slack_bot:
                 message = (
                     f"🚨 *Auto-Escalation Summary*\n\n"
                     f"• Insights checked: {stats['total_checked']}\n"
@@ -946,13 +1058,12 @@ class TodoScheduler:
                     f"• Channel posts: {stats['channel_posts']}\n"
                     f"• GitHub comments: {stats['github_comments']}\n"
                 )
-                if stats['errors'] > 0:
+                if stats["errors"] > 0:
                     message += f"• Errors: {stats['errors']}\n"
 
                 try:
                     self.slack_bot.post_message(
-                        channel=settings.notifications.slack_channel,
-                        text=message
+                        channel=settings.notifications.slack_channel, text=message
                     )
                 except Exception as e:
                     logger.error(f"Error sending Slack notification: {e}")

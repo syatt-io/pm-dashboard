@@ -3,9 +3,11 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.services.vector_search import VectorSearchService
+
 
 def test_fireflies_filter():
     """Test Fireflies filtering with SUBS project."""
@@ -24,20 +26,17 @@ def test_fireflies_filter():
     print("TEST 1: Search 'searchspring' WITHOUT project filter")
     print("=" * 60)
     results = service.search(
-        query="searchspring",
-        top_k=20,
-        days_back=365,
-        user_email="mike.samimi@syatt.io"
+        query="searchspring", top_k=20, days_back=365, user_email="mike.samimi@syatt.io"
     )
 
-    fireflies_count = len([r for r in results if r.source == 'fireflies'])
+    fireflies_count = len([r for r in results if r.source == "fireflies"])
     print(f"✅ Total results: {len(results)}")
     print(f"📧 Fireflies results: {fireflies_count}")
 
     if fireflies_count > 0:
         print("\n🎯 Sample Fireflies titles:")
         for result in results[:5]:
-            if result.source == 'fireflies':
+            if result.source == "fireflies":
                 print(f"   - {result.title}")
 
     # Test 2: Search WITH project filter (should still show Fireflies if keywords match)
@@ -49,17 +48,17 @@ def test_fireflies_filter():
         top_k=20,
         days_back=365,
         user_email="mike.samimi@syatt.io",
-        project_key="SUBS"
+        project_key="SUBS",
     )
 
-    fireflies_count2 = len([r for r in results2 if r.source == 'fireflies'])
+    fireflies_count2 = len([r for r in results2 if r.source == "fireflies"])
     print(f"✅ Total results: {len(results2)}")
     print(f"📧 Fireflies results: {fireflies_count2}")
 
     if fireflies_count2 > 0:
         print("\n🎯 Sample Fireflies titles:")
         for result in results2[:5]:
-            if result.source == 'fireflies':
+            if result.source == "fireflies":
                 print(f"   - {result.title}")
     else:
         print("\n⚠️  No Fireflies results with project filter!")
@@ -81,6 +80,7 @@ def test_fireflies_filter():
         )
         keywords = [row[0] for row in result]
         print(f"✅ SUBS keywords: {keywords}")
+
 
 if __name__ == "__main__":
     test_fireflies_filter()

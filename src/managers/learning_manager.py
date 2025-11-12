@@ -28,7 +28,7 @@ class LearningManager:
         submitted_by: str,
         submitted_by_id: str = None,
         category: str = None,
-        source: str = 'slack'
+        source: str = "slack",
     ) -> Learning:
         """Create a new learning entry.
 
@@ -51,9 +51,13 @@ class LearningManager:
             learning = Learning(
                 title=title,
                 description=description,
-                user_id=int(submitted_by_id) if submitted_by_id and submitted_by_id.isdigit() else None,
+                user_id=(
+                    int(submitted_by_id)
+                    if submitted_by_id and submitted_by_id.isdigit()
+                    else None
+                ),
                 category=category,
-                source=source
+                source=source,
             )
 
             session.add(learning)
@@ -75,7 +79,7 @@ class LearningManager:
         limit: int = 20,
         offset: int = 0,
         category: str = None,
-        include_archived: bool = False
+        include_archived: bool = False,
     ) -> List[Learning]:
         """Get learnings with optional filtering.
 
@@ -95,7 +99,12 @@ class LearningManager:
             if category:
                 query = query.filter(Learning.category == category)
 
-            return query.order_by(desc(Learning.created_at)).offset(offset).limit(limit).all()
+            return (
+                query.order_by(desc(Learning.created_at))
+                .offset(offset)
+                .limit(limit)
+                .all()
+            )
         finally:
             session.close()
 
@@ -108,10 +117,7 @@ class LearningManager:
             session.close()
 
     def search_learnings(
-        self,
-        search_term: str,
-        limit: int = 20,
-        include_archived: bool = False
+        self, search_term: str, limit: int = 20, include_archived: bool = False
     ) -> List[Learning]:
         """Search learnings by title and description.
 
@@ -130,8 +136,8 @@ class LearningManager:
             # Case-insensitive search in title and description
             query = query.filter(
                 or_(
-                    Learning.title.ilike(f'%{search_term}%'),
-                    Learning.description.ilike(f'%{search_term}%')
+                    Learning.title.ilike(f"%{search_term}%"),
+                    Learning.description.ilike(f"%{search_term}%"),
                 )
             )
 
@@ -153,9 +159,13 @@ class LearningManager:
         try:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-            return session.query(Learning).filter(
-                Learning.created_at >= cutoff_date
-            ).order_by(desc(Learning.created_at)).limit(limit).all()
+            return (
+                session.query(Learning)
+                .filter(Learning.created_at >= cutoff_date)
+                .order_by(desc(Learning.created_at))
+                .limit(limit)
+                .all()
+            )
         finally:
             session.close()
 
@@ -167,19 +177,19 @@ class LearningManager:
         """
         session = self.Session()
         try:
-            categories = session.query(Learning.category).filter(
-                Learning.category != None
-            ).distinct().all()
+            categories = (
+                session.query(Learning.category)
+                .filter(Learning.category != None)
+                .distinct()
+                .all()
+            )
 
             return [cat[0] for cat in categories if cat[0]]
         finally:
             session.close()
 
     def update_learning(
-        self,
-        learning_id: int,
-        content: str = None,
-        category: str = None
+        self, learning_id: int, content: str = None, category: str = None
     ) -> bool:
         """Update an existing learning.
 
@@ -193,13 +203,17 @@ class LearningManager:
         """
         session = self.Session()
         try:
-            learning = session.query(Learning).filter(Learning.id == learning_id).first()
+            learning = (
+                session.query(Learning).filter(Learning.id == learning_id).first()
+            )
             if not learning:
                 return False
 
             if content is not None:
                 # Split content into title and description
-                learning.title = content[:255] if len(content) <= 255 else content[:252] + "..."
+                learning.title = (
+                    content[:255] if len(content) <= 255 else content[:252] + "..."
+                )
                 learning.description = content if len(content) > 255 else None
             if category is not None:
                 learning.category = category
@@ -229,7 +243,9 @@ class LearningManager:
         """
         session = self.Session()
         try:
-            learning = session.query(Learning).filter(Learning.id == learning_id).first()
+            learning = (
+                session.query(Learning).filter(Learning.id == learning_id).first()
+            )
             if not learning:
                 return False
 
@@ -257,22 +273,34 @@ class LearningManager:
         try:
             total = session.query(Learning).count()
 
-            today = session.query(Learning).filter(
-                Learning.created_at >= datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-            ).count()
+            today = (
+                session.query(Learning)
+                .filter(
+                    Learning.created_at
+                    >= datetime.now(timezone.utc).replace(
+                        hour=0, minute=0, second=0, microsecond=0
+                    )
+                )
+                .count()
+            )
 
-            this_week = session.query(Learning).filter(
-                Learning.created_at >= datetime.now(timezone.utc) - timedelta(days=7)
-            ).count()
+            this_week = (
+                session.query(Learning)
+                .filter(
+                    Learning.created_at
+                    >= datetime.now(timezone.utc) - timedelta(days=7)
+                )
+                .count()
+            )
 
             categories = self.get_categories()
 
             return {
-                'total': total,
-                'today': today,
-                'this_week': this_week,
-                'categories_count': len(categories),
-                'categories': categories[:10]  # Top 10 categories
+                "total": total,
+                "today": today,
+                "this_week": this_week,
+                "categories_count": len(categories),
+                "categories": categories[:10],  # Top 10 categories
             }
         finally:
             session.close()
@@ -287,10 +315,7 @@ class LearningManager:
             Formatted string for Slack
         """
         category_str = f" [{learning.category}]" if learning.category else ""
-        date_str = learning.created_at.strftime('%m/%d')
+        date_str = learning.created_at.strftime("%m/%d")
         content = learning.description or learning.title
 
-        return (
-            f"💡{category_str} *{content}*\n"
-            f"   _on {date_str}_"
-        )
+        return f"💡{category_str} *{content}*\n" f"   _on {date_str}_"

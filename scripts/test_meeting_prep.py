@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone
 
 # Add parent directory to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.utils.database import get_session
 from src.models.user import User
@@ -19,7 +19,7 @@ def test_meeting_prep():
 
     try:
         # Get today's weekday (lowercase: "monday", "tuesday", etc.)
-        today_weekday = datetime.now(timezone.utc).strftime('%A').lower()
+        today_weekday = datetime.now(timezone.utc).strftime("%A").lower()
         print(f"Today is: {today_weekday}")
         print()
 
@@ -40,7 +40,9 @@ def test_meeting_prep():
         insights = detector.detect_insights_for_user(user)
 
         # Filter for meeting prep insights
-        meeting_prep_insights = [i for i in insights if i.insight_type == 'meeting_prep']
+        meeting_prep_insights = [
+            i for i in insights if i.insight_type == "meeting_prep"
+        ]
 
         print(f"Total insights detected: {len(insights)}")
         print(f"Meeting prep insights: {len(meeting_prep_insights)}")
@@ -60,13 +62,20 @@ def test_meeting_prep():
 
             # Show which projects have meeting days set
             from sqlalchemy import text
-            query = text("SELECT key, weekly_meeting_day FROM projects WHERE weekly_meeting_day IS NOT NULL")
+
+            query = text(
+                "SELECT key, weekly_meeting_day FROM projects WHERE weekly_meeting_day IS NOT NULL"
+            )
             results = db.execute(query).fetchall()
 
             if results:
                 print("\n   Projects with meeting days configured:")
                 for row in results:
-                    marker = "👉" if row.weekly_meeting_day.lower() == today_weekday else "  "
+                    marker = (
+                        "👉"
+                        if row.weekly_meeting_day.lower() == today_weekday
+                        else "  "
+                    )
                     print(f"   {marker} {row.key}: {row.weekly_meeting_day}")
             else:
                 print("\n   No projects have meeting days configured yet.")
@@ -74,6 +83,7 @@ def test_meeting_prep():
     except Exception as e:
         print(f"❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
     finally:
         db.close()

@@ -11,10 +11,10 @@ def normalize_epic_name(epic_summary: str) -> str:
     """Normalize epic names (same as in analytics.py)."""
     normalized = epic_summary.strip().lower()
     consolidations = {
-        'pdp details': 'product details',
-        'pdp image & summary': 'product details',
-        'product detail page': 'product details',
-        'globals': 'globals & style guide',
+        "pdp details": "product details",
+        "pdp image & summary": "product details",
+        "product detail page": "product details",
+        "globals": "globals & style guide",
     }
     for pattern, canonical in consolidations.items():
         if normalized == pattern:
@@ -78,35 +78,34 @@ def get_temporal_distribution_weights():
     """
     return {
         # Front-loaded (more hours in first 1/3)
-        'footer': 'front',
-        'search': 'front',
-        'analytics': 'front',
-        'plp / srp': 'front',
-        'globals & style guide': 'front',
-        'header': 'front',
-        'components': 'front',
-
+        "footer": "front",
+        "search": "front",
+        "analytics": "front",
+        "plp / srp": "front",
+        "globals & style guide": "front",
+        "header": "front",
+        "components": "front",
         # Evenly distributed
-        'project oversight / support': 'even',
-        'content sections': 'even',
-        'cart': 'even',
-        'product details': 'even',
-        '3rd party apps': 'even',
-        'design': 'even',
-        'ux': 'even',
-        'emails': 'even',
-
+        "project oversight / support": "even",
+        "content sections": "even",
+        "cart": "even",
+        "product details": "even",
+        "3rd party apps": "even",
+        "design": "even",
+        "ux": "even",
+        "emails": "even",
         # Mid-peaked
-        'pages': 'mid-peak',
-
+        "pages": "mid-peak",
         # Back-loaded (more hours in last 1/3)
-        'checkout': 'back',
-        'brands': 'back',
-        'mega menu': 'back',
+        "checkout": "back",
+        "brands": "back",
+        "mega menu": "back",
     }
 
 
-def calculate_monthly_distribution(epic_name: str, total_hours: float, duration_months: int):
+def calculate_monthly_distribution(
+    epic_name: str, total_hours: float, duration_months: int
+):
     """
     Distribute epic hours across months based on temporal patterns.
 
@@ -118,12 +117,12 @@ def calculate_monthly_distribution(epic_name: str, total_hours: float, duration_
     Returns:
         list: Hours per month
     """
-    distribution = get_temporal_distribution_weights().get(epic_name, 'even')
+    distribution = get_temporal_distribution_weights().get(epic_name, "even")
 
     # Generate weights for each month based on distribution pattern
     weights = []
 
-    if distribution == 'front':
+    if distribution == "front":
         # Front-loaded: Heavy first 1/3, light middle, lighter end
         for i in range(duration_months):
             if i < duration_months / 3:
@@ -133,7 +132,7 @@ def calculate_monthly_distribution(epic_name: str, total_hours: float, duration_
             else:
                 weights.append(0.5)  # 50% lighter
 
-    elif distribution == 'back':
+    elif distribution == "back":
         # Back-loaded: Light first 2/3, heavy last 1/3
         for i in range(duration_months):
             if i < duration_months * 2 / 3:
@@ -141,7 +140,7 @@ def calculate_monthly_distribution(epic_name: str, total_hours: float, duration_
             else:
                 weights.append(2.5)  # 150% heavier
 
-    elif distribution == 'mid-peak':
+    elif distribution == "mid-peak":
         # Mid-peaked: Bell curve centered in middle
         for i in range(duration_months):
             # Distance from middle (0 = middle, 1 = edges)
@@ -168,7 +167,9 @@ def calculate_monthly_distribution(epic_name: str, total_hours: float, duration_
     return monthly_hours
 
 
-def generate_project_schedule(total_hours: float, duration_months: int, start_date: str):
+def generate_project_schedule(
+    total_hours: float, duration_months: int, start_date: str
+):
     """
     Generate complete project schedule with month-by-month breakdown.
 
@@ -191,7 +192,7 @@ def generate_project_schedule(total_hours: float, duration_months: int, start_da
     months = []
     for i in range(duration_months):
         month_dt = start_dt + relativedelta(months=i)
-        months.append(month_dt.strftime('%Y-%m'))
+        months.append(month_dt.strftime("%Y-%m"))
 
     # Generate schedule for each epic
     epics_data = []
@@ -210,30 +211,29 @@ def generate_project_schedule(total_hours: float, duration_months: int, start_da
         breakdown = []
         for i, month in enumerate(months):
             hours = round(monthly_breakdown[i], 1)
-            breakdown.append({
-                'month': month,
-                'hours': hours
-            })
+            breakdown.append({"month": month, "hours": hours})
             monthly_totals[month] += hours
 
-        epics_data.append({
-            'epic_category': epic,
-            'ratio': round(ratio, 4),
-            'allocated_hours': round(allocated_hours, 1),
-            'monthly_breakdown': breakdown
-        })
+        epics_data.append(
+            {
+                "epic_category": epic,
+                "ratio": round(ratio, 4),
+                "allocated_hours": round(allocated_hours, 1),
+                "monthly_breakdown": breakdown,
+            }
+        )
 
     # Format monthly totals
     monthly_totals_list = [
-        {'month': month, 'total_hours': round(monthly_totals[month], 1)}
+        {"month": month, "total_hours": round(monthly_totals[month], 1)}
         for month in months
     ]
 
     return {
-        'total_hours': total_hours,
-        'duration_months': duration_months,
-        'start_date': start_date,
-        'months': months,
-        'epics': epics_data,
-        'monthly_totals': monthly_totals_list
+        "total_hours": total_hours,
+        "duration_months": duration_months,
+        "start_date": start_date,
+        "months": months,
+        "epics": epics_data,
+        "monthly_totals": monthly_totals_list,
     }

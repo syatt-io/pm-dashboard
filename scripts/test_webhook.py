@@ -24,16 +24,14 @@ load_dotenv()
 def generate_signature(payload_json: str, secret: str) -> str:
     """Generate HMAC SHA-256 signature for webhook payload."""
     signature = hmac.new(
-        secret.encode('utf-8'),
-        payload_json.encode('utf-8'),
-        hashlib.sha256
+        secret.encode("utf-8"), payload_json.encode("utf-8"), hashlib.sha256
     ).hexdigest()
-    return f'sha256={signature}'
+    return f"sha256={signature}"
 
 
 def test_webhook(base_url: str, webhook_secret: str):
     """Test webhook endpoint with various scenarios."""
-    webhook_url = f'{base_url}/api/webhooks/fireflies'
+    webhook_url = f"{base_url}/api/webhooks/fireflies"
 
     print(f"\n🧪 Testing Fireflies Webhook Endpoint")
     print(f"📍 URL: {webhook_url}")
@@ -44,7 +42,7 @@ def test_webhook(base_url: str, webhook_secret: str):
     payload = {
         "event": "transcript.completed",
         "meetingId": "TEST_MEETING_123",
-        "eventType": "transcription_complete"
+        "eventType": "transcription_complete",
     }
     payload_json = json.dumps(payload)
     signature = generate_signature(payload_json, webhook_secret)
@@ -53,20 +51,17 @@ def test_webhook(base_url: str, webhook_secret: str):
         response = requests.post(
             webhook_url,
             data=payload_json,
-            headers={
-                'Content-Type': 'application/json',
-                'x-hub-signature': signature
-            },
-            timeout=10
+            headers={"Content-Type": "application/json", "x-hub-signature": signature},
+            timeout=10,
         )
         print(f"   Status: {response.status_code}")
         print(f"   Response: {response.text}")
 
         if response.status_code == 200:
             result = response.json()
-            if result.get('status') == 'already_processed':
+            if result.get("status") == "already_processed":
                 print("   ✅ PASS: Meeting already processed (idempotency working)")
-            elif result.get('status') == 'enqueued':
+            elif result.get("status") == "enqueued":
                 print("   ✅ PASS: Webhook accepted and Celery task enqueued")
             else:
                 print(f"   ⚠️  WARNING: Unexpected status: {result.get('status')}")
@@ -77,17 +72,17 @@ def test_webhook(base_url: str, webhook_secret: str):
 
     # Test 2: Invalid signature
     print("\n❌ Test 2: Invalid signature (should be rejected)")
-    invalid_signature = 'sha256=invalid_signature_here'
+    invalid_signature = "sha256=invalid_signature_here"
 
     try:
         response = requests.post(
             webhook_url,
             data=payload_json,
             headers={
-                'Content-Type': 'application/json',
-                'x-hub-signature': invalid_signature
+                "Content-Type": "application/json",
+                "x-hub-signature": invalid_signature,
             },
-            timeout=10
+            timeout=10,
         )
         print(f"   Status: {response.status_code}")
         print(f"   Response: {response.text}")
@@ -106,10 +101,8 @@ def test_webhook(base_url: str, webhook_secret: str):
         response = requests.post(
             webhook_url,
             data=payload_json,
-            headers={
-                'Content-Type': 'application/json'
-            },
-            timeout=10
+            headers={"Content-Type": "application/json"},
+            timeout=10,
         )
         print(f"   Status: {response.status_code}")
         print(f"   Response: {response.text}")
@@ -126,7 +119,7 @@ def test_webhook(base_url: str, webhook_secret: str):
     ignore_payload = {
         "event": "transcript.started",
         "meetingId": "TEST_MEETING_456",
-        "eventType": "transcription_started"
+        "eventType": "transcription_started",
     }
     ignore_json = json.dumps(ignore_payload)
     ignore_signature = generate_signature(ignore_json, webhook_secret)
@@ -136,17 +129,17 @@ def test_webhook(base_url: str, webhook_secret: str):
             webhook_url,
             data=ignore_json,
             headers={
-                'Content-Type': 'application/json',
-                'x-hub-signature': ignore_signature
+                "Content-Type": "application/json",
+                "x-hub-signature": ignore_signature,
             },
-            timeout=10
+            timeout=10,
         )
         print(f"   Status: {response.status_code}")
         print(f"   Response: {response.text}")
 
         if response.status_code == 200:
             result = response.json()
-            if result.get('status') == 'ignored':
+            if result.get("status") == "ignored":
                 print("   ✅ PASS: Non-completion event correctly ignored")
             else:
                 print(f"   ⚠️  WARNING: Unexpected status: {result.get('status')}")
@@ -164,19 +157,19 @@ def test_webhook(base_url: str, webhook_secret: str):
     print("   4. Test with real Fireflies meeting to validate end-to-end")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Determine environment
-    use_production = '--production' in sys.argv or '-p' in sys.argv
+    use_production = "--production" in sys.argv or "-p" in sys.argv
 
     if use_production:
-        base_url = 'https://agent-pm-tsbbb.ondigitalocean.app'
+        base_url = "https://agent-pm-tsbbb.ondigitalocean.app"
         print("\n⚠️  PRODUCTION MODE: Testing against live production endpoint")
     else:
-        base_url = 'http://localhost:4000'
+        base_url = "http://localhost:4000"
         print("\n🧪 LOCAL MODE: Testing against local development server")
 
     # Get webhook secret
-    webhook_secret = os.getenv('FIREFLIES_WEBHOOK_SECRET')
+    webhook_secret = os.getenv("FIREFLIES_WEBHOOK_SECRET")
 
     if not webhook_secret:
         print("\n❌ ERROR: FIREFLIES_WEBHOOK_SECRET not found in environment")

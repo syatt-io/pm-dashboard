@@ -20,7 +20,7 @@ from sqlalchemy import create_engine, text, MetaData, Table, Column, Text
 from sqlalchemy.exc import SQLAlchemyError
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from config.settings import settings
 
@@ -49,7 +49,9 @@ def add_column_to_table(engine, table_name: str, column_name: str, column_type: 
             trans = conn.begin()
             try:
                 # Add the column
-                alter_sql = f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                alter_sql = (
+                    f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+                )
                 conn.execute(text(alter_sql))
                 trans.commit()
                 logger.info(f"Successfully added column {column_name} to {table_name}")
@@ -71,7 +73,9 @@ def main():
 
         # Check if the column already exists
         if check_column_exists(engine, "users", "fireflies_api_key_encrypted"):
-            logger.info("Column 'fireflies_api_key_encrypted' already exists in users table")
+            logger.info(
+                "Column 'fireflies_api_key_encrypted' already exists in users table"
+            )
             logger.info("Migration not needed - skipping")
             return
 

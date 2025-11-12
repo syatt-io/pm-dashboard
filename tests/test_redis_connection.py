@@ -4,19 +4,18 @@
 import os
 import sys
 
+
 def test_redis():
     """Test Redis connectivity."""
-    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
     print(f"Testing Redis connection to: {mask_password(redis_url)}")
 
     try:
         import redis
+
         client = redis.from_url(
-            redis_url,
-            decode_responses=True,
-            socket_connect_timeout=5,
-            socket_timeout=5
+            redis_url, decode_responses=True, socket_connect_timeout=5, socket_timeout=5
         )
 
         # Test ping
@@ -49,10 +48,10 @@ def test_redis():
 
 def mask_password(url: str) -> str:
     """Mask password in URL for safe logging."""
-    if '@' in url and '://' in url:
-        protocol, rest = url.split('://', 1)
-        if '@' in rest:
-            auth, host = rest.rsplit('@', 1)
+    if "@" in url and "://" in url:
+        protocol, rest = url.split("://", 1)
+        if "@" in rest:
+            auth, host = rest.rsplit("@", 1)
             return f"{protocol}://***@{host}"
     return url
 

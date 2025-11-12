@@ -9,7 +9,7 @@ from src.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_slack_messages', bind=True)
+@celery_app.task(name="src.tasks.vector_tasks.ingest_slack_messages", bind=True)
 def ingest_slack_messages(self) -> Dict[str, Any]:
     """Periodic task: Ingest new Slack messages from all channels.
 
@@ -38,7 +38,7 @@ def ingest_slack_messages(self) -> Dict[str, Any]:
             slack_client = WebClient(token=settings.notifications.slack_bot_token)
 
             # Get last sync time (default to 1 hour ago)
-            last_sync = ingest_service.get_last_sync_timestamp('slack')
+            last_sync = ingest_service.get_last_sync_timestamp("slack")
             if not last_sync:
                 last_sync = datetime.now() - timedelta(hours=1)
 
@@ -47,28 +47,28 @@ def ingest_slack_messages(self) -> Dict[str, Any]:
 
             # Get all public channels (no groups:read scope needed)
             channels_response = slack_client.conversations_list(
-                exclude_archived=True,
-                types="public_channel",
-                limit=200
+                exclude_archived=True, types="public_channel", limit=200
             )
 
-            if not channels_response.get('ok'):
-                logger.error(f"Failed to list Slack channels: {channels_response.get('error')}")
+            if not channels_response.get("ok"):
+                logger.error(
+                    f"Failed to list Slack channels: {channels_response.get('error')}"
+                )
                 return {"success": False, "error": "Failed to list channels"}
 
-            channels = channels_response.get('channels', [])
+            channels = channels_response.get("channels", [])
             total_ingested = 0
             channels_processed = 0
 
             # Ingest messages from each channel
             for channel in channels:
-                channel_id = channel['id']
-                channel_name = channel['name']
-                is_private = channel.get('is_private', False)
+                channel_id = channel["id"]
+                channel_name = channel["name"]
+                is_private = channel.get("is_private", False)
 
                 try:
                     # Auto-join public channels (requires channels:join scope)
-                    if not is_private and not channel.get('is_member', False):
+                    if not is_private and not channel.get("is_member", False):
                         try:
                             slack_client.conversations_join(channel=channel_id)
                             logger.info(f"Joined public channel #{channel_name}")
@@ -77,16 +77,14 @@ def ingest_slack_messages(self) -> Dict[str, Any]:
 
                     # Get message history since last sync
                     history = slack_client.conversations_history(
-                        channel=channel_id,
-                        oldest=oldest_timestamp,
-                        limit=100
+                        channel=channel_id, oldest=oldest_timestamp, limit=100
                     )
 
-                    if not history.get('ok'):
+                    if not history.get("ok"):
                         logger.warning(f"Could not fetch history for #{channel_name}")
                         continue
 
-                    messages = history.get('messages', [])
+                    messages = history.get("messages", [])
                     if not messages:
                         continue
 
@@ -95,7 +93,7 @@ def ingest_slack_messages(self) -> Dict[str, Any]:
                         messages=messages,
                         channel_id=channel_id,
                         channel_name=channel_name,
-                        is_private=is_private
+                        is_private=is_private,
                     )
 
                     total_ingested += count
@@ -107,19 +105,21 @@ def ingest_slack_messages(self) -> Dict[str, Any]:
                     continue
 
             # Update last sync timestamp
-            ingest_service.update_last_sync_timestamp('slack', datetime.now())
+            ingest_service.update_last_sync_timestamp("slack", datetime.now())
 
             result = {
                 "success": True,
                 "channels_processed": channels_processed,
                 "total_ingested": total_ingested,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             # Store result data in tracker
             tracker.set_result(result)
 
-            logger.info(f"✅ Slack ingestion complete: {total_ingested} messages from {channels_processed} channels")
+            logger.info(
+                f"✅ Slack ingestion complete: {total_ingested} messages from {channels_processed} channels"
+            )
 
             return result
 
@@ -130,7 +130,7 @@ def ingest_slack_messages(self) -> Dict[str, Any]:
         db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_jira_issues', bind=True)
+@celery_app.task(name="src.tasks.vector_tasks.ingest_jira_issues", bind=True)
 def ingest_jira_issues(self) -> Dict[str, Any]:
     """Periodic task: Ingest Jira issues updated since last sync.
 
@@ -160,11 +160,11 @@ def ingest_jira_issues(self) -> Dict[str, Any]:
             jira_client = JiraMCPClient(
                 jira_url=settings.jira.url,
                 username=settings.jira.username,
-                api_token=settings.jira.api_token
+                api_token=settings.jira.api_token,
             )
 
             # Get last sync time (default to 1 hour ago)
-            last_sync = ingest_service.get_last_sync_timestamp('jira')
+            last_sync = ingest_service.get_last_sync_timestamp("jira")
             if not last_sync:
                 last_sync = datetime.now() - timedelta(hours=1)
 
@@ -183,19 +183,21 @@ def ingest_jira_issues(self) -> Dict[str, Any]:
             asyncio.set_event_loop(loop)
             try:
                 issues_result = loop.run_until_complete(
-                    jira_client.search_issues(jql, max_results=100, expand_comments=True)
+                    jira_client.search_issues(
+                        jql, max_results=100, expand_comments=True
+                    )
                 )
             finally:
                 loop.close()
 
-            issues = issues_result.get('issues', [])
+            issues = issues_result.get("issues", [])
 
             if not issues:
                 logger.info("No updated Jira issues found")
                 result = {
                     "success": True,
                     "total_ingested": 0,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
                 tracker.set_result(result)
                 return result
@@ -203,7 +205,11 @@ def ingest_jira_issues(self) -> Dict[str, Any]:
             # Group issues by project and ingest
             projects = {}
             for issue in issues:
-                project_key = issue.get('key', '').split('-')[0] if issue.get('key') else 'UNKNOWN'
+                project_key = (
+                    issue.get("key", "").split("-")[0]
+                    if issue.get("key")
+                    else "UNKNOWN"
+                )
                 if project_key not in projects:
                     projects[project_key] = []
                 projects[project_key].append(issue)
@@ -212,8 +218,7 @@ def ingest_jira_issues(self) -> Dict[str, Any]:
             for project_key, project_issues in projects.items():
                 try:
                     count = ingest_service.ingest_jira_issues(
-                        issues=project_issues,
-                        project_key=project_key
+                        issues=project_issues, project_key=project_key
                     )
                     total_ingested += count
                     logger.info(f"✅ Ingested {count} issues from {project_key}")
@@ -223,19 +228,21 @@ def ingest_jira_issues(self) -> Dict[str, Any]:
                     continue
 
             # Update last sync timestamp
-            ingest_service.update_last_sync_timestamp('jira', datetime.now())
+            ingest_service.update_last_sync_timestamp("jira", datetime.now())
 
             result = {
                 "success": True,
                 "projects_processed": len(projects),
                 "total_ingested": total_ingested,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             # Store result data in tracker
             tracker.set_result(result)
 
-            logger.info(f"✅ Jira ingestion complete: {total_ingested} issues from {len(projects)} projects")
+            logger.info(
+                f"✅ Jira ingestion complete: {total_ingested} issues from {len(projects)} projects"
+            )
 
             return result
 
@@ -246,7 +253,7 @@ def ingest_jira_issues(self) -> Dict[str, Any]:
         db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_fireflies_transcripts', bind=True)
+@celery_app.task(name="src.tasks.vector_tasks.ingest_fireflies_transcripts", bind=True)
 def ingest_fireflies_transcripts(self) -> Dict[str, Any]:
     """Periodic task: Ingest Fireflies transcripts from the last day.
 
@@ -284,7 +291,7 @@ def ingest_fireflies_transcripts(self) -> Dict[str, Any]:
             fireflies_client = FirefliesClient(api_key=api_key)
 
             # Get last sync time (default to 1 day ago)
-            last_sync = ingest_service.get_last_sync_timestamp('fireflies')
+            last_sync = ingest_service.get_last_sync_timestamp("fireflies")
             if not last_sync:
                 last_sync = datetime.now() - timedelta(days=1)
 
@@ -301,7 +308,7 @@ def ingest_fireflies_transcripts(self) -> Dict[str, Any]:
                 result = {
                     "success": True,
                     "total_ingested": 0,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
                 tracker.set_result(result)
                 return result
@@ -310,13 +317,15 @@ def ingest_fireflies_transcripts(self) -> Dict[str, Any]:
             transcripts = []
             for meeting in meetings:
                 try:
-                    transcript = fireflies_client.get_meeting_transcript(meeting['id'])
+                    transcript = fireflies_client.get_meeting_transcript(meeting["id"])
                     if transcript:
                         # get_meeting_transcript now returns dict with proper sharing settings
                         transcripts.append(transcript)
 
                 except Exception as e:
-                    logger.error(f"Error fetching transcript for meeting {meeting['id']}: {e}")
+                    logger.error(
+                        f"Error fetching transcript for meeting {meeting['id']}: {e}"
+                    )
                     continue
 
             # Ingest transcripts
@@ -325,18 +334,20 @@ def ingest_fireflies_transcripts(self) -> Dict[str, Any]:
             )
 
             # Update last sync timestamp
-            ingest_service.update_last_sync_timestamp('fireflies', datetime.now())
+            ingest_service.update_last_sync_timestamp("fireflies", datetime.now())
 
             result = {
                 "success": True,
                 "total_ingested": total_ingested,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             # Store result data in tracker
             tracker.set_result(result)
 
-            logger.info(f"✅ Fireflies ingestion complete: {total_ingested} transcripts")
+            logger.info(
+                f"✅ Fireflies ingestion complete: {total_ingested} transcripts"
+            )
 
             return result
 
@@ -347,7 +358,7 @@ def ingest_fireflies_transcripts(self) -> Dict[str, Any]:
         db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_notion_pages', bind=True)
+@celery_app.task(name="src.tasks.vector_tasks.ingest_notion_pages", bind=True)
 def ingest_notion_pages(self) -> Dict[str, Any]:
     """Periodic task: Ingest Notion pages updated since last sync.
 
@@ -372,7 +383,7 @@ def ingest_notion_pages(self) -> Dict[str, Any]:
         tracker = track_celery_task(self, db, "ingest-notion-daily")
         with tracker:
             # Check if Notion is configured
-            if not hasattr(settings, 'notion') or not settings.notion.api_key:
+            if not hasattr(settings, "notion") or not settings.notion.api_key:
                 logger.warning("Notion not configured - skipping ingestion")
                 result = {"success": False, "error": "No API key"}
                 tracker.set_result(result)
@@ -383,7 +394,7 @@ def ingest_notion_pages(self) -> Dict[str, Any]:
             notion_client = NotionAPIClient(api_key=settings.notion.api_key)
 
             # Get last sync time (default to 1 day ago)
-            last_sync = ingest_service.get_last_sync_timestamp('notion')
+            last_sync = ingest_service.get_last_sync_timestamp("notion")
             if not last_sync:
                 last_sync = datetime.now() - timedelta(days=1)
 
@@ -400,7 +411,7 @@ def ingest_notion_pages(self) -> Dict[str, Any]:
                 result = {
                     "success": True,
                     "total_ingested": 0,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
                 tracker.set_result(result)
                 return result
@@ -409,26 +420,27 @@ def ingest_notion_pages(self) -> Dict[str, Any]:
             full_content_map = {}
             for page in pages:
                 try:
-                    page_id = page['id']
+                    page_id = page["id"]
                     content = notion_client.get_full_page_content(page_id)
                     full_content_map[page_id] = content
                 except Exception as e:
-                    logger.error(f"Error fetching content for page {page.get('id')}: {e}")
+                    logger.error(
+                        f"Error fetching content for page {page.get('id')}: {e}"
+                    )
                     full_content_map[page_id] = ""  # Store empty content
 
             # Ingest pages
             total_ingested = ingest_service.ingest_notion_pages(
-                pages=pages,
-                full_content_map=full_content_map
+                pages=pages, full_content_map=full_content_map
             )
 
             # Update last sync timestamp
-            ingest_service.update_last_sync_timestamp('notion', datetime.now())
+            ingest_service.update_last_sync_timestamp("notion", datetime.now())
 
             result = {
                 "success": True,
                 "total_ingested": total_ingested,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             # Store result data in tracker
@@ -445,7 +457,7 @@ def ingest_notion_pages(self) -> Dict[str, Any]:
         db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.ingest_tempo_worklogs', bind=True)
+@celery_app.task(name="src.tasks.vector_tasks.ingest_tempo_worklogs", bind=True)
 def ingest_tempo_worklogs(self) -> Dict[str, Any]:
     """Periodic task: Ingest Tempo worklogs updated since last sync.
 
@@ -475,7 +487,7 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
             tempo_client = TempoAPIClient(api_token=settings.jira.tempo_api_token)
 
             # Get last sync time (default to 2 days ago to catch any updates)
-            last_sync = ingest_service.get_last_sync_timestamp('tempo')
+            last_sync = ingest_service.get_last_sync_timestamp("tempo")
             if not last_sync:
                 last_sync = datetime.now() - timedelta(days=2)
 
@@ -491,7 +503,7 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
             # Fetch worklogs
             worklogs = tempo_client.get_worklogs(
                 start_date=start_date.strftime("%Y-%m-%d"),
-                end_date=end_date.strftime("%Y-%m-%d")
+                end_date=end_date.strftime("%Y-%m-%d"),
             )
 
             if not worklogs:
@@ -499,7 +511,7 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
                 result = {
                     "success": True,
                     "total_ingested": 0,
-                    "timestamp": datetime.now().isoformat()
+                    "timestamp": datetime.now().isoformat(),
                 }
                 tracker.set_result(result)
                 return result
@@ -510,19 +522,21 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
             total_ingested = ingest_service.ingest_tempo_worklogs(worklogs=worklogs)
 
             # Update last sync timestamp
-            ingest_service.update_last_sync_timestamp('tempo', datetime.now())
+            ingest_service.update_last_sync_timestamp("tempo", datetime.now())
 
             result = {
                 "success": True,
                 "total_ingested": total_ingested,
                 "days_back": days_back,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             # Store result data in tracker
             tracker.set_result(result)
 
-            logger.info(f"✅ Tempo worklogs ingestion complete: {total_ingested} worklogs")
+            logger.info(
+                f"✅ Tempo worklogs ingestion complete: {total_ingested} worklogs"
+            )
 
             return result
 
@@ -533,7 +547,7 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
         db.close()
 
 
-@celery_app.task(name='src.tasks.vector_tasks.backfill_all_sources')
+@celery_app.task(name="src.tasks.vector_tasks.backfill_all_sources")
 def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
     """One-time backfill task: Ingest historical data from all sources.
 
@@ -552,12 +566,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
 
     logger.info(f"🔄 Starting full backfill for {days} days...")
 
-    results = {
-        "slack": {},
-        "jira": {},
-        "fireflies": {},
-        "notion": {}
-    }
+    results = {"slack": {}, "jira": {}, "fireflies": {}, "notion": {}}
 
     try:
         ingest_service = VectorIngestService()
@@ -568,7 +577,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
             jira_client = JiraMCPClient(
                 jira_url=settings.jira.url,
                 username=settings.jira.username,
-                api_token=settings.jira.api_token
+                api_token=settings.jira.api_token,
             )
 
             jql = f"updated >= -{days}d ORDER BY updated DESC"
@@ -578,18 +587,24 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
             asyncio.set_event_loop(loop)
             try:
                 issues_result = loop.run_until_complete(
-                    jira_client.search_issues(jql, max_results=1000, expand_comments=True)
+                    jira_client.search_issues(
+                        jql, max_results=1000, expand_comments=True
+                    )
                 )
             finally:
                 loop.close()
 
-            issues = issues_result.get('issues', [])
+            issues = issues_result.get("issues", [])
             logger.info(f"Found {len(issues)} Jira issues")
 
             # Group by project and ingest
             projects = {}
             for issue in issues:
-                project_key = issue.get('key', '').split('-')[0] if issue.get('key') else 'UNKNOWN'
+                project_key = (
+                    issue.get("key", "").split("-")[0]
+                    if issue.get("key")
+                    else "UNKNOWN"
+                )
                 if project_key not in projects:
                     projects[project_key] = []
                 projects[project_key].append(issue)
@@ -598,8 +613,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
             for project_key, project_issues in projects.items():
                 try:
                     count = ingest_service.ingest_jira_issues(
-                        issues=project_issues,
-                        project_key=project_key
+                        issues=project_issues, project_key=project_key
                     )
                     total_ingested += count
                     logger.info(f"✅ Ingested {count} issues from {project_key}")
@@ -609,7 +623,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
             results["jira"] = {
                 "success": True,
                 "total_ingested": total_ingested,
-                "projects_processed": len(projects)
+                "projects_processed": len(projects),
             }
 
         except Exception as e:
@@ -627,18 +641,17 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
             transcripts = []
             for meeting in meetings:
                 try:
-                    transcript = fireflies_client.get_meeting_transcript(meeting['id'])
+                    transcript = fireflies_client.get_meeting_transcript(meeting["id"])
                     if transcript:
                         # get_meeting_transcript now returns dict with proper sharing settings
                         transcripts.append(transcript)
                 except Exception as e:
                     logger.error(f"Error fetching transcript {meeting['id']}: {e}")
 
-            total_ingested = ingest_service.ingest_fireflies_transcripts(transcripts=transcripts)
-            results["fireflies"] = {
-                "success": True,
-                "total_ingested": total_ingested
-            }
+            total_ingested = ingest_service.ingest_fireflies_transcripts(
+                transcripts=transcripts
+            )
+            results["fireflies"] = {"success": True, "total_ingested": total_ingested}
 
         except Exception as e:
             logger.error(f"Fireflies backfill failed: {e}")
@@ -655,26 +668,26 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
 
             # Get all public channels (no groups:read scope needed)
             channels_response = slack_client.conversations_list(
-                exclude_archived=True,
-                types="public_channel",
-                limit=200
+                exclude_archived=True, types="public_channel", limit=200
             )
 
-            if not channels_response.get('ok'):
-                raise Exception(f"Failed to list channels: {channels_response.get('error')}")
+            if not channels_response.get("ok"):
+                raise Exception(
+                    f"Failed to list channels: {channels_response.get('error')}"
+                )
 
-            channels = channels_response.get('channels', [])
+            channels = channels_response.get("channels", [])
             total_ingested = 0
             channels_processed = 0
 
             for channel in channels:
-                channel_id = channel['id']
-                channel_name = channel['name']
-                is_private = channel.get('is_private', False)
+                channel_id = channel["id"]
+                channel_name = channel["name"]
+                is_private = channel.get("is_private", False)
 
                 try:
                     # Auto-join public channels (requires channels:join scope)
-                    if not is_private and not channel.get('is_member', False):
+                    if not is_private and not channel.get("is_member", False):
                         try:
                             slack_client.conversations_join(channel=channel_id)
                             logger.info(f"Joined public channel #{channel_name}")
@@ -683,16 +696,14 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
 
                     # Get message history
                     history = slack_client.conversations_history(
-                        channel=channel_id,
-                        oldest=oldest_timestamp,
-                        limit=1000
+                        channel=channel_id, oldest=oldest_timestamp, limit=1000
                     )
 
-                    if not history.get('ok'):
+                    if not history.get("ok"):
                         logger.warning(f"Could not fetch history for #{channel_name}")
                         continue
 
-                    messages = history.get('messages', [])
+                    messages = history.get("messages", [])
                     if not messages:
                         continue
 
@@ -701,7 +712,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
                         messages=messages,
                         channel_id=channel_id,
                         channel_name=channel_name,
-                        is_private=is_private
+                        is_private=is_private,
                     )
 
                     total_ingested += count
@@ -715,7 +726,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
             results["slack"] = {
                 "success": True,
                 "channels_processed": channels_processed,
-                "total_ingested": total_ingested
+                "total_ingested": total_ingested,
             }
 
         except Exception as e:
@@ -727,7 +738,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
         try:
             from src.integrations.notion_api import NotionAPIClient
 
-            if hasattr(settings, 'notion') and settings.notion.api_key:
+            if hasattr(settings, "notion") and settings.notion.api_key:
                 notion_client = NotionAPIClient(api_key=settings.notion.api_key)
                 pages = notion_client.get_all_pages(days_back=days)
                 logger.info(f"Found {len(pages)} Notion pages")
@@ -736,23 +747,21 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
                 full_content_map = {}
                 for page in pages:
                     try:
-                        page_id = page['id']
+                        page_id = page["id"]
                         content = notion_client.get_full_page_content(page_id)
                         full_content_map[page_id] = content
                     except Exception as e:
-                        logger.error(f"Error fetching content for page {page.get('id')}: {e}")
+                        logger.error(
+                            f"Error fetching content for page {page.get('id')}: {e}"
+                        )
                         full_content_map[page_id] = ""
 
                 # Ingest pages
                 total_ingested = ingest_service.ingest_notion_pages(
-                    pages=pages,
-                    full_content_map=full_content_map
+                    pages=pages, full_content_map=full_content_map
                 )
 
-                results["notion"] = {
-                    "success": True,
-                    "total_ingested": total_ingested
-                }
+                results["notion"] = {"success": True, "total_ingested": total_ingested}
             else:
                 logger.warning("Notion not configured - skipping backfill")
                 results["notion"] = {"success": False, "error": "Not configured"}
@@ -765,7 +774,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
         return {
             "success": True,
             "results": results,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
@@ -773,7 +782,7 @@ def backfill_all_sources(days: int = 90) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-@celery_app.task(name='src.tasks.vector_tasks.backfill_notion')
+@celery_app.task(name="src.tasks.vector_tasks.backfill_notion")
 def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
     """Manual task: Backfill all Notion pages from the last N days.
 
@@ -794,7 +803,7 @@ def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
 
     try:
         # Check if Notion is configured
-        if not hasattr(settings, 'notion') or not settings.notion.api_key:
+        if not hasattr(settings, "notion") or not settings.notion.api_key:
             logger.warning("Notion not configured - skipping backfill")
             return {"success": False, "error": "No API key"}
 
@@ -821,7 +830,7 @@ def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
                 if i % 10 == 0:
                     logger.info(f"   Progress: {i}/{len(pages)} pages processed...")
 
-                page_id = page.get('id', '')
+                page_id = page.get("id", "")
                 if page_id:
                     full_content = notion_client.get_full_page_content(page_id)
                     if full_content and full_content.strip():
@@ -842,11 +851,12 @@ def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
         # Ingest into Pinecone
         logger.info("📊 Ingesting into Pinecone...")
         total_ingested = ingest_service.ingest_notion_pages(
-            pages=pages,
-            full_content_map=full_content_map
+            pages=pages, full_content_map=full_content_map
         )
 
-        logger.info(f"✅ Notion backfill complete! Total ingested: {total_ingested} pages")
+        logger.info(
+            f"✅ Notion backfill complete! Total ingested: {total_ingested} pages"
+        )
 
         return {
             "success": True,
@@ -854,7 +864,7 @@ def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
             "pages_with_content": len(full_content_map),
             "pages_failed": failed_count,
             "pages_ingested": total_ingested,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
@@ -862,7 +872,7 @@ def backfill_notion(days_back: int = 365) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-@celery_app.task(name='src.tasks.vector_tasks.backfill_slack')
+@celery_app.task(name="src.tasks.vector_tasks.backfill_slack")
 def backfill_slack(days_back: int = 365) -> Dict[str, Any]:
     """Manual task: Backfill all Slack messages from the last N days.
 
@@ -894,28 +904,28 @@ def backfill_slack(days_back: int = 365) -> Dict[str, Any]:
 
         # Get all public channels
         channels_response = slack_client.conversations_list(
-            exclude_archived=True,
-            types="public_channel",
-            limit=200
+            exclude_archived=True, types="public_channel", limit=200
         )
 
-        if not channels_response.get('ok'):
-            logger.error(f"Failed to list Slack channels: {channels_response.get('error')}")
+        if not channels_response.get("ok"):
+            logger.error(
+                f"Failed to list Slack channels: {channels_response.get('error')}"
+            )
             return {"success": False, "error": "Failed to list channels"}
 
-        channels = channels_response.get('channels', [])
+        channels = channels_response.get("channels", [])
         total_ingested = 0
         channels_processed = 0
 
         # Ingest messages from each channel
         for channel in channels:
-            channel_id = channel['id']
-            channel_name = channel['name']
-            is_private = channel.get('is_private', False)
+            channel_id = channel["id"]
+            channel_name = channel["name"]
+            is_private = channel.get("is_private", False)
 
             try:
                 # Auto-join public channels
-                if not is_private and not channel.get('is_member', False):
+                if not is_private and not channel.get("is_member", False):
                     try:
                         slack_client.conversations_join(channel=channel_id)
                         logger.info(f"Joined public channel #{channel_name}")
@@ -931,18 +941,18 @@ def backfill_slack(days_back: int = 365) -> Dict[str, Any]:
                         channel=channel_id,
                         oldest=oldest_timestamp,
                         limit=100,
-                        cursor=cursor
+                        cursor=cursor,
                     )
 
-                    if not history.get('ok'):
+                    if not history.get("ok"):
                         logger.warning(f"Could not fetch history for #{channel_name}")
                         break
 
-                    messages = history.get('messages', [])
+                    messages = history.get("messages", [])
                     messages_all.extend(messages)
 
                     # Check if there are more messages
-                    cursor = history.get('response_metadata', {}).get('next_cursor')
+                    cursor = history.get("response_metadata", {}).get("next_cursor")
                     if not cursor:
                         break
 
@@ -954,7 +964,7 @@ def backfill_slack(days_back: int = 365) -> Dict[str, Any]:
                     messages=messages_all,
                     channel_id=channel_id,
                     channel_name=channel_name,
-                    is_private=is_private
+                    is_private=is_private,
                 )
 
                 total_ingested += count
@@ -965,14 +975,16 @@ def backfill_slack(days_back: int = 365) -> Dict[str, Any]:
                 logger.error(f"Error ingesting #{channel_name}: {e}")
                 continue
 
-        logger.info(f"✅ Slack backfill complete! Total ingested: {total_ingested} messages from {channels_processed} channels")
+        logger.info(
+            f"✅ Slack backfill complete! Total ingested: {total_ingested} messages from {channels_processed} channels"
+        )
 
         return {
             "success": True,
             "channels_processed": channels_processed,
             "messages_ingested": total_ingested,
             "days_back": days_back,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
     except Exception as e:
@@ -980,7 +992,7 @@ def backfill_slack(days_back: int = 365) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-@celery_app.task(name='src.tasks.vector_tasks.backfill_jira')
+@celery_app.task(name="src.tasks.vector_tasks.backfill_jira")
 def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
     """Manual task: Backfill all Jira issues from the last N days.
 
@@ -1009,13 +1021,13 @@ def backfill_jira(days_back: int = 365) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-@celery_app.task(name='src.tasks.vector_tasks.backfill_tempo', bind=True)
+@celery_app.task(name="src.tasks.vector_tasks.backfill_tempo", bind=True)
 def backfill_tempo(
     self,
     days_back: int = None,
     from_date: str = None,
     to_date: str = None,
-    batch_id: str = None
+    batch_id: str = None,
 ) -> Dict[str, Any]:
     """Manual task: Backfill Tempo worklogs with date range support.
 
@@ -1036,7 +1048,9 @@ def backfill_tempo(
     from src.tasks.backfill_tempo import backfill_tempo_worklogs
 
     if from_date and to_date:
-        logger.info(f"🔄 Starting Tempo backfill via Celery for date range: {from_date} to {to_date}")
+        logger.info(
+            f"🔄 Starting Tempo backfill via Celery for date range: {from_date} to {to_date}"
+        )
     else:
         if days_back is None:
             days_back = 365
@@ -1047,10 +1061,7 @@ def backfill_tempo(
     try:
         # Call the shared backfill function with new parameters
         result = backfill_tempo_worklogs(
-            days_back=days_back,
-            from_date=from_date,
-            to_date=to_date,
-            batch_id=batch_id
+            days_back=days_back, from_date=from_date, to_date=to_date, batch_id=batch_id
         )
         logger.info(f"✅ Tempo backfill task complete: {result}")
         return result

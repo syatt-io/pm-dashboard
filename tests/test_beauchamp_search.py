@@ -14,14 +14,16 @@ from config.settings import settings
 
 # Enable debug logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
 logger = logging.getLogger(__name__)
 
+
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Integration test requiring database setup with project_keywords table")
+@pytest.mark.skip(
+    reason="Integration test requiring database setup with project_keywords table"
+)
 async def test_beauchamp_search():
     """Test search for Beauchamp meetings."""
 
@@ -38,9 +40,9 @@ async def test_beauchamp_search():
     results = await search_service.search(
         query=query,
         days_back=30,  # 4 weeks
-        sources=['fireflies'],  # Only search Fireflies
+        sources=["fireflies"],  # Only search Fireflies
         user_id=1,  # Use user ID 1 (admin)
-        debug=True  # Enable debug logging
+        debug=True,  # Enable debug logging
     )
 
     logger.info("=" * 80)
@@ -66,14 +68,16 @@ async def test_beauchamp_search():
         logger.info(f"   Content: {result.content[:200]}...")
 
     # Check if we got any Fireflies results
-    fireflies_count = sum(1 for r in results.results if r.source == 'fireflies')
+    fireflies_count = sum(1 for r in results.results if r.source == "fireflies")
 
     if fireflies_count == 0:
         logger.error("\n❌ NO FIREFLIES RESULTS FOUND!")
         logger.info("\nDebugging steps:")
         logger.info("1. Check if Fireflies data is in Pinecone")
         logger.info("2. Check if project keywords are set up for Beauchamp")
-        logger.info("3. Check if Fireflies meetings have been indexed with project_tags")
+        logger.info(
+            "3. Check if Fireflies meetings have been indexed with project_tags"
+        )
 
         # Check project keywords
         logger.info("\n" + "=" * 80)
@@ -86,18 +90,23 @@ async def test_beauchamp_search():
         engine = get_engine()
         with engine.connect() as conn:
             result = conn.execute(
-                text("SELECT project_key, keyword FROM project_keywords WHERE LOWER(keyword) LIKE '%beauchamp%'")
+                text(
+                    "SELECT project_key, keyword FROM project_keywords WHERE LOWER(keyword) LIKE '%beauchamp%'"
+                )
             )
             beauchamp_keywords = list(result)
 
             if beauchamp_keywords:
-                logger.info(f"✅ Found {len(beauchamp_keywords)} Beauchamp-related keywords:")
+                logger.info(
+                    f"✅ Found {len(beauchamp_keywords)} Beauchamp-related keywords:"
+                )
                 for row in beauchamp_keywords:
                     logger.info(f"   {row[0]}: {row[1]}")
             else:
                 logger.error("❌ No Beauchamp keywords found in database!")
     else:
         logger.info(f"\n✅ Found {fireflies_count} Fireflies results")
+
 
 if __name__ == "__main__":
     asyncio.run(test_beauchamp_search())

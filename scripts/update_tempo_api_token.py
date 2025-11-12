@@ -21,7 +21,7 @@ def get_app_spec():
         ["doctl", "apps", "spec", "get", APP_ID, "--format", "json"],
         capture_output=True,
         text=True,
-        check=True
+        check=True,
     )
     return json.loads(result.stdout)
 
@@ -43,7 +43,9 @@ def update_tempo_token_in_spec(spec):
                         env["scope"] = "RUN_AND_BUILD_TIME"
                         env["type"] = "SECRET"
                         updated_count += 1
-                        print(f"  ✓ Updated TEMPO_API_TOKEN in service '{service['name']}'")
+                        print(
+                            f"  ✓ Updated TEMPO_API_TOKEN in service '{service['name']}'"
+                        )
 
     # Update in workers (if any)
     if "workers" in spec:
@@ -55,7 +57,9 @@ def update_tempo_token_in_spec(spec):
                         env["scope"] = "RUN_AND_BUILD_TIME"
                         env["type"] = "SECRET"
                         updated_count += 1
-                        print(f"  ✓ Updated TEMPO_API_TOKEN in worker '{worker['name']}'")
+                        print(
+                            f"  ✓ Updated TEMPO_API_TOKEN in worker '{worker['name']}'"
+                        )
 
     print(f"\n📊 Total updates: {updated_count} TEMPO_API_TOKEN values")
     return spec, updated_count
@@ -87,7 +91,7 @@ def save_and_update_spec(spec):
             ["doctl", "apps", "update", APP_ID, "--spec", temp_file],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
         print("✅ App updated successfully!")
         print("\n📋 Deployment started. Check status with:")
@@ -118,7 +122,9 @@ def main():
             print("\n📌 Next steps:")
             print("  1. Wait for deployment to complete (~3-5 minutes)")
             print("  2. Monitor deployment: doctl apps list | grep agent-pm")
-            print("  3. Check logs: doctl apps logs", APP_ID, "app --type run --tail=100")
+            print(
+                "  3. Check logs: doctl apps logs", APP_ID, "app --type run --tail=100"
+            )
             print("  4. Test the sync job manually (see README)")
         else:
             print("\n❌ Update failed")

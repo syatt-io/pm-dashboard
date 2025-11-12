@@ -15,7 +15,11 @@ import httpx
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from src.utils.timezone import format_est_datetime, format_est_date, format_est_time_only
+from src.utils.timezone import (
+    format_est_datetime,
+    format_est_date,
+    format_est_time_only,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -24,6 +28,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NotificationContent:
     """Content for notifications."""
+
     title: str
     body: str
     priority: str = "normal"  # normal, high, urgent
@@ -42,8 +47,12 @@ class NotificationManager:
         self.teams_webhook = None
 
         # Test mode configuration for meeting emails
-        self.meeting_email_test_mode = os.getenv("MEETING_EMAIL_TEST_MODE", "false").lower() == "true"
-        self.meeting_email_test_recipient = os.getenv("MEETING_EMAIL_TEST_RECIPIENT", "")
+        self.meeting_email_test_mode = (
+            os.getenv("MEETING_EMAIL_TEST_MODE", "false").lower() == "true"
+        )
+        self.meeting_email_test_recipient = os.getenv(
+            "MEETING_EMAIL_TEST_RECIPIENT", ""
+        )
 
         if self.meeting_email_test_mode:
             logger.warning(
@@ -55,16 +64,36 @@ class NotificationManager:
     def _setup_channels(self):
         """Set up notification channels based on configuration."""
         # Setup Slack - Read from config if available, otherwise from environment
-        slack_token = self.config.slack_bot_token if self.config and hasattr(self.config, 'slack_bot_token') else os.getenv("SLACK_BOT_TOKEN")
+        slack_token = (
+            self.config.slack_bot_token
+            if self.config and hasattr(self.config, "slack_bot_token")
+            else os.getenv("SLACK_BOT_TOKEN")
+        )
         if slack_token:
             self.slack_client = WebClient(token=slack_token)
             logger.info("Slack notification channel configured")
 
         # Setup Email - Read from config if available, otherwise from environment
-        smtp_host = self.config.smtp_host if self.config and hasattr(self.config, 'smtp_host') else os.getenv("SMTP_HOST")
-        smtp_user = self.config.smtp_user if self.config and hasattr(self.config, 'smtp_user') else os.getenv("SMTP_USER")
-        smtp_password = self.config.smtp_password if self.config and hasattr(self.config, 'smtp_password') else os.getenv("SMTP_PASSWORD")
-        smtp_port = self.config.smtp_port if self.config and hasattr(self.config, 'smtp_port') else int(os.getenv("SMTP_PORT", "587"))
+        smtp_host = (
+            self.config.smtp_host
+            if self.config and hasattr(self.config, "smtp_host")
+            else os.getenv("SMTP_HOST")
+        )
+        smtp_user = (
+            self.config.smtp_user
+            if self.config and hasattr(self.config, "smtp_user")
+            else os.getenv("SMTP_USER")
+        )
+        smtp_password = (
+            self.config.smtp_password
+            if self.config and hasattr(self.config, "smtp_password")
+            else os.getenv("SMTP_PASSWORD")
+        )
+        smtp_port = (
+            self.config.smtp_port
+            if self.config and hasattr(self.config, "smtp_port")
+            else int(os.getenv("SMTP_PORT", "587"))
+        )
 
         if all([smtp_host, smtp_user, smtp_password]):
             self.smtp_config = {
@@ -73,17 +102,23 @@ class NotificationManager:
                 "user": smtp_user,
                 "password": smtp_password,
                 "from_email": os.getenv("SMTP_FROM_EMAIL", smtp_user),
-                "from_name": os.getenv("SMTP_FROM_NAME", "PM Agent")
+                "from_name": os.getenv("SMTP_FROM_NAME", "PM Agent"),
             }
             logger.info("Email notification channel configured")
 
         # Setup Teams - Read from config if available, otherwise from environment
-        teams_webhook = self.config.teams_webhook_url if self.config and hasattr(self.config, 'teams_webhook_url') else os.getenv("TEAMS_WEBHOOK_URL")
+        teams_webhook = (
+            self.config.teams_webhook_url
+            if self.config and hasattr(self.config, "teams_webhook_url")
+            else os.getenv("TEAMS_WEBHOOK_URL")
+        )
         if teams_webhook:
             self.teams_webhook = teams_webhook
             logger.info("Teams notification channel configured")
 
-    async def send_notification(self, content: NotificationContent, channels: List[str] = None):
+    async def send_notification(
+        self, content: NotificationContent, channels: List[str] = None
+    ):
         """Send notification to specified channels."""
         channels = channels or ["slack", "email"]
         results = {}
@@ -105,35 +140,52 @@ class NotificationManager:
 
     async def _send_slack(self, content: NotificationContent) -> Dict[str, Any]:
         """Send notification to Slack."""
+
         def _send_slack_sync():
             """Synchronous Slack sending (runs in executor)."""
             try:
                 # Determine channel based on priority - Read from config if available, otherwise from environment
-                urgent_channel = self.config.slack_urgent_channel if self.config and hasattr(self.config, 'slack_urgent_channel') else os.getenv("SLACK_URGENT_CHANNEL")
-                default_channel = self.config.slack_channel if self.config and hasattr(self.config, 'slack_channel') else os.getenv("SLACK_CHANNEL", "#general")
-                channel_name = urgent_channel if content.priority == "urgent" else default_channel
+                urgent_channel = (
+                    self.config.slack_urgent_channel
+                    if self.config and hasattr(self.config, "slack_urgent_channel")
+                    else os.getenv("SLACK_URGENT_CHANNEL")
+                )
+                default_channel = (
+                    self.config.slack_channel
+                    if self.config and hasattr(self.config, "slack_channel")
+                    else os.getenv("SLACK_CHANNEL", "#general")
+                )
+                channel_name = (
+                    urgent_channel if content.priority == "urgent" else default_channel
+                )
 
                 # Convert channel name to ID if it starts with # (channel name)
                 # Slack API requires channel IDs, not names
-                if channel_name.startswith('#'):
+                if channel_name.startswith("#"):
                     # Try to resolve channel name to ID using conversations.list
                     try:
                         response = self.slack_client.conversations_list(
                             types="public_channel,private_channel",
-                            exclude_archived=True
+                            exclude_archived=True,
                         )
-                        clean_name = channel_name.lstrip('#')
-                        for ch in response.get('channels', []):
-                            if ch['name'] == clean_name:
-                                channel = ch['id']
-                                logger.info(f"Resolved Slack channel '{channel_name}' to ID '{channel}'")
+                        clean_name = channel_name.lstrip("#")
+                        for ch in response.get("channels", []):
+                            if ch["name"] == clean_name:
+                                channel = ch["id"]
+                                logger.info(
+                                    f"Resolved Slack channel '{channel_name}' to ID '{channel}'"
+                                )
                                 break
                         else:
                             # Channel not found, use name as-is (will likely fail but with clear error)
                             channel = channel_name
-                            logger.warning(f"Could not resolve channel '{channel_name}' to ID, using as-is")
+                            logger.warning(
+                                f"Could not resolve channel '{channel_name}' to ID, using as-is"
+                            )
                     except Exception as e:
-                        logger.warning(f"Error resolving channel name '{channel_name}': {e}, using as-is")
+                        logger.warning(
+                            f"Error resolving channel name '{channel_name}': {e}, using as-is"
+                        )
                         channel = channel_name
                 else:
                     # Already a channel ID or no # prefix
@@ -143,47 +195,45 @@ class NotificationManager:
                 blocks = [
                     {
                         "type": "header",
-                        "text": {
-                            "type": "plain_text",
-                            "text": content.title
-                        }
+                        "text": {"type": "plain_text", "text": content.title},
                     },
                     {
                         "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": content.body
-                        }
-                    }
+                        "text": {"type": "mrkdwn", "text": content.body},
+                    },
                 ]
 
                 # Add items if present
                 if content.items:
-                    items_text = "\n".join([f"• {item.get('title', item)}" for item in content.items[:10]])
-                    blocks.append({
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": items_text
+                    items_text = "\n".join(
+                        [f"• {item.get('title', item)}" for item in content.items[:10]]
+                    )
+                    blocks.append(
+                        {
+                            "type": "section",
+                            "text": {"type": "mrkdwn", "text": items_text},
                         }
-                    })
+                    )
 
                 # Add footer if present
                 if content.footer:
-                    blocks.append({
-                        "type": "context",
-                        "elements": [{
-                            "type": "plain_text",
-                            "text": content.footer
-                        }]
-                    })
+                    blocks.append(
+                        {
+                            "type": "context",
+                            "elements": [
+                                {"type": "plain_text", "text": content.footer}
+                            ],
+                        }
+                    )
 
                 response = self.slack_client.chat_postMessage(
-                    channel=channel,
-                    blocks=blocks,
-                    text=content.title  # Fallback text
+                    channel=channel, blocks=blocks, text=content.title  # Fallback text
                 )
-                return {"success": True, "channel": "slack", "message_id": response["ts"]}
+                return {
+                    "success": True,
+                    "channel": "slack",
+                    "message_id": response["ts"],
+                }
 
             except SlackApiError as e:
                 logger.error(f"Slack API error: {e}")
@@ -206,8 +256,7 @@ class NotificationManager:
             """Synchronous Slack DM sending (runs in executor)."""
             try:
                 response = self.slack_client.chat_postMessage(
-                    channel=slack_user_id,
-                    text=message
+                    channel=slack_user_id, text=message
                 )
                 return {"success": True, "channel": slack_user_id, "ts": response["ts"]}
             except SlackApiError as e:
@@ -226,7 +275,9 @@ class NotificationManager:
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = f"[PM Agent] {content.title}"
-            msg["From"] = f"{self.smtp_config['from_name']} <{self.smtp_config['from_email']}>"
+            msg["From"] = (
+                f"{self.smtp_config['from_name']} <{self.smtp_config['from_email']}>"
+            )
             msg["To"] = self.smtp_config["user"]  # Send to self by default
 
             # Create HTML version
@@ -240,7 +291,9 @@ class NotificationManager:
             if content.items:
                 html_body += "<ul>"
                 for item in content.items[:10]:
-                    title = item.get("title", item) if isinstance(item, dict) else str(item)
+                    title = (
+                        item.get("title", item) if isinstance(item, dict) else str(item)
+                    )
                     html_body += f"<li>{title}</li>"
                 html_body += "</ul>"
 
@@ -256,7 +309,9 @@ class NotificationManager:
             msg.attach(part)
 
             # Send email
-            with smtplib.SMTP(self.smtp_config["host"], self.smtp_config["port"]) as server:
+            with smtplib.SMTP(
+                self.smtp_config["host"], self.smtp_config["port"]
+            ) as server:
                 server.starttls()
                 server.login(self.smtp_config["user"], self.smtp_config["password"])
                 server.send_message(msg)
@@ -278,7 +333,7 @@ class NotificationManager:
                 "themeColor": "0078D4" if content.priority == "normal" else "FF0000",
                 "title": content.title,
                 "text": content.body,
-                "sections": []
+                "sections": [],
             }
 
             # Add items section if present
@@ -286,24 +341,19 @@ class NotificationManager:
                 facts = []
                 for item in content.items[:10]:
                     if isinstance(item, dict):
-                        facts.append({
-                            "name": item.get("title", "Item"),
-                            "value": item.get("description", "")[:100]
-                        })
+                        facts.append(
+                            {
+                                "name": item.get("title", "Item"),
+                                "value": item.get("description", "")[:100],
+                            }
+                        )
                     else:
                         facts.append({"name": "Item", "value": str(item)[:100]})
 
-                card["sections"].append({
-                    "title": "Action Items",
-                    "facts": facts
-                })
+                card["sections"].append({"title": "Action Items", "facts": facts})
 
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.teams_webhook,
-                    json=card,
-                    timeout=10
-                )
+                response = await client.post(self.teams_webhook, json=card, timeout=10)
                 response.raise_for_status()
 
             return {"success": True, "channel": "teams"}
@@ -312,7 +362,9 @@ class NotificationManager:
             logger.error(f"Error sending Teams notification: {e}")
             return {"success": False, "channel": "teams", "error": str(e)}
 
-    async def send_daily_digest(self, todos: List[Dict], overdue: List[Dict], due_today: List[Dict]):
+    async def send_daily_digest(
+        self, todos: List[Dict], overdue: List[Dict], due_today: List[Dict]
+    ):
         """Send daily digest notification."""
         from src.utils.timezone import now_est, format_est_date, format_est_time_only
 
@@ -334,12 +386,14 @@ class NotificationManager:
             body=body,
             priority="high" if overdue else "normal",
             items=overdue[:5] + due_today[:5] + todos[:5],
-            footer=f"Generated at {format_est_time_only(now)}"
+            footer=f"Generated at {format_est_time_only(now)}",
         )
 
         await self.send_notification(content, channels=["slack", "email", "teams"])
 
-    async def send_urgent_notification(self, title: str, message: str, ticket_info: Dict = None):
+    async def send_urgent_notification(
+        self, title: str, message: str, ticket_info: Dict = None
+    ):
         """Send urgent notification immediately."""
         body = f"⚠️ *URGENT* ⚠️\n\n{message}"
 
@@ -352,13 +406,14 @@ class NotificationManager:
             title=title,
             body=body,
             priority="urgent",
-            footer="This is an urgent notification requiring immediate attention"
+            footer="This is an urgent notification requiring immediate attention",
         )
 
         await self.send_notification(content, channels=["slack", "email", "teams"])
 
-    async def send_meeting_processed_notification(self, meeting_title: str, action_items_count: int,
-                                                 tickets_created: List[str]):
+    async def send_meeting_processed_notification(
+        self, meeting_title: str, action_items_count: int, tickets_created: List[str]
+    ):
         """Send notification when a meeting has been processed."""
         from src.utils.timezone import now_est, format_est_time_only
 
@@ -375,7 +430,7 @@ class NotificationManager:
             title="Meeting Processed",
             body=body,
             priority="normal",
-            footer=f"Processed at {format_est_time_only(now_est())}"
+            footer=f"Processed at {format_est_time_only(now_est())}",
         )
 
         await self.send_notification(content, channels=["slack"])
@@ -388,7 +443,7 @@ class NotificationManager:
         topics: List[Dict],  # New: List of topic sections with title and content_items
         action_items: List[Dict],
         ai_provider: Optional[str] = None,
-        ai_model: Optional[str] = None
+        ai_model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Send meeting analysis email to participants.
@@ -418,7 +473,10 @@ class NotificationManager:
         if self.meeting_email_test_mode:
             if not self.meeting_email_test_recipient:
                 logger.error("Test mode enabled but no test recipient configured")
-                return {"success": False, "error": "Test mode enabled but MEETING_EMAIL_TEST_RECIPIENT not set"}
+                return {
+                    "success": False,
+                    "error": "Test mode enabled but MEETING_EMAIL_TEST_RECIPIENT not set",
+                }
 
             logger.info(
                 f"🧪 Test mode active - Redirecting email from {recipients} to {self.meeting_email_test_recipient}"
@@ -429,7 +487,9 @@ class NotificationManager:
             # Build HTML email
             msg = MIMEMultipart("alternative")
             msg["Subject"] = f"Meeting Analysis: {meeting_title}"
-            msg["From"] = f"{self.smtp_config['from_name']} <{self.smtp_config['from_email']}>"
+            msg["From"] = (
+                f"{self.smtp_config['from_name']} <{self.smtp_config['from_email']}>"
+            )
             msg["To"] = ", ".join(recipients)
 
             # Create HTML body with test mode banner if needed
@@ -497,7 +557,7 @@ class NotificationManager:
                             html_body += f'<li class="sub-item">{item[4:]}</li>'
                         else:
                             # Main bullet point
-                            html_body += f'<li>{item}</li>'
+                            html_body += f"<li>{item}</li>"
 
                     html_body += """
                             </ul>
@@ -528,6 +588,7 @@ class NotificationManager:
 
             # Add footer
             from src.utils.timezone import now_est
+
             html_body += f"""
                     </div>
                     <div class="footer">
@@ -542,7 +603,9 @@ class NotificationManager:
             msg.attach(part)
 
             # Send email
-            with smtplib.SMTP(self.smtp_config["host"], self.smtp_config["port"]) as server:
+            with smtplib.SMTP(
+                self.smtp_config["host"], self.smtp_config["port"]
+            ) as server:
                 server.starttls()
                 server.login(self.smtp_config["user"], self.smtp_config["password"])
                 server.send_message(msg)
@@ -554,8 +617,10 @@ class NotificationManager:
             return {
                 "success": True,
                 "recipients": recipients,
-                "original_recipients": original_recipients if self.meeting_email_test_mode else recipients,
-                "test_mode": self.meeting_email_test_mode
+                "original_recipients": (
+                    original_recipients if self.meeting_email_test_mode else recipients
+                ),
+                "test_mode": self.meeting_email_test_mode,
             }
 
         except Exception as e:
@@ -571,7 +636,7 @@ class NotificationManager:
         action_items: List[Dict],
         meeting_url: Optional[str] = None,
         ai_provider: Optional[str] = None,
-        ai_model: Optional[str] = None
+        ai_model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Send meeting analysis via Slack DM to project followers.
@@ -610,26 +675,41 @@ class NotificationManager:
             try:
                 # Query project followers with Slack user IDs
                 result = session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT DISTINCT u.slack_user_id, u.name, u.email
                         FROM user_watched_projects uwp
                         JOIN users u ON uwp.user_id = u.id
                         WHERE uwp.project_key = :project_key
                         AND u.slack_user_id IS NOT NULL
                         AND u.slack_user_id != ''
-                    """),
-                    {"project_key": project_key}
+                    """
+                    ),
+                    {"project_key": project_key},
                 )
-                followers = [{"slack_user_id": row[0], "name": row[1], "email": row[2]} for row in result]
+                followers = [
+                    {"slack_user_id": row[0], "name": row[1], "email": row[2]}
+                    for row in result
+                ]
 
                 if not followers:
-                    logger.info(f"No followers with Slack IDs found for project {project_key}")
-                    return {"success": True, "recipients": [], "message": "No followers to notify"}
+                    logger.info(
+                        f"No followers with Slack IDs found for project {project_key}"
+                    )
+                    return {
+                        "success": True,
+                        "recipients": [],
+                        "message": "No followers to notify",
+                    }
 
-                logger.info(f"Found {len(followers)} followers with Slack IDs for project {project_key}")
+                logger.info(
+                    f"Found {len(followers)} followers with Slack IDs for project {project_key}"
+                )
 
                 # Format parent message
-                parent_message = f"*{meeting_title} Notes* ({format_est_date(meeting_date)})"
+                parent_message = (
+                    f"*{meeting_title} Notes* ({format_est_date(meeting_date)})"
+                )
 
                 # Format thread message with full analysis
                 thread_message = self._format_slack_meeting_analysis(
@@ -639,7 +719,7 @@ class NotificationManager:
                     action_items=action_items,
                     meeting_url=meeting_url,
                     ai_provider=ai_provider,
-                    ai_model=ai_model
+                    ai_model=ai_model,
                 )
 
                 # Send DMs to each follower
@@ -651,19 +731,20 @@ class NotificationManager:
                     try:
                         # Send parent message
                         parent_response = self.slack_client.chat_postMessage(
-                            channel=follower["slack_user_id"],
-                            text=parent_message
+                            channel=follower["slack_user_id"], text=parent_message
                         )
 
                         # Send thread reply with full analysis
                         self.slack_client.chat_postMessage(
                             channel=follower["slack_user_id"],
                             thread_ts=parent_response["ts"],
-                            text=thread_message
+                            text=thread_message,
                         )
 
                         sent_count += 1
-                        logger.info(f"✅ Sent meeting analysis DM to {follower['name']} ({follower['email']})")
+                        logger.info(
+                            f"✅ Sent meeting analysis DM to {follower['name']} ({follower['email']})"
+                        )
 
                     except SlackApiError as e:
                         failed_count += 1
@@ -676,14 +757,16 @@ class NotificationManager:
                     "sent_count": sent_count,
                     "failed_count": failed_count,
                     "total_followers": len(followers),
-                    "errors": errors if errors else None
+                    "errors": errors if errors else None,
                 }
 
             finally:
                 session.close()
 
         except Exception as e:
-            logger.error(f"Error sending meeting analysis Slack DMs: {e}", exc_info=True)
+            logger.error(
+                f"Error sending meeting analysis Slack DMs: {e}", exc_info=True
+            )
             return {"success": False, "error": str(e)}
 
     def _format_slack_meeting_analysis(
@@ -694,7 +777,7 @@ class NotificationManager:
         action_items: List[Dict],
         meeting_url: Optional[str] = None,
         ai_provider: Optional[str] = None,
-        ai_model: Optional[str] = None
+        ai_model: Optional[str] = None,
     ) -> str:
         """
         Format meeting analysis for Slack message.
@@ -714,7 +797,9 @@ class NotificationManager:
         # Build message with emoji and formatting
         message = f"📋 *{meeting_title}*\n"
         message += f"📅 {format_est_datetime(meeting_date)}\n"
-        message += f"🤖 _AI Model: {ai_provider or 'unknown'}/{ai_model or 'unknown'}_\n\n"
+        message += (
+            f"🤖 _AI Model: {ai_provider or 'unknown'}/{ai_model or 'unknown'}_\n\n"
+        )
 
         # Add topics
         if topics:
@@ -747,7 +832,11 @@ class NotificationManager:
                 message += f"\n✅ *{title}*\n"
                 if description:
                     # Limit description to 200 chars for Slack
-                    desc_preview = description[:200] + "..." if len(description) > 200 else description
+                    desc_preview = (
+                        description[:200] + "..."
+                        if len(description) > 200
+                        else description
+                    )
                     message += f"   {desc_preview}\n"
                 message += f"   👤 {assignee} | 🔥 {priority}\n"
         else:
@@ -765,13 +854,15 @@ class NotificationManager:
             title="PM Agent Test Notification",
             body="This is a test notification from the PM Agent. If you receive this, the channel is working correctly.",
             priority="normal",
-            footer="Test notification - please ignore"
+            footer="Test notification - please ignore",
         )
 
-        results = await self.send_notification(content, channels=["slack", "email", "teams"])
+        results = await self.send_notification(
+            content, channels=["slack", "email", "teams"]
+        )
 
         return {
             "slack": results[0]["success"] if len(results) > 0 else False,
             "email": results[1]["success"] if len(results) > 1 else False,
-            "teams": results[2]["success"] if len(results) > 2 else False
+            "teams": results[2]["success"] if len(results) > 2 else False,
         }

@@ -11,12 +11,7 @@ import time
 import functools
 from typing import Callable, Any, Tuple, Type, Optional, List
 import requests
-from requests.exceptions import (
-    Timeout,
-    ConnectionError,
-    HTTPError,
-    RequestException
-)
+from requests.exceptions import Timeout, ConnectionError, HTTPError, RequestException
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +40,9 @@ RETRIABLE_EXCEPTIONS: Tuple[Type[Exception], ...] = (
 )
 
 
-def exponential_backoff(attempt: int, base_delay: float, max_delay: float, backoff_factor: float) -> float:
+def exponential_backoff(
+    attempt: int, base_delay: float, max_delay: float, backoff_factor: float
+) -> float:
     """Calculate exponential backoff with jitter.
 
     Args:
@@ -60,7 +57,7 @@ def exponential_backoff(attempt: int, base_delay: float, max_delay: float, backo
     import random
 
     # Calculate exponential delay: base_delay * (backoff_factor ^ attempt)
-    delay = min(base_delay * (backoff_factor ** attempt), max_delay)
+    delay = min(base_delay * (backoff_factor**attempt), max_delay)
 
     # Add jitter (±25% of delay)
     jitter = delay * 0.25 * (2 * random.random() - 1)
@@ -82,7 +79,7 @@ def is_retriable_error(exception: Exception) -> bool:
 
     # Special handling for HTTPError - check status code
     if isinstance(exception, HTTPError):
-        if hasattr(exception, 'response') and exception.response is not None:
+        if hasattr(exception, "response") and exception.response is not None:
             return exception.response.status_code in RETRIABLE_STATUS_CODES
 
     return False
@@ -94,7 +91,7 @@ def retry_with_backoff(
     max_delay: float = DEFAULT_MAX_DELAY,
     backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
     retriable_exceptions: Optional[Tuple[Type[Exception], ...]] = None,
-    retriable_status_codes: Optional[set] = None
+    retriable_status_codes: Optional[set] = None,
 ):
     """Decorator to retry a function with exponential backoff.
 
@@ -113,6 +110,7 @@ def retry_with_backoff(
             response.raise_for_status()
             return response.json()
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> Any:
@@ -138,19 +136,23 @@ def retry_with_backoff(
 
                     # Special handling for HTTPError
                     if isinstance(e, HTTPError):
-                        if hasattr(e, 'response') and e.response is not None:
-                            should_retry = e.response.status_code in status_codes_to_retry
+                        if hasattr(e, "response") and e.response is not None:
+                            should_retry = (
+                                e.response.status_code in status_codes_to_retry
+                            )
 
                     # If this is the last attempt, or not retriable, raise
                     if attempt >= max_retries or not should_retry:
                         logger.error(
                             f"{func.__name__} failed after {attempt + 1} attempts: {e}",
-                            exc_info=True
+                            exc_info=True,
                         )
                         raise
 
                     # Calculate backoff delay
-                    delay = exponential_backoff(attempt, base_delay, max_delay, backoff_factor)
+                    delay = exponential_backoff(
+                        attempt, base_delay, max_delay, backoff_factor
+                    )
 
                     logger.warning(
                         f"{func.__name__} failed (attempt {attempt + 1}/{max_retries + 1}): {e}. "
@@ -163,7 +165,7 @@ def retry_with_backoff(
                     # Non-retriable exception - raise immediately
                     logger.error(
                         f"{func.__name__} failed with non-retriable error: {e}",
-                        exc_info=True
+                        exc_info=True,
                     )
                     raise
 
@@ -171,6 +173,7 @@ def retry_with_backoff(
             raise last_exception
 
         return wrapper
+
     return decorator
 
 
@@ -179,7 +182,7 @@ def retry_requests_call(
     *args,
     max_retries: int = DEFAULT_MAX_RETRIES,
     base_delay: float = DEFAULT_BASE_DELAY,
-    **kwargs
+    **kwargs,
 ) -> Any:
     """Retry a requests library call with exponential backoff.
 
@@ -203,6 +206,7 @@ def retry_requests_call(
             max_retries=3
         )
     """
+
     @retry_with_backoff(max_retries=max_retries, base_delay=base_delay)
     def wrapper():
         return func(*args, **kwargs)
@@ -215,7 +219,7 @@ def retry_langchain_call(
     *args,
     max_retries: int = DEFAULT_MAX_RETRIES,
     base_delay: float = DEFAULT_BASE_DELAY,
-    **kwargs
+    **kwargs,
 ) -> Any:
     """Retry a LangChain LLM call with exponential backoff.
 
@@ -238,11 +242,12 @@ def retry_langchain_call(
             max_retries=3
         )
     """
+
     # LangChain may raise different exceptions, so we need broader exception handling
     @retry_with_backoff(
         max_retries=max_retries,
         base_delay=base_delay,
-        retriable_exceptions=(Exception,)  # Catch all for LLM calls
+        retriable_exceptions=(Exception,),  # Catch all for LLM calls
     )
     def wrapper():
         return func(*args, **kwargs)
@@ -252,13 +257,14 @@ def retry_langchain_call(
 
 # Convenience functions for common API patterns
 
+
 def retry_graphql_request(
     url: str,
     query: str,
     variables: dict,
     headers: dict,
     max_retries: int = DEFAULT_MAX_RETRIES,
-    timeout: int = 30
+    timeout: int = 30,
 ) -> dict:
     """Retry a GraphQL request with exponential backoff.
 
@@ -281,6 +287,7 @@ def retry_graphql_request(
             {"Authorization": "Bearer token"}
         )
     """
+
     @retry_with_backoff(max_retries=max_retries)
     def make_request():
         payload = {"query": query, "variables": variables}
@@ -297,7 +304,7 @@ def retry_rest_request(
     headers: dict,
     max_retries: int = DEFAULT_MAX_RETRIES,
     timeout: int = 30,
-    **kwargs
+    **kwargs,
 ) -> requests.Response:
     """Retry a REST API request with exponential backoff.
 
@@ -320,14 +327,11 @@ def retry_rest_request(
             params={"from": "2025-01-01", "to": "2025-01-31"}
         )
     """
+
     @retry_with_backoff(max_retries=max_retries)
     def make_request():
         response = requests.request(
-            method,
-            url,
-            headers=headers,
-            timeout=timeout,
-            **kwargs
+            method, url, headers=headers, timeout=timeout, **kwargs
         )
         response.raise_for_status()
         return response
@@ -336,6 +340,7 @@ def retry_rest_request(
 
 
 # Metrics and monitoring
+
 
 class RetryMetrics:
     """Track retry metrics for monitoring and alerting."""
@@ -368,9 +373,13 @@ class RetryMetrics:
             "total_calls": self.total_calls,
             "total_retries": self.total_retries,
             "total_failures": self.total_failures,
-            "retry_rate": self.total_retries / self.total_calls if self.total_calls > 0 else 0,
-            "failure_rate": self.total_failures / self.total_calls if self.total_calls > 0 else 0,
-            "by_function": self.retry_counts
+            "retry_rate": (
+                self.total_retries / self.total_calls if self.total_calls > 0 else 0
+            ),
+            "failure_rate": (
+                self.total_failures / self.total_calls if self.total_calls > 0 else 0
+            ),
+            "by_function": self.retry_counts,
         }
 
     def reset(self):

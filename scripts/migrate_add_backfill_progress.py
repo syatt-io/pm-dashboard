@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, inspect
 from src.utils.database import get_engine
 from src.models import Base, BackfillProgress
 
+
 def main():
     """Run database migration."""
     print("=" * 80)
@@ -18,7 +19,7 @@ def main():
         inspector = inspect(engine)
 
         # Check if table already exists
-        if 'backfill_progress' in inspector.get_table_names():
+        if "backfill_progress" in inspector.get_table_names():
             print("⚠️  Table 'backfill_progress' already exists - skipping creation")
             print()
             sys.exit(0)
@@ -30,7 +31,7 @@ def main():
         print()
 
         # Verify
-        if 'backfill_progress' in inspect(engine).get_table_names():
+        if "backfill_progress" in inspect(engine).get_table_names():
             print("✅ Migration completed successfully!")
             sys.exit(0)
         else:
@@ -40,6 +41,7 @@ def main():
     except Exception as e:
         print(f"❌ Migration failed: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

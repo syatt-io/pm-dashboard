@@ -75,8 +75,7 @@ class JobExecutionTracker:
             self.priority = self.job_config.priority
         except KeyError:
             logger.warning(
-                f"Job '{job_name}' not found in monitoring config. "
-                f"Using defaults."
+                f"Job '{job_name}' not found in monitoring config. " f"Using defaults."
             )
             self.job_config = None
             self.job_category = "unknown"
@@ -275,7 +274,10 @@ class JobExecutionTracker:
 # CELERY TASK INTEGRATION HELPERS
 # ============================================================================
 
-def track_celery_task(task: Task, db_session: Session, job_name: str) -> JobExecutionTracker:
+
+def track_celery_task(
+    task: Task, db_session: Session, job_name: str
+) -> JobExecutionTracker:
     """Create a tracker for a Celery task with automatic context extraction.
 
     Args:
@@ -291,7 +293,9 @@ def track_celery_task(task: Task, db_session: Session, job_name: str) -> JobExec
         job_name=job_name,
         task_id=task.request.id if task.request else None,
         worker_name=task.request.hostname if task.request else None,
-        celery_queue=task.request.delivery_info.get("routing_key") if task.request else None,
+        celery_queue=(
+            task.request.delivery_info.get("routing_key") if task.request else None
+        ),
     )
 
 
@@ -328,6 +332,7 @@ def track_job_execution(
 # ============================================================================
 # QUERY HELPERS
 # ============================================================================
+
 
 def get_recent_failures(
     db_session: Session,
@@ -373,19 +378,27 @@ def get_job_success_rate(
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
-    total = db_session.query(JobExecution).filter(
-        JobExecution.job_name == job_name,
-        JobExecution.started_at >= cutoff,
-    ).count()
+    total = (
+        db_session.query(JobExecution)
+        .filter(
+            JobExecution.job_name == job_name,
+            JobExecution.started_at >= cutoff,
+        )
+        .count()
+    )
 
     if total == 0:
         return 0.0
 
-    successful = db_session.query(JobExecution).filter(
-        JobExecution.job_name == job_name,
-        JobExecution.started_at >= cutoff,
-        JobExecution.status == "success",
-    ).count()
+    successful = (
+        db_session.query(JobExecution)
+        .filter(
+            JobExecution.job_name == job_name,
+            JobExecution.started_at >= cutoff,
+            JobExecution.status == "success",
+        )
+        .count()
+    )
 
     return (successful / total) * 100.0
 
@@ -410,13 +423,15 @@ def get_average_duration(
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
-    result = db_session.query(
-        func.avg(JobExecution.duration_seconds)
-    ).filter(
-        JobExecution.job_name == job_name,
-        JobExecution.started_at >= cutoff,
-        JobExecution.status == "success",
-        JobExecution.duration_seconds.isnot(None),
-    ).scalar()
+    result = (
+        db_session.query(func.avg(JobExecution.duration_seconds))
+        .filter(
+            JobExecution.job_name == job_name,
+            JobExecution.started_at >= cutoff,
+            JobExecution.status == "success",
+            JobExecution.duration_seconds.isnot(None),
+        )
+        .scalar()
+    )
 
     return float(result) if result else None

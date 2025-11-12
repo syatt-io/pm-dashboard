@@ -3,6 +3,7 @@
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.services.vector_search import VectorSearchService
@@ -46,10 +47,12 @@ def verify_parent_filtering():
             if i % 10 == 0 and i > 0:
                 logger.info(f"   Progress: {i}/{len(pages)} pages...")
 
-            page_id = page['id']
+            page_id = page["id"]
             try:
                 blocks = notion_client.get_page_blocks(page_id)
-                full_content_map[page_id] = notion_client.extract_text_from_blocks(blocks)
+                full_content_map[page_id] = notion_client.extract_text_from_blocks(
+                    blocks
+                )
             except Exception as e:
                 logger.warning(f"   ⚠️  Failed to get content for {page_id}: {e}")
                 full_content_map[page_id] = ""
@@ -62,31 +65,25 @@ def verify_parent_filtering():
         # Step 3: Find a parent with children to test
         parent_map = {}
         for page in pages:
-            parent = page.get('parent', {})
-            parent_type = parent.get('type', 'workspace')
+            parent = page.get("parent", {})
+            parent_type = parent.get("type", "workspace")
 
             parent_id = None
-            if parent_type == 'page_id':
-                parent_id = parent.get('page_id')
-            elif parent_type == 'database_id':
-                parent_id = parent.get('database_id')
+            if parent_type == "page_id":
+                parent_id = parent.get("page_id")
+            elif parent_type == "database_id":
+                parent_id = parent.get("database_id")
 
             if parent_id:
                 if parent_id not in parent_map:
-                    parent_map[parent_id] = {
-                        'type': parent_type,
-                        'children': []
-                    }
-                parent_map[parent_id]['children'].append({
-                    'id': page['id'],
-                    'title': notion_client.get_page_title(page)
-                })
+                    parent_map[parent_id] = {"type": parent_type, "children": []}
+                parent_map[parent_id]["children"].append(
+                    {"id": page["id"], "title": notion_client.get_page_title(page)}
+                )
 
         # Get the parent with most children
         sorted_parents = sorted(
-            parent_map.items(),
-            key=lambda x: len(x[1]['children']),
-            reverse=True
+            parent_map.items(), key=lambda x: len(x[1]["children"]), reverse=True
         )
 
         if not sorted_parents:
@@ -94,7 +91,7 @@ def verify_parent_filtering():
             return
 
         test_parent_id = sorted_parents[0][0]
-        test_children = sorted_parents[0][1]['children']
+        test_children = sorted_parents[0][1]["children"]
 
         logger.info(f"🎯 Testing with parent: {test_parent_id[:8]}...")
         logger.info(f"   Has {len(test_children)} child pages:")
@@ -113,44 +110,50 @@ def verify_parent_filtering():
 
         # Test filter with parent ID
         test_filter = {
-            "$or": [
-                {"page_id": test_parent_id},
-                {"parent_id": test_parent_id}
-            ]
+            "$or": [{"page_id": test_parent_id}, {"parent_id": test_parent_id}]
         }
 
         logger.info(f"   Filter: {test_filter}")
 
         results = vector_service.pinecone_index.query(
-            vector=query_embedding,
-            top_k=50,
-            filter=test_filter,
-            include_metadata=True
+            vector=query_embedding, top_k=50, filter=test_filter, include_metadata=True
         )
 
-        matches = results.get('matches', [])
+        matches = results.get("matches", [])
         logger.info(f"✅ Found {len(matches)} results using parent filter\n")
 
         if matches:
             logger.info("📄 Sample results:")
             for i, match in enumerate(matches[:5], 1):
-                metadata = match.get('metadata', {})
-                title = metadata.get('title', 'Untitled')
-                page_id = metadata.get('page_id', 'unknown')
-                parent_id = metadata.get('parent_id', 'none')
+                metadata = match.get("metadata", {})
+                title = metadata.get("title", "Untitled")
+                page_id = metadata.get("page_id", "unknown")
+                parent_id = metadata.get("parent_id", "none")
 
                 is_parent = page_id == test_parent_id
                 is_child = parent_id == test_parent_id
 
                 logger.info(f"   {i}. {title[:60]}")
                 logger.info(f"      page_id: {page_id[:8]}...")
-                logger.info(f"      parent_id: {parent_id[:8] if parent_id else 'None'}...")
-                logger.info(f"      Match type: {'PARENT PAGE' if is_parent else 'CHILD PAGE' if is_child else 'UNKNOWN'}")
+                logger.info(
+                    f"      parent_id: {parent_id[:8] if parent_id else 'None'}..."
+                )
+                logger.info(
+                    f"      Match type: {'PARENT PAGE' if is_parent else 'CHILD PAGE' if is_child else 'UNKNOWN'}"
+                )
                 logger.info("")
 
             # Verify we got both parent and children
-            parent_matches = [m for m in matches if m.get('metadata', {}).get('page_id') == test_parent_id]
-            child_matches = [m for m in matches if m.get('metadata', {}).get('parent_id') == test_parent_id]
+            parent_matches = [
+                m
+                for m in matches
+                if m.get("metadata", {}).get("page_id") == test_parent_id
+            ]
+            child_matches = [
+                m
+                for m in matches
+                if m.get("metadata", {}).get("parent_id") == test_parent_id
+            ]
 
             logger.info(f"✅ Verification Summary:")
             logger.info(f"   • Parent page matches: {len(parent_matches)}")
@@ -160,9 +163,13 @@ def verify_parent_filtering():
             if len(parent_matches) > 0 or len(child_matches) > 0:
                 logger.info(f"\n✅ SUCCESS: Parent-based filtering is working!")
             else:
-                logger.warning(f"\n⚠️  WARNING: Got results but none matched parent/child criteria")
+                logger.warning(
+                    f"\n⚠️  WARNING: Got results but none matched parent/child criteria"
+                )
         else:
-            logger.warning("⚠️  No results found - may need to wait for backfill to complete")
+            logger.warning(
+                "⚠️  No results found - may need to wait for backfill to complete"
+            )
 
     except Exception as e:
         logger.error(f"❌ Error verifying parent filtering: {e}", exc_info=True)

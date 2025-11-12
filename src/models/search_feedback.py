@@ -8,7 +8,7 @@ from src.models.base import Base
 class SearchFeedback(Base):
     """Store user feedback on search results."""
 
-    __tablename__ = 'search_feedback'
+    __tablename__ = "search_feedback"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -23,9 +23,13 @@ class SearchFeedback(Base):
 
     # Context for learning
     result_count = Column(Integer, nullable=True)  # Number of results returned
-    result_sources = Column(JSON, nullable=True)  # List of sources in results (e.g., ['jira', 'slack', 'github'])
+    result_sources = Column(
+        JSON, nullable=True
+    )  # List of sources in results (e.g., ['jira', 'slack', 'github'])
     top_result_source = Column(String(50), nullable=True)  # Source of top result
-    detail_level = Column(String(20), nullable=True)  # Detail level used (brief/normal/detailed/slack)
+    detail_level = Column(
+        String(20), nullable=True
+    )  # Detail level used (brief/normal/detailed/slack)
     project_key = Column(String(10), nullable=True)  # Project context if detected
 
     # Response metadata
@@ -33,7 +37,9 @@ class SearchFeedback(Base):
     summary_length = Column(Integer, nullable=True)  # Length of summary generated
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     def __repr__(self):
         """String representation."""
@@ -44,7 +50,7 @@ class SearchFeedback(Base):
 class QueryExpansion(Base):
     """Store learned query expansions and synonyms."""
 
-    __tablename__ = 'query_expansions'
+    __tablename__ = "query_expansions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -53,21 +59,42 @@ class QueryExpansion(Base):
     expanded_term = Column(String(100), nullable=False)
 
     # Expansion type
-    expansion_type = Column(String(20), nullable=False)  # 'synonym', 'related', 'acronym', 'learned'
+    expansion_type = Column(
+        String(20), nullable=False
+    )  # 'synonym', 'related', 'acronym', 'learned'
 
     # Quality metrics
-    confidence_score = Column(Float, nullable=False, default=1.0)  # How confident we are in this expansion
-    usage_count = Column(Integer, nullable=False, default=0)  # How many times this expansion was used
-    success_count = Column(Integer, nullable=False, default=0)  # How many times it led to positive feedback
+    confidence_score = Column(
+        Float, nullable=False, default=1.0
+    )  # How confident we are in this expansion
+    usage_count = Column(
+        Integer, nullable=False, default=0
+    )  # How many times this expansion was used
+    success_count = Column(
+        Integer, nullable=False, default=0
+    )  # How many times it led to positive feedback
 
     # Context
-    project_key = Column(String(10), nullable=True)  # Project-specific expansion (e.g., "BC" -> "beauchamp")
-    domain = Column(String(50), nullable=True)  # Domain context (e.g., "ecommerce", "dev-tools")
+    project_key = Column(
+        String(10), nullable=True
+    )  # Project-specific expansion (e.g., "BC" -> "beauchamp")
+    domain = Column(
+        String(50), nullable=True
+    )  # Domain context (e.g., "ecommerce", "dev-tools")
 
     # Metadata
-    is_active = Column(Boolean, nullable=False, default=True)  # Can be disabled if low quality
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    is_active = Column(
+        Boolean, nullable=False, default=True
+    )  # Can be disabled if low quality
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
     def __repr__(self):
         """String representation."""
