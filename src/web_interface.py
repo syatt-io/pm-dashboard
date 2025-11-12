@@ -370,6 +370,11 @@ logger.info("✅ Backfill endpoints exempted from CSRF protection")
 csrf.exempt(historical_import_bp)
 logger.info("✅ Historical Import endpoints exempted from CSRF protection")
 
+# Exempt Historical Import endpoints from rate limiting (long-running tasks)
+if limiter:
+    limiter.exempt(historical_import_bp)
+    logger.info("✅ Historical Import endpoints exempted from rate limiting")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)

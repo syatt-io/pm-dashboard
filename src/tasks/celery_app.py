@@ -6,6 +6,10 @@ import tempfile
 import atexit
 from celery import Celery
 from celery.schedules import crontab
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set up GCP credentials from environment variable
 # The credentials JSON is stored as GOOGLE_APPLICATION_CREDENTIALS_JSON
@@ -41,7 +45,17 @@ else:
 # GCP Pub/Sub broker configuration
 # Format: gcpubsub://projects/PROJECT_ID
 gcp_project_id = os.getenv('GCP_PROJECT_ID', 'syatt-io')
-broker_url = f'gcpubsub://projects/{gcp_project_id}'
+gcp_creds = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+
+# Fall back to Redis for local development if GCP credentials not available
+if gcp_creds:
+    broker_url = f'gcpubsub://projects/{gcp_project_id}'
+    print(f"Celery broker: GCP Pub/Sub (project: {gcp_project_id})")
+else:
+    # Use Redis for local development
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/1')
+    broker_url = redis_url
+    print(f"Celery broker: Redis (local development) - {redis_url}")
 
 # Use PostgreSQL for result backend (storing task results)
 # Default to pm_agent_local for local development to match Flask app
@@ -53,7 +67,6 @@ elif database_url.startswith('postgres://'):
 else:
     result_backend_url = 'db+' + database_url
 
-print(f"Celery broker: GCP Pub/Sub (project: {gcp_project_id})")
 backend_display = result_backend_url.split('@')[0] + '@***' if '@' in result_backend_url else result_backend_url
 print(f"Celery result backend: {backend_display}")
 

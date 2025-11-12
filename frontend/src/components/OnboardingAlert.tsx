@@ -100,7 +100,23 @@ const OnboardingAlert: React.FC<OnboardingAlertProps> = ({ onDismiss }) => {
             </Button>
           </Box>
         }
-        sx={{ minWidth: 400 }}
+        sx={{
+          minWidth: 400,
+          maxWidth: 600,
+          backgroundColor: isInvalid ? '#fff4e5' : '#e3f2fd',
+          border: isInvalid ? '2px solid #ff9800' : '2px solid #554DFF',
+          boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)',
+          '& .MuiAlert-icon': {
+            color: isInvalid ? '#ff9800' : '#554DFF',
+          },
+          '& .MuiAlertTitle-root': {
+            color: isInvalid ? '#e65100' : '#554DFF',
+            fontWeight: 600,
+          },
+          '& .MuiAlert-message': {
+            color: '#333',
+          },
+        }}
       >
         <AlertTitle>
           {isInvalid ? '🔧 Fireflies Setup Required' : '👋 Welcome to PM Command Center!'}

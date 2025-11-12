@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 from celery import shared_task
+from src.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -396,7 +397,7 @@ def sync_project_epic_hours(self, project_key):
         raise
 
 
-@shared_task(
+@celery_app.task(
     name='src.tasks.notification_tasks.import_historical_epic_hours',
     bind=True,  # Bind task instance to get retry info
     autoretry_for=(Exception,),  # Auto-retry on any exception
@@ -660,6 +661,19 @@ def import_historical_epic_hours(self, project_key, start_date, end_date, charac
 
             session.commit()
             logger.info(f"Inserted/updated {records_inserted} epic hours records for {project_key}")
+
+            # Ensure project exists in projects table before saving characteristics
+            from src.models.project import Project
+            project = session.query(Project).filter_by(key=project_key).first()
+            if not project:
+                # Create project record if it doesn't exist
+                project = Project(
+                    key=project_key,
+                    name=project_key  # Will be updated when full project sync runs
+                )
+                session.add(project)
+                session.commit()
+                logger.info(f"Created project record for {project_key}")
 
             # Save project characteristics
             self.update_state(

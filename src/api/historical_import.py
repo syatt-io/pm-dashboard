@@ -2,7 +2,6 @@
 
 from flask import Blueprint, jsonify, request
 from src.services.auth import admin_required
-from src.tasks.notification_tasks import import_historical_epic_hours
 from src.utils.database import get_session
 from src.models.project import Project
 from datetime import datetime
@@ -115,12 +114,11 @@ def import_project_data(current_user):
         if not project:
             logger.warning(f"Project {project_key} not found in local database, will attempt to fetch from Jira")
 
-        # Queue Celery task
-        task = import_historical_epic_hours.delay(
-            project_key=project_key,
-            start_date=start_date_str,
-            end_date=end_date_str,
-            characteristics=characteristics
+        # Queue Celery task using celery_app instance to ensure correct broker is used
+        from src.tasks.celery_app import celery_app
+        task = celery_app.send_task(
+            'src.tasks.notification_tasks.import_historical_epic_hours',
+            args=[project_key, start_date_str, end_date_str, characteristics]
         )
 
         logger.info(f"Queued historical import task {task.id} for project {project_key} ({start_date_str} to {end_date_str})")
@@ -157,10 +155,10 @@ def get_task_status(current_user, task_id):
         }
     """
     from celery.result import AsyncResult
-    from src.web_interface import celery
+    from src.tasks.celery_app import celery_app
 
     try:
-        task = AsyncResult(task_id, app=celery)
+        task = AsyncResult(task_id, app=celery_app)
 
         response = {
             'state': task.state,

@@ -212,6 +212,10 @@ def auth_required(f):
     """Decorator to require authentication for routes."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Allow OPTIONS requests for CORS preflight
+        if request.method == 'OPTIONS':
+            return '', 200
+
         token = None
 
         # Get token from Authorization header

@@ -1,8 +1,8 @@
 import { createTheme } from '@mui/material/styles';
-import { nanoLightTheme, nanoDarkTheme } from 'react-admin';
+import { nanoLightTheme } from 'react-admin';
 import { deepmerge } from '@mui/utils';
 
-// Custom theme overrides for both light and dark modes
+// Custom theme overrides
 const customThemeOverrides = {
   typography: {
     fontSize: 15, // Increased from default 14px
@@ -34,6 +34,26 @@ const lightThemeOverrides = {
           '&.RaMenuItemLink-active': {
             color: '#1976d2',
             backgroundColor: 'rgba(25, 118, 210, 0.08)',
+          },
+        },
+      },
+    },
+    RaLayout: {
+      styleOverrides: {
+        root: {
+          '& .RaLayout-content': {
+            paddingTop: '12px', // Reduced from default (usually 16-24px)
+            marginTop: 0,
+          },
+        },
+      },
+    },
+    MuiToolbar: {
+      styleOverrides: {
+        root: {
+          minHeight: '48px !important', // Reduced from default 64px
+          '@media (min-width: 600px)': {
+            minHeight: '48px !important',
           },
         },
       },
@@ -83,6 +103,26 @@ const darkThemeOverrides = {
           },
           '&:hover': {
             backgroundColor: 'rgba(255, 255, 255, 0.08)',
+          },
+        },
+      },
+    },
+    RaLayout: {
+      styleOverrides: {
+        root: {
+          '& .RaLayout-content': {
+            paddingTop: '12px', // Reduced from default (usually 16-24px)
+            marginTop: 0,
+          },
+        },
+      },
+    },
+    MuiToolbar: {
+      styleOverrides: {
+        root: {
+          minHeight: '48px !important', // Reduced from default 64px
+          '@media (min-width: 600px)': {
+            minHeight: '48px !important',
           },
         },
       },
