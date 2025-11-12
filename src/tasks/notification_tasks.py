@@ -802,6 +802,61 @@ def import_historical_epic_hours(
 
             session.commit()
 
+            # === NEW: AUTOMATED EPIC ENRICHMENT & ANALYSIS ===
+            # Step 1: Enrich epic summaries from Jira (replace ticket keys with real names)
+            logger.info("🔄 Step 1/3: Enriching epic summaries from Jira...")
+            self.update_state(
+                state="PROGRESS",
+                meta={"message": "Enriching epic names from Jira..."}
+            )
+
+            from src.services.epic_enrichment_service import EpicEnrichmentService
+            enrichment_service = EpicEnrichmentService(session)
+            enrichment_result = enrichment_service.enrich_project_epics(project_key)
+
+            if enrichment_result['success']:
+                logger.info(
+                    f"✅ Enriched {enrichment_result['enriched_count']} epics "
+                    f"({enrichment_result['records_updated']} records updated)"
+                )
+            else:
+                logger.warning(f"⚠️ Enrichment failed: {enrichment_result.get('error', 'Unknown error')}")
+
+            # Step 2: Run AI grouping analysis (create canonical categories)
+            logger.info("🔄 Step 2/3: Analyzing epic groupings with AI...")
+            self.update_state(
+                state="PROGRESS",
+                meta={"message": "Analyzing epic groupings with AI..."}
+            )
+
+            from src.services.epic_analysis_service import EpicAnalysisService
+            analysis_service = EpicAnalysisService(session)
+            analysis_result = analysis_service.analyze_and_group_epics()
+
+            if analysis_result['success']:
+                logger.info(
+                    f"✅ Created {analysis_result['total_categories']} canonical categories "
+                    f"from {analysis_result['total_epics']} epics"
+                )
+            else:
+                logger.warning(f"⚠️ Analysis failed: {analysis_result.get('error', 'Unknown error')}")
+
+            # Step 3: Regenerate baselines (update forecasting data)
+            logger.info("🔄 Step 3/3: Regenerating epic baselines...")
+            self.update_state(
+                state="PROGRESS",
+                meta={"message": "Regenerating epic baselines..."}
+            )
+
+            from scripts.generate_epic_baselines import generate_baselines
+            try:
+                baseline_result = generate_baselines()
+                logger.info(f"✅ Generated {len(baseline_result)} epic baselines")
+                baseline_count = len(baseline_result)
+            except Exception as baseline_error:
+                logger.error(f"⚠️ Baseline generation failed: {baseline_error}", exc_info=True)
+                baseline_count = 0
+
             logger.info(f"✅ Successfully imported historical data for {project_key}")
 
             return {
@@ -813,6 +868,20 @@ def import_historical_epic_hours(
                 "processed": processed,
                 "skipped": skipped,
                 "retries": self.request.retries,
+                # NEW: Enrichment & analysis stats
+                "enrichment": {
+                    "success": enrichment_result.get('success', False),
+                    "enriched_count": enrichment_result.get('enriched_count', 0),
+                    "records_updated": enrichment_result.get('records_updated', 0),
+                },
+                "analysis": {
+                    "success": analysis_result.get('success', False),
+                    "total_categories": analysis_result.get('total_categories', 0),
+                    "total_epics": analysis_result.get('total_epics', 0),
+                },
+                "baselines": {
+                    "count": baseline_count,
+                },
             }
 
         finally:
@@ -825,6 +894,152 @@ def import_historical_epic_hours(
         )
         # Re-raise to trigger auto-retry
         raise
+
+
+@shared_task(
+    name="src.tasks.notification_tasks.regenerate_epic_baselines_monthly",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_kwargs={
+        "max_retries": 2,
+        "countdown": 300,
+    },  # Retry 2 times, wait 5 min between retries
+    retry_backoff=True,
+    retry_backoff_max=1800,  # Max 30 min backoff
+    retry_jitter=True,
+)
+def regenerate_epic_baselines_monthly(self):
+    """
+    Monthly task to regenerate epic baselines with latest data.
+    Scheduled to run on the 3rd of each month at 9:30 AM EST (13:30 UTC).
+
+    This task:
+    1. Enriches all epic summaries from Jira
+    2. Runs AI grouping analysis
+    3. Regenerates all epic baselines
+    4. Sends Slack notification with results
+
+    Resilience features:
+    - Auto-retry up to 2 times with exponential backoff
+    - 5-minute initial wait, up to 30-minute max backoff
+    - Jitter to prevent simultaneous retries
+    """
+    from src.utils.database import get_session
+    from src.services.epic_enrichment_service import EpicEnrichmentService
+    from src.services.epic_analysis_service import EpicAnalysisService
+    from scripts.generate_epic_baselines import generate_baselines
+    from src.integrations.slack import SlackBot
+
+    retry_info = (
+        f" (attempt {self.request.retries + 1}/3)"
+        if self.request.retries > 0
+        else ""
+    )
+    logger.info(f"🔄 Starting monthly epic baseline regeneration{retry_info}...")
+
+    session = get_session()
+    results = {
+        "enrichment": {},
+        "analysis": {},
+        "baselines": {},
+    }
+
+    try:
+        # Step 1: Enrich all epic summaries from Jira
+        logger.info("🔄 Step 1/3: Enriching all epic summaries from Jira...")
+        self.update_state(
+            state="PROGRESS",
+            meta={"message": "Enriching epic names from Jira..."}
+        )
+
+        enrichment_service = EpicEnrichmentService(session)
+        enrichment_result = enrichment_service.enrich_all_epics()
+        results["enrichment"] = enrichment_result
+
+        if enrichment_result['success']:
+            logger.info(
+                f"✅ Enriched {enrichment_result['enriched_count']} epics "
+                f"({enrichment_result['records_updated']} records updated)"
+            )
+        else:
+            logger.warning(f"⚠️ Enrichment failed: {enrichment_result.get('error', 'Unknown error')}")
+
+        # Step 2: Run AI grouping analysis
+        logger.info("🔄 Step 2/3: Analyzing epic groupings with AI...")
+        self.update_state(
+            state="PROGRESS",
+            meta={"message": "Analyzing epic groupings with AI..."}
+        )
+
+        analysis_service = EpicAnalysisService(session)
+        analysis_result = analysis_service.analyze_and_group_epics()
+        results["analysis"] = analysis_result
+
+        if analysis_result['success']:
+            logger.info(
+                f"✅ Created {analysis_result['total_categories']} canonical categories "
+                f"from {analysis_result['total_epics']} epics"
+            )
+        else:
+            logger.warning(f"⚠️ Analysis failed: {analysis_result.get('error', 'Unknown error')}")
+
+        # Step 3: Regenerate all baselines
+        logger.info("🔄 Step 3/3: Regenerating all epic baselines...")
+        self.update_state(
+            state="PROGRESS",
+            meta={"message": "Regenerating epic baselines..."}
+        )
+
+        try:
+            baseline_result = generate_baselines()
+            logger.info(f"✅ Generated {len(baseline_result)} epic baselines")
+            results["baselines"] = {
+                "success": True,
+                "count": len(baseline_result),
+            }
+        except Exception as baseline_error:
+            logger.error(f"⚠️ Baseline generation failed: {baseline_error}", exc_info=True)
+            results["baselines"] = {
+                "success": False,
+                "error": str(baseline_error),
+                "count": 0,
+            }
+
+        # Send Slack notification
+        try:
+            slack_bot = SlackBot()
+            message = (
+                "📊 *Monthly Epic Baseline Regeneration Complete*\n\n"
+                f"*Enrichment:* {enrichment_result.get('enriched_count', 0)} epics enriched "
+                f"({enrichment_result.get('records_updated', 0)} records updated)\n"
+                f"*Analysis:* {analysis_result.get('total_categories', 0)} categories created "
+                f"from {analysis_result.get('total_epics', 0)} epics\n"
+                f"*Baselines:* {results['baselines'].get('count', 0)} baselines generated\n\n"
+                f"✅ All epic forecasting data has been refreshed!"
+            )
+            slack_bot.send_message(message)
+            logger.info("✅ Slack notification sent")
+        except Exception as slack_error:
+            logger.warning(f"⚠️ Failed to send Slack notification: {slack_error}")
+
+        logger.info("✅ Monthly epic baseline regeneration completed successfully")
+
+        return {
+            "success": True,
+            "retries": self.request.retries,
+            **results
+        }
+
+    except Exception as e:
+        logger.error(
+            f"❌ Error in monthly baseline regeneration (attempt {self.request.retries + 1}/3): {e}",
+            exc_info=True,
+        )
+        # Re-raise to trigger auto-retry
+        raise
+
+    finally:
+        session.close()
 
 
 @shared_task(

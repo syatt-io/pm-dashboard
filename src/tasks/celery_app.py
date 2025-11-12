@@ -273,6 +273,13 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.notification_tasks.run_monthly_epic_reconciliation",
         "schedule": crontab(hour=13, minute=0, day_of_month="3"),
     },
+    # Monthly Epic Baseline Regeneration - 3rd of every month at 9:30 AM EST (13:30 UTC)
+    # Runs after epic reconciliation to ensure baselines use latest data
+    # Enriches epic names from Jira, runs AI grouping analysis, regenerates baselines
+    "monthly-epic-baseline-regeneration": {
+        "task": "src.tasks.notification_tasks.regenerate_epic_baselines_monthly",
+        "schedule": crontab(hour=13, minute=30, day_of_month="3"),
+    },
     # ========== Monitoring & Health Check Tasks ==========
     # Celery health check - DISABLED (replaced by daily job monitoring digest)
     # 'celery-health-check': {
