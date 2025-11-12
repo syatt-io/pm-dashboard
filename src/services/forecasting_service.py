@@ -4,6 +4,7 @@ Epic forecasting service using historical data baselines.
 
 from typing import List, Dict, Any
 import csv
+import warnings
 from pathlib import Path
 
 
@@ -105,6 +106,11 @@ class ForecastingService:
         """
         Calculate forecast based on project characteristics.
 
+        .. deprecated::
+            This method uses boolean characteristics and is deprecated.
+            Use calculate_from_total_hours() instead, which supports full 1-5 scale
+            granularity and provides more accurate forecasts.
+
         Args:
             be_integrations: Whether project requires backend integrations
             custom_theme: Whether project requires custom theme development
@@ -116,6 +122,12 @@ class ForecastingService:
         Returns:
             Dictionary with forecast data including month-by-month breakdown
         """
+        warnings.warn(
+            "calculate_forecast() with boolean characteristics is deprecated. "
+            "Use calculate_from_total_hours() with 1-5 scale characteristics for better accuracy.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         # Select baseline set based on integration requirement
         baseline_set = 'with_integration' if be_integrations else 'no_integration'
 
@@ -384,13 +396,17 @@ class ForecastingService:
         """
         Distribute total hours budget across teams using intelligent historical analysis.
 
-        Uses machine learning-informed distribution based on project characteristics:
-        - Backend Integrations (≥3) → Heavy BE involvement, shifted distribution
-        - Extensive Customizations (≥3) → Increased BE Dev allocation up to +30%
-        - Custom Theme (≥3) → Increased FE hours
-        - Custom Designs (≥3) → Design/UX front-loaded in early months
-        - UX Research (≥3) → Extended UX engagement across lifecycle
-        - Project Oversight → Adjusts PM allocation (1=less, 3=typical, 5=high)
+        Uses smooth interpolation across full 1-5 scale for accurate forecasting:
+        - Backend Integrations: Smooth blend between no_integration (1) and with_integration (5)
+          baselines using formula: blend_factor = (value - 1) / 4.0
+        - Extensive Customizations: Smooth BE Dev boost from 0% (1-2) to +30% (5)
+          using formula: multiplier = 1.0 + max(0, (value - 2)) * 0.1
+        - Custom Theme: FE hours scale smoothly from 1.0x (1) to 3.0x (5)
+        - Custom Designs: Design/UX multiplier scales from 1.0x (1) to 4.0x (5)
+        - UX Research: UX multiplier scales from 1.0x (1) to 4.0x (5)
+        - Project Oversight: PM allocation adjusts around baseline (1=less, 3=typical, 5=high)
+
+        All characteristics use continuous interpolation for nuanced forecasting.
 
         Args:
             total_hours: Total hours budget for the project
@@ -474,14 +490,11 @@ class ForecastingService:
 
         # Apply BE Dev boost for extensive customizations
         # User requirement: "extensive customization also generally means more BE Dev support is needed"
-        if extensive_customizations >= 3 and 'BE Devs' in distribution_ratios:
-            # Determine multiplier based on slider value
-            be_boost_multipliers = {
-                3: 1.1,  # +10%
-                4: 1.2,  # +20%
-                5: 1.3   # +30%
-            }
-            multiplier = be_boost_multipliers.get(extensive_customizations, 1.0)
+        if 'BE Devs' in distribution_ratios:
+            # Determine multiplier using smooth interpolation across full 1-5 scale
+            # Formula: 1.0 + max(0, (value - 2)) * 0.1
+            # Value 1-2: no boost (1.0x), Value 3: +10% (1.1x), Value 4: +20% (1.2x), Value 5: +30% (1.3x)
+            multiplier = 1.0 + max(0, (extensive_customizations - 2)) * 0.1
 
             # Calculate boosted BE hours
             baseline_be_ratio = distribution_ratios['BE Devs']
