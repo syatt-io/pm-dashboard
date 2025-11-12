@@ -69,12 +69,16 @@ def classify_variance(cv: float) -> str:
         return "high"
 
 
-def generate_baselines(min_project_count: int = 3):
+def generate_baselines(min_project_count: int = None):
     """
     Generate epic baselines from historical data.
 
     Args:
-        min_project_count: Minimum number of projects an epic must appear in to be included
+        min_project_count: Minimum number of projects an epic must appear in to be included.
+                          If None (default), automatically determined based on available data:
+                          - 1 project: min = 1 (show all epics)
+                          - 2-3 projects: min = 2 (require 2+ projects)
+                          - 4+ projects: min = 3 (require 3+ projects for quality)
     """
     session = get_session()
 
@@ -82,6 +86,25 @@ def generate_baselines(min_project_count: int = 3):
         logger.info("Fetching epic hours data...")
         all_records = session.query(EpicHours).all()
         logger.info(f"Found {len(all_records)} total epic hour records")
+
+        # Determine unique project count for adaptive threshold
+        if min_project_count is None:
+            unique_projects = set(record.project_key for record in all_records if record.project_key)
+            total_projects = len(unique_projects)
+
+            # Use permissive threshold to show all historical epic data for forecasting
+            # The coefficient_of_variation field indicates reliability of each estimate
+            if total_projects <= 10:
+                min_project_count = 1
+                logger.info(f"{total_projects} project(s) found - showing all epics (min_project_count=1)")
+            elif total_projects <= 20:
+                min_project_count = 2
+                logger.info(f"{total_projects} projects found - requiring 2+ projects per epic (min_project_count=2)")
+            else:
+                min_project_count = 3
+                logger.info(f"{total_projects} projects found - requiring 3+ projects per epic (min_project_count=3)")
+        else:
+            logger.info(f"Using explicitly set min_project_count={min_project_count}")
 
         # Group by normalized epic summary
         # First, aggregate hours by project+epic (sum across all months)
@@ -117,18 +140,25 @@ def generate_baselines(min_project_count: int = 3):
             mean_hours = statistics.mean(hours)
             median_hours = statistics.median(hours)
 
-            # Calculate percentiles
-            sorted_hours = sorted(hours)
-            p75_hours = statistics.quantiles(sorted_hours, n=4)[2]  # 75th percentile
-            p90_index = int(len(sorted_hours) * 0.9)
-            p90_hours = sorted_hours[p90_index]
-
             min_hours = min(hours)
             max_hours = max(hours)
 
-            # Coefficient of variation (CV% = std_dev / mean * 100)
-            std_dev = statistics.stdev(hours) if len(hours) > 1 else 0
-            cv = (std_dev / mean_hours * 100) if mean_hours > 0 else 0
+            # Handle single data point case
+            if len(hours) == 1:
+                p75_hours = hours[0]
+                p90_hours = hours[0]
+                std_dev = 0
+                cv = 0
+            else:
+                # Calculate percentiles
+                sorted_hours = sorted(hours)
+                p75_hours = statistics.quantiles(sorted_hours, n=4)[2]  # 75th percentile
+                p90_index = int(len(sorted_hours) * 0.9)
+                p90_hours = sorted_hours[p90_index]
+
+                # Coefficient of variation (CV% = std_dev / mean * 100)
+                std_dev = statistics.stdev(hours)
+                cv = (std_dev / mean_hours * 100) if mean_hours > 0 else 0
 
             variance_level = classify_variance(cv)
 
@@ -215,7 +245,7 @@ def generate_baselines(min_project_count: int = 3):
 def main():
     """Main entry point."""
     logger.info("Generating epic baselines from historical data...")
-    baselines = generate_baselines(min_project_count=3)
+    baselines = generate_baselines()  # Use adaptive threshold based on available data
     logger.info(f"Generated {len(baselines)} baseline estimates")
 
 
