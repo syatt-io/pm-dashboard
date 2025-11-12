@@ -945,7 +945,8 @@ def update_project_forecasts(project_key):
         from sqlalchemy import text
         engine = get_engine()
 
-        with engine.connect() as conn:
+        # Use engine.begin() instead of connect() for auto-commit
+        with engine.begin() as conn:
             for forecast in forecasts:
                 month_year = forecast.get('month_year')
                 forecasted_hours = forecast.get('forecasted_hours', 0)
@@ -964,8 +965,6 @@ def update_project_forecasts(project_key):
                     "month_year": month_year,
                     "forecasted_hours": forecasted_hours
                 })
-
-            conn.commit()
 
         return success_response(message='Forecasts updated successfully')
 
