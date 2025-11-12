@@ -72,8 +72,8 @@ def generate_baselines(min_project_count: int = None):
             # Use permissive threshold to show all historical epic data for forecasting
             # The coefficient_of_variation field indicates reliability of each estimate
             if total_projects <= 10:
-                min_project_count = 1
-                logger.info(f"{total_projects} project(s) found - showing all epics (min_project_count=1)")
+                min_project_count = 2
+                logger.info(f"{total_projects} project(s) found - requiring 2+ projects per epic (min_project_count=2)")
             elif total_projects <= 20:
                 min_project_count = 2
                 logger.info(f"{total_projects} projects found - requiring 2+ projects per epic (min_project_count=2)")
