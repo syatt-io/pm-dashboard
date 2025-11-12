@@ -51,15 +51,23 @@ const SyattTitle = () => (
   </Box>
 );
 
-// Custom Sidebar with enhanced styling
+// Custom Sidebar with enhanced styling and fixed positioning
 const CustomSidebar = styled(Sidebar)(({ theme }) => ({
   '& .RaSidebar-fixed': {
-    zIndex: theme.zIndex.drawer,
+    position: 'fixed',
+    height: '100vh',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    zIndex: theme.zIndex.drawer + 1, // Ensure it's above content
   },
   '& .MuiDrawer-paper': {
+    position: 'fixed',
+    width: 240,
+    height: '100vh',
     backgroundColor: '#FFFFFF',
     borderRight: '1px solid rgba(101, 96, 131, 0.1)',
     boxShadow: '4px 0 16px rgba(30, 29, 39, 0.06)',
+    overflowX: 'hidden', // Prevent horizontal scroll
   },
 }));
 
