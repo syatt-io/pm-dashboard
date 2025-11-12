@@ -90,7 +90,9 @@ const HistoricalDataImportTab: React.FC = () => {
           'Content-Type': 'application/json',
         },
       });
-      setProjects(response.data);
+      // API returns { success: true, data: { projects: [...] } }
+      const projectsData = response.data.data?.projects || response.data.projects || [];
+      setProjects(Array.isArray(projectsData) ? projectsData : []);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load projects');
       console.error('Error loading projects:', err);
