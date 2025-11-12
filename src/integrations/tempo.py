@@ -209,6 +209,38 @@ class TempoAPIClient:
             self.epic_cache[issue_key] = None
             return None
 
+    def get_epic_details_from_jira(self, epic_key: str) -> Optional[Dict]:
+        """
+        Get epic details from Jira including summary and other fields.
+
+        Args:
+            epic_key: Jira epic key (e.g., "RNWL-123")
+
+        Returns:
+            Dict with epic details including 'summary' field, or None if not found
+        """
+        try:
+            # Rate limit to avoid hitting Jira API limits
+            self._rate_limit()
+
+            url = f"{self.jira_url}/rest/api/3/issue/{epic_key}"
+            params = {"fields": "summary,issuetype"}
+            response = requests.get(url, headers=self.jira_headers, params=params, timeout=10)
+            response.raise_for_status()
+
+            issue_data = response.json()
+            fields = issue_data.get("fields", {})
+
+            return {
+                'key': epic_key,
+                'summary': fields.get("summary", epic_key),
+                'issuetype': fields.get("issuetype", {}).get("name", "")
+            }
+
+        except Exception as e:
+            logger.debug(f"Error getting epic details for {epic_key}: {e}")
+            return None
+
     @retry_with_backoff(max_retries=3, base_delay=1.0)
     def get_user_name(self, account_id: str) -> Optional[str]:
         """

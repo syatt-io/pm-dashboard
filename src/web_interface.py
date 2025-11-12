@@ -286,6 +286,7 @@ from src.routes.admin_settings import admin_settings_bp
 from src.routes.insights import insights_bp
 from src.routes.escalation import escalation_bp
 from src.api.analytics import analytics_bp
+from src.api.historical_import import historical_import_bp
 from src.api.forecasts import forecasts_bp
 from src.api.epic_budgets import epic_budgets_bp
 from src.api.epic_categories import epic_categories_bp
@@ -364,6 +365,11 @@ logger.info("✅ Epic Templates endpoints exempted from CSRF protection")
 csrf.exempt(backfill_bp)
 logger.info("✅ Backfill endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Historical Import endpoints from CSRF protection
+# Historical Import endpoints are called from React frontend with JWT auth
+csrf.exempt(historical_import_bp)
+logger.info("✅ Historical Import endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
@@ -384,6 +390,7 @@ app.register_blueprint(forecasts_bp)
 app.register_blueprint(epic_budgets_bp)
 app.register_blueprint(epic_categories_bp)
 app.register_blueprint(epic_templates_bp)
+app.register_blueprint(historical_import_bp)
 
 # ✅ SECURITY: CSRF token endpoint for frontend to fetch tokens
 @app.route('/api/csrf-token', methods=['GET'])

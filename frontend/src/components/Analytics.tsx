@@ -32,10 +32,12 @@ import {
   Download as DownloadIcon,
   Group as TeamIcon,
   Refresh as RefreshIcon,
+  Upload as UploadIcon,
 } from '@mui/icons-material';
 import { usePermissions } from 'react-admin';
 import axios from 'axios';
 import ProjectForecastTab from './ProjectForecastTab';
+import HistoricalDataImportTab from './HistoricalDataImportTab';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
 
 interface EpicBaseline {
@@ -350,6 +352,7 @@ export const AnalyticsList = () => {
           <Tab icon={<ForecastIcon />} label="Project Forecasting" />
           <Tab icon={<WarningIcon />} label="High-Risk Epics" />
           <Tab icon={<TeamIcon />} label="Project Forecast" />
+          <Tab icon={<UploadIcon />} label="Import Historical Data" />
         </Tabs>
       </Box>
 
@@ -637,6 +640,9 @@ export const AnalyticsList = () => {
 
       {/* Tab 4: Project Forecast (Unified) */}
       {tabValue === 3 && <ProjectForecastTab />}
+
+      {/* Tab 5: Import Historical Data */}
+      {tabValue === 4 && <HistoricalDataImportTab />}
     </Box>
   );
 };
