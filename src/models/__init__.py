@@ -27,6 +27,7 @@ from .standard_epic_template import StandardEpicTemplate
 from .project_keyword import ProjectKeyword
 from .project_resource_mapping import ProjectResourceMapping
 from .project_monthly_forecast import ProjectMonthlyForecast
+from .project_forecasting_config import ProjectForecastingConfig
 from .job_execution import JobExecution
 
 # TODO models - create simple Todo models for basic functionality
@@ -194,6 +195,7 @@ __all__ = [
     "ProjectKeyword",
     "ProjectResourceMapping",
     "ProjectMonthlyForecast",
+    "ProjectForecastingConfig",
     "JobExecution",
     "Base",
     # DTOs
