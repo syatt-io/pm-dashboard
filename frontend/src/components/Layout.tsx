@@ -60,6 +60,7 @@ const CustomSidebar = styled(Sidebar)(({ theme }) => ({
     backgroundColor: '#FFFFFF',
     borderRight: '1px solid rgba(101, 96, 131, 0.1)',
     boxShadow: '4px 0 16px rgba(30, 29, 39, 0.06)',
+    paddingTop: '64px',  // Add padding to account for AppBar height
   },
 }));
 
