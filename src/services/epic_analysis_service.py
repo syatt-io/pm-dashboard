@@ -42,7 +42,9 @@ class EpicAnalysisService:
             logger.error("AI configuration not available")
             return None
 
-        logger.info(f"Creating LLM with provider={ai_config.provider}, model={ai_config.model}")
+        logger.info(
+            f"Creating LLM with provider={ai_config.provider}, model={ai_config.model}"
+        )
 
         if ai_config.provider == "openai":
             return ChatOpenAI(
@@ -99,7 +101,9 @@ class EpicAnalysisService:
             logger.error("LLM not available, cannot analyze")
             return {}
 
-        logger.info(f"Sending {len(epic_names)} epic names to AI for grouping analysis...")
+        logger.info(
+            f"Sending {len(epic_names)} epic names to AI for grouping analysis..."
+        )
 
         # Format epic names for the prompt
         epic_list = "\n".join([f"- {name}" for name in sorted(epic_names)])
@@ -140,7 +144,7 @@ Return JSON mapping each epic name to its canonical category."""
 
         messages = [
             SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
+            HumanMessage(content=user_prompt),
         ]
 
         try:
@@ -162,7 +166,9 @@ Return JSON mapping each epic name to its canonical category."""
                 response_text = "\n".join(json_lines)
 
             mappings = json.loads(response_text)
-            logger.info(f"AI proposed {len(set(mappings.values()))} canonical categories")
+            logger.info(
+                f"AI proposed {len(set(mappings.values()))} canonical categories"
+            )
 
             return mappings
 
@@ -192,9 +198,9 @@ Return JSON mapping each epic name to its canonical category."""
             mapping = EpicBaselineMapping(
                 epic_summary=epic_summary,
                 baseline_category=baseline_category.lower().strip(),
-                created_by='ai',
+                created_by="ai",
                 created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc)
+                updated_at=datetime.now(timezone.utc),
             )
             self.session.add(mapping)
 
@@ -216,10 +222,10 @@ Return JSON mapping each epic name to its canonical category."""
         category_counts = Counter(mappings.values())
 
         return {
-            'total_epics': len(mappings),
-            'total_categories': len(category_counts),
-            'top_categories': dict(category_counts.most_common(10)),
-            'categories_by_size': dict(category_counts)
+            "total_epics": len(mappings),
+            "total_categories": len(category_counts),
+            "top_categories": dict(category_counts.most_common(10)),
+            "categories_by_size": dict(category_counts),
         }
 
     def analyze_and_group_epics(self) -> Dict[str, any]:
@@ -230,20 +236,14 @@ Return JSON mapping each epic name to its canonical category."""
         """
         if not self.llm:
             logger.error("LLM not available - cannot run analysis")
-            return {
-                'success': False,
-                'error': 'AI configuration not available'
-            }
+            return {"success": False, "error": "AI configuration not available"}
 
         # Step 1: Fetch unique epic names
         epic_names = self.fetch_unique_epic_names()
 
         if not epic_names:
             logger.warning("No epic names found in database")
-            return {
-                'success': False,
-                'error': 'No epic names found'
-            }
+            return {"success": False, "error": "No epic names found"}
 
         # Step 2: Analyze with AI
         mappings = self.analyze_with_ai(epic_names)
@@ -254,8 +254,4 @@ Return JSON mapping each epic name to its canonical category."""
         # Step 4: Generate statistics
         stats = self.generate_analysis_stats(mappings)
 
-        return {
-            'success': True,
-            'mappings_saved': mappings_saved,
-            **stats
-        }
+        return {"success": True, "mappings_saved": mappings_saved, **stats}

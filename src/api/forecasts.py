@@ -363,7 +363,9 @@ def calculate_from_total_hours():
 
                 # Add metadata indicating AI was used
                 result["forecast_method"] = "ai_powered"
-                result["forecast_description"] = "Intelligent AI analysis of similar historical projects"
+                result["forecast_description"] = (
+                    "Intelligent AI analysis of similar historical projects"
+                )
 
             finally:
                 session.close()
@@ -385,7 +387,9 @@ def calculate_from_total_hours():
 
             # Add metadata indicating statistical method was used
             result["forecast_method"] = "statistical_baseline"
-            result["forecast_description"] = "Statistical averaging of historical baselines"
+            result["forecast_description"] = (
+                "Statistical averaging of historical baselines"
+            )
 
         return jsonify(result), 200
 

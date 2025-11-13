@@ -19,9 +19,20 @@ class ProjectForecastingConfig(Base):
     forecasting_start_date = Column(Date, nullable=False)
     forecasting_end_date = Column(Date, nullable=False)
     include_in_forecasting = Column(Boolean, nullable=False, default=True, index=True)
-    project_type = Column(String(50), nullable=True)  # 'project-based', 'growth-services', etc.
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    project_type = Column(
+        String(50), nullable=True
+    )  # 'project-based', 'growth-services', etc.
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     def __repr__(self):
         return (

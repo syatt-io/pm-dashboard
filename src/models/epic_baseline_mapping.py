@@ -32,7 +32,7 @@ class EpicBaselineMapping(Base):
     confidence_score = Column(Float, nullable=True)
 
     # Source of mapping: 'ai', 'manual', 'seed'
-    created_by = Column(String(50), nullable=False, default='ai')
+    created_by = Column(String(50), nullable=False, default="ai")
 
     # Metadata
     created_at = Column(

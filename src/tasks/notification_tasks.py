@@ -221,9 +221,7 @@ def sync_tempo_hours(self):
     from src.utils.database import get_db
 
     retry_info = (
-        f" (attempt {self.request.retries + 1}/4)"
-        if self.request.retries > 0
-        else ""
+        f" (attempt {self.request.retries + 1}/4)" if self.request.retries > 0 else ""
     )
     logger.info(f"⏰ Starting Tempo hours sync task{retry_info}...")
 
@@ -237,7 +235,11 @@ def sync_tempo_hours(self):
             scheduler.sync_tempo_hours()
             logger.info("✅ Tempo hours sync completed")
 
-            result = {"success": True, "task": "tempo_sync", "retries": self.request.retries}
+            result = {
+                "success": True,
+                "task": "tempo_sync",
+                "retries": self.request.retries,
+            }
             tracker.set_result(result)
             return result
     except Exception as e:
@@ -544,7 +546,12 @@ def sync_project_epic_hours(self, project_key):
     retry_jitter=True,  # Add jitter to prevent thundering herd
 )
 def import_historical_epic_hours(
-    self, project_key, start_date, end_date, characteristics, include_in_forecasting=True
+    self,
+    project_key,
+    start_date,
+    end_date,
+    characteristics,
+    include_in_forecasting=True,
 ):
     """
     Import historical epic hours for a project from Tempo (Celery task).
@@ -887,13 +894,23 @@ def import_historical_epic_hours(
                 logger.info(f"Created project characteristics for {project_key}")
 
             # Save forecasting date range configuration
-            logger.info(f"Saving forecasting config for {project_key} (date range: {start_date} to {end_date})")
-            existing_config = session.query(ProjectForecastingConfig).filter_by(project_key=project_key).first()
+            logger.info(
+                f"Saving forecasting config for {project_key} (date range: {start_date} to {end_date})"
+            )
+            existing_config = (
+                session.query(ProjectForecastingConfig)
+                .filter_by(project_key=project_key)
+                .first()
+            )
 
             if existing_config:
                 # Update existing config
-                existing_config.forecasting_start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
-                existing_config.forecasting_end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+                existing_config.forecasting_start_date = datetime.strptime(
+                    start_date, "%Y-%m-%d"
+                ).date()
+                existing_config.forecasting_end_date = datetime.strptime(
+                    end_date, "%Y-%m-%d"
+                ).date()
                 existing_config.include_in_forecasting = include_in_forecasting
                 existing_config.updated_at = datetime.now()
                 logger.info(f"Updated forecasting config for {project_key}")
@@ -901,9 +918,11 @@ def import_historical_epic_hours(
                 # Create new config
                 new_config = ProjectForecastingConfig(
                     project_key=project_key,
-                    forecasting_start_date=datetime.strptime(start_date, "%Y-%m-%d").date(),
+                    forecasting_start_date=datetime.strptime(
+                        start_date, "%Y-%m-%d"
+                    ).date(),
                     forecasting_end_date=datetime.strptime(end_date, "%Y-%m-%d").date(),
-                    include_in_forecasting=include_in_forecasting
+                    include_in_forecasting=include_in_forecasting,
                 )
                 session.add(new_config)
                 logger.info(f"Created forecasting config for {project_key}")
@@ -914,55 +933,62 @@ def import_historical_epic_hours(
             # Step 1: Enrich epic summaries from Jira (replace ticket keys with real names)
             logger.info("🔄 Step 1/3: Enriching epic summaries from Jira...")
             self.update_state(
-                state="PROGRESS",
-                meta={"message": "Enriching epic names from Jira..."}
+                state="PROGRESS", meta={"message": "Enriching epic names from Jira..."}
             )
 
             from src.services.epic_enrichment_service import EpicEnrichmentService
+
             enrichment_service = EpicEnrichmentService(session)
             enrichment_result = enrichment_service.enrich_project_epics(project_key)
 
-            if enrichment_result['success']:
+            if enrichment_result["success"]:
                 logger.info(
                     f"✅ Enriched {enrichment_result['enriched_count']} epics "
                     f"({enrichment_result['records_updated']} records updated)"
                 )
             else:
-                logger.warning(f"⚠️ Enrichment failed: {enrichment_result.get('error', 'Unknown error')}")
+                logger.warning(
+                    f"⚠️ Enrichment failed: {enrichment_result.get('error', 'Unknown error')}"
+                )
 
             # Step 2: Run AI grouping analysis (create canonical categories)
             logger.info("🔄 Step 2/3: Analyzing epic groupings with AI...")
             self.update_state(
                 state="PROGRESS",
-                meta={"message": "Analyzing epic groupings with AI..."}
+                meta={"message": "Analyzing epic groupings with AI..."},
             )
 
             from src.services.epic_analysis_service import EpicAnalysisService
+
             analysis_service = EpicAnalysisService(session)
             analysis_result = analysis_service.analyze_and_group_epics()
 
-            if analysis_result['success']:
+            if analysis_result["success"]:
                 logger.info(
                     f"✅ Created {analysis_result['total_categories']} canonical categories "
                     f"from {analysis_result['total_epics']} epics"
                 )
             else:
-                logger.warning(f"⚠️ Analysis failed: {analysis_result.get('error', 'Unknown error')}")
+                logger.warning(
+                    f"⚠️ Analysis failed: {analysis_result.get('error', 'Unknown error')}"
+                )
 
             # Step 3: Regenerate baselines (update forecasting data)
             logger.info("🔄 Step 3/3: Regenerating epic baselines...")
             self.update_state(
-                state="PROGRESS",
-                meta={"message": "Regenerating epic baselines..."}
+                state="PROGRESS", meta={"message": "Regenerating epic baselines..."}
             )
 
             from scripts.generate_epic_baselines import generate_baselines
+
             try:
                 baseline_result = generate_baselines()
                 logger.info(f"✅ Generated {len(baseline_result)} epic baselines")
                 baseline_count = len(baseline_result)
             except Exception as baseline_error:
-                logger.error(f"⚠️ Baseline generation failed: {baseline_error}", exc_info=True)
+                logger.error(
+                    f"⚠️ Baseline generation failed: {baseline_error}", exc_info=True
+                )
                 baseline_count = 0
 
             logger.info(f"✅ Successfully imported historical data for {project_key}")
@@ -978,14 +1004,14 @@ def import_historical_epic_hours(
                 "retries": self.request.retries,
                 # NEW: Enrichment & analysis stats
                 "enrichment": {
-                    "success": enrichment_result.get('success', False),
-                    "enriched_count": enrichment_result.get('enriched_count', 0),
-                    "records_updated": enrichment_result.get('records_updated', 0),
+                    "success": enrichment_result.get("success", False),
+                    "enriched_count": enrichment_result.get("enriched_count", 0),
+                    "records_updated": enrichment_result.get("records_updated", 0),
                 },
                 "analysis": {
-                    "success": analysis_result.get('success', False),
-                    "total_categories": analysis_result.get('total_categories', 0),
-                    "total_epics": analysis_result.get('total_epics', 0),
+                    "success": analysis_result.get("success", False),
+                    "total_categories": analysis_result.get("total_categories", 0),
+                    "total_epics": analysis_result.get("total_epics", 0),
                 },
                 "baselines": {
                     "count": baseline_count,
@@ -1039,9 +1065,7 @@ def regenerate_epic_baselines_monthly(self):
     from src.integrations.slack import SlackBot
 
     retry_info = (
-        f" (attempt {self.request.retries + 1}/3)"
-        if self.request.retries > 0
-        else ""
+        f" (attempt {self.request.retries + 1}/3)" if self.request.retries > 0 else ""
     )
     logger.info(f"🔄 Starting monthly epic baseline regeneration{retry_info}...")
 
@@ -1056,46 +1080,47 @@ def regenerate_epic_baselines_monthly(self):
         # Step 1: Enrich all epic summaries from Jira
         logger.info("🔄 Step 1/3: Enriching all epic summaries from Jira...")
         self.update_state(
-            state="PROGRESS",
-            meta={"message": "Enriching epic names from Jira..."}
+            state="PROGRESS", meta={"message": "Enriching epic names from Jira..."}
         )
 
         enrichment_service = EpicEnrichmentService(session)
         enrichment_result = enrichment_service.enrich_all_epics()
         results["enrichment"] = enrichment_result
 
-        if enrichment_result['success']:
+        if enrichment_result["success"]:
             logger.info(
                 f"✅ Enriched {enrichment_result['enriched_count']} epics "
                 f"({enrichment_result['records_updated']} records updated)"
             )
         else:
-            logger.warning(f"⚠️ Enrichment failed: {enrichment_result.get('error', 'Unknown error')}")
+            logger.warning(
+                f"⚠️ Enrichment failed: {enrichment_result.get('error', 'Unknown error')}"
+            )
 
         # Step 2: Run AI grouping analysis
         logger.info("🔄 Step 2/3: Analyzing epic groupings with AI...")
         self.update_state(
-            state="PROGRESS",
-            meta={"message": "Analyzing epic groupings with AI..."}
+            state="PROGRESS", meta={"message": "Analyzing epic groupings with AI..."}
         )
 
         analysis_service = EpicAnalysisService(session)
         analysis_result = analysis_service.analyze_and_group_epics()
         results["analysis"] = analysis_result
 
-        if analysis_result['success']:
+        if analysis_result["success"]:
             logger.info(
                 f"✅ Created {analysis_result['total_categories']} canonical categories "
                 f"from {analysis_result['total_epics']} epics"
             )
         else:
-            logger.warning(f"⚠️ Analysis failed: {analysis_result.get('error', 'Unknown error')}")
+            logger.warning(
+                f"⚠️ Analysis failed: {analysis_result.get('error', 'Unknown error')}"
+            )
 
         # Step 3: Regenerate all baselines
         logger.info("🔄 Step 3/3: Regenerating all epic baselines...")
         self.update_state(
-            state="PROGRESS",
-            meta={"message": "Regenerating epic baselines..."}
+            state="PROGRESS", meta={"message": "Regenerating epic baselines..."}
         )
 
         try:
@@ -1106,7 +1131,9 @@ def regenerate_epic_baselines_monthly(self):
                 "count": len(baseline_result),
             }
         except Exception as baseline_error:
-            logger.error(f"⚠️ Baseline generation failed: {baseline_error}", exc_info=True)
+            logger.error(
+                f"⚠️ Baseline generation failed: {baseline_error}", exc_info=True
+            )
             results["baselines"] = {
                 "success": False,
                 "error": str(baseline_error),
@@ -1132,11 +1159,7 @@ def regenerate_epic_baselines_monthly(self):
 
         logger.info("✅ Monthly epic baseline regeneration completed successfully")
 
-        return {
-            "success": True,
-            "retries": self.request.retries,
-            **results
-        }
+        return {"success": True, "retries": self.request.retries, **results}
 
     except Exception as e:
         logger.error(
@@ -1249,7 +1272,8 @@ def detect_proactive_insights(self):
 
                     asyncio.run(
                         notifier._send_slack_message(
-                            channel=settings.notifications.slack_channel, message=message
+                            channel=settings.notifications.slack_channel,
+                            message=message,
                         )
                     )
                 except Exception as notif_error:
@@ -1312,11 +1336,14 @@ def send_daily_briefs(self):
 
                     asyncio.run(
                         notifier._send_slack_message(
-                            channel=settings.notifications.slack_channel, message=message
+                            channel=settings.notifications.slack_channel,
+                            message=message,
                         )
                     )
                 except Exception as notif_error:
-                    logger.error(f"Error sending daily brief notification: {notif_error}")
+                    logger.error(
+                        f"Error sending daily brief notification: {notif_error}"
+                    )
 
             result = {"success": True, "task": "daily_briefs", **stats}
             tracker.set_result(result)
@@ -1374,7 +1401,8 @@ def run_auto_escalation(self):
 
                     asyncio.run(
                         notifier._send_slack_message(
-                            channel=settings.notifications.slack_channel, message=message
+                            channel=settings.notifications.slack_channel,
+                            message=message,
                         )
                     )
                 except Exception as notif_error:
@@ -1396,7 +1424,9 @@ def run_auto_escalation(self):
 # ========== PM Automation Tasks (Migrated from Python Scheduler) ==========
 
 
-@shared_task(name="src.tasks.notification_tasks.run_time_tracking_compliance", bind=True)
+@shared_task(
+    name="src.tasks.notification_tasks.run_time_tracking_compliance", bind=True
+)
 def run_time_tracking_compliance(self):
     """
     Run weekly time tracking compliance check (Celery task wrapper).
@@ -1440,7 +1470,9 @@ def run_time_tracking_compliance(self):
         db.close()
 
 
-@shared_task(name="src.tasks.notification_tasks.run_monthly_epic_reconciliation", bind=True)
+@shared_task(
+    name="src.tasks.notification_tasks.run_monthly_epic_reconciliation", bind=True
+)
 def run_monthly_epic_reconciliation(self):
     """
     Run monthly epic reconciliation with epic association (Celery task wrapper).
@@ -1480,7 +1512,11 @@ def run_monthly_epic_reconciliation(self):
                     f"({epic_assoc.get('updates_applied', 0)} applied) "
                     f"in {stats['duration_seconds']:.2f}s"
                 )
-                result = {"success": True, "task": "monthly_epic_reconciliation", **stats}
+                result = {
+                    "success": True,
+                    "task": "monthly_epic_reconciliation",
+                    **stats,
+                }
                 tracker.set_result(result)
                 return result
             else:

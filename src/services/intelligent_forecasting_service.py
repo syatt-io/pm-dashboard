@@ -88,7 +88,9 @@ class IntelligentForecastingService:
 
         # Step 2: Build rich historical context
         historical_context = self._build_historical_context(similar_projects)
-        logger.info(f"\nBuilt historical context ({len(historical_context)} characters)")
+        logger.info(
+            f"\nBuilt historical context ({len(historical_context)} characters)"
+        )
 
         # Step 3: Generate AI-powered forecast
         ai_forecast = self._generate_ai_forecast(
@@ -156,11 +158,7 @@ class IntelligentForecastingService:
             # Calculate distance in 6-dimensional characteristic space
             distance_squared = sum(
                 [
-                    (
-                        getattr(char, key, 3)
-                        - target_characteristics.get(key, 3)
-                    )
-                    ** 2
+                    (getattr(char, key, 3) - target_characteristics.get(key, 3)) ** 2
                     for key in [
                         "be_integrations",
                         "custom_theme",
@@ -257,9 +255,7 @@ class IntelligentForecastingService:
         similar_projects.sort(key=lambda x: x["similarity_score"], reverse=True)
         return similar_projects[:limit]
 
-    def _build_historical_context(
-        self, similar_projects: List[Dict[str, Any]]
-    ) -> str:
+    def _build_historical_context(self, similar_projects: List[Dict[str, Any]]) -> str:
         """
         Build rich historical context from similar projects for AI prompt.
 
@@ -318,11 +314,11 @@ class IntelligentForecastingService:
                             if e["month"] == entry["month"]
                         ]
                         month_total = sum(e["hours"] for e in month_entries)
-                        context_lines.append(f"  Month {entry['month']}: {month_total}h")
+                        context_lines.append(
+                            f"  Month {entry['month']}: {month_total}h"
+                        )
                         for e in sorted(month_entries, key=lambda x: -x["hours"])[:3]:
-                            context_lines.append(
-                                f"    - {e['team']}: {e['hours']}h"
-                            )
+                            context_lines.append(f"    - {e['team']}: {e['hours']}h")
 
         return "\n".join(context_lines)
 
@@ -501,7 +497,9 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
 
         try:
             # Call LLM based on configured provider
-            logger.info(f"\nCalling AI ({settings.ai.provider}) for forecast analysis...")
+            logger.info(
+                f"\nCalling AI ({settings.ai.provider}) for forecast analysis..."
+            )
             if settings.ai.provider == "openai":
                 response_text = self._call_openai(prompt)
             elif settings.ai.provider == "anthropic":
@@ -527,15 +525,19 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
             ai_forecast = json.loads(response_text)
 
             logger.info(f"\nAI forecast parsed successfully:")
-            logger.info(f"  Confidence score: {ai_forecast.get('confidence_score', 'N/A')}")
-            logger.info(f"  Overall reasoning: {ai_forecast.get('overall_reasoning', '')[:200]}...")
-            if 'team_allocations' in ai_forecast:
+            logger.info(
+                f"  Confidence score: {ai_forecast.get('confidence_score', 'N/A')}"
+            )
+            logger.info(
+                f"  Overall reasoning: {ai_forecast.get('overall_reasoning', '')[:200]}..."
+            )
+            if "team_allocations" in ai_forecast:
                 logger.info(f"  Team allocations:")
-                for team, alloc in ai_forecast['team_allocations'].items():
+                for team, alloc in ai_forecast["team_allocations"].items():
                     logger.info(f"    - {team}: {alloc.get('percentage', 0):.1f}%")
-            if 'epic_allocations' in ai_forecast:
+            if "epic_allocations" in ai_forecast:
                 logger.info(f"  Epic allocations:")
-                for epic, alloc in ai_forecast['epic_allocations'].items():
+                for epic, alloc in ai_forecast["epic_allocations"].items():
                     logger.info(f"    - {epic}: {alloc.get('percentage', 0):.1f}%")
 
             # Validate and structure the forecast

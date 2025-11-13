@@ -80,7 +80,9 @@ class EpicBaselineGrouper:
                 .all()
             )
             self._existing_categories = {r.baseline_category for r in results}
-            logger.debug(f"Loaded {len(self._existing_categories)} existing categories from database")
+            logger.debug(
+                f"Loaded {len(self._existing_categories)} existing categories from database"
+            )
 
         return self._existing_categories
 
@@ -119,7 +121,9 @@ class EpicBaselineGrouper:
             return existing_mapping.baseline_category
 
         # Use AI to group (with context of existing categories)
-        logger.info(f"No mapping found for '{epic_summary_normalized}', using AI to classify")
+        logger.info(
+            f"No mapping found for '{epic_summary_normalized}', using AI to classify"
+        )
         category = self._group_with_ai(epic_summary_normalized)
 
         # Save to database
@@ -147,7 +151,9 @@ class EpicBaselineGrouper:
         existing_categories = self._get_existing_categories()
 
         if existing_categories:
-            categories_list = "\n".join([f"- {cat}" for cat in sorted(existing_categories)])
+            categories_list = "\n".join(
+                [f"- {cat}" for cat in sorted(existing_categories)]
+            )
             system_prompt = f"""You are an expert at grouping e-commerce project epics into canonical categories.
 
 Existing baseline categories in the system:
@@ -196,7 +202,7 @@ Examples:
 
         messages = [
             SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
+            HumanMessage(content=user_prompt),
         ]
 
         try:
@@ -204,10 +210,12 @@ Examples:
             category = response.content.strip().lower()
 
             # Validate category name (basic sanitization)
-            category = category.replace('"', '').replace("'", '').strip()
+            category = category.replace('"', "").replace("'", "").strip()
 
             if not category or len(category) > 200:
-                logger.warning(f"Invalid category from AI: '{category}', defaulting to 'uncategorized'")
+                logger.warning(
+                    f"Invalid category from AI: '{category}', defaulting to 'uncategorized'"
+                )
                 return "uncategorized"
 
             logger.info(f"AI grouped '{epic_summary}' → '{category}'")
@@ -233,9 +241,9 @@ Examples:
             mapping = EpicBaselineMapping(
                 epic_summary=epic_summary,
                 baseline_category=baseline_category,
-                created_by='ai',
+                created_by="ai",
                 created_at=datetime.now(timezone.utc),
-                updated_at=datetime.now(timezone.utc)
+                updated_at=datetime.now(timezone.utc),
             )
             self.db_session.add(mapping)
             self.db_session.commit()

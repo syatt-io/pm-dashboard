@@ -575,9 +575,19 @@ class JobMonitoringDigestService:
             <tbody>
 """
             for job in all_jobs:
-                status_emoji = "✅" if job["status"] == "success" else "❌" if job["status"] == "failed" else "🔄"
-                status_color = "#00C853" if job["status"] == "success" else "#D32F2F" if job["status"] == "failed" else "#FFA000"
-                duration_display = f"{job['duration_seconds']}s" if job['duration_seconds'] else "N/A"
+                status_emoji = (
+                    "✅"
+                    if job["status"] == "success"
+                    else "❌" if job["status"] == "failed" else "🔄"
+                )
+                status_color = (
+                    "#00C853"
+                    if job["status"] == "success"
+                    else "#D32F2F" if job["status"] == "failed" else "#FFA000"
+                )
+                duration_display = (
+                    f"{job['duration_seconds']}s" if job["duration_seconds"] else "N/A"
+                )
 
                 html += f"""
                 <tr>
@@ -684,8 +694,14 @@ _{summary['period_start'][:10]} to {summary['period_end'][:10]} ({summary['perio
         if all_jobs:
             message += f"*📋 All Job Executions ({len(all_jobs)}):*\n"
             for job in all_jobs[:20]:  # Show first 20 jobs
-                status_emoji = "✅" if job["status"] == "success" else "❌" if job["status"] == "failed" else "🔄"
-                duration = f" ({job['duration_seconds']}s)" if job['duration_seconds'] else ""
+                status_emoji = (
+                    "✅"
+                    if job["status"] == "success"
+                    else "❌" if job["status"] == "failed" else "🔄"
+                )
+                duration = (
+                    f" ({job['duration_seconds']}s)" if job["duration_seconds"] else ""
+                )
                 message += f"{status_emoji} `{job['job_name']}`{duration}\n"
 
             if len(all_jobs) > 20:

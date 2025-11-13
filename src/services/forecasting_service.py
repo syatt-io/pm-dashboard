@@ -44,7 +44,11 @@ class ForecastingService:
             Dictionary with two baseline sets (no_integration, with_integration),
             each containing total hours by team.
         """
-        from src.models import EpicHours, ProjectForecastingConfig, ProjectCharacteristics
+        from src.models import (
+            EpicHours,
+            ProjectForecastingConfig,
+            ProjectCharacteristics,
+        )
         from src.utils.database import get_session
 
         # Use provided session or create new one
@@ -61,23 +65,27 @@ class ForecastingService:
                 session.query(
                     EpicHours.project_key,
                     EpicHours.team,
-                    func.sum(EpicHours.hours).label('total_hours'),
-                    ProjectCharacteristics.be_integrations
+                    func.sum(EpicHours.hours).label("total_hours"),
+                    ProjectCharacteristics.be_integrations,
                 )
                 .join(
                     ProjectForecastingConfig,
-                    EpicHours.project_key == ProjectForecastingConfig.project_key
+                    EpicHours.project_key == ProjectForecastingConfig.project_key,
                 )
                 .join(
                     ProjectCharacteristics,
-                    EpicHours.project_key == ProjectCharacteristics.project_key
+                    EpicHours.project_key == ProjectCharacteristics.project_key,
                 )
                 .filter(
                     ProjectForecastingConfig.include_in_forecasting == True,
                     EpicHours.month >= ProjectForecastingConfig.forecasting_start_date,
-                    EpicHours.month <= ProjectForecastingConfig.forecasting_end_date
+                    EpicHours.month <= ProjectForecastingConfig.forecasting_end_date,
                 )
-                .group_by(EpicHours.project_key, EpicHours.team, ProjectCharacteristics.be_integrations)
+                .group_by(
+                    EpicHours.project_key,
+                    EpicHours.team,
+                    ProjectCharacteristics.be_integrations,
+                )
             )
 
             results = query.all()
@@ -89,7 +97,9 @@ class ForecastingService:
                 )
                 return self._get_fallback_baselines()
 
-            logger.info(f"Loaded {len(results)} project-team combinations from database for baseline calculation")
+            logger.info(
+                f"Loaded {len(results)} project-team combinations from database for baseline calculation"
+            )
 
             # Aggregate by team and baseline category
             no_integration_totals = {}  # be_integrations <= 2
@@ -101,24 +111,33 @@ class ForecastingService:
                 # Categorize projects by BE integrations level
                 if be_integrations <= 2:
                     # Low integration projects
-                    no_integration_totals[team] = no_integration_totals.get(team, 0.0) + total_hours
+                    no_integration_totals[team] = (
+                        no_integration_totals.get(team, 0.0) + total_hours
+                    )
                     no_integration_counts[team] = no_integration_counts.get(team, 0) + 1
                 elif be_integrations >= 4:
                     # High integration projects
-                    with_integration_totals[team] = with_integration_totals.get(team, 0.0) + total_hours
-                    with_integration_counts[team] = with_integration_counts.get(team, 0) + 1
+                    with_integration_totals[team] = (
+                        with_integration_totals.get(team, 0.0) + total_hours
+                    )
+                    with_integration_counts[team] = (
+                        with_integration_counts.get(team, 0) + 1
+                    )
                 else:
                     # Medium projects (be_integrations = 3) contribute to BOTH baselines
-                    no_integration_totals[team] = no_integration_totals.get(team, 0.0) + total_hours
+                    no_integration_totals[team] = (
+                        no_integration_totals.get(team, 0.0) + total_hours
+                    )
                     no_integration_counts[team] = no_integration_counts.get(team, 0) + 1
-                    with_integration_totals[team] = with_integration_totals.get(team, 0.0) + total_hours
-                    with_integration_counts[team] = with_integration_counts.get(team, 0) + 1
+                    with_integration_totals[team] = (
+                        with_integration_totals.get(team, 0.0) + total_hours
+                    )
+                    with_integration_counts[team] = (
+                        with_integration_counts.get(team, 0) + 1
+                    )
 
             # Calculate averages per project
-            baselines = {
-                "no_integration": {},
-                "with_integration": {}
-            }
+            baselines = {"no_integration": {}, "with_integration": {}}
 
             # Calculate no_integration baselines (average hours per project)
             for team, total_hours in no_integration_totals.items():
@@ -136,7 +155,9 @@ class ForecastingService:
                 for team in standard_teams:
                     if team not in baselines[baseline_set]:
                         # Use fallback estimate for missing teams
-                        fallback = self._get_fallback_baselines()[baseline_set].get(team, 50.0)
+                        fallback = self._get_fallback_baselines()[baseline_set].get(
+                            team, 50.0
+                        )
                         baselines[baseline_set][team] = fallback
                         logger.warning(
                             f"No historical data for {team} in {baseline_set} projects. "
