@@ -70,7 +70,7 @@ def generate_baselines(min_project_count: int = None):
             session.query(EpicHours)
             .join(
                 ProjectForecastingConfig,
-                EpicHours.project_key == ProjectForecastingConfig.project_key
+                EpicHours.project_key == ProjectForecastingConfig.project_key,
             )
             .filter(ProjectForecastingConfig.include_in_forecasting == True)
             .filter(EpicHours.month >= ProjectForecastingConfig.forecasting_start_date)
@@ -78,30 +78,46 @@ def generate_baselines(min_project_count: int = None):
         )
 
         all_records = query.all()
-        logger.info(f"Found {len(all_records)} filtered epic hour records (date-bounded forecasting)")
+        logger.info(
+            f"Found {len(all_records)} filtered epic hour records (date-bounded forecasting)"
+        )
 
         # Log forecasting configs being used
-        forecasting_configs = session.query(ProjectForecastingConfig).filter_by(include_in_forecasting=True).all()
+        forecasting_configs = (
+            session.query(ProjectForecastingConfig)
+            .filter_by(include_in_forecasting=True)
+            .all()
+        )
         logger.info(f"Using {len(forecasting_configs)} projects for forecasting:")
         for config in forecasting_configs:
-            logger.info(f"  - {config.project_key}: {config.forecasting_start_date} to {config.forecasting_end_date}")
+            logger.info(
+                f"  - {config.project_key}: {config.forecasting_start_date} to {config.forecasting_end_date}"
+            )
 
         # Determine unique project count for adaptive threshold
         if min_project_count is None:
-            unique_projects = set(record.project_key for record in all_records if record.project_key)
+            unique_projects = set(
+                record.project_key for record in all_records if record.project_key
+            )
             total_projects = len(unique_projects)
 
             # Use permissive threshold to show all historical epic data for forecasting
             # The coefficient_of_variation field indicates reliability of each estimate
             if total_projects <= 10:
                 min_project_count = 2
-                logger.info(f"{total_projects} project(s) found - requiring 2+ projects per epic (min_project_count=2)")
+                logger.info(
+                    f"{total_projects} project(s) found - requiring 2+ projects per epic (min_project_count=2)"
+                )
             elif total_projects <= 20:
                 min_project_count = 2
-                logger.info(f"{total_projects} projects found - requiring 2+ projects per epic (min_project_count=2)")
+                logger.info(
+                    f"{total_projects} projects found - requiring 2+ projects per epic (min_project_count=2)"
+                )
             else:
                 min_project_count = 3
-                logger.info(f"{total_projects} projects found - requiring 3+ projects per epic (min_project_count=3)")
+                logger.info(
+                    f"{total_projects} projects found - requiring 3+ projects per epic (min_project_count=3)"
+                )
         else:
             logger.info(f"Using explicitly set min_project_count={min_project_count}")
 
@@ -152,7 +168,9 @@ def generate_baselines(min_project_count: int = None):
             else:
                 # Calculate percentiles
                 sorted_hours = sorted(hours)
-                p75_hours = statistics.quantiles(sorted_hours, n=4)[2]  # 75th percentile
+                p75_hours = statistics.quantiles(sorted_hours, n=4)[
+                    2
+                ]  # 75th percentile
                 p90_index = int(len(sorted_hours) * 0.9)
                 p90_hours = sorted_hours[p90_index]
 

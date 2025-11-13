@@ -23,8 +23,7 @@ from src.services.epic_enrichment_service import EpicEnrichmentService
 from src.utils.database import get_session
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -42,9 +41,11 @@ def generate_report(result: dict):
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description='Enrich epic summaries from Jira')
-    parser.add_argument('--dry-run', action='store_true', help='Preview without saving to database')
-    parser.add_argument('--project', type=str, help='Enrich specific project only')
+    parser = argparse.ArgumentParser(description="Enrich epic summaries from Jira")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview without saving to database"
+    )
+    parser.add_argument("--project", type=str, help="Enrich specific project only")
     args = parser.parse_args()
 
     logger.info("Starting epic summary enrichment...")
@@ -65,13 +66,19 @@ def main():
             result = service.enrich_all_epics()
 
         # Generate report
-        if result['success']:
+        if result["success"]:
             generate_report(result)
 
-            print("\n✅ Enrichment complete! Epic summaries updated in epic_hours table")
+            print(
+                "\n✅ Enrichment complete! Epic summaries updated in epic_hours table"
+            )
             print("\nNext steps:")
-            print("1. Re-run 'python scripts/analyze_epic_groups.py' to regenerate AI groupings")
-            print("2. Run 'python scripts/generate_epic_baselines.py' to rebuild baselines")
+            print(
+                "1. Re-run 'python scripts/analyze_epic_groups.py' to regenerate AI groupings"
+            )
+            print(
+                "2. Run 'python scripts/generate_epic_baselines.py' to rebuild baselines"
+            )
         else:
             logger.error(f"Enrichment failed: {result.get('error', 'Unknown error')}")
             return 1

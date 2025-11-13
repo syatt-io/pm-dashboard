@@ -24,8 +24,7 @@ from src.services.epic_analysis_service import EpicAnalysisService
 from src.utils.database import get_session
 
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ def generate_report(result: dict):
     print(f"{'Category':<40} {'Epic Count':<15}")
     print("-" * 80)
 
-    for category, count in list(result['top_categories'].items())[:10]:
+    for category, count in list(result["top_categories"].items())[:10]:
         print(f"{category:<40} {count:<15}")
 
     print("=" * 80)
@@ -65,14 +64,18 @@ def main():
         # Run analysis
         result = service.analyze_and_group_epics()
 
-        if result['success']:
+        if result["success"]:
             # Generate report
             generate_report(result)
 
-            print("\n✅ Analysis complete! Mappings saved to epic_baseline_mappings table")
+            print(
+                "\n✅ Analysis complete! Mappings saved to epic_baseline_mappings table"
+            )
             print("\nNext steps:")
             print("1. Review the mappings in the database")
-            print("2. Run 'python scripts/generate_epic_baselines.py' to regenerate baselines")
+            print(
+                "2. Run 'python scripts/generate_epic_baselines.py' to regenerate baselines"
+            )
             print("3. The Epic Baselines tab should now show grouped categories")
 
             return 0

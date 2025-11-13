@@ -33,9 +33,9 @@ def backfill_forecasting_configs():
         projects_query = (
             session.query(
                 EpicHours.project_key,
-                func.min(EpicHours.month).label('start_date'),
-                func.max(EpicHours.month).label('end_date'),
-                func.count(EpicHours.id).label('record_count')
+                func.min(EpicHours.month).label("start_date"),
+                func.max(EpicHours.month).label("end_date"),
+                func.count(EpicHours.id).label("record_count"),
             )
             .group_by(EpicHours.project_key)
             .order_by(EpicHours.project_key)
@@ -84,7 +84,7 @@ def backfill_forecasting_configs():
                     forecasting_end_date=project.end_date,
                     include_in_forecasting=True,  # Default to True
                     created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc)
+                    updated_at=datetime.now(timezone.utc),
                 )
                 session.add(new_config)
                 logger.info(f"✓ Created config for {project.project_key}")

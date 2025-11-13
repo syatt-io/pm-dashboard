@@ -68,9 +68,7 @@ def get_unique_users_from_worklogs(tempo_client: TempoAPIClient) -> dict:
     logger.info(f"\n  Extracted {len(users)} unique users")
 
     # Sort by display name
-    sorted_users = OrderedDict(
-        sorted(users.items(), key=lambda x: x[1].lower())
-    )
+    sorted_users = OrderedDict(sorted(users.items(), key=lambda x: x[1].lower()))
 
     return sorted_users
 
@@ -87,24 +85,27 @@ def export_to_csv(users: dict, output_file: str):
 
     # Import valid teams to show in CSV header
     from src.models.user_team import UserTeam
+
     valid_teams = UserTeam.valid_teams()
 
-    with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
+    with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
 
         # Write header with instructions
-        writer.writerow(['# USER/TEAM MAPPING FILE'])
+        writer.writerow(["# USER/TEAM MAPPING FILE"])
         writer.writerow(['# Instructions: Fill in the "team" column for each user'])
         writer.writerow([f'# Valid teams: {", ".join(valid_teams)}'])
-        writer.writerow(['# Leave team empty or use "Unassigned" for users without a team'])
+        writer.writerow(
+            ['# Leave team empty or use "Unassigned" for users without a team']
+        )
         writer.writerow([])
 
         # Column headers
-        writer.writerow(['account_id', 'display_name', 'team'])
+        writer.writerow(["account_id", "display_name", "team"])
 
         # Write user rows
         for account_id, display_name in users.items():
-            writer.writerow([account_id, display_name, ''])  # Empty team column
+            writer.writerow([account_id, display_name, ""])  # Empty team column
 
     logger.info(f"  ✅ Exported {len(users)} users to {output_file}")
     logger.info(f"\nNext steps:")
@@ -119,9 +120,9 @@ def main():
         description="Export Jira users who logged hours to CSV for team mapping"
     )
     parser.add_argument(
-        '--output',
-        default='users_to_map.csv',
-        help='Output CSV file path (default: users_to_map.csv)'
+        "--output",
+        default="users_to_map.csv",
+        help="Output CSV file path (default: users_to_map.csv)",
     )
     args = parser.parse_args()
 
@@ -152,6 +153,7 @@ def main():
     except Exception as e:
         logger.error(f"\n❌ Error during export: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

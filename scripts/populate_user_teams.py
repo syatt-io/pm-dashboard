@@ -48,17 +48,17 @@ def read_csv_file(csv_file: str) -> list:
     mappings = []
     valid_teams = UserTeam.valid_teams()
 
-    with open(csv_file, 'r', encoding='utf-8') as f:
+    with open(csv_file, "r", encoding="utf-8") as f:
         # Skip comment lines starting with #
-        lines = [line for line in f if not line.strip().startswith('#')]
+        lines = [line for line in f if not line.strip().startswith("#")]
 
         # Reset to start and use csv.DictReader
         reader = csv.DictReader(lines)
 
         for row_num, row in enumerate(reader, start=1):
-            account_id = row.get('account_id', '').strip()
-            display_name = row.get('display_name', '').strip()
-            team = row.get('team', '').strip()
+            account_id = row.get("account_id", "").strip()
+            display_name = row.get("display_name", "").strip()
+            team = row.get("team", "").strip()
 
             # Skip rows with empty account_id
             if not account_id:
@@ -76,11 +76,13 @@ def read_csv_file(csv_file: str) -> list:
                 )
                 continue
 
-            mappings.append({
-                'account_id': account_id,
-                'display_name': display_name,
-                'team': team,
-            })
+            mappings.append(
+                {
+                    "account_id": account_id,
+                    "display_name": display_name,
+                    "team": team,
+                }
+            )
 
     logger.info(f"  Found {len(mappings)} valid user/team mappings")
     return mappings
@@ -105,7 +107,7 @@ def populate_database(mappings: list, dry_run: bool = False):
         # Show summary by team
         team_counts = {}
         for mapping in mappings:
-            team = mapping['team']
+            team = mapping["team"]
             team_counts[team] = team_counts.get(team, 0) + 1
 
         logger.info("Summary by team:")
@@ -124,22 +126,22 @@ def populate_database(mappings: list, dry_run: bool = False):
             # Check if record exists
             existing = (
                 session.query(UserTeam)
-                .filter_by(account_id=mapping['account_id'])
+                .filter_by(account_id=mapping["account_id"])
                 .first()
             )
 
             if existing:
                 # Update existing record
-                existing.display_name = mapping['display_name']
-                existing.team = mapping['team']
+                existing.display_name = mapping["display_name"]
+                existing.team = mapping["team"]
                 existing.updated_at = datetime.now(timezone.utc)
                 updated += 1
             else:
                 # Insert new record
                 new_user_team = UserTeam(
-                    account_id=mapping['account_id'],
-                    display_name=mapping['display_name'],
-                    team=mapping['team'],
+                    account_id=mapping["account_id"],
+                    display_name=mapping["display_name"],
+                    team=mapping["team"],
                     updated_at=datetime.now(timezone.utc),
                 )
                 session.add(new_user_team)
@@ -194,13 +196,12 @@ def main():
         description="Populate user_teams table from CSV file with user/team mappings"
     )
     parser.add_argument(
-        'csv_file',
-        help='CSV file with account_id, display_name, team columns'
+        "csv_file", help="CSV file with account_id, display_name, team columns"
     )
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Show what would be done without modifying database'
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without modifying database",
     )
     args = parser.parse_args()
 
@@ -242,6 +243,7 @@ def main():
     except Exception as e:
         logger.error(f"\n❌ Error during population: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
