@@ -460,7 +460,7 @@ def sync_project_epic_hours(self, project_key):
     retry_jitter=True,  # Add jitter to prevent thundering herd
 )
 def import_historical_epic_hours(
-    self, project_key, start_date, end_date, characteristics
+    self, project_key, start_date, end_date, characteristics, include_in_forecasting=True
 ):
     """
     Import historical epic hours for a project from Tempo (Celery task).
@@ -470,6 +470,7 @@ def import_historical_epic_hours(
     - Accepts custom date range
     - Uses AI to categorize epics
     - Saves project characteristics
+    - Saves forecasting date range configuration
     - Appends data (doesn't delete existing records)
 
     Args:
@@ -483,6 +484,7 @@ def import_historical_epic_hours(
             - ux_research
             - extensive_customizations
             - project_oversight
+        include_in_forecasting: Whether to include this project in forecasting models (default: True)
 
     Resilience features:
     - Auto-retry up to 2 times with exponential backoff
@@ -493,7 +495,7 @@ def import_historical_epic_hours(
         from datetime import datetime, date
         from collections import defaultdict
         from src.integrations.tempo import TempoAPIClient
-        from src.models import EpicHours, EpicCategoryMapping
+        from src.models import EpicHours, EpicCategoryMapping, ProjectForecastingConfig
         from src.models.project import ProjectCharacteristics
         from src.utils.database import get_session
         from src.services.epic_categorizer import EpicCategorizer
@@ -799,6 +801,28 @@ def import_historical_epic_hours(
                 )
                 session.add(new_chars)
                 logger.info(f"Created project characteristics for {project_key}")
+
+            # Save forecasting date range configuration
+            logger.info(f"Saving forecasting config for {project_key} (date range: {start_date} to {end_date})")
+            existing_config = session.query(ProjectForecastingConfig).filter_by(project_key=project_key).first()
+
+            if existing_config:
+                # Update existing config
+                existing_config.forecasting_start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                existing_config.forecasting_end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+                existing_config.include_in_forecasting = include_in_forecasting
+                existing_config.updated_at = datetime.now()
+                logger.info(f"Updated forecasting config for {project_key}")
+            else:
+                # Create new config
+                new_config = ProjectForecastingConfig(
+                    project_key=project_key,
+                    forecasting_start_date=datetime.strptime(start_date, "%Y-%m-%d").date(),
+                    forecasting_end_date=datetime.strptime(end_date, "%Y-%m-%d").date(),
+                    include_in_forecasting=include_in_forecasting
+                )
+                session.add(new_config)
+                logger.info(f"Created forecasting config for {project_key}")
 
             session.commit()
 
@@ -1422,13 +1446,14 @@ def send_job_monitoring_digest():
                     smtp_port = getattr(settings.notifications, "smtp_port", 587)
                     from_email = os.getenv("SMTP_FROM_EMAIL", smtp_user)
                     from_name = os.getenv("SMTP_FROM_NAME", "Agent PM")
+                    to_email = os.getenv("ADMIN_EMAIL", smtp_user)
 
                     msg = MIMEMultipart("alternative")
                     msg["Subject"] = (
                         f"Job Monitoring Daily Digest - {digest['summary']['period_start'][:10]}"
                     )
                     msg["From"] = f"{from_name} <{from_email}>"
-                    msg["To"] = smtp_user  # Send to SMTP user by default
+                    msg["To"] = to_email
 
                     # Attach HTML content
                     msg.attach(MIMEText(email_html, "html"))
@@ -1452,7 +1477,10 @@ def send_job_monitoring_digest():
                         getattr(settings.notifications, "slack_pm_channel", None)
                         or settings.notifications.slack_channel
                     )
-                    notifier.send_slack_message(slack_message, channel=channel)
+                    # Use slack_client directly to send message
+                    notifier.slack_client.chat_postMessage(
+                        channel=channel, text=slack_message
+                    )
                     logger.info("✅ Slack digest sent successfully")
                 except Exception as slack_err:
                     logger.error(f"Failed to send Slack digest: {slack_err}")

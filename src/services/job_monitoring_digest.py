@@ -91,6 +91,9 @@ class JobMonitoringDigestService:
             failures, slow_jobs, success_rate
         )
 
+        # Get all jobs with status
+        all_jobs = self._get_all_jobs(executions)
+
         # Build digest
         digest = {
             "summary": {
@@ -104,6 +107,7 @@ class JobMonitoringDigestService:
                 "success_rate": round(success_rate, 1),
             },
             "by_category": by_category,
+            "all_jobs": all_jobs,
             "failures": failures if failures else [],
             "slow_jobs": slow_jobs if slow_jobs else [],
             "recommendations": recommendations,
@@ -252,6 +256,33 @@ class JobMonitoringDigestService:
         slow_jobs.sort(key=lambda j: j["slowdown_factor"], reverse=True)
 
         return slow_jobs
+
+    def _get_all_jobs(self, executions: List[JobExecution]) -> List[Dict[str, Any]]:
+        """Get all jobs with their status for comprehensive listing.
+
+        Args:
+            executions: List of JobExecution records
+
+        Returns:
+            List of all job details sorted by time
+        """
+        all_jobs = []
+
+        for execution in executions:
+            job = {
+                "job_name": execution.job_name,
+                "category": execution.job_category,
+                "status": execution.status,
+                "started_at": execution.started_at.isoformat(),
+                "duration_seconds": execution.duration_seconds,
+                "retry_count": execution.retry_count,
+            }
+            all_jobs.append(job)
+
+        # Sort by started_at (most recent first)
+        all_jobs.sort(key=lambda j: j["started_at"], reverse=True)
+
+        return all_jobs
 
     def _generate_recommendations(
         self,
@@ -525,6 +556,44 @@ class JobMonitoringDigestService:
     </div>
 """
 
+        # All jobs section
+        all_jobs = digest.get("all_jobs", [])
+        if all_jobs:
+            html += """
+    <div class="section">
+        <div class="section-title">📋 All Job Executions</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Job Name</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                    <th>Started At</th>
+                </tr>
+            </thead>
+            <tbody>
+"""
+            for job in all_jobs:
+                status_emoji = "✅" if job["status"] == "success" else "❌" if job["status"] == "failed" else "🔄"
+                status_color = "#00C853" if job["status"] == "success" else "#D32F2F" if job["status"] == "failed" else "#FFA000"
+                duration_display = f"{job['duration_seconds']}s" if job['duration_seconds'] else "N/A"
+
+                html += f"""
+                <tr>
+                    <td><strong>{job['job_name']}</strong></td>
+                    <td>{job['category']}</td>
+                    <td style="color: {status_color};">{status_emoji} {job['status']}</td>
+                    <td>{duration_display}</td>
+                    <td style="font-size: 11px;">{job['started_at'][:19].replace('T', ' ')}</td>
+                </tr>
+"""
+            html += """
+            </tbody>
+        </table>
+    </div>
+"""
+
         # Footer
         html += f"""
     <div class="footer">
@@ -608,5 +677,18 @@ _{summary['period_start'][:10]} to {summary['period_end'][:10]} ({summary['perio
             message += "*📁 By Category:*\n"
             for category, stats in sorted(by_category.items()):
                 message += f"• `{category}`: {stats['successful']}/{stats['total']} successful ({stats['success_rate']}%)\n"
+            message += "\n"
+
+        # All jobs listing
+        all_jobs = digest.get("all_jobs", [])
+        if all_jobs:
+            message += f"*📋 All Job Executions ({len(all_jobs)}):*\n"
+            for job in all_jobs[:20]:  # Show first 20 jobs
+                status_emoji = "✅" if job["status"] == "success" else "❌" if job["status"] == "failed" else "🔄"
+                duration = f" ({job['duration_seconds']}s)" if job['duration_seconds'] else ""
+                message += f"{status_emoji} `{job['job_name']}`{duration}\n"
+
+            if len(all_jobs) > 20:
+                message += f"   _...and {len(all_jobs) - 20} more jobs_\n"
 
         return message
