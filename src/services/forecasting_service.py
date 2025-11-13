@@ -5,29 +5,169 @@ Epic forecasting service using historical data baselines.
 from typing import List, Dict, Any
 import csv
 import warnings
+import logging
 from pathlib import Path
+from sqlalchemy import func, and_
+from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 
 class ForecastingService:
     """Calculate epic forecasts based on project characteristics and historical baselines."""
 
-    def __init__(self):
-        """Initialize forecasting service with baseline data."""
+    def __init__(self, session: Session = None):
+        """Initialize forecasting service with baseline data.
+
+        Args:
+            session: Optional SQLAlchemy session for database queries.
+                    If not provided, will create a new session when needed.
+        """
+        self.session = session
         self.baselines = self._load_baselines()
         self.lifecycle_percentages = self._load_lifecycle_percentages()
 
     def _load_baselines(self) -> Dict[str, Dict[str, float]]:
         """
-        Load baseline hours from ACTUAL historical data.
+        Load baseline hours from database by querying historical epic hours data.
 
-        Based on real projects:
+        Queries epic_hours table filtered by project_forecasting_config:
+        - Only includes projects where include_in_forecasting=True
+        - Only includes hours within forecasting_start_date to forecasting_end_date
+        - Aggregates total hours by team across all historical projects
+        - Separates into two baseline sets based on project characteristics:
+          * no_integration: Projects with be_integrations <= 2
+          * with_integration: Projects with be_integrations >= 4
+          * Medium projects (be_integrations = 3) contribute to both baselines
+
+        Returns:
+            Dictionary with two baseline sets (no_integration, with_integration),
+            each containing total hours by team.
+        """
+        from src.models import EpicHours, ProjectForecastingConfig, ProjectCharacteristics
+        from src.utils.database import get_session
+
+        # Use provided session or create new one
+        if self.session:
+            session = self.session
+            should_close = False
+        else:
+            session = get_session()
+            should_close = True
+
+        try:
+            # Query epic hours filtered by forecasting config
+            query = (
+                session.query(
+                    EpicHours.project_key,
+                    EpicHours.team,
+                    func.sum(EpicHours.hours).label('total_hours'),
+                    ProjectCharacteristics.be_integrations
+                )
+                .join(
+                    ProjectForecastingConfig,
+                    EpicHours.project_key == ProjectForecastingConfig.project_key
+                )
+                .join(
+                    ProjectCharacteristics,
+                    EpicHours.project_key == ProjectCharacteristics.project_key
+                )
+                .filter(
+                    ProjectForecastingConfig.include_in_forecasting == True,
+                    EpicHours.month >= ProjectForecastingConfig.forecasting_start_date,
+                    EpicHours.month <= ProjectForecastingConfig.forecasting_end_date
+                )
+                .group_by(EpicHours.project_key, EpicHours.team, ProjectCharacteristics.be_integrations)
+            )
+
+            results = query.all()
+
+            if not results:
+                logger.warning(
+                    "No historical data found in database. Using fallback hardcoded baselines. "
+                    "Make sure to import historical projects via Analytics → Import Historical Data."
+                )
+                return self._get_fallback_baselines()
+
+            logger.info(f"Loaded {len(results)} project-team combinations from database for baseline calculation")
+
+            # Aggregate by team and baseline category
+            no_integration_totals = {}  # be_integrations <= 2
+            with_integration_totals = {}  # be_integrations >= 4
+            no_integration_counts = {}
+            with_integration_counts = {}
+
+            for project_key, team, total_hours, be_integrations in results:
+                # Categorize projects by BE integrations level
+                if be_integrations <= 2:
+                    # Low integration projects
+                    no_integration_totals[team] = no_integration_totals.get(team, 0.0) + total_hours
+                    no_integration_counts[team] = no_integration_counts.get(team, 0) + 1
+                elif be_integrations >= 4:
+                    # High integration projects
+                    with_integration_totals[team] = with_integration_totals.get(team, 0.0) + total_hours
+                    with_integration_counts[team] = with_integration_counts.get(team, 0) + 1
+                else:
+                    # Medium projects (be_integrations = 3) contribute to BOTH baselines
+                    no_integration_totals[team] = no_integration_totals.get(team, 0.0) + total_hours
+                    no_integration_counts[team] = no_integration_counts.get(team, 0) + 1
+                    with_integration_totals[team] = with_integration_totals.get(team, 0.0) + total_hours
+                    with_integration_counts[team] = with_integration_counts.get(team, 0) + 1
+
+            # Calculate averages per project
+            baselines = {
+                "no_integration": {},
+                "with_integration": {}
+            }
+
+            # Calculate no_integration baselines (average hours per project)
+            for team, total_hours in no_integration_totals.items():
+                count = no_integration_counts[team]
+                baselines["no_integration"][team] = round(total_hours / count, 2)
+
+            # Calculate with_integration baselines (average hours per project)
+            for team, total_hours in with_integration_totals.items():
+                count = with_integration_counts[team]
+                baselines["with_integration"][team] = round(total_hours / count, 2)
+
+            # Ensure all standard teams are present in both baselines (use Data team estimate if missing)
+            standard_teams = ["BE Devs", "FE Devs", "Design", "UX", "PMs", "Data"]
+            for baseline_set in ["no_integration", "with_integration"]:
+                for team in standard_teams:
+                    if team not in baselines[baseline_set]:
+                        # Use fallback estimate for missing teams
+                        fallback = self._get_fallback_baselines()[baseline_set].get(team, 50.0)
+                        baselines[baseline_set][team] = fallback
+                        logger.warning(
+                            f"No historical data for {team} in {baseline_set} projects. "
+                            f"Using fallback estimate: {fallback}h"
+                        )
+
+            logger.info(
+                f"Calculated baselines from database:\n"
+                f"  No Integration: {baselines['no_integration']}\n"
+                f"  With Integration: {baselines['with_integration']}"
+            )
+
+            return baselines
+
+        except Exception as e:
+            logger.error(f"Error loading baselines from database: {e}", exc_info=True)
+            logger.warning("Falling back to hardcoded baselines")
+            return self._get_fallback_baselines()
+        finally:
+            if should_close:
+                session.close()
+
+    def _get_fallback_baselines(self) -> Dict[str, Dict[str, float]]:
+        """
+        Fallback hardcoded baselines (used only if database query fails).
+
+        Based on original 3 projects:
         - With integrations: SRLK project (BE=733h, FE=679h, balanced)
         - Without integrations: BIGO+BMBY average (BE=40h, FE=856h, FE-heavy)
-
-        These are the ONLY 3 projects in our historical dataset.
         """
-        baselines = {
-            # Average of BIGO (67/1117) and BMBY (13/595) - design & FE only projects
+        return {
             "no_integration": {
                 "BE Devs": 40.0,  # Minimal backend work
                 "FE Devs": 856.0,  # Heavy frontend
@@ -36,7 +176,6 @@ class ForecastingService:
                 "PMs": 316.0,  # Project management
                 "Data": 50.0,  # Estimate (no data)
             },
-            # From SRLK project - backend integrations required
             "with_integration": {
                 "BE Devs": 733.0,  # Heavy backend (18x more than no-integration)
                 "FE Devs": 679.0,  # Balanced with BE
@@ -46,8 +185,6 @@ class ForecastingService:
                 "Data": 100.0,  # Estimate (no data)
             },
         }
-
-        return baselines
 
     def _load_lifecycle_percentages(self) -> Dict[str, Dict[str, float]]:
         """

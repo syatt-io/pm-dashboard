@@ -4,6 +4,7 @@ API endpoints for epic forecasting.
 
 from flask import Blueprint, request, jsonify, make_response
 from src.services.forecasting_service import ForecastingService
+from src.services.intelligent_forecasting_service import IntelligentForecastingService
 from src.models import EpicForecast
 from src.utils.database import get_session
 import logging
@@ -297,6 +298,10 @@ def calculate_from_total_hours():
     """
     Calculate team distribution from total hours budget.
 
+    Supports two modes:
+    1. Statistical baseline mode (default): Uses averaged historical data
+    2. AI-powered mode (use_ai=true): Uses LLM to analyze similar projects and make intelligent predictions
+
     Request body:
     {
         "total_hours": float,
@@ -308,7 +313,8 @@ def calculate_from_total_hours():
         "project_oversight": int (1-5 slider value, optional, default: 3),
         "teams_selected": [...],
         "estimated_months": int,
-        "start_date": str (YYYY-MM-DD, optional)
+        "start_date": str (YYYY-MM-DD, optional),
+        "use_ai": bool (optional, default: true) - Use AI-powered intelligent forecasting
     }
     """
     try:
@@ -328,24 +334,63 @@ def calculate_from_total_hours():
             if field not in data:
                 return jsonify({"error": f"Missing required field: {field}"}), 400
 
-        # Calculate distribution
-        result = forecasting_service.calculate_from_total_hours(
-            total_hours=data["total_hours"],
-            be_integrations=data["be_integrations"],
-            custom_theme=data["custom_theme"],
-            custom_designs=data["custom_designs"],
-            ux_research=data["ux_research"],
-            teams_selected=data["teams_selected"],
-            estimated_months=data["estimated_months"],
-            extensive_customizations=data.get("extensive_customizations", 1),
-            project_oversight=data.get("project_oversight", 3),
-            start_date=data.get("start_date"),
-        )
+        # Check if AI-powered forecasting is requested (default: true for intelligent analysis)
+        use_ai = data.get("use_ai", True)
+
+        if use_ai:
+            # Use AI-powered intelligent forecasting
+            logger.info("Using AI-powered intelligent forecasting")
+            session = get_session()
+            try:
+                intelligent_service = IntelligentForecastingService(session)
+
+                project_characteristics = {
+                    "be_integrations": data["be_integrations"],
+                    "custom_theme": data["custom_theme"],
+                    "custom_designs": data["custom_designs"],
+                    "ux_research": data["ux_research"],
+                    "extensive_customizations": data.get("extensive_customizations", 1),
+                    "project_oversight": data.get("project_oversight", 3),
+                }
+
+                result = intelligent_service.generate_intelligent_forecast(
+                    project_characteristics=project_characteristics,
+                    total_hours=data["total_hours"],
+                    estimated_months=data["estimated_months"],
+                    teams_selected=data["teams_selected"],
+                    start_date=data.get("start_date"),
+                )
+
+                # Add metadata indicating AI was used
+                result["forecast_method"] = "ai_powered"
+                result["forecast_description"] = "Intelligent AI analysis of similar historical projects"
+
+            finally:
+                session.close()
+        else:
+            # Use traditional statistical baseline forecasting
+            logger.info("Using statistical baseline forecasting")
+            result = forecasting_service.calculate_from_total_hours(
+                total_hours=data["total_hours"],
+                be_integrations=data["be_integrations"],
+                custom_theme=data["custom_theme"],
+                custom_designs=data["custom_designs"],
+                ux_research=data["ux_research"],
+                teams_selected=data["teams_selected"],
+                estimated_months=data["estimated_months"],
+                extensive_customizations=data.get("extensive_customizations", 1),
+                project_oversight=data.get("project_oversight", 3),
+                start_date=data.get("start_date"),
+            )
+
+            # Add metadata indicating statistical method was used
+            result["forecast_method"] = "statistical_baseline"
+            result["forecast_description"] = "Statistical averaging of historical baselines"
 
         return jsonify(result), 200
 
     except Exception as e:
-        logger.error(f"Error calculating team distribution: {e}")
+        logger.error(f"Error calculating team distribution: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 
