@@ -46,6 +46,11 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+const API_BASE_URL = process.env.REACT_APP_API_URL ||
+  (window.location.hostname === 'localhost'
+    ? 'http://localhost:4000'
+    : 'https://agent-pm-tsbbb.ondigitalocean.app');
+
 // Type definitions
 interface TeamForecast {
   team: string;
@@ -156,7 +161,7 @@ const ProjectForecastTab: React.FC = () => {
 
       // Call team forecast API
       const teamResponse = await axios.post(
-        'http://localhost:4000/api/forecasts/calculate-from-total',
+        `${API_BASE_URL}/api/forecasts/calculate-from-total`,
         {
           total_hours: totalHours,
           be_integrations: beIntegrations,
@@ -174,7 +179,7 @@ const ProjectForecastTab: React.FC = () => {
 
       // Call epic schedule API
       const epicResponse = await axios.post(
-        'http://localhost:4000/api/analytics/project-schedule',
+        `${API_BASE_URL}/api/analytics/project-schedule`,
         {
           total_hours: totalHours,
           duration_months: calendarMonths,  // Use calendar months, not project duration
@@ -200,7 +205,7 @@ const ProjectForecastTab: React.FC = () => {
       const calendarMonths = isMidMonthStart ? estimatedMonths + 1 : estimatedMonths;
 
       const response = await axios.post(
-        'http://localhost:4000/api/forecasts/export-combined-forecast',
+        `${API_BASE_URL}/api/forecasts/export-combined-forecast`,
         {
           total_hours: totalHours,
           be_integrations: beIntegrations,
@@ -249,7 +254,7 @@ const ProjectForecastTab: React.FC = () => {
     try {
       const epicNames = epicSchedule.epics.map((e) => e.epic_category);
       const response = await axios.post(
-        'http://localhost:4000/api/forecasts/match-jira-epics',
+        `${API_BASE_URL}/api/forecasts/match-jira-epics`,
         {
           project_key: projectKey,
           epic_names: epicNames,
@@ -307,7 +312,7 @@ const ProjectForecastTab: React.FC = () => {
       });
 
       const response = await axios.post(
-        'http://localhost:4000/api/forecasts/export-to-jira',
+        `${API_BASE_URL}/api/forecasts/export-to-jira`,
         {
           project_key: projectKey,
           epics: epicsToExport,
