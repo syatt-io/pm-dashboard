@@ -52,8 +52,7 @@ class UserCSVImporter:
                 f"Row {row_num}: google_id is still a placeholder - needs real Google ID"
             )
 
-        if not row.get("jira_account_id"):
-            errors.append(f"Row {row_num}: Missing jira_account_id")
+        # jira_account_id is optional (nullable in DB)
 
         return errors
 

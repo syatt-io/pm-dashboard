@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, Typography, Select, MenuItem, Switch, Box, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -21,6 +21,9 @@ const UserList = () => {
     slack_user_id: '',
     weekly_hours_minimum: 32
   });
+
+  // Debounce timers for auto-save fields
+  const debounceTimers = useRef<{[key: string]: NodeJS.Timeout}>({});
 
   useEffect(() => {
     fetchUsers();
@@ -61,15 +64,34 @@ const UserList = () => {
     }
   };
 
-  const handleTeamSettingsChange = async (userId: number, field: string, value: any) => {
-    try {
-      const data: any = {};
-      data[field] = value;
-      await axios.put(`/api/auth/users/${userId}/team-settings`, data);
-      fetchUsers();
-    } catch (error: any) {
-      setError(error.response?.data?.error || `Failed to update ${field}`);
+  // Debounced team settings update - waits 1 second after user stops typing
+  const handleTeamSettingsChange = (userId: number, field: string, value: any) => {
+    // Update local state immediately for responsive UI
+    setUsers(prevUsers =>
+      prevUsers.map((u: any) =>
+        u.id === userId ? { ...u, [field]: value } : u
+      )
+    );
+
+    // Clear existing timer for this user-field combination
+    const timerKey = `${userId}-${field}`;
+    if (debounceTimers.current[timerKey]) {
+      clearTimeout(debounceTimers.current[timerKey]);
     }
+
+    // Set new timer to save after 1 second of inactivity
+    debounceTimers.current[timerKey] = setTimeout(async () => {
+      try {
+        const data: any = {};
+        data[field] = value;
+        await axios.put(`/api/auth/users/${userId}/team-settings`, data);
+        // Don't refetch - local state is already updated
+      } catch (error: any) {
+        setError(error.response?.data?.error || `Failed to update ${field}`);
+        // On error, refetch to restore correct value
+        fetchUsers();
+      }
+    }, 1000);
   };
 
   const handleCreateUser = async () => {
@@ -237,7 +259,7 @@ const UserList = () => {
                   <td style={{ padding: '12px' }}>
                     <TextField
                       type="number"
-                      value={user.weekly_hours_minimum || 32}
+                      value={user.weekly_hours_minimum ?? 32}
                       onChange={(e) => handleTeamSettingsChange(user.id, 'weekly_hours_minimum', parseFloat(e.target.value))}
                       size="small"
                       inputProps={{ min: 0, step: 0.5 }}

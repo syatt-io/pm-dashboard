@@ -224,7 +224,7 @@ def create_auth_blueprint(db_session_factory, limiter=None):
         try:
             from src.models.user import User
 
-            users = db_session.query(User).all()
+            users = db_session.query(User).order_by(User.name).all()
             return jsonify({"users": [user.to_dict() for user in users]})
         except Exception as e:
             logger.error(f"Failed to get users: {e}")
