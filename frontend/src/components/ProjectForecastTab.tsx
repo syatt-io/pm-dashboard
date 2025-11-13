@@ -63,10 +63,18 @@ interface TeamForecast {
   }>;
 }
 
+interface EpicForecast {
+  epic: string;
+  total_hours: number;
+  percentage: number;
+  reasoning: string;
+}
+
 interface ForecastResult {
   total_hours: number;
   estimated_months: number;
   teams: TeamForecast[];
+  epics?: EpicForecast[];  // AI-generated epic allocations
   distribution_ratios: { [team: string]: number };
   baseline_set_used: string;
   characteristics?: {
@@ -847,6 +855,84 @@ const ProjectForecastTab: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* AI Epic Forecast Section */}
+            {teamForecast.epics && teamForecast.epics.length > 0 && (
+              <Card sx={{ mb: 3 }}>
+                <CardHeader
+                  title="AI Epic Category Forecast"
+                  subheader="AI-predicted distribution by epic category based on project characteristics"
+                />
+                <CardContent>
+                  {/* Epic Allocation Summary Cards */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {teamForecast.epics
+                      .sort((a, b) => b.percentage - a.percentage)
+                      .map((epic) => (
+                        <Grid item xs={12} sm={6} md={4} key={epic.epic}>
+                          <Card variant="outlined" sx={{ height: '100%' }}>
+                            <CardContent>
+                              <Typography variant="h6" color="primary" gutterBottom>
+                                {epic.epic}
+                              </Typography>
+                              <Typography variant="h4">
+                                {epic.total_hours.toFixed(1)}h
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {epic.percentage.toFixed(1)}% of total
+                              </Typography>
+                              {epic.reasoning && (
+                                <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                                  {epic.reasoning}
+                                </Typography>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                  </Grid>
+
+                  {/* Epic Allocation Table */}
+                  <Typography variant="h6" gutterBottom>
+                    Epic Category Breakdown
+                  </Typography>
+                  <TableContainer component={Paper}>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Epic Category</TableCell>
+                          <TableCell align="right">Hours</TableCell>
+                          <TableCell align="right">% of Total</TableCell>
+                          <TableCell>AI Reasoning</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {teamForecast.epics
+                          .sort((a, b) => b.percentage - a.percentage)
+                          .map((epic) => (
+                            <TableRow key={epic.epic}>
+                              <TableCell>
+                                <strong>{epic.epic}</strong>
+                              </TableCell>
+                              <TableCell align="right">
+                                {epic.total_hours.toFixed(1)}h
+                              </TableCell>
+                              <TableCell align="right">
+                                {epic.percentage.toFixed(1)}%
+                              </TableCell>
+                              <TableCell>
+                                <Typography variant="body2" color="text.secondary">
+                                  {epic.reasoning}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </CardContent>
+              </Card>
+            )}
           </>
         ) : (
           <Box sx={{ textAlign: 'center', py: 8 }}>

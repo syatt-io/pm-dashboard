@@ -422,9 +422,34 @@ The 1-5 scale represents the INTENSITY of each requirement:
    - Medium confidence (0.5-0.7): Some adjustment needed from historical patterns
    - Low confidence (0.2-0.4): Significant differences, major adjustments required
 
+# EPIC CATEGORY ALLOCATION
+
+In addition to team allocation, predict EPIC CATEGORY distribution based on project characteristics.
+
+Common epic categories for web application projects:
+- **Project Oversight** (10-20%): Planning, meetings, stakeholder management, project coordination
+- **FE Dev** (30-45%): Frontend implementation, React/Vue components, UI development
+- **BE Dev** (15-30%): Backend APIs, database design, business logic, server-side code
+- **Design** (8-15%): Visual design, mockups, style guides, UI/UX design work
+- **UX** (3-8%): User research, usability testing, user flows, personas
+- **Infrastructure** (3-8%): DevOps, deployment pipelines, hosting setup, CI/CD
+- **Authentication** (5-10%): Login systems, user management, permissions, security
+- **Search** (3-8%): Search functionality, filters, indexing (if applicable)
+- **Cart/Checkout** (5-12%): E-commerce features, payment integration (if applicable)
+
+Scale epic categories based on characteristics:
+- **High be_integrations (4-5)** → increase "BE Dev" epic to 25-35%
+- **Low be_integrations (1-2)** → reduce "BE Dev" epic to 8-15%
+- **High custom_designs (4-5)** → increase "Design" epic to 12-18%
+- **Low custom_designs (1-2)** → reduce "Design" epic to 4-8%
+- **High ux_research (4-5)** → increase "UX" epic to 8-12%
+- **Low ux_research (1-2)** → reduce "UX" epic to 2-4%
+- **High project_oversight (4-5)** → increase "Project Oversight" epic to 15-25%
+- **Low project_oversight (1-2)** → reduce "Project Oversight" epic to 8-12%
+
 # Your Task
 
-Analyze the historical projects above, then predict the optimal team allocation for the NEW project.
+Analyze the historical projects above, then predict the optimal team allocation AND epic category allocation for the NEW project.
 REMEMBER: Adjust heavily based on the characteristic differences explained above!
 
 Return your analysis as a JSON object with this exact structure:
@@ -441,6 +466,20 @@ Return your analysis as a JSON object with this exact structure:
     "UX": {{ ... }},
     "PMs": {{ ... }},
     "Data": {{ ... }}
+  }},
+  "epic_allocations": {{
+    "Project Oversight": {{
+      "total_hours": <number>,
+      "percentage": <number 0-100>,
+      "reasoning": "<why this allocation>"
+    }},
+    "FE Dev": {{ ... }},
+    "BE Dev": {{ ... }},
+    "Design": {{ ... }},
+    "UX": {{ ... }},
+    "Infrastructure": {{ ... }},
+    "Authentication": {{ ... }}
+    // Include other relevant epics based on project type
   }},
   "monthly_distribution_pattern": {{
     "ramp_up_percentage": <number 0-100>,
@@ -494,17 +533,15 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
                 logger.info(f"  Team allocations:")
                 for team, alloc in ai_forecast['team_allocations'].items():
                     logger.info(f"    - {team}: {alloc.get('percentage', 0):.1f}%")
+            if 'epic_allocations' in ai_forecast:
+                logger.info(f"  Epic allocations:")
+                for epic, alloc in ai_forecast['epic_allocations'].items():
+                    logger.info(f"    - {epic}: {alloc.get('percentage', 0):.1f}%")
 
             # Validate and structure the forecast
             structured_forecast = self._structure_ai_forecast(
                 ai_forecast, total_hours, estimated_months, teams_selected, start_date
             )
-
-            logger.info(f"\nFinal structured forecast:")
-            for team_data in structured_forecast.get('teams', []):
-                logger.info(
-                    f"  - {team_data['team']}: {team_data['total_hours']}h ({team_data['percentage']:.1f}%)"
-                )
 
             return structured_forecast
 
@@ -614,8 +651,35 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
                 }
             )
 
+        # Extract epic allocations from AI forecast
+        epics_data = []
+        epic_allocations = ai_forecast.get("epic_allocations", {})
+
+        for epic_name, allocation in epic_allocations.items():
+            epics_data.append(
+                {
+                    "epic": epic_name,
+                    "total_hours": round(allocation.get("total_hours", 0), 2),
+                    "percentage": round(allocation.get("percentage", 0), 2),
+                    "reasoning": allocation.get("reasoning", ""),
+                }
+            )
+
+        logger.info(f"\nFinal structured forecast:")
+        for team_data in teams_data:
+            logger.info(
+                f"  - {team_data['team']}: {team_data['total_hours']}h ({team_data['percentage']:.1f}%)"
+            )
+        if epics_data:
+            logger.info(f"\nEpic allocations:")
+            for epic_data in epics_data:
+                logger.info(
+                    f"  - {epic_data['epic']}: {epic_data['total_hours']}h ({epic_data['percentage']:.1f}%)"
+                )
+
         return {
             "teams": teams_data,
+            "epics": epics_data,
             "reasoning": ai_forecast.get("overall_reasoning", ""),
             "key_insights": ai_forecast.get("key_insights", []),
             "confidence_score": ai_forecast.get("confidence_score", 0.5),
