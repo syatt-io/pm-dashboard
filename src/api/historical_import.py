@@ -50,6 +50,7 @@ def import_project_data(current_user):
         start_date_str = data.get("start_date")
         end_date_str = data.get("end_date")
         characteristics = data.get("characteristics", {})
+        include_in_forecasting = data.get("include_in_forecasting", True)
 
         if not project_key:
             return jsonify({"success": False, "error": "project_key is required"}), 400
@@ -141,7 +142,7 @@ def import_project_data(current_user):
 
         task = celery_app.send_task(
             "src.tasks.notification_tasks.import_historical_epic_hours",
-            args=[project_key, start_date_str, end_date_str, characteristics],
+            args=[project_key, start_date_str, end_date_str, characteristics, include_in_forecasting],
         )
 
         logger.info(
