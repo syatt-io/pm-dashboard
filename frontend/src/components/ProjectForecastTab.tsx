@@ -764,96 +764,89 @@ const ProjectForecastTab: React.FC = () => {
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                {/* Monthly Breakdown by Epic */}
+                {epicSchedule && epicSchedule.epics && epicSchedule.epics.length > 0 && (
+                  <>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 4, mb: 2 }}>
+                      <Typography variant="h6">
+                        Monthly Breakdown by Epic
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        startIcon={<Upload />}
+                        onClick={handleExportToJira}
+                        size="small"
+                      >
+                        Export to Jira
+                      </Button>
+                    </Box>
+                    <TableContainer component={Paper}>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ position: 'sticky', left: 0, bgcolor: 'background.paper', zIndex: 1 }}>
+                              Epic Category
+                            </TableCell>
+                            <TableCell align="right">Ratio %</TableCell>
+                            <TableCell align="right">Total Hours</TableCell>
+                            {epicSchedule.months?.map((month) => (
+                              <TableCell key={month} align="right">
+                                {formatMonth(month)}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {epicSchedule.epics.map((epic) => {
+                            const maxHours = Math.max(
+                              ...epic.monthly_breakdown.map((m) => m.hours)
+                            );
+                            return (
+                              <TableRow key={epic.epic_category}>
+                                <TableCell sx={{ position: 'sticky', left: 0, bgcolor: 'background.paper' }}>
+                                  {epic.epic_category}
+                                </TableCell>
+                                <TableCell align="right">{(epic.ratio * 100).toFixed(1)}%</TableCell>
+                                <TableCell align="right">{epic.allocated_hours.toFixed(1)}h</TableCell>
+                                {epic.monthly_breakdown.map((monthData) => {
+                                  const intensity = maxHours > 0 ? monthData.hours / maxHours : 0;
+                                  return (
+                                    <TableCell
+                                      key={monthData.month}
+                                      align="right"
+                                      sx={{
+                                        bgcolor: `rgba(85, 77, 255, ${intensity * 0.3})`,
+                                      }}
+                                    >
+                                      {monthData.hours.toFixed(1)}
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            );
+                          })}
+                          {/* Totals Row */}
+                          <TableRow sx={{ fontWeight: 'bold', bgcolor: 'action.hover' }}>
+                            <TableCell sx={{ position: 'sticky', left: 0, bgcolor: 'action.hover' }}>
+                              <strong>Total</strong>
+                            </TableCell>
+                            <TableCell align="right">100%</TableCell>
+                            <TableCell align="right">{epicSchedule.total_hours.toFixed(1)}h</TableCell>
+                            {epicSchedule.monthly_totals?.map((monthTotal) => (
+                              <TableCell key={monthTotal.month} align="right">
+                                <strong>{monthTotal.total_hours.toFixed(1)}</strong>
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </>
+                )}
               </CardContent>
             </Card>
-
-            {/* Epic Schedule Section */}
-            {epicSchedule && epicSchedule.epics && epicSchedule.epics.length > 0 && (
-              <Card>
-                <CardHeader
-                  title="Epic Schedule Breakdown"
-                  subheader={`${epicSchedule.duration_months} months starting ${
-                    epicSchedule.months && epicSchedule.months.length > 0
-                      ? formatMonth(epicSchedule.months[0])
-                      : startDate
-                  }`}
-                  action={
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      startIcon={<Upload />}
-                      onClick={handleExportToJira}
-                      size="small"
-                    >
-                      Export to Jira
-                    </Button>
-                  }
-                />
-                <CardContent>
-                  <TableContainer component={Paper}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ position: 'sticky', left: 0, bgcolor: 'background.paper', zIndex: 1 }}>
-                            Epic Category
-                          </TableCell>
-                          <TableCell align="right">Ratio %</TableCell>
-                          <TableCell align="right">Total Hours</TableCell>
-                          {epicSchedule.months?.map((month) => (
-                            <TableCell key={month} align="right">
-                              {formatMonth(month)}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {epicSchedule.epics.map((epic) => {
-                          const maxHours = Math.max(
-                            ...epic.monthly_breakdown.map((m) => m.hours)
-                          );
-                          return (
-                            <TableRow key={epic.epic_category}>
-                              <TableCell sx={{ position: 'sticky', left: 0, bgcolor: 'background.paper' }}>
-                                {epic.epic_category}
-                              </TableCell>
-                              <TableCell align="right">{(epic.ratio * 100).toFixed(1)}%</TableCell>
-                              <TableCell align="right">{epic.allocated_hours.toFixed(1)}h</TableCell>
-                              {epic.monthly_breakdown.map((monthData) => {
-                                const intensity = maxHours > 0 ? monthData.hours / maxHours : 0;
-                                return (
-                                  <TableCell
-                                    key={monthData.month}
-                                    align="right"
-                                    sx={{
-                                      bgcolor: `rgba(85, 77, 255, ${intensity * 0.3})`,
-                                    }}
-                                  >
-                                    {monthData.hours.toFixed(1)}
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                          );
-                        })}
-                        {/* Totals Row */}
-                        <TableRow sx={{ fontWeight: 'bold' }}>
-                          <TableCell sx={{ position: 'sticky', left: 0, bgcolor: 'background.paper' }}>
-                            <strong>Total</strong>
-                          </TableCell>
-                          <TableCell align="right">100%</TableCell>
-                          <TableCell align="right">{epicSchedule.total_hours.toFixed(1)}h</TableCell>
-                          {epicSchedule.monthly_totals?.map((monthTotal) => (
-                            <TableCell key={monthTotal.month} align="right">
-                              <strong>{monthTotal.total_hours.toFixed(1)}</strong>
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </CardContent>
-              </Card>
-            )}
           </>
         ) : (
           <Box sx={{ textAlign: 'center', py: 8 }}>
