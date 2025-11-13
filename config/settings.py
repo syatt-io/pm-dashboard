@@ -24,6 +24,7 @@ class JiraConfig:
     username: str
     api_token: str
     default_project: Optional[str] = None
+    tempo_api_token: Optional[str] = None
 
 
 @dataclass
@@ -175,6 +176,7 @@ class Settings:
             username=username,
             api_token=api_token,
             default_project=os.getenv("JIRA_DEFAULT_PROJECT"),
+            tempo_api_token=os.getenv("TEMPO_API_TOKEN"),
         )
 
     @staticmethod

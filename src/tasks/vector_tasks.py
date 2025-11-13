@@ -484,7 +484,7 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
         with tracker:
             # Initialize services
             ingest_service = VectorIngestService()
-            tempo_client = TempoAPIClient(api_token=settings.jira.tempo_api_token)
+            tempo_client = TempoAPIClient()  # Loads TEMPO_API_TOKEN from environment
 
             # Get last sync time (default to 2 days ago to catch any updates)
             last_sync = ingest_service.get_last_sync_timestamp("tempo")
@@ -502,8 +502,8 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
 
             # Fetch worklogs
             worklogs = tempo_client.get_worklogs(
-                start_date=start_date.strftime("%Y-%m-%d"),
-                end_date=end_date.strftime("%Y-%m-%d"),
+                from_date=start_date.strftime("%Y-%m-%d"),
+                to_date=end_date.strftime("%Y-%m-%d"),
             )
 
             if not worklogs:
@@ -519,7 +519,9 @@ def ingest_tempo_worklogs(self) -> Dict[str, Any]:
             logger.info(f"Found {len(worklogs)} worklogs to ingest")
 
             # Ingest worklogs
-            total_ingested = ingest_service.ingest_tempo_worklogs(worklogs=worklogs)
+            total_ingested = ingest_service.ingest_tempo_worklogs(
+                worklogs=worklogs, tempo_client=tempo_client
+            )
 
             # Update last sync timestamp
             ingest_service.update_last_sync_timestamp("tempo", datetime.now())
