@@ -591,7 +591,7 @@ def import_historical_epic_hours(
         from src.utils.database import get_session
         from src.services.epic_categorizer import EpicCategorizer
         from sqlalchemy.dialects.postgresql import insert
-        from sqlalchemy import text
+        from sqlalchemy import text, func
 
         retry_info = (
             f" (attempt {self.request.retries + 1}/3)"
