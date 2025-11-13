@@ -993,6 +993,52 @@ def import_historical_epic_hours(
 
             logger.info(f"✅ Successfully imported historical data for {project_key}")
 
+            # Calculate team breakdown percentages
+            team_breakdown = {}
+            total_hours = (
+                session.query(func.sum(EpicHours.hours))
+                .filter(EpicHours.project_key == project_key)
+                .scalar()
+                or 0
+            )
+
+            if total_hours > 0:
+                team_stats = (
+                    session.query(
+                        EpicHours.team, func.sum(EpicHours.hours).label("hours")
+                    )
+                    .filter(EpicHours.project_key == project_key)
+                    .group_by(EpicHours.team)
+                    .all()
+                )
+
+                for team, hours in team_stats:
+                    percentage = round((hours / total_hours) * 100, 1)
+                    team_breakdown[team] = {
+                        "hours": round(hours, 2),
+                        "percentage": percentage,
+                    }
+
+            # Calculate epic category breakdown percentages
+            category_breakdown = {}
+            if total_hours > 0:
+                category_stats = (
+                    session.query(
+                        EpicHours.epic_category,
+                        func.sum(EpicHours.hours).label("hours"),
+                    )
+                    .filter(EpicHours.project_key == project_key)
+                    .group_by(EpicHours.epic_category)
+                    .all()
+                )
+
+                for category, hours in category_stats:
+                    percentage = round((hours / total_hours) * 100, 1)
+                    category_breakdown[category or "Uncategorized"] = {
+                        "hours": round(hours, 2),
+                        "percentage": percentage,
+                    }
+
             return {
                 "success": True,
                 "project_key": project_key,
@@ -1002,7 +1048,11 @@ def import_historical_epic_hours(
                 "processed": processed,
                 "skipped": skipped,
                 "retries": self.request.retries,
-                # NEW: Enrichment & analysis stats
+                # NEW: Team breakdown
+                "team_breakdown": team_breakdown,
+                # NEW: Epic category breakdown
+                "category_breakdown": category_breakdown,
+                # Enrichment & analysis stats
                 "enrichment": {
                     "success": enrichment_result.get("success", False),
                     "enriched_count": enrichment_result.get("enriched_count", 0),

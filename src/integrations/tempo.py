@@ -295,7 +295,7 @@ class TempoAPIClient:
             return self.team_cache[account_id]
 
         try:
-            from sqlalchemy import create_engine
+            from sqlalchemy import create_engine, or_
             from sqlalchemy.orm import sessionmaker
             from src.models import User
 
@@ -312,8 +312,20 @@ class TempoAPIClient:
             session = Session()
 
             try:
+                # Use partial matching to handle truncated account IDs from Tempo API
+                # Tempo returns truncated IDs (31 chars) for newer Atlassian Cloud accounts
+                # while DB stores full IDs (43 chars)
                 user = (
-                    session.query(User).filter_by(jira_account_id=account_id).first()
+                    session.query(User)
+                    .filter(
+                        or_(
+                            User.jira_account_id == account_id,  # Try exact match first
+                            User.jira_account_id.like(
+                                f"{account_id}%"
+                            ),  # Then prefix match
+                        )
+                    )
+                    .first()
                 )
                 if user and user.team:
                     team = user.team
