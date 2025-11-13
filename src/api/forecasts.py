@@ -366,6 +366,7 @@ def calculate_from_total_hours():
                 result["forecast_description"] = (
                     "Intelligent AI analysis of similar historical projects"
                 )
+                result["estimated_months"] = data["estimated_months"]
 
             finally:
                 session.close()
@@ -390,6 +391,7 @@ def calculate_from_total_hours():
             result["forecast_description"] = (
                 "Statistical averaging of historical baselines"
             )
+            result["estimated_months"] = data["estimated_months"]
 
         return jsonify(result), 200
 
