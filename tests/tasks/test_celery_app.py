@@ -90,8 +90,11 @@ class TestGCPCredentialsHandling:
                                     # Call the cleanup function
                                     cleanup_func()
 
-                                    # Verify file existence was checked
-                                    mock_exists.assert_called_once_with(mock_path)
+                                    # Verify file existence was checked (may be called multiple times during import)
+                                    assert any(
+                                        call[0][0] == mock_path
+                                        for call in mock_exists.call_args_list
+                                    ), f"Expected mock_path {mock_path} in exists calls: {mock_exists.call_args_list}"
 
                                     # Verify file was deleted
                                     mock_unlink.assert_called_once_with(mock_path)
@@ -106,27 +109,30 @@ class TestGCPCredentialsHandling:
             {"GOOGLE_APPLICATION_CREDENTIALS_JSON": mock_creds_json},
             clear=False,
         ):
-            with patch("tempfile.mkstemp") as mock_mkstemp:
-                with patch("os.chmod"):
-                    with patch("os.fdopen", mock_open()):
-                        with patch("atexit.register") as mock_atexit:
-                            with patch("os.path.exists") as mock_exists:
-                                with patch("os.unlink") as mock_unlink:
-                                    mock_mkstemp.return_value = (123, mock_path)
-                                    mock_exists.return_value = False
+            with patch(
+                "dotenv.load_dotenv"
+            ):  # Mock at dotenv module level to avoid frame issues
+                with patch("tempfile.mkstemp") as mock_mkstemp:
+                    with patch("os.chmod"):
+                        with patch("os.fdopen", mock_open()):
+                            with patch("atexit.register") as mock_atexit:
+                                with patch("os.path.exists") as mock_exists:
+                                    with patch("os.unlink") as mock_unlink:
+                                        mock_mkstemp.return_value = (123, mock_path)
+                                        mock_exists.return_value = False
 
-                                    # Import module
-                                    import importlib
-                                    import src.tasks.celery_app
+                                        # Import module
+                                        import importlib
+                                        import src.tasks.celery_app
 
-                                    importlib.reload(src.tasks.celery_app)
+                                        importlib.reload(src.tasks.celery_app)
 
-                                    # Get and call cleanup function
-                                    cleanup_func = mock_atexit.call_args[0][0]
-                                    cleanup_func()
+                                        # Get and call cleanup function
+                                        cleanup_func = mock_atexit.call_args[0][0]
+                                        cleanup_func()
 
-                                    # Verify unlink was NOT called since file doesn't exist
-                                    mock_unlink.assert_not_called()
+                                        # Verify unlink was NOT called since file doesn't exist
+                                        mock_unlink.assert_not_called()
 
     def test_gcp_credentials_cleanup_handles_errors_silently(self):
         """Test that cleanup handles errors gracefully without raising."""
@@ -347,15 +353,39 @@ class TestBrokerConfiguration:
 
     def test_broker_url_uses_gcp_pubsub(self):
         """Test that broker URL is configured for GCP Pub/Sub."""
-        with patch.dict(os.environ, {"GCP_PROJECT_ID": "test-project"}, clear=False):
-            import importlib
-            import src.tasks.celery_app
+        mock_creds_json = '{"type": "service_account", "project_id": "test-project"}'
 
-            importlib.reload(src.tasks.celery_app)
+        with patch.dict(
+            os.environ,
+            {
+                "GCP_PROJECT_ID": "test-project",
+                "GOOGLE_APPLICATION_CREDENTIALS_JSON": mock_creds_json,
+            },
+            clear=False,
+        ):
+            with patch(
+                "dotenv.load_dotenv"
+            ):  # Mock at dotenv module level to avoid frame issues
+                with patch("tempfile.mkstemp") as mock_mkstemp:
+                    with patch("os.chmod"):
+                        with patch("os.fdopen", mock_open()):
+                            with patch("atexit.register"):
+                                # Mock mkstemp to return fake file descriptor and path
+                                mock_mkstemp.return_value = (
+                                    123,
+                                    "/tmp/gcp-creds-test.json",
+                                )
 
-            from src.tasks.celery_app import celery_app
+                                import importlib
+                                import src.tasks.celery_app
 
-            assert celery_app.conf.broker_url.startswith("gcpubsub://projects/")
+                                importlib.reload(src.tasks.celery_app)
+
+                                from src.tasks.celery_app import celery_app
+
+                                assert celery_app.conf.broker_url.startswith(
+                                    "gcpubsub://projects/"
+                                )
 
     def test_broker_ack_deadline_configured(self):
         """Test that broker acknowledgment deadline is configured."""
