@@ -283,7 +283,7 @@ class TempoAPIClient:
 
     def get_user_team(self, account_id: str) -> Optional[str]:
         """
-        Look up user's team from database via account ID.
+        Look up user's team from users table via jira_account_id.
 
         Args:
             account_id: Jira account ID (e.g., "abc123")
@@ -297,7 +297,7 @@ class TempoAPIClient:
         try:
             from sqlalchemy import create_engine
             from sqlalchemy.orm import sessionmaker
-            from src.models import UserTeam
+            from src.models import User
 
             # Get database URL
             database_url = os.getenv("DATABASE_URL")
@@ -306,21 +306,21 @@ class TempoAPIClient:
                 self.team_cache[account_id] = None
                 return None
 
-            # Query database for user team
+            # Query database for user by jira_account_id
             engine = create_engine(database_url)
             Session = sessionmaker(bind=engine)
             session = Session()
 
             try:
-                user_team = (
-                    session.query(UserTeam).filter_by(account_id=account_id).first()
+                user = (
+                    session.query(User).filter_by(jira_account_id=account_id).first()
                 )
-                if user_team:
-                    team = user_team.team
+                if user and user.team:
+                    team = user.team
                     self.team_cache[account_id] = team
                     return team
                 else:
-                    # User not found in team assignments
+                    # User not found or team not set
                     logger.debug(
                         f"No team assignment found for account ID {account_id}"
                     )

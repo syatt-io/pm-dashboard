@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.integrations.tempo import TempoAPIClient
-from src.models import TimeTrackingCompliance, UserTeam, User
+from src.models import TimeTrackingCompliance, User
 from src.managers.notifications import NotificationManager
 from config.settings import settings
 

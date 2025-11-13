@@ -1,5 +1,19 @@
 # User/Team Mapping Guide
 
+> **⚠️ DEPRECATED**: This guide describes the old `user_teams` table workflow which has been deprecated.
+>
+> **New Approach**: Team assignments are now managed directly in the `users` table via the web UI:
+> - Go to **Settings → User Management** in the web application
+> - Edit user profiles to assign teams (jira_account_id and team fields)
+> - No separate CSV imports or scripts needed
+> - Single source of truth in the `users` table
+>
+> The `user_teams` table has been removed as of November 2025. Historical scripts (`populate_user_teams.py`, `load_user_teams.py`) have been deleted.
+
+---
+
+## Old Workflow (Deprecated)
+
 This guide explains how to map Jira users to team assignments for accurate forecasting and analytics.
 
 ## Overview

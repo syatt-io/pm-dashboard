@@ -18,7 +18,7 @@ from .epic_budget import EpicBudget
 from .epic_category_mapping import EpicCategoryMapping
 from .epic_baseline_mapping import EpicBaselineMapping
 from .epic_category import EpicCategory
-from .user_team import UserTeam
+from .tempo_worklog import TempoWorklog
 from .forecast import EpicForecast
 from .time_tracking_compliance import TimeTrackingCompliance
 from .monthly_reconciliation import MonthlyReconciliationReport
@@ -185,7 +185,7 @@ __all__ = [
     "EpicCategoryMapping",
     "EpicBaselineMapping",
     "EpicCategory",
-    "UserTeam",
+    "TempoWorklog",
     "EpicForecast",
     "TimeTrackingCompliance",
     "MonthlyReconciliationReport",

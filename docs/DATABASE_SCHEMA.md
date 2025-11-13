@@ -532,15 +532,6 @@ TABLE: user_preferences
     - updated_at                     TIMESTAMP WITHOUT TIME ZONE NULL    
     - last_notification_sent         TIMESTAMP WITHOUT TIME ZONE NULL    
 
-TABLE: user_teams
---------------------------------------------------------------------------------
-  Columns:
-  
-    - account_id                     CHARACTER VARYING    NOT NULL [PK]
-    - display_name                   CHARACTER VARYING    NULL    
-    - team                           CHARACTER VARYING    NOT NULL
-    - updated_at                     TIMESTAMP WITH TIME ZONE NULL    
-
 TABLE: user_watched_projects
 --------------------------------------------------------------------------------
   Columns:
