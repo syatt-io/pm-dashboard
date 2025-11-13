@@ -56,6 +56,13 @@ class IntelligentForecastingService:
                 - similar_projects: List of historical projects used for analysis
                 - confidence_score: AI's confidence in predictions (0-1)
         """
+        logger.info("=" * 80)
+        logger.info("INTELLIGENT FORECASTING REQUEST")
+        logger.info("=" * 80)
+        logger.info(f"Target characteristics: {project_characteristics}")
+        logger.info(f"Total hours: {total_hours}, Duration: {estimated_months} months")
+        logger.info(f"Teams selected: {teams_selected}")
+
         # Step 1: Find similar historical projects
         similar_projects = self._find_similar_projects(project_characteristics, limit=5)
 
@@ -72,8 +79,16 @@ class IntelligentForecastingService:
                 "confidence_score": 0.0,
             }
 
+        logger.info(f"\nFound {len(similar_projects)} similar projects:")
+        for p in similar_projects:
+            logger.info(
+                f"  - {p['project_key']}: similarity={p['similarity_score']:.3f}, "
+                f"chars={p['characteristics']}, total_hours={p['total_hours']}h"
+            )
+
         # Step 2: Build rich historical context
         historical_context = self._build_historical_context(similar_projects)
+        logger.info(f"\nBuilt historical context ({len(historical_context)} characters)")
 
         # Step 3: Generate AI-powered forecast
         ai_forecast = self._generate_ai_forecast(
@@ -85,6 +100,7 @@ class IntelligentForecastingService:
             start_date=start_date,
         )
 
+        logger.info("=" * 80)
         return {
             **ai_forecast,
             "similar_projects": [
@@ -338,6 +354,30 @@ class IntelligentForecastingService:
         # Build comprehensive AI prompt
         prompt = f"""You are an expert software project forecaster analyzing historical project data to predict team allocation and timeline for a new project.
 
+# CHARACTERISTIC SCALE DEFINITIONS (CRITICAL - READ CAREFULLY!)
+
+The 1-5 scale represents the INTENSITY of each requirement:
+
+**1 = MINIMAL/ALMOST NONE**
+- Expect 0-10% allocation compared to typical projects
+- Example: BE Integrations 1/5 → Minimal backend work → 3-10% BE Devs (NOT 25-30%!)
+
+**2 = BELOW AVERAGE**
+- Expect 40-60% of typical allocation
+- Example: Custom Designs 2/5 → Less design than usual → 4-8% Design
+
+**3 = TYPICAL/STANDARD**
+- Use historical baseline averages
+- Example: Custom Theme 3/5 → Standard theme work → Use similar project patterns
+
+**4 = ABOVE AVERAGE**
+- Expect 140-180% of typical allocation
+- Example: UX Research 4/5 → Heavy UX work → 8-12% UX
+
+**5 = EXTENSIVE/MAXIMUM**
+- Expect 200-300%+ of typical allocation
+- Example: BE Integrations 5/5 → Complex backend → 35-50% BE Devs
+
 # New Project Details
 
 **Total Budget**: {total_hours} hours
@@ -345,26 +385,47 @@ class IntelligentForecastingService:
 **Start Date**: {start_date or 'Not specified'}
 **Teams Available**: {', '.join(teams_selected)}
 
-**Characteristics** (1-5 scale):
-- Backend Integrations: {project_characteristics.get('be_integrations', 3)}/5
-- Custom Theme: {project_characteristics.get('custom_theme', 3)}/5
-- Custom Designs: {project_characteristics.get('custom_designs', 3)}/5
-- UX Research: {project_characteristics.get('ux_research', 3)}/5
+**NEW PROJECT CHARACTERISTICS:**
+- Backend Integrations: {project_characteristics.get('be_integrations', 3)}/5 → {"MINIMAL backend (expect 3-10% BE Devs)" if project_characteristics.get('be_integrations', 3) == 1 else "BELOW AVG backend (expect 10-20% BE Devs)" if project_characteristics.get('be_integrations', 3) == 2 else "TYPICAL backend (use baseline ~20-30% BE Devs)" if project_characteristics.get('be_integrations', 3) == 3 else "HEAVY backend (expect 30-40% BE Devs)" if project_characteristics.get('be_integrations', 3) == 4 else "EXTENSIVE backend (expect 40-50%+ BE Devs)"}
+- Custom Theme: {project_characteristics.get('custom_theme', 3)}/5 → {"MINIMAL theme work" if project_characteristics.get('custom_theme', 3) <= 2 else "TYPICAL theme work" if project_characteristics.get('custom_theme', 3) == 3 else "HEAVY theme work"}
+- Custom Designs: {project_characteristics.get('custom_designs', 3)}/5 → {"MINIMAL design needs" if project_characteristics.get('custom_designs', 3) <= 2 else "TYPICAL design needs" if project_characteristics.get('custom_designs', 3) == 3 else "EXTENSIVE design work"}
+- UX Research: {project_characteristics.get('ux_research', 3)}/5 → {"MINIMAL UX" if project_characteristics.get('ux_research', 3) <= 2 else "TYPICAL UX" if project_characteristics.get('ux_research', 3) == 3 else "HEAVY UX work"}
 - Extensive Customizations: {project_characteristics.get('extensive_customizations', 3)}/5
 - Project Oversight: {project_characteristics.get('project_oversight', 3)}/5
 
 {historical_context}
 
+# CRITICAL ANALYSIS RULES (MUST FOLLOW!)
+
+⚠️ **PRIMARY DIRECTIVE**: The new project's characteristics are MORE IMPORTANT than historical patterns!
+
+1. **ADJUST FOR CHARACTERISTIC DIFFERENCES**:
+   - If new project has be_integrations=1 but similar projects have 4-5:
+     → REDUCE BE Dev allocation by 70-90% from their pattern (NOT just 20-30%!)
+   - If new project has custom_designs=5 but similar projects have 2-3:
+     → INCREASE Design allocation by 100-150% from their pattern
+
+2. **MAGNITUDE OF ADJUSTMENTS**:
+   - 1-point difference: Adjust by 20-40%
+   - 2-point difference: Adjust by 50-80%
+   - 3-point difference: Adjust by 80-120%
+   - 4-point difference: Adjust by 150-200%
+
+3. **DO NOT SIMPLY AVERAGE** historical projects:
+   - Historical patterns are STARTING POINTS, not final answers
+   - The specific characteristics of THIS project must drive your predictions
+   - Example: If all historical projects allocated 30% to BE Devs but THIS project has be_integrations=1,
+     you MUST predict ~5-10% BE Devs, NOT 25-30%!
+
+4. **CONFIDENCE SCORING**:
+   - High confidence (0.8-1.0): Similar projects with matching characteristics exist
+   - Medium confidence (0.5-0.7): Some adjustment needed from historical patterns
+   - Low confidence (0.2-0.4): Significant differences, major adjustments required
+
 # Your Task
 
-Deeply analyze the historical projects above, paying special attention to those with high similarity scores. Consider how the project characteristics influenced team allocation patterns, monthly distributions, and timeline dynamics.
-
-Based on this analysis, predict the optimal team allocation for the new project. Your prediction should:
-
-1. **Be data-driven**: Base your predictions on patterns from similar historical projects
-2. **Consider characteristics**: Factor in how each characteristic affects team needs
-3. **Account for timeline**: Distribute hours across {estimated_months} months realistically
-4. **Explain your reasoning**: Provide clear reasoning for your predictions
+Analyze the historical projects above, then predict the optimal team allocation for the NEW project.
+REMEMBER: Adjust heavily based on the characteristic differences explained above!
 
 Return your analysis as a JSON object with this exact structure:
 
@@ -401,6 +462,7 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
 
         try:
             # Call LLM based on configured provider
+            logger.info(f"\nCalling AI ({settings.ai.provider}) for forecast analysis...")
             if settings.ai.provider == "openai":
                 response_text = self._call_openai(prompt)
             elif settings.ai.provider == "anthropic":
@@ -408,6 +470,9 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
             else:
                 # Fallback to OpenAI
                 response_text = self._call_openai(prompt)
+
+            logger.info(f"AI response received ({len(response_text)} characters)")
+            logger.info(f"Raw AI response (first 500 chars): {response_text[:500]}...")
 
             # Parse AI response
             # Remove markdown code blocks if present
@@ -422,10 +487,26 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
 
             ai_forecast = json.loads(response_text)
 
+            logger.info(f"\nAI forecast parsed successfully:")
+            logger.info(f"  Confidence score: {ai_forecast.get('confidence_score', 'N/A')}")
+            logger.info(f"  Overall reasoning: {ai_forecast.get('overall_reasoning', '')[:200]}...")
+            if 'team_allocations' in ai_forecast:
+                logger.info(f"  Team allocations:")
+                for team, alloc in ai_forecast['team_allocations'].items():
+                    logger.info(f"    - {team}: {alloc.get('percentage', 0):.1f}%")
+
             # Validate and structure the forecast
-            return self._structure_ai_forecast(
+            structured_forecast = self._structure_ai_forecast(
                 ai_forecast, total_hours, estimated_months, teams_selected, start_date
             )
+
+            logger.info(f"\nFinal structured forecast:")
+            for team_data in structured_forecast.get('teams', []):
+                logger.info(
+                    f"  - {team_data['team']}: {team_data['total_hours']}h ({team_data['percentage']:.1f}%)"
+                )
+
+            return structured_forecast
 
         except Exception as e:
             logger.error(f"Error generating AI forecast: {e}", exc_info=True)
@@ -452,7 +533,7 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
                 },
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.3,  # Lower temperature for more consistent predictions
+            temperature=0.5,  # Balanced temperature for creative adjustments while maintaining structure
             max_tokens=2000,
         )
 
@@ -468,7 +549,7 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
         response = client.messages.create(
             model=settings.ai.model or "claude-3-5-sonnet-20241022",
             max_tokens=2000,
-            temperature=0.3,
+            temperature=0.5,  # Balanced temperature for creative adjustments while maintaining structure
             messages=[{"role": "user", "content": prompt}],
         )
 
