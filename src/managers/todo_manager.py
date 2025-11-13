@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, and_, or_
 
 from config.settings import settings
-from main import TodoItem, Base
+from src.models import TodoItem, Base
 from src.managers.notifications import NotificationManager, NotificationContent
 
 
