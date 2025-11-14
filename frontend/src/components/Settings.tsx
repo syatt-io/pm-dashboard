@@ -57,6 +57,7 @@ import { Loading, Title, useDataProvider, useNotify, useRedirect } from 'react-a
 import { getApiUrl } from '../config';
 import UserManagement from './UserManagement';
 import EpicCategoriesManagement from './EpicCategoriesManagement';
+import EpicMappingsManagement from './EpicMappingsManagement';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
 
 interface Project {
@@ -187,6 +188,9 @@ export const Settings = () => {
   // Slack OAuth state
   const [deletingSlack, setDeletingSlack] = useState(false);
   const [deleteSlackDialog, setDeleteSlackDialog] = useState(false);
+
+  // Epic Categories nested tab state
+  const [epicSubTab, setEpicSubTab] = useState(0);
 
   // Notification preferences state
   const [notificationPrefs, setNotificationPrefs] = useState({
@@ -2289,7 +2293,19 @@ export const Settings = () => {
       {/* Tab 7: Epic Categories (Admin Only) */}
       {settings.user.role === 'admin' && (
         <TabPanel value={tabValue} index={6}>
-          <EpicCategoriesManagement />
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+            <Tabs
+              value={epicSubTab}
+              onChange={(e, newValue) => setEpicSubTab(newValue)}
+              aria-label="epic categories sub-tabs"
+            >
+              <Tab label="Manage Categories" />
+              <Tab label="Epic Mappings" />
+            </Tabs>
+          </Box>
+
+          {epicSubTab === 0 && <EpicCategoriesManagement />}
+          {epicSubTab === 1 && <EpicMappingsManagement />}
         </TabPanel>
       )}
 

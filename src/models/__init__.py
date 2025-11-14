@@ -30,6 +30,8 @@ from .project_monthly_forecast import ProjectMonthlyForecast
 from .project_forecasting_config import ProjectForecastingConfig
 from .job_execution import JobExecution
 from .temporal_pattern_baseline import TemporalPatternBaseline
+from .characteristic_impact_baseline import CharacteristicImpactBaseline
+from .epic_allocation_baseline import EpicAllocationBaseline
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -199,6 +201,8 @@ __all__ = [
     "ProjectForecastingConfig",
     "JobExecution",
     "TemporalPatternBaseline",
+    "CharacteristicImpactBaseline",
+    "EpicAllocationBaseline",
     "Base",
     # DTOs
     "ProcessedMeetingDTO",

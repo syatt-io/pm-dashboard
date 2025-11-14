@@ -16,19 +16,6 @@ logger = logging.getLogger(__name__)
 class EpicCategorizer:
     """Service for categorizing epics using AI."""
 
-    # Valid epic categories
-    VALID_CATEGORIES = [
-        "FE Dev",
-        "BE Dev",
-        "Project Oversight",
-        "Design",
-        "UX",
-        "Data",
-        "Infrastructure",
-        "QA",
-        "Uncategorized",
-    ]
-
     def __init__(self, db_session: Session):
         """Initialize the categorizer with a database session.
 
@@ -38,6 +25,42 @@ class EpicCategorizer:
         self.db_session = db_session
         self.llm = self._create_llm()
         self._cache: Dict[str, str] = {}
+        self._valid_categories: Optional[list[str]] = None
+
+    def _load_valid_categories(self) -> list[str]:
+        """Load valid categories from database.
+
+        Returns:
+            List of category names plus "Uncategorized"
+        """
+        if self._valid_categories is not None:
+            return self._valid_categories
+
+        try:
+            from src.models.epic_category import EpicCategory
+
+            categories = (
+                self.db_session.query(EpicCategory)
+                .order_by(EpicCategory.display_order)
+                .all()
+            )
+
+            # Get category names from database
+            category_names = [cat.name for cat in categories]
+
+            # Always add "Uncategorized" as fallback
+            if "Uncategorized" not in category_names:
+                category_names.append("Uncategorized")
+
+            self._valid_categories = category_names
+            logger.info(f"Loaded {len(category_names)} valid categories from database: {category_names}")
+
+            return category_names
+
+        except Exception as e:
+            logger.error(f"Error loading categories from database: {e}", exc_info=True)
+            # Fallback to basic list if database load fails
+            return ["UI Dev", "Project Oversight", "Uncategorized"]
 
     def _create_llm(self):
         """Create LLM instance based on centralized settings."""
@@ -78,6 +101,33 @@ class EpicCategorizer:
             logger.error(f"Unsupported AI provider: {ai_config.provider}")
             return None
 
+    def _fuzzy_match_category(self, epic_summary: str) -> Optional[str]:
+        """Try to match epic summary to a category using fuzzy matching.
+
+        Args:
+            epic_summary: Epic title/summary
+
+        Returns:
+            Category name if match found, None otherwise
+        """
+        valid_categories = self._load_valid_categories()
+        summary_lower = epic_summary.lower().strip()
+
+        # Exact match (case-insensitive)
+        for category in valid_categories:
+            if category.lower() == summary_lower:
+                logger.info(f"Fuzzy matched '{epic_summary}' to '{category}' (exact match)")
+                return category
+
+        # Check if summary contains full category name
+        for category in valid_categories:
+            if category.lower() in summary_lower:
+                logger.info(f"Fuzzy matched '{epic_summary}' to '{category}' (contains match)")
+                return category
+
+        # No fuzzy match found
+        return None
+
     def categorize_epic(self, epic_key: str, epic_summary: str) -> str:
         """Categorize an epic based on its summary.
 
@@ -107,6 +157,14 @@ class EpicCategorizer:
             self._cache[epic_key] = existing_mapping.category
             return existing_mapping.category
 
+        # Try fuzzy matching first (faster and cheaper than AI)
+        fuzzy_category = self._fuzzy_match_category(epic_summary)
+        if fuzzy_category:
+            logger.info(f"Fuzzy matched {epic_key} to {fuzzy_category}, skipping AI")
+            self._save_mapping(epic_key, fuzzy_category)
+            self._cache[epic_key] = fuzzy_category
+            return fuzzy_category
+
         # Use AI to categorize
         category = self._categorize_with_ai(epic_summary)
 
@@ -131,29 +189,47 @@ class EpicCategorizer:
             logger.warning("LLM not available, defaulting to 'Uncategorized'")
             return "Uncategorized"
 
-        system_prompt = f"""You are an expert at categorizing software development epics.
+        valid_categories = self._load_valid_categories()
+
+        # Build category descriptions dynamically
+        category_descriptions = {
+            "Project Oversight": "Project management, planning, coordination, stakeholder management, meetings, status updates",
+            "UX": "User experience research, usability testing, UX design, user flows, wireframes, customer interviews",
+            "Design": "Visual design, UI design, graphics, branding, design systems, mockups, style guides",
+            "UI Dev": "Frontend development, user interface implementation, pages, components, navigation, headers, footers, forms, buttons, modals. DEFAULT choice if epic involves user-facing work and category is unclear.",
+            "Customizations": "Client-specific features, custom functionality, tailored solutions, special requirements",
+            "Integrations": "External system integrations, API connections, third-party services (non-app integrations)",
+            "Migrations": "Data migrations, platform migrations, system transitions, legacy system updates",
+            "3rd Party Apps": "Third-party plugins, external applications, app marketplace integrations (Shopify apps, extensions, etc.)",
+            "SEO & Analytics": "Search engine optimization, analytics implementation, tracking, performance monitoring",
+            "POS": "Point of sale systems, retail solutions, in-store technology",
+            "Launch Support": "Go-live activities, production support, launch coordination, post-launch fixes",
+        }
+
+        # Build prompt with categories from database
+        categories_list = "\n".join([
+            f"- {cat}: {category_descriptions.get(cat, 'General category')}"
+            for cat in valid_categories if cat != "Uncategorized"
+        ])
+
+        system_prompt = f"""You are an expert at categorizing software development epics for e-commerce and web development projects.
 
 Categorize the following epic into ONE of these categories:
-- FE Dev: Frontend development (React, Vue, Angular, UI components, client-side features)
-- BE Dev: Backend development (APIs, databases, server-side logic, integrations)
-- Project Oversight: Project management (planning, coordination, stakeholder management)
-- Design: Visual design (UI design, graphics, branding, design systems)
-- UX: User experience (user research, usability testing, UX design, customer interviews)
-- Data: Data science, analytics, reporting, data pipelines
-- Infrastructure: DevOps, hosting, CI/CD, deployment, monitoring
-- QA: Testing, quality assurance, test automation
-- Uncategorized: If none of the above fit
+{categories_list}
+- Uncategorized: ONLY if none of the above fit and you are uncertain
 
-Rules:
+**IMPORTANT RULES**:
 1. Return ONLY the category name exactly as shown above (case-sensitive)
 2. Choose the most specific category that fits
-3. If multiple categories could apply, choose the primary focus
-4. Do NOT explain your reasoning, just return the category name
+3. **If multiple categories could apply, choose the primary focus**
+4. **If the epic is vague and involves user-facing work (pages, navigation, UI elements), default to "UI Dev"**
+5. Do NOT explain your reasoning, just return the category name
+6. Examples of "UI Dev": headers, footers, pages, navigation, account pages, cart, checkout UI, product listings
 
 Example responses:
-"FE Dev"
-"BE Dev"
+"UI Dev"
 "Project Oversight"
+"3rd Party Apps"
 """
 
         user_prompt = f"Epic: {epic_summary}"
@@ -168,14 +244,15 @@ Example responses:
             category = response.content.strip()
 
             # Validate category
-            if category in self.VALID_CATEGORIES:
+            if category in valid_categories:
                 logger.info(f"AI categorized epic as: {category}")
                 return category
             else:
                 logger.warning(
-                    f"AI returned invalid category '{category}', defaulting to 'Uncategorized'"
+                    f"AI returned invalid category '{category}', defaulting to 'UI Dev'"
                 )
-                return "Uncategorized"
+                # Default to "UI Dev" instead of "Uncategorized" for better user experience
+                return "UI Dev" if "UI Dev" in valid_categories else "Uncategorized"
 
         except Exception as e:
             logger.error(f"Error categorizing epic with AI: {e}", exc_info=True)

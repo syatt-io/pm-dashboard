@@ -432,6 +432,129 @@ def get_all_mappings():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@epic_categories_bp.route("/mappings/enriched", methods=["GET"])
+def get_enriched_mappings():
+    """
+    Get enriched epic category mappings with full epic details.
+
+    Joins epic_hours data to provide epic_key, epic_summary, project_key, and category.
+
+    Query Parameters:
+        project_key: Filter by project (e.g., "SUBS")
+        category: Filter by category (e.g., "FE Dev", "Uncategorized")
+        search: Search epic_key or epic_summary
+        page: Page number (default: 1)
+        per_page: Results per page (default: 50, max: 200)
+
+    Returns:
+        200: List of enriched mappings with pagination info
+    """
+    try:
+        from src.models import EpicHours
+        from sqlalchemy import or_, func, distinct
+
+        session = get_session()
+
+        # Get query parameters
+        project_key = request.args.get("project_key")
+        category = request.args.get("category")
+        search = request.args.get("search", "").strip()
+        page = int(request.args.get("page", 1))
+        per_page = min(int(request.args.get("per_page", 50)), 200)
+
+        # Build base query - get unique epics with their latest data
+        subquery = (
+            session.query(
+                EpicHours.epic_key,
+                EpicHours.epic_summary,
+                EpicHours.project_key,
+                EpicHours.epic_category,
+                func.max(EpicHours.updated_at).label("latest_update"),
+            )
+            .group_by(
+                EpicHours.epic_key,
+                EpicHours.epic_summary,
+                EpicHours.project_key,
+                EpicHours.epic_category,
+            )
+            .subquery()
+        )
+
+        query = session.query(
+            subquery.c.epic_key,
+            subquery.c.epic_summary,
+            subquery.c.project_key,
+            subquery.c.epic_category,
+            subquery.c.latest_update,
+        )
+
+        # Apply filters
+        if project_key:
+            query = query.filter(subquery.c.project_key == project_key)
+
+        if category:
+            if category.lower() == "uncategorized":
+                query = query.filter(subquery.c.epic_category == "Uncategorized")
+            else:
+                query = query.filter(subquery.c.epic_category == category)
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    subquery.c.epic_key.ilike(search_pattern),
+                    subquery.c.epic_summary.ilike(search_pattern),
+                )
+            )
+
+        # Get total count
+        total = query.count()
+
+        # Apply pagination
+        offset = (page - 1) * per_page
+        results = (
+            query.order_by(subquery.c.epic_key).offset(offset).limit(per_page).all()
+        )
+
+        # Format results
+        mappings = []
+        for row in results:
+            mappings.append(
+                {
+                    "epic_key": row.epic_key,
+                    "epic_summary": row.epic_summary
+                    or row.epic_key,  # Fallback to epic_key if no summary
+                    "project_key": row.project_key,
+                    "category": row.epic_category,
+                    "updated_at": (
+                        row.latest_update.isoformat() if row.latest_update else None
+                    ),
+                }
+            )
+
+        session.close()
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "mappings": mappings,
+                    "pagination": {
+                        "page": page,
+                        "per_page": per_page,
+                        "total": total,
+                        "total_pages": (total + per_page - 1) // per_page,
+                    },
+                }
+            ),
+            200,
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting enriched epic mappings: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @epic_categories_bp.route("/mappings/<epic_key>", methods=["GET"])
 def get_mapping(epic_key):
     """
@@ -539,9 +662,23 @@ def set_mapping(epic_key):
             action = "created"
 
         session.commit()
+
+        # Also update epic_category in epic_hours table for all rows with this epic_key
+        from src.models import EpicHours
+
+        updated_count = (
+            session.query(EpicHours)
+            .filter(EpicHours.epic_key == epic_key)
+            .update({"epic_category": category}, synchronize_session=False)
+        )
+        session.commit()
+
         session.close()
 
-        logger.info(f"Epic category mapping {action}: {epic_key} → {category}")
+        logger.info(
+            f"Epic category mapping {action}: {epic_key} → {category} "
+            f"(updated {updated_count} epic_hours rows)"
+        )
 
         return (
             jsonify(
@@ -550,6 +687,7 @@ def set_mapping(epic_key):
                     "epic_key": epic_key,
                     "category": category,
                     "action": action,
+                    "epic_hours_updated": updated_count,
                 }
             ),
             200,

@@ -109,6 +109,9 @@ class User(Base):
             "project_team": self.project_team,
             "weekly_hours_minimum": self.weekly_hours_minimum,
             "slack_user_id": self.slack_user_id,
+            # Notification preferences
+            "notify_daily_todo_digest": self.notify_daily_todo_digest,
+            "notify_project_hours_forecast": self.notify_project_hours_forecast,
         }
 
     def has_role(self, role):

@@ -331,6 +331,10 @@ def create_auth_blueprint(db_session_factory, limiter=None):
             weekly_hours_minimum = data.get("weekly_hours_minimum")
             slack_user_id = data.get("slack_user_id")
 
+            # Extract notification preference fields
+            notify_daily_todo_digest = data.get("notify_daily_todo_digest")
+            notify_project_hours_forecast = data.get("notify_project_hours_forecast")
+
             # Validate weekly_hours_minimum if provided
             if weekly_hours_minimum is not None:
                 try:
@@ -395,6 +399,12 @@ def create_auth_blueprint(db_session_factory, limiter=None):
                 user.weekly_hours_minimum = weekly_hours_minimum
             if slack_user_id is not None:
                 user.slack_user_id = slack_user_id if slack_user_id else None
+
+            # Update notification preferences (only if provided)
+            if notify_daily_todo_digest is not None:
+                user.notify_daily_todo_digest = bool(notify_daily_todo_digest)
+            if notify_project_hours_forecast is not None:
+                user.notify_project_hours_forecast = bool(notify_project_hours_forecast)
 
             db_session.commit()
 

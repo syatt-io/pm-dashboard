@@ -24,6 +24,80 @@ class IntelligentForecastingService:
             session: SQLAlchemy database session
         """
         self.session = session
+        self._epic_ranges_cache = None
+
+    def _get_learned_epic_ranges(self) -> Optional[Dict[str, str]]:
+        """
+        Get learned epic category ranges from database.
+
+        Returns:
+            Dict mapping epic_category to range string (e.g., "30-45%")
+            or None if no learned data available
+        """
+        if self._epic_ranges_cache is not None:
+            return self._epic_ranges_cache
+
+        from src.models import EpicAllocationBaseline
+
+        baselines = self.session.query(EpicAllocationBaseline).all()
+
+        if not baselines:
+            logger.info("No learned epic ranges available - will use hardcoded ranges")
+            return None
+
+        # Build ranges dict
+        ranges = {}
+        for baseline in baselines:
+            ranges[baseline.epic_category] = baseline.get_range_string()
+
+        logger.info(f"Loaded {len(ranges)} learned epic ranges from database")
+        self._epic_ranges_cache = ranges
+        return ranges
+
+    def _generate_epic_category_prompt_section(self) -> str:
+        """
+        Generate the epic category allocation section of the AI prompt.
+
+        Uses learned ranges if available, otherwise falls back to hardcoded ranges.
+
+        Returns:
+            Formatted string for the epic category section of the prompt
+        """
+        learned_ranges = self._get_learned_epic_ranges()
+
+        if learned_ranges:
+            # Use learned data - build prompt from database
+            logger.info("Using LEARNED epic ranges in AI prompt")
+            lines = [
+                "Common epic categories for web application projects (LEARNED from historical data):"
+            ]
+
+            # Sort by category name for consistency
+            for category in sorted(learned_ranges.keys()):
+                range_str = learned_ranges[category]
+                lines.append(f"- **{category}** ({range_str})")
+
+            lines.append("")
+            lines.append(
+                "NOTE: These ranges are learned from actual historical projects and reflect real allocation patterns."
+            )
+
+            return "\n".join(lines)
+        else:
+            # Fallback to hardcoded ranges
+            logger.info(
+                "Using HARDCODED epic ranges in AI prompt (no learned data available)"
+            )
+            return """Common epic categories for web application projects:
+- **Project Oversight** (10-20%): Planning, meetings, stakeholder management, project coordination
+- **FE Dev** (30-45%): Frontend implementation, React/Vue components, UI development
+- **BE Dev** (15-30%): Backend APIs, database design, business logic, server-side code
+- **Design** (8-15%): Visual design, mockups, style guides, UI/UX design work
+- **UX** (3-8%): User research, usability testing, user flows, personas
+- **Infrastructure** (3-8%): DevOps, deployment pipelines, hosting setup, CI/CD
+- **Authentication** (5-10%): Login systems, user management, permissions, security
+- **Search** (3-8%): Search functionality, filters, indexing (if applicable)
+- **Cart/Checkout** (5-12%): E-commerce features, payment integration (if applicable)"""
 
     def generate_intelligent_forecast(
         self,
@@ -488,16 +562,7 @@ manually distribute hours across months. The system will handle temporal distrib
 
 In addition to team allocation, predict EPIC CATEGORY distribution based on project characteristics.
 
-Common epic categories for web application projects:
-- **Project Oversight** (10-20%): Planning, meetings, stakeholder management, project coordination
-- **FE Dev** (30-45%): Frontend implementation, React/Vue components, UI development
-- **BE Dev** (15-30%): Backend APIs, database design, business logic, server-side code
-- **Design** (8-15%): Visual design, mockups, style guides, UI/UX design work
-- **UX** (3-8%): User research, usability testing, user flows, personas
-- **Infrastructure** (3-8%): DevOps, deployment pipelines, hosting setup, CI/CD
-- **Authentication** (5-10%): Login systems, user management, permissions, security
-- **Search** (3-8%): Search functionality, filters, indexing (if applicable)
-- **Cart/Checkout** (5-12%): E-commerce features, payment integration (if applicable)
+{self._generate_epic_category_prompt_section()}
 
 Scale epic categories based on characteristics:
 - **High be_integrations (4-5)** → increase "BE Dev" epic to 25-35%

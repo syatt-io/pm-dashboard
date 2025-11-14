@@ -174,6 +174,8 @@ const UserList = () => {
                   <th style={{ padding: '12px', textAlign: 'left' }}>Jira Account ID</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Slack User ID</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Min Hours/Week</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Slack Notifs</th>
+                  <th style={{ padding: '12px', textAlign: 'left' }}>Email Notifs</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Created</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Last Login</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Actions</th>
@@ -264,6 +266,22 @@ const UserList = () => {
                       size="small"
                       inputProps={{ min: 0, step: 0.5 }}
                       sx={{ width: 80 }}
+                    />
+                  </td>
+                  <td style={{ padding: '12px' }}>
+                    <Switch
+                      checked={user.notify_project_hours_forecast ?? true}
+                      onChange={(e) => handleTeamSettingsChange(user.id, 'notify_project_hours_forecast', e.target.checked)}
+                      size="small"
+                      title="Tempo hours forecast Slack notifications"
+                    />
+                  </td>
+                  <td style={{ padding: '12px' }}>
+                    <Switch
+                      checked={user.notify_daily_todo_digest ?? true}
+                      onChange={(e) => handleTeamSettingsChange(user.id, 'notify_daily_todo_digest', e.target.checked)}
+                      size="small"
+                      title="Daily todo digest email notifications"
                     />
                   </td>
                   <td style={{ padding: '12px' }}>

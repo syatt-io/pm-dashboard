@@ -29,8 +29,10 @@ class ForecastingService:
         self.lifecycle_percentages = self._load_lifecycle_percentages()
         # NEW: Use learned patterns from historical data
         from src.services.temporal_pattern_service import TemporalPatternService
+        from src.services.characteristic_impact_service import CharacteristicImpactService
 
         self.temporal_pattern_service = TemporalPatternService()
+        self.characteristic_impact_service = CharacteristicImpactService()
 
     def _load_baselines(self) -> Dict[str, Dict[str, float]]:
         """
@@ -496,48 +498,93 @@ class ForecastingService:
         if not selected_baselines:
             raise ValueError("No valid teams selected")
 
-        # Apply AGGRESSIVE characteristic multipliers for visible redistribution
-        # Since we're working with a fixed total_hours budget, these multipliers
-        # dramatically shift the distribution percentages
-        adjusted_baselines = selected_baselines.copy()
+        # NEW APPROACH: Use learned characteristic impacts from historical data
+        # Try to get learned allocations first, fall back to hardcoded multipliers if no data
 
-        # Custom Designs: DRAMATICALLY increase Design allocation (1→1.0x, 5→4.0x)
-        # This ensures Design gets a much larger SHARE of the total budget
-        if "Design" in adjusted_baselines:
-            # Exponential scaling: 1→1.0x, 2→1.5x, 3→2.0x, 4→3.0x, 5→4.0x
-            design_multiplier = 1.0 + (custom_designs - 1) * 0.75
-            adjusted_baselines["Design"] *= design_multiplier
-
-        # UX Research: DRAMATICALLY increase UX allocation (1→1.0x, 5→4.0x)
-        if "UX" in adjusted_baselines:
-            ux_multiplier = 1.0 + (ux_research - 1) * 0.75
-            adjusted_baselines["UX"] *= ux_multiplier
-
-        # Custom Theme: SIGNIFICANTLY increase FE allocation (1→1.0x, 5→3.0x)
-        if "FE Devs" in adjusted_baselines:
-            fe_multiplier = 1.0 + (custom_theme - 1) * 0.5
-            adjusted_baselines["FE Devs"] *= fe_multiplier
-
-        # Project Oversight: Adjust PM allocation (1→0.5x less, 3→1.0x baseline, 5→1.5x more)
-        # Uses linear interpolation centered at value 3 (typical oversight)
-        if "PMs" in adjusted_baselines:
-            # Map slider: 1→0.5x, 2→0.75x, 3→1.0x, 4→1.25x, 5→1.5x
-            # Formula: 1.0 + (value - 3) * 0.25
-            pm_multiplier = 1.0 + (project_oversight - 3) * 0.25
-            adjusted_baselines["PMs"] *= pm_multiplier
-
-        # Calculate distribution ratios by normalizing adjusted baselines
-        # NOTE: After normalization, these become PROPORTIONS that sum to 1.0
-        # The actual hours will be: team_hours = total_hours * ratio
-        # So the multipliers change the DISTRIBUTION, not the absolute hours
-        total_baseline = sum(adjusted_baselines.values())
-        distribution_ratios = {
-            team: (hours / total_baseline) for team, hours in adjusted_baselines.items()
+        # Check if we have learned data for these characteristics
+        learned_allocations = {}
+        characteristics_map = {
+            "custom_designs": (custom_designs, ["Design"]),
+            "ux_research": (ux_research, ["UX"]),
+            "custom_theme": (custom_theme, ["FE Devs"]),
+            "project_oversight": (project_oversight, ["PMs"]),
+            "be_integrations": (be_integrations, ["BE Devs"]),
+            "extensive_customizations": (extensive_customizations, ["BE Devs"]),
         }
 
-        # Apply BE Dev boost for extensive customizations
-        # User requirement: "extensive customization also generally means more BE Dev support is needed"
-        if "BE Devs" in distribution_ratios:
+        # Try to get learned allocations for each characteristic/team combination
+        for char_name, (char_value, relevant_teams) in characteristics_map.items():
+            for team in relevant_teams:
+                if team in teams_selected:
+                    learned_pct = self.characteristic_impact_service.get_allocation_for_characteristic(
+                        char_name, char_value, team
+                    )
+                    if learned_pct is not None:
+                        # Store learned allocation
+                        if team not in learned_allocations:
+                            learned_allocations[team] = []
+                        learned_allocations[team].append(learned_pct)
+                        logger.debug(
+                            f"Using learned allocation: {char_name}={char_value}, {team}: {learned_pct:.1f}%"
+                        )
+
+        # Decide whether to use learned data or fall back to multipliers
+        use_learned_data = len(learned_allocations) > 0
+
+        if use_learned_data:
+            # NEW: Use learned allocations directly (they're already percentages)
+            logger.info(f"Using learned characteristic impacts for {len(learned_allocations)} teams")
+
+            # Average learned allocations for teams with multiple characteristic impacts
+            distribution_ratios = {}
+            for team in teams_selected:
+                if team in learned_allocations:
+                    # Average the learned allocations for this team
+                    avg_pct = sum(learned_allocations[team]) / len(learned_allocations[team])
+                    distribution_ratios[team] = avg_pct / 100.0  # Convert to ratio
+                else:
+                    # No learned data for this team - use baseline proportion
+                    # Calculate baseline proportion from selected_baselines
+                    baseline_total = sum(selected_baselines.values())
+                    if baseline_total > 0:
+                        distribution_ratios[team] = selected_baselines.get(team, 0) / baseline_total
+                    else:
+                        distribution_ratios[team] = 1.0 / len(teams_selected)
+        else:
+            # FALLBACK: Use hardcoded multipliers (old approach)
+            logger.info("No learned characteristic impacts available - using hardcoded multipliers")
+            adjusted_baselines = selected_baselines.copy()
+
+            # Custom Designs: DRAMATICALLY increase Design allocation (1→1.0x, 5→4.0x)
+            if "Design" in adjusted_baselines:
+                design_multiplier = 1.0 + (custom_designs - 1) * 0.75
+                adjusted_baselines["Design"] *= design_multiplier
+
+            # UX Research: DRAMATICALLY increase UX allocation (1→1.0x, 5→4.0x)
+            if "UX" in adjusted_baselines:
+                ux_multiplier = 1.0 + (ux_research - 1) * 0.75
+                adjusted_baselines["UX"] *= ux_multiplier
+
+            # Custom Theme: SIGNIFICANTLY increase FE allocation (1→1.0x, 5→3.0x)
+            if "FE Devs" in adjusted_baselines:
+                fe_multiplier = 1.0 + (custom_theme - 1) * 0.5
+                adjusted_baselines["FE Devs"] *= fe_multiplier
+
+            # Project Oversight: Adjust PM allocation (1→0.5x less, 3→1.0x baseline, 5→1.5x more)
+            if "PMs" in adjusted_baselines:
+                pm_multiplier = 1.0 + (project_oversight - 3) * 0.25
+                adjusted_baselines["PMs"] *= pm_multiplier
+
+            # Calculate distribution ratios by normalizing adjusted baselines
+            total_baseline = sum(adjusted_baselines.values())
+            distribution_ratios = {
+                team: (hours / total_baseline) for team, hours in adjusted_baselines.items()
+            }
+
+        # Apply BE Dev boost for extensive customizations (only if using hardcoded multipliers)
+        # Note: Learned allocations already include this impact, so skip if using learned data
+        if not use_learned_data and "BE Devs" in distribution_ratios:
+            # User requirement: "extensive customization also generally means more BE Dev support is needed"
             # Determine multiplier using smooth interpolation across full 1-5 scale
             # Formula: 1.0 + max(0, (value - 2)) * 0.1
             # Value 1-2: no boost (1.0x), Value 3: +10% (1.1x), Value 4: +20% (1.2x), Value 5: +30% (1.3x)

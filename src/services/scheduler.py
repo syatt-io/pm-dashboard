@@ -708,16 +708,22 @@ class TodoScheduler:
 
                         # Send individual DMs to opted-in users
                         from src.utils.database import session_scope
-                        from src.models.user import User
+                        from src.models.user import User, UserWatchedProject
 
                         opted_in_users = []
                         with session_scope() as db_session:
+                            # CRITICAL FIX: Only notify users who:
+                            # 1. Have notify_project_hours_forecast enabled
+                            # 2. Have a Slack user ID configured
+                            # 3. Are watching at least one project (JOIN with user_watched_projects)
                             opted_in_users = (
                                 db_session.query(User)
+                                .join(UserWatchedProject, User.id == UserWatchedProject.user_id)
                                 .filter(
                                     User.notify_project_hours_forecast == True,
                                     User.slack_user_id.isnot(None),
                                 )
+                                .distinct()  # Avoid duplicates if user watches multiple projects
                                 .all()
                             )
 
@@ -726,19 +732,57 @@ class TodoScheduler:
                                 db_session.expunge(user)
 
                         logger.info(
-                            f"Found {len(opted_in_users)} users opted in for project hours forecast"
+                            f"Found {len(opted_in_users)} users opted in for project hours forecast with watched projects"
                         )
 
-                        # Send DMs to opted-in users
+                        # Send DMs to opted-in users with personalized project summaries
                         async def send_dms():
                             for user in opted_in_users:
                                 try:
+                                    # Get user's watched project keys
+                                    watched_project_keys = {wp.project_key for wp in user.watched_projects}
+
+                                    # Filter project_summary to only include user's watched projects
+                                    user_projects = [
+                                        proj for proj in project_summary
+                                        if proj['key'] in watched_project_keys
+                                    ]
+
+                                    # Skip if user has no relevant projects in this summary (edge case)
+                                    if not user_projects:
+                                        logger.info(
+                                            f"Skipping user {user.email} - no watched projects in current summary"
+                                        )
+                                        continue
+
+                                    # Build personalized summary
+                                    personalized_body = f"✅ *Tempo Hours Sync Completed*\n\n"
+                                    personalized_body += f"• Projects Updated: {stats['projects_updated']}\n"
+                                    personalized_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
+                                    personalized_body += f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+
+                                    # Add personalized project hours summary
+                                    personalized_body += f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary* (Your Watched Projects):\n"
+
+                                    for project in user_projects:
+                                        status_emoji = project["emoji"]
+                                        personalized_body += f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
+
+                                        if project["forecasted_hours"] > 0:
+                                            personalized_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
+                                            personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                                            personalized_body += f"  • Usage: {project['percentage']:.1f}%\n"
+                                        else:
+                                            # No forecast - just show actual hours
+                                            personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                                            personalized_body += f"  • (No forecast set)\n"
+
                                     await self.notifier._send_slack_dm(
                                         slack_user_id=user.slack_user_id,
-                                        message=summary_body,
+                                        message=personalized_body,
                                     )
                                     logger.info(
-                                        f"Sent project hours forecast DM to user {user.email}"
+                                        f"Sent personalized project hours forecast DM to user {user.email} ({len(user_projects)} projects)"
                                     )
                                 except Exception as user_error:
                                     logger.error(
