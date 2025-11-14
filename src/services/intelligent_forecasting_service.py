@@ -621,6 +621,8 @@ IMPORTANT:
 1. Return ONLY the JSON object, no additional text before or after.
 2. Do NOT include "monthly_distribution_pattern" - the system automatically applies learned temporal patterns.
 3. Focus on team and epic allocation percentages - the system handles monthly distribution.
+4. **CRITICAL**: Keep ALL reasoning strings SHORT (max 100 characters) and use ONLY plain text - no quotes, newlines, or special characters that could break JSON parsing.
+5. Use simple, concise explanations in reasoning fields.
 """
 
         try:
@@ -672,21 +674,57 @@ IMPORTANT:
                     f"Response around error position: ...{response_text[max(0, e.pos-100):min(len(response_text), e.pos+100)]}..."
                 )
 
-                # Try to fix common JSON issues
-                # 1. Try to find and extract just the JSON object
-                import re
+                # Try to fix unterminated string errors by truncating at the error position
+                if "Unterminated string" in str(e):
+                    logger.warning(
+                        "Attempting to fix unterminated string by truncating..."
+                    )
+                    # Find the last complete JSON object before the error
+                    # Strategy: try to find the last properly closed brace before the error
+                    truncated = response_text[: e.pos]
+                    # Count open braces to find where we should close
+                    open_braces = truncated.count("{") - truncated.count("}")
+                    # Add closing braces
+                    fixed_json = truncated + ("}" * open_braces)
 
-                json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
-                if json_match:
-                    potential_json = json_match.group(0)
                     try:
-                        ai_forecast = json.loads(potential_json)
-                        logger.warning("Successfully extracted JSON after regex fix")
-                    except json.JSONDecodeError:
-                        logger.error("Regex extraction also failed")
-                        raise
+                        ai_forecast = json.loads(fixed_json)
+                        logger.warning(
+                            f"Successfully recovered JSON by truncating at error position (removed {len(response_text) - len(fixed_json)} chars)"
+                        )
+                    except json.JSONDecodeError as e2:
+                        logger.error(f"Truncation fix failed: {e2}")
+                        # Last resort: try regex extraction
+                        import re
+
+                        json_match = re.search(
+                            r"\{[^}]*\}", response_text[: e.pos], re.DOTALL
+                        )
+                        if json_match:
+                            try:
+                                ai_forecast = json.loads(json_match.group(0))
+                                logger.warning("Recovered partial JSON with regex")
+                            except:
+                                raise e  # Give up, re-raise original error
+                        else:
+                            raise e
                 else:
-                    raise
+                    # Try regex extraction for other errors
+                    import re
+
+                    json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+                    if json_match:
+                        potential_json = json_match.group(0)
+                        try:
+                            ai_forecast = json.loads(potential_json)
+                            logger.warning(
+                                "Successfully extracted JSON after regex fix"
+                            )
+                        except json.JSONDecodeError:
+                            logger.error("Regex extraction also failed")
+                            raise
+                    else:
+                        raise
 
             logger.info(f"\nAI forecast parsed successfully:")
             logger.info(
