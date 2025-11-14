@@ -643,18 +643,23 @@ IMPORTANT:
             response_text = response_text.strip()
 
             # Try to extract JSON from markdown code blocks
-            if "```json" in response_text:
-                # Extract content between ```json and ```
+            if response_text.startswith("```json"):
+                # Remove ```json from start
+                response_text = response_text[7:].strip()
+                # Remove trailing ```
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3].strip()
+            elif response_text.startswith("```"):
+                # Generic code block
+                response_text = response_text[3:].strip()
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3].strip()
+            elif "```json" in response_text:
+                # Extract content between ```json and ``` (for inline code blocks)
                 start = response_text.find("```json") + 7
                 end = response_text.find("```", start)
                 if end > start:
                     response_text = response_text[start:end].strip()
-            elif response_text.startswith("```"):
-                # Generic code block
-                response_text = response_text[3:]
-                if response_text.endswith("```"):
-                    response_text = response_text[:-3]
-                response_text = response_text.strip()
 
             # Log cleaned response for debugging
             logger.info(f"Cleaned response (first 500 chars): {response_text[:500]}...")
