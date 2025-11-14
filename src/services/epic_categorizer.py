@@ -191,18 +191,18 @@ class EpicCategorizer:
 
         valid_categories = self._load_valid_categories()
 
-        # Build category descriptions dynamically
+        # Build category descriptions dynamically with keyword hints
         category_descriptions = {
-            "Project Oversight": "Project management, planning, coordination, stakeholder management, meetings, status updates",
+            "Project Oversight": "Project management, planning, coordination, stakeholder management, meetings, status updates, UAT, testing, QA, environment setup, infrastructure setup, DevOps",
             "UX": "User experience research, usability testing, UX design, user flows, wireframes, customer interviews",
             "Design": "Visual design, UI design, graphics, branding, design systems, mockups, style guides",
             "UI Dev": "Frontend development, user interface implementation, pages, components, navigation, headers, footers, forms, buttons, modals. DEFAULT choice if epic involves user-facing work and category is unclear.",
-            "Customizations": "Client-specific features, custom functionality, tailored solutions, special requirements",
-            "Integrations": "External system integrations, API connections, third-party services (non-app integrations)",
-            "Migrations": "Data migrations, platform migrations, system transitions, legacy system updates",
-            "3rd Party Apps": "Third-party plugins, external applications, app marketplace integrations (Shopify apps, extensions, etc.)",
+            "Customizations": "Client-specific features, custom functionality, tailored solutions, special requirements, custom purchasing flows, scholarships, donations, configurators, custom forms, bulk tools, custom uploaders",
+            "Integrations": "External system integrations, API connections, third-party services, middleware, import/export systems, sync operations, order sync, product imports, data integrations (NOT marketplace apps)",
+            "Migrations": "Data migrations, platform migrations, system transitions, legacy system updates, product migrations, moving between systems",
+            "3rd Party Apps": "Shopify apps, marketplace plugins, app store integrations, pre-built third-party extensions",
             "SEO & Analytics": "Search engine optimization, analytics implementation, tracking, performance monitoring",
-            "POS": "Point of sale systems, retail solutions, in-store technology",
+            "POS": "Point of sale systems, retail solutions, in-store technology (NOT scholarship systems with POS in name)",
             "Launch Support": "Go-live activities, production support, launch coordination, post-launch fixes",
         }
 
@@ -218,18 +218,59 @@ Categorize the following epic into ONE of these categories:
 {categories_list}
 - Uncategorized: ONLY if none of the above fit and you are uncertain
 
-**IMPORTANT RULES**:
-1. Return ONLY the category name exactly as shown above (case-sensitive)
-2. Choose the most specific category that fits
-3. **If multiple categories could apply, choose the primary focus**
-4. **If the epic is vague and involves user-facing work (pages, navigation, UI elements), default to "UI Dev"**
-5. Do NOT explain your reasoning, just return the category name
-6. Examples of "UI Dev": headers, footers, pages, navigation, account pages, cart, checkout UI, product listings
+**CRITICAL**: Your response MUST be ONLY the category name, nothing else. No explanations, no markdown, no reasoning.
+
+**CATEGORIZATION STRATEGY (apply in this order)**:
+
+1. **Check for OBVIOUS KEYWORDS first**:
+   - UAT, testing, QA, environment setup, infrastructure → "Project Oversight"
+   - Import, export, sync, middleware, data integration → "Integrations"
+   - Migration, moving between systems → "Migrations"
+   - Shopify app, marketplace plugin → "3rd Party Apps"
+   - SEO, analytics, tracking → "SEO & Analytics"
+
+2. **Check if it's a STANDARD E-COMMERCE UI COMPONENT**:
+   Standard UI patterns that should be "UI Dev":
+   - Headers, footers, navigation, menus
+   - Product listings (PLP), product details (PDP), collections
+   - Cart, mini-cart, checkout flow
+   - Search, filters, sorting
+   - Account pages, login, registration
+   - Homepage sections, landing pages
+   - Forms (standard contact, newsletter)
+
+   If it matches these → "UI Dev"
+
+3. **Check if it's CUSTOM BUSINESS LOGIC**:
+   If it's a functional deliverable that is NOT a standard e-commerce pattern:
+   - Custom purchasing flows (academic purchasing, group orders)
+   - Custom business features (scholarships, donations, memberships)
+   - Custom configurators or builders
+   - Custom bulk tools or uploaders
+   - Client-specific workflows
+
+   If it's unique business logic → "Customizations"
+
+4. **Last resort**: If still unclear and user-facing → "UI Dev"
+
+**EXAMPLES**:
+- "UAT | PLP" → "Project Oversight" (testing keyword)
+- "Environment Setup" → "Project Oversight" (infrastructure keyword)
+- "Import products from eagle" → "Integrations" (import keyword)
+- "Order Sync" → "Integrations" (sync keyword)
+- "Product Migration" → "Migrations" (migration keyword)
+- "Product Listings" → "UI Dev" (standard e-commerce UI)
+- "Cart" → "UI Dev" (standard e-commerce UI)
+- "Header" → "UI Dev" (standard e-commerce UI)
+- "Scholarships" → "Customizations" (unique business logic)
+- "Academic Purchasing Journey" → "Customizations" (unique business logic)
+- "Configurator" → "Customizations" (unique business logic)
+- "Bulk Image Uploader" → "Customizations" (unique business tool)
 
 Example responses:
 "UI Dev"
 "Project Oversight"
-"3rd Party Apps"
+"Customizations"
 """
 
         user_prompt = f"Epic: {epic_summary}"
@@ -241,18 +282,44 @@ Example responses:
             ]
 
             response = self.llm.invoke(messages)
-            category = response.content.strip()
+            raw_response = response.content.strip()
 
-            # Validate category
+            # Try to extract category name from response
+            # AI might return verbose response like "**UI Dev**\n\nReasoning..."
+            # Extract just the category name
+            category = raw_response
+
+            # Remove markdown formatting
+            category = category.replace("**", "").replace("*", "")
+
+            # If response has multiple lines, take first line
+            if "\n" in category:
+                category = category.split("\n")[0].strip()
+
+            # Remove common prefixes
+            for prefix in ["Category: ", "Answer: ", "Result: "]:
+                if category.startswith(prefix):
+                    category = category[len(prefix):].strip()
+
+            # Check if extracted category is valid
             if category in valid_categories:
-                logger.info(f"AI categorized epic as: {category}")
+                if category != raw_response:
+                    logger.info(f"AI returned verbose response, extracted category: {category}")
+                else:
+                    logger.info(f"AI categorized epic as: {category}")
                 return category
-            else:
-                logger.warning(
-                    f"AI returned invalid category '{category}', defaulting to 'UI Dev'"
-                )
-                # Default to "UI Dev" instead of "Uncategorized" for better user experience
-                return "UI Dev" if "UI Dev" in valid_categories else "Uncategorized"
+
+            # Try to find any valid category mentioned in the response
+            for valid_cat in valid_categories:
+                if valid_cat in raw_response:
+                    logger.info(f"AI returned invalid format, but found valid category '{valid_cat}' in response")
+                    return valid_cat
+
+            # No valid category found
+            logger.warning(
+                f"AI returned invalid category '{raw_response[:100]}...', defaulting to 'Uncategorized'"
+            )
+            return "Uncategorized"
 
         except Exception as e:
             logger.error(f"Error categorizing epic with AI: {e}", exc_info=True)
