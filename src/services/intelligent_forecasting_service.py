@@ -322,6 +322,43 @@ class IntelligentForecastingService:
 
         return "\n".join(context_lines)
 
+    def _format_temporal_patterns(self, patterns_summary: Dict[str, List[Dict]]) -> str:
+        """
+        Format learned temporal patterns for AI prompt.
+
+        Args:
+            patterns_summary: Dictionary from temporal_pattern_service.get_all_patterns_summary()
+
+        Returns:
+            Formatted markdown string showing learned patterns
+        """
+        if not patterns_summary:
+            return "No learned temporal patterns available yet."
+
+        lines = ["## Learned Temporal Distribution Patterns\n"]
+        lines.append(
+            "(Percentage of each team's TOTAL work done in each timeline segment)\n"
+        )
+
+        # Sort timeline buckets
+        timeline_buckets = sorted(patterns_summary.keys())
+
+        for bucket in timeline_buckets:
+            team_patterns = patterns_summary[bucket]
+            if not team_patterns:
+                continue
+
+            lines.append(f"\n**Timeline {bucket}:**")
+            for pattern in team_patterns:
+                team = pattern["team"]
+                work_pct = pattern["work_pct"]
+                sample_size = pattern["sample_size"]
+                lines.append(
+                    f"  - {team:15s}: {work_pct:5.1f}% of their total work (n={sample_size} projects)"
+                )
+
+        return "\n".join(lines)
+
     def _generate_ai_forecast(
         self,
         project_characteristics: Dict[str, int],
@@ -346,6 +383,16 @@ class IntelligentForecastingService:
             Dictionary with AI-generated forecast and reasoning
         """
         from config.settings import settings
+        from src.services.temporal_pattern_service import TemporalPatternService
+
+        # Get learned temporal patterns to show AI
+        temporal_service = TemporalPatternService()
+        learned_patterns_summary = temporal_service.get_all_patterns_summary()
+
+        # Format learned patterns for prompt
+        temporal_patterns_text = self._format_temporal_patterns(
+            learned_patterns_summary
+        )
 
         # Build comprehensive AI prompt
         prompt = f"""You are an expert software project forecaster analyzing historical project data to predict team allocation and timeline for a new project.
@@ -390,6 +437,25 @@ The 1-5 scale represents the INTENSITY of each requirement:
 - Project Oversight: {project_characteristics.get('project_oversight', 3)}/5
 
 {historical_context}
+
+# LEARNED TEMPORAL PATTERNS (DATA-DRIVEN DISTRIBUTION)
+
+The system has analyzed ALL historical projects and learned data-driven temporal distribution patterns.
+These patterns show when each team typically does their work throughout project timelines (normalized by percentage).
+
+**IMPORTANT**: You do NOT need to predict monthly distribution patterns - the system automatically
+applies these learned patterns. Focus your analysis on team and epic allocation percentages.
+
+{temporal_patterns_text}
+
+**Key Insights from Learned Patterns:**
+- **Design & UX**: Heavily front-loaded (19.7% and 35.1% in first 10% of timeline)
+- **FE Devs**: Low early work (1.3% in first 10%), peaks mid-project (28.7% in 30-40% range)
+- **BE Devs**: Low early work (4.1% in first 10%), steady mid-project work
+- **PMs**: Relatively even distribution throughout project timeline
+
+These patterns are automatically applied to your team allocations, so you don't need to
+manually distribute hours across months. The system will handle temporal distribution.
 
 # CRITICAL ANALYSIS RULES (MUST FOLLOW!)
 
@@ -477,22 +543,19 @@ Return your analysis as a JSON object with this exact structure:
     "Authentication": {{ ... }}
     // Include other relevant epics based on project type
   }},
-  "monthly_distribution_pattern": {{
-    "ramp_up_percentage": <number 0-100>,
-    "peak_percentage": <number 0-100>,
-    "ramp_down_percentage": <number 0-100>,
-    "reasoning": "<why this pattern>"
-  }},
   "key_insights": [
-    "<insight 1>",
-    "<insight 2>",
-    "<insight 3>"
+    "<insight 1: how learned temporal patterns align with this project>",
+    "<insight 2: how characteristic differences affect team allocations>",
+    "<insight 3: confidence in predictions based on similar projects>"
   ],
   "confidence_score": <number 0-1>,
-  "overall_reasoning": "<comprehensive explanation of your predictions>"
+  "overall_reasoning": "<comprehensive explanation noting that temporal distribution is automatically handled by learned patterns>"
 }}
 
-IMPORTANT: Return ONLY the JSON object, no additional text before or after.
+IMPORTANT:
+1. Return ONLY the JSON object, no additional text before or after.
+2. Do NOT include "monthly_distribution_pattern" - the system automatically applies learned temporal patterns.
+3. Focus on team and epic allocation percentages - the system handles monthly distribution.
 """
 
         try:
@@ -622,14 +685,16 @@ IMPORTANT: Return ONLY the JSON object, no additional text before or after.
 
         # Extract team allocations from AI forecast
         team_allocations = ai_forecast.get("team_allocations", {})
-        monthly_pattern = ai_forecast.get("monthly_distribution_pattern", {})
 
-        # Convert monthly pattern to lifecycle percentages
+        # NOTE: monthly_distribution_pattern is no longer used.
+        # The forecasting service now uses learned temporal patterns from the database.
+        # Lifecycle percentages below are DEPRECATED but kept for backward compatibility.
         lifecycle = {
-            "ramp_up": monthly_pattern.get("ramp_up_percentage", 30.0),
-            "busy": monthly_pattern.get("peak_percentage", 50.0),
-            "ramp_down": monthly_pattern.get("ramp_down_percentage", 20.0),
+            "ramp_up": 30.0,  # DEPRECATED - not used
+            "busy": 50.0,  # DEPRECATED - not used
+            "ramp_down": 20.0,  # DEPRECATED - not used
         }
+        monthly_pattern = {}  # Empty for backward compatibility
 
         for team in teams_selected:
             if team not in team_allocations:

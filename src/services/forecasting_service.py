@@ -25,7 +25,12 @@ class ForecastingService:
         """
         self.session = session
         self.baselines = self._load_baselines()
+        # DEPRECATED: Replaced with learned temporal patterns from TemporalPatternService
         self.lifecycle_percentages = self._load_lifecycle_percentages()
+        # NEW: Use learned patterns from historical data
+        from src.services.temporal_pattern_service import TemporalPatternService
+
+        self.temporal_pattern_service = TemporalPatternService()
 
     def _load_baselines(self) -> Dict[str, Dict[str, float]]:
         """
@@ -337,192 +342,73 @@ class ForecastingService:
         start_date: str = None,
     ) -> List[Dict[str, Any]]:
         """
-        Distribute hours across months based on lifecycle percentages.
+        Distribute hours across months using learned temporal patterns.
 
-        For Design/UX teams with high ramp_up percentages (52%/57%), uses
-        exponential front-loading to concentrate hours in first 1-2 months,
-        matching real data patterns (BMBY: 67% Month 1, 25% Month 2, 7% Month 3).
+        REPLACED HARDCODED LOGIC: This method now uses data-driven temporal patterns
+        learned from historical projects (stored in temporal_pattern_baselines table).
+
+        The learned patterns normalize work distribution by timeline percentage,
+        making them duration-agnostic and applicable to projects of any length.
+
+        Example learned patterns:
+        - FE Devs: 1.3% in first 10% of timeline, peak at 28.7% in 30-40% range
+        - Design: 19.7% in first 10% of timeline (front-loaded)
+        - UX: 35.1% in first 10% of timeline (heavily front-loaded)
 
         Args:
             total_hours: Total hours for this team
             num_months: Number of months to distribute across
-            lifecycle: Dictionary with ramp_up, busy, ramp_down percentages
-            team_name: Team name for special front-loading logic
+            lifecycle: Dictionary with ramp_up, busy, ramp_down percentages (DEPRECATED - not used)
+            team_name: Team name for pattern lookup
             start_date: Optional start date (YYYY-MM-DD) for proration
 
         Returns:
             List of monthly hour allocations with phase labels
         """
         from datetime import datetime
-        from calendar import monthrange
 
-        # Calculate proration factors for first and last months
-        first_month_factor = 1.0
-        last_month_factor = 1.0
-
-        if start_date and num_months > 1:
+        # Convert start_date string to date object if provided
+        start_date_obj = None
+        if start_date:
             try:
                 start_dt = datetime.fromisoformat(start_date)
-                start_day = start_dt.day
-
-                # Calculate days available in first month
-                days_in_start_month = monthrange(start_dt.year, start_dt.month)[1]
-                days_available_first = days_in_start_month - start_day + 1
-                first_month_factor = days_available_first / days_in_start_month
-
-                # Calculate days available in last month
-                # Last month ends when we run out of the project duration
-                last_month = start_dt
-                for _ in range(num_months - 1):
-                    if last_month.month == 12:
-                        last_month = last_month.replace(
-                            year=last_month.year + 1, month=1
-                        )
-                    else:
-                        last_month = last_month.replace(month=last_month.month + 1)
-
-                # Last month ends on the same day as start (e.g., Jan 15 -> Jun 15)
-                # So we need days from day 1 to start_day
-                last_month_factor = (
-                    start_day / monthrange(last_month.year, last_month.month)[1]
-                )
-
+                start_date_obj = start_dt.date()
             except (ValueError, AttributeError):
-                # If date parsing fails, use full months
+                # If date parsing fails, use None (no proration)
                 pass
 
+        # Use learned temporal patterns from historical data
+        distributions = self.temporal_pattern_service.distribute_hours_by_month(
+            total_hours=total_hours,
+            team=team_name,
+            duration_months=num_months,
+            start_date=start_date_obj,
+            prorate_first_month=True,
+            prorate_last_month=True,
+        )
+
+        # Transform to expected format with phase labels
+        # Phase labels are derived from timeline percentage for backward compatibility
         monthly_breakdown = []
+        for idx, dist in enumerate(distributions):
+            timeline_pct = dist.get("timeline_pct", 0)
 
-        # Calculate which months fall into which phase
-        if num_months == 1:
-            # Single month = all ramp up
-            monthly_breakdown.append(
-                {"month": 1, "phase": "Ramp Up", "hours": round(total_hours, 2)}
-            )
-        elif num_months == 2:
-            # 2 months = ramp up + ramp down
-            ramp_up_hours = total_hours * (lifecycle["ramp_up"] / 100)
-            ramp_down_hours = total_hours - ramp_up_hours
-
-            monthly_breakdown.append(
-                {"month": 1, "phase": "Ramp Up", "hours": round(ramp_up_hours, 2)}
-            )
-            monthly_breakdown.append(
-                {"month": 2, "phase": "Ramp Down", "hours": round(ramp_down_hours, 2)}
-            )
-        else:
-            # 3+ months = ramp up → busy → ramp down
-            ramp_up_pct = lifecycle["ramp_up"] / 100
-            busy_pct = lifecycle["busy"] / 100
-            ramp_down_pct = lifecycle["ramp_down"] / 100
-
-            ramp_up_hours = total_hours * ramp_up_pct
-            busy_hours = total_hours * busy_pct
-            ramp_down_hours = total_hours * ramp_down_pct
-
-            # DATA-DRIVEN TEMPORAL PATTERNS (based on real project analysis)
-            # Design: 70-80% of ALL hours in first 2 months (EXTREMELY FRONT-LOADED)
-            # UX: 47% first third (FRONT-LOADED)
-            # FE Devs: 55% middle third (MID-PEAKED)
-            # BE Devs: 45% middle, even distribution (EVEN)
-            # PMs: 41% middle, even distribution (EVEN)
-
-            # Determine temporal pattern for this team
-            temporal_pattern = None
-            if team_name == "Design":
-                # Design is heavily front-loaded: 54% in first third
-                temporal_pattern = "front_heavy"  # ~85-90% in first 2 months
-            elif team_name == "UX":
-                # UX is front-loaded: 47% in first third
-                temporal_pattern = "front"  # ~70-75% in first third
-            elif team_name == "FE Devs":
-                # FE is mid-peaked: 55% in middle third
-                temporal_pattern = "mid_peak"
+            # Derive phase label from timeline percentage
+            # 0-33%: Ramp Up, 34-66%: Busy (Peak), 67-100%: Ramp Down
+            if timeline_pct < 33.3:
+                phase = "Ramp Up"
+            elif timeline_pct < 66.6:
+                phase = "Busy (Peak)"
             else:
-                # BE Devs, PMs, Others: relatively even
-                temporal_pattern = "even"
+                phase = "Ramp Down"
 
-            # Determine phase boundaries
-            ramp_up_months = max(1, int(num_months * 0.33))
-            ramp_down_months = max(1, int(num_months * 0.33))
-            busy_months = num_months - ramp_up_months - ramp_down_months
-
-            # Distribute hours within each phase based on temporal pattern
-            for i in range(1, num_months + 1):
-                # Special Design handling: 64% in M1, 14.4% in M2 (total 78.4%)
-                # This overrides phase boundaries to ensure extreme front-loading
-                if temporal_pattern == "front_heavy":
-                    if i == 1:
-                        hours = total_hours * 0.64  # 64% of ALL hours in month 1
-                        phase = "Ramp Up"
-                    elif i == 2:
-                        hours = total_hours * 0.144  # 14.4% of ALL hours in month 2
-                        phase = "Ramp Up" if i <= ramp_up_months else "Busy (Peak)"
-                    else:
-                        # Remaining 21.6% distributed evenly across other months
-                        remaining_hours = total_hours * 0.216
-                        remaining_months = num_months - 2
-                        hours = (
-                            remaining_hours / remaining_months
-                            if remaining_months > 0
-                            else 0
-                        )
-
-                        if i <= ramp_up_months:
-                            phase = "Ramp Up"
-                        elif i > num_months - ramp_down_months:
-                            phase = "Ramp Down"
-                        else:
-                            phase = "Busy (Peak)"
-
-                elif i <= ramp_up_months:
-                    phase = "Ramp Up"
-
-                    if temporal_pattern == "front":
-                        # UX: Strong front-loading (75% in first third)
-                        if i == 1:
-                            hours = ramp_up_hours * 0.55  # 55% in month 1
-                        elif i == 2 and ramp_up_months >= 2:
-                            hours = ramp_up_hours * 0.30  # 30% in month 2
-                        else:
-                            # Remaining 15% split across other ramp-up months
-                            remaining_months = max(1, ramp_up_months - 2)
-                            hours = (ramp_up_hours * 0.15) / remaining_months
-                    else:
-                        # Even distribution for BE Devs, PMs
-                        hours = ramp_up_hours / ramp_up_months
-
-                elif i > num_months - ramp_down_months:
-                    phase = "Ramp Down"
-                    hours = ramp_down_hours / ramp_down_months
-                else:
-                    phase = "Busy (Peak)"
-                    if temporal_pattern == "mid_peak":
-                        # FE Devs: Peak in middle months
-                        middle_position = (
-                            (i - ramp_up_months) / busy_months
-                            if busy_months > 0
-                            else 0.5
-                        )
-                        # Bell curve: peak at 1.5x average, edges at 0.7x average
-                        peak_multiplier = 1.5 - 0.8 * abs(middle_position - 0.5)
-                        hours = (
-                            (busy_hours / busy_months) * peak_multiplier
-                            if busy_months > 0
-                            else 0
-                        )
-                    else:
-                        hours = busy_hours / busy_months if busy_months > 0 else 0
-
-                # Apply proration for first and last months
-                if i == 1 and first_month_factor != 1.0:
-                    hours = hours * first_month_factor
-                elif i == num_months and last_month_factor != 1.0:
-                    hours = hours * last_month_factor
-
-                monthly_breakdown.append(
-                    {"month": i, "phase": phase, "hours": round(hours, 2)}
-                )
+            monthly_breakdown.append(
+                {
+                    "month": idx + 1,  # Convert to 1-based month number
+                    "phase": phase,
+                    "hours": dist["hours"],
+                }
+            )
 
         return monthly_breakdown
 

@@ -991,6 +991,33 @@ def import_historical_epic_hours(
                 )
                 baseline_count = 0
 
+            # Step 4: Regenerate temporal patterns (NEW DATA-DRIVEN FORECASTING)
+            logger.info("🔄 Step 4/4: Regenerating learned temporal patterns...")
+            self.update_state(
+                state="PROGRESS",
+                meta={
+                    "message": "Regenerating temporal patterns from historical data..."
+                },
+            )
+
+            try:
+                from scripts.learn_temporal_patterns import main as learn_patterns
+
+                # Regenerate patterns from all historical data
+                learn_patterns(dry_run=False)
+                logger.info(
+                    "✅ Temporal patterns regenerated successfully from updated historical data"
+                )
+            except Exception as pattern_error:
+                logger.error(
+                    f"⚠️ Temporal pattern regeneration failed: {pattern_error}",
+                    exc_info=True,
+                )
+                # Don't fail the entire import if pattern regeneration fails
+                logger.warning(
+                    "Temporal patterns not updated, but historical data import was successful"
+                )
+
             logger.info(f"✅ Successfully imported historical data for {project_key}")
 
             # Calculate team breakdown percentages

@@ -29,6 +29,7 @@ from .project_resource_mapping import ProjectResourceMapping
 from .project_monthly_forecast import ProjectMonthlyForecast
 from .project_forecasting_config import ProjectForecastingConfig
 from .job_execution import JobExecution
+from .temporal_pattern_baseline import TemporalPatternBaseline
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -197,6 +198,7 @@ __all__ = [
     "ProjectMonthlyForecast",
     "ProjectForecastingConfig",
     "JobExecution",
+    "TemporalPatternBaseline",
     "Base",
     # DTOs
     "ProcessedMeetingDTO",
