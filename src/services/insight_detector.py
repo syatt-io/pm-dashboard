@@ -96,61 +96,17 @@ class InsightDetector:
             return insights
 
         try:
-            # Define stale threshold (3 days)
-            stale_threshold = datetime.now(timezone.utc) - timedelta(days=3)
+            # TEMPORARY FIX: Disable stale PR detection until GitHub API methods are implemented
+            # The GitHubClient doesn't have list_pull_requests() or get_pr_reviews() methods yet
+            # This was causing the proactive-insights task to hang for hours
+            logger.info(
+                "Stale PR detection temporarily disabled - GitHub API methods not yet implemented"
+            )
+            return insights
 
-            # Get open PRs
-            prs = self.github_client.list_pull_requests(state="open")
-
-            for pr in prs:
-                try:
-                    # Check if PR is stale (older than 3 days, no reviews)
-                    created_at = datetime.fromisoformat(
-                        pr["created_at"].replace("Z", "+00:00")
-                    )
-
-                    if created_at > stale_threshold:
-                        continue  # Not stale yet
-
-                    # Check if already alerted in last 24 hours
-                    if self._recently_alerted(user.id, "stale_pr", pr["number"]):
-                        continue
-
-                    # Get review count
-                    reviews = self.github_client.get_pr_reviews(pr["number"])
-                    if len(reviews) > 0:
-                        continue  # Has reviews, not stale
-
-                    # Calculate days open
-                    days_open = (datetime.now(timezone.utc) - created_at).days
-
-                    # Create insight
-                    insight = ProactiveInsight(
-                        id=str(uuid.uuid4()),
-                        user_id=user.id,
-                        project_key=None,  # Could map repo to project if needed
-                        insight_type="stale_pr",
-                        title=f"PR #{pr['number']} needs review",
-                        description=f"Pull request '{pr['title']}' has been open for {days_open} days without reviews.",
-                        severity="warning",
-                        metadata_json={
-                            "pr_number": pr["number"],
-                            "pr_url": pr["html_url"],
-                            "pr_title": pr["title"],
-                            "days_open": days_open,
-                            "author": pr["user"]["login"],
-                            "repo": pr["base"]["repo"]["name"],
-                        },
-                        created_at=datetime.now(timezone.utc),
-                    )
-
-                    insights.append(insight)
-
-                except Exception as e:
-                    logger.error(f"Error processing PR {pr.get('number')}: {e}")
-                    continue
-
-            logger.info(f"Detected {len(insights)} stale PRs for user {user.id}")
+            # TODO: Re-enable once we add these methods to GitHubClient:
+            # - list_pull_requests(state="open")
+            # - get_pr_reviews(pr_number)
 
         except Exception as e:
             logger.error(f"Error detecting stale PRs: {e}", exc_info=True)

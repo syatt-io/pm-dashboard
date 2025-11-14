@@ -1709,6 +1709,10 @@ def send_job_monitoring_digest():
                     from_name = os.getenv("SMTP_FROM_NAME", "Agent PM")
                     to_email = os.getenv("ADMIN_EMAIL", smtp_user)
 
+                    logger.info(
+                        f"Sending email digest to {to_email} via {smtp_host}:{smtp_port}"
+                    )
+
                     msg = MIMEMultipart("alternative")
                     msg["Subject"] = (
                         f"Job Monitoring Daily Digest - {digest['summary']['period_start'][:10]}"
@@ -1720,14 +1724,20 @@ def send_job_monitoring_digest():
                     msg.attach(MIMEText(email_html, "html"))
 
                     # Send email
-                    with smtplib.SMTP(smtp_host, smtp_port) as server:
+                    with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
                         server.starttls()
                         server.login(smtp_user, smtp_password)
                         server.send_message(msg)
 
                     logger.info("✅ Email digest sent successfully")
                 except Exception as email_err:
-                    logger.error(f"Failed to send email digest: {email_err}")
+                    logger.error(
+                        f"Failed to send email digest: {email_err}", exc_info=True
+                    )
+            else:
+                logger.warning(
+                    f"Email not configured (smtp_host={smtp_host}, smtp_user={smtp_user}, smtp_password={'***' if smtp_password else None})"
+                )
 
             # Send Slack notification
             if settings.notifications.slack_bot_token:

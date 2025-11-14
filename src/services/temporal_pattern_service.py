@@ -168,6 +168,24 @@ class TemporalPatternService:
                 month_distributions, start_date, duration_months
             )
 
+        # CRITICAL: Normalize distributions to maintain total_hours budget
+        # This handles cases where learned patterns don't sum to 100% or proration edge cases
+        actual_total = sum(d["hours"] for d in month_distributions)
+        if actual_total > 0 and abs(actual_total - total_hours) > 0.01:
+            logger.warning(
+                f"{team}: Monthly distribution sums to {actual_total:.2f}h "
+                f"but expected {total_hours:.2f}h. Normalizing to maintain budget."
+            )
+            scale_factor = total_hours / actual_total
+            for d in month_distributions:
+                d["hours"] = round(d["hours"] * scale_factor, 2)
+
+            # Verify after scaling
+            final_total = sum(d["hours"] for d in month_distributions)
+            logger.info(
+                f"{team}: After normalization, total = {final_total:.2f}h (target: {total_hours:.2f}h)"
+            )
+
         return month_distributions
 
     def _get_month_start(self, start_date: date, month_offset: int) -> date:

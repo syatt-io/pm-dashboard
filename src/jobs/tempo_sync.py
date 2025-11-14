@@ -147,7 +147,14 @@ class TempoSyncJob:
             current_month_hours = self.tempo_client.get_current_month_hours()
 
             # Fetch all-time hours (cumulative from project start)
-            logger.info("Fetching all-time hours from Tempo...")
+            # PERFORMANCE NOTE: This fetches ALL worklogs since 2020 for all 38 projects
+            # Takes ~53 minutes (3167 seconds) to complete. Consider optimizing by:
+            # 1. Using tempo_hours_log table to calculate cumulative hours from DB
+            # 2. Only fetching recent worklogs (last 7-30 days) and incrementing existing cumulative
+            # 3. Caching cumulative hours and only updating with deltas
+            logger.info(
+                "Fetching all-time hours from Tempo (this takes ~53 minutes)..."
+            )
             cumulative_hours = self.tempo_client.get_all_time_hours()
 
             # Update database
