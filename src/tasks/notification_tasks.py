@@ -1341,9 +1341,10 @@ def detect_proactive_insights(self):
             # Send Slack notification if insights detected
             if stats["insights_detected"] > 0:
                 try:
+                    from src.managers.notifications import NotificationContent
+
                     notifier = NotificationManager(settings.notifications)
                     message = (
-                        f"🔍 *Proactive Insight Detection Complete*\n\n"
                         f"• Users processed: {stats['users_processed']}\n"
                         f"• Insights detected: {stats['insights_detected']}\n"
                         f"• Insights stored: {stats['insights_stored']}\n"
@@ -1351,12 +1352,13 @@ def detect_proactive_insights(self):
                     if stats.get("errors"):
                         message += f"• Errors: {len(stats['errors'])}\n"
 
-                    asyncio.run(
-                        notifier._send_slack_message(
-                            channel=settings.notifications.slack_channel,
-                            message=message,
-                        )
+                    content = NotificationContent(
+                        title="🔍 Proactive Insight Detection Complete",
+                        body=message,
+                        priority="normal",
                     )
+
+                    asyncio.run(notifier.send_notification(content, channels=["slack"]))
                 except Exception as notif_error:
                     logger.error(
                         f"Error sending insight detection notification: {notif_error}"
@@ -1404,9 +1406,10 @@ def send_daily_briefs(self):
             # Send Slack notification if briefs sent
             if stats["briefs_sent_slack"] > 0 or stats["briefs_sent_email"] > 0:
                 try:
+                    from src.managers.notifications import NotificationContent
+
                     notifier = NotificationManager(settings.notifications)
                     message = (
-                        f"📬 *Daily Brief Delivery Complete*\n\n"
                         f"• Users processed: {stats['users_processed']}\n"
                         f"• Briefs sent via Slack: {stats['briefs_sent_slack']}\n"
                         f"• Briefs sent via Email: {stats['briefs_sent_email']}\n"
@@ -1415,12 +1418,13 @@ def send_daily_briefs(self):
                     if stats.get("errors"):
                         message += f"• Errors: {len(stats['errors'])}\n"
 
-                    asyncio.run(
-                        notifier._send_slack_message(
-                            channel=settings.notifications.slack_channel,
-                            message=message,
-                        )
+                    content = NotificationContent(
+                        title="📬 Daily Brief Delivery Complete",
+                        body=message,
+                        priority="normal",
                     )
+
+                    asyncio.run(notifier.send_notification(content, channels=["slack"]))
                 except Exception as notif_error:
                     logger.error(
                         f"Error sending daily brief notification: {notif_error}"
@@ -1468,9 +1472,10 @@ def run_auto_escalation(self):
             # Send Slack notification if escalations performed
             if stats["escalations_performed"] > 0:
                 try:
+                    from src.managers.notifications import NotificationContent
+
                     notifier = NotificationManager(settings.notifications)
                     message = (
-                        f"🚨 *Auto-Escalation Summary*\n\n"
                         f"• Insights checked: {stats['total_checked']}\n"
                         f"• Escalations performed: {stats['escalations_performed']}\n"
                         f"• DMs sent: {stats['dm_sent']}\n"
@@ -1480,12 +1485,13 @@ def run_auto_escalation(self):
                     if stats.get("errors", 0) > 0:
                         message += f"• Errors: {stats['errors']}\n"
 
-                    asyncio.run(
-                        notifier._send_slack_message(
-                            channel=settings.notifications.slack_channel,
-                            message=message,
-                        )
+                    content = NotificationContent(
+                        title="🚨 Auto-Escalation Summary",
+                        body=message,
+                        priority="normal",
                     )
+
+                    asyncio.run(notifier.send_notification(content, channels=["slack"]))
                 except Exception as notif_error:
                     logger.error(
                         f"Error sending auto-escalation notification: {notif_error}"

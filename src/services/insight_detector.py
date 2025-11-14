@@ -888,6 +888,13 @@ def detect_insights_for_all_users(db: Optional[Session] = None) -> Dict[str, Any
                     f"Error detecting insights for user {user.id}: {e}", exc_info=True
                 )
                 stats["errors"].append(f"User {user.id}: {str(e)}")
+                # CRITICAL: Rollback transaction to prevent "InFailedSqlTransaction" errors
+                # If we don't rollback, the session remains in a failed state and all
+                # subsequent operations will fail
+                try:
+                    db.rollback()
+                except Exception as rollback_error:
+                    logger.error(f"Error rolling back transaction: {rollback_error}")
                 continue
 
         logger.info(f"Insight detection complete: {stats}")
