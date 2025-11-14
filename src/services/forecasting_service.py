@@ -29,7 +29,9 @@ class ForecastingService:
         self.lifecycle_percentages = self._load_lifecycle_percentages()
         # NEW: Use learned patterns from historical data
         from src.services.temporal_pattern_service import TemporalPatternService
-        from src.services.characteristic_impact_service import CharacteristicImpactService
+        from src.services.characteristic_impact_service import (
+            CharacteristicImpactService,
+        )
 
         self.temporal_pattern_service = TemporalPatternService()
         self.characteristic_impact_service = CharacteristicImpactService()
@@ -533,26 +535,34 @@ class ForecastingService:
 
         if use_learned_data:
             # NEW: Use learned allocations directly (they're already percentages)
-            logger.info(f"Using learned characteristic impacts for {len(learned_allocations)} teams")
+            logger.info(
+                f"Using learned characteristic impacts for {len(learned_allocations)} teams"
+            )
 
             # Average learned allocations for teams with multiple characteristic impacts
             distribution_ratios = {}
             for team in teams_selected:
                 if team in learned_allocations:
                     # Average the learned allocations for this team
-                    avg_pct = sum(learned_allocations[team]) / len(learned_allocations[team])
+                    avg_pct = sum(learned_allocations[team]) / len(
+                        learned_allocations[team]
+                    )
                     distribution_ratios[team] = avg_pct / 100.0  # Convert to ratio
                 else:
                     # No learned data for this team - use baseline proportion
                     # Calculate baseline proportion from selected_baselines
                     baseline_total = sum(selected_baselines.values())
                     if baseline_total > 0:
-                        distribution_ratios[team] = selected_baselines.get(team, 0) / baseline_total
+                        distribution_ratios[team] = (
+                            selected_baselines.get(team, 0) / baseline_total
+                        )
                     else:
                         distribution_ratios[team] = 1.0 / len(teams_selected)
         else:
             # FALLBACK: Use hardcoded multipliers (old approach)
-            logger.info("No learned characteristic impacts available - using hardcoded multipliers")
+            logger.info(
+                "No learned characteristic impacts available - using hardcoded multipliers"
+            )
             adjusted_baselines = selected_baselines.copy()
 
             # Custom Designs: DRAMATICALLY increase Design allocation (1→1.0x, 5→4.0x)
@@ -578,7 +588,8 @@ class ForecastingService:
             # Calculate distribution ratios by normalizing adjusted baselines
             total_baseline = sum(adjusted_baselines.values())
             distribution_ratios = {
-                team: (hours / total_baseline) for team, hours in adjusted_baselines.items()
+                team: (hours / total_baseline)
+                for team, hours in adjusted_baselines.items()
             }
 
         # Apply BE Dev boost for extensive customizations (only if using hardcoded multipliers)

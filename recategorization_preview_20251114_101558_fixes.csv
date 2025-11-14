@@ -1,0 +1,22 @@
+epic_key,project_key,epic_summary,old_category,new_category,change_type,used_fuzzy_match,BETTER_MATCH
+BEVS-116,BEVS,Product Migration,Project Oversight,UI Dev,updated,FALSE,Migrations
+BEVS-2,BEVS,Environment Setup,Infrastructure,UI Dev,updated,FALSE,Project Oversight
+BIGO-165,BIGO,UAT | PLP,UX,UI Dev,updated,FALSE,Project Oversight
+BIGO-173,BIGO,UAT | PDP,UX,UI Dev,updated,FALSE,Project Oversight
+BIGO-193,BIGO,UAT | Global Site Functionality,QA,UI Dev,updated,FALSE,Project Oversight
+BIGO-194,BIGO,UAT | Homepage Sections,UX,UI Dev,updated,FALSE,Project Oversight
+BIGO-253,BIGO,UAT | Discounts/Promotions,QA,UI Dev,updated,FALSE,Project Oversight
+CAR-203,CAR,Import products from eagle to Shopify,BE Dev,Migrations,updated,FALSE,Integrations
+CAR-22,CAR,Import Other Vendor Products,BE Dev,UI Dev,updated,FALSE,Integrations
+CAR-24,CAR,Shopify Configuration Support,BE Dev,UI Dev,updated,FALSE,Project Oversight
+CAR-28,CAR,Setup Middleware Infrastructure,Infrastructure,UI Dev,updated,FALSE,Integrations
+ECAT-7,CAR,Order Sync,BE Dev,UI Dev,updated,FALSE,Integrations
+COOP-102,COOP,Academic Purchasing Journey,Project Oversight,UI Dev,updated,FALSE,Customizations
+COOP-104,COOP,Customizable Product Form & Purchasing,BE Dev,UI Dev,updated,FALSE,Customizations
+COOP-108,COOP,Scholarships,Uncategorized,UI Dev,new,FALSE,Customizations
+COOP-112,COOP,POS Scholarship Extension,Project Oversight,POS,updated,TRUE,Customizations
+COOP-143,COOP,Donations,Uncategorized,UI Dev,new,FALSE,Customizations
+IRIS-4,IRIS,Configurator,Uncategorized,UI Dev,new,FALSE,Customizations
+IRIS-82,IRIS,Environment Setup,Infrastructure,UI Dev,updated,FALSE,Project Oversight
+SRLK-36,SRLK,Bulk Image Uploader,BE Dev,UI Dev,updated,FALSE,Customizations
+SRLK-57,SRLK,Gift Card Integration,BE Dev,3rd Party Apps,updated,FALSE,Integrations

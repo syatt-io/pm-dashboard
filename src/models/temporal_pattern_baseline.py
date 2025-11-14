@@ -21,24 +21,26 @@ class TemporalPatternBaseline(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     timeline_start_pct = Column(Integer, nullable=False)  # 0, 10, 20, ..., 90
-    timeline_end_pct = Column(Integer, nullable=False)    # 10, 20, 30, ..., 100
-    team = Column(String(50), nullable=False)             # FE Devs, BE Devs, etc.
-    work_pct = Column(Float, nullable=False)              # % of team's total work in this interval
-    sample_size = Column(Integer, nullable=False)         # How many projects contributed
+    timeline_end_pct = Column(Integer, nullable=False)  # 10, 20, 30, ..., 100
+    team = Column(String(50), nullable=False)  # FE Devs, BE Devs, etc.
+    work_pct = Column(Float, nullable=False)  # % of team's total work in this interval
+    sample_size = Column(Integer, nullable=False)  # How many projects contributed
     last_updated = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
-        nullable=False
+        nullable=False,
     )
 
     # Indexes defined in migration
     __table_args__ = (
-        Index('ix_temporal_pattern_timeline', 'timeline_start_pct', 'timeline_end_pct'),
-        Index('ix_temporal_pattern_team', 'team'),
+        Index("ix_temporal_pattern_timeline", "timeline_start_pct", "timeline_end_pct"),
+        Index("ix_temporal_pattern_team", "team"),
         Index(
-            'ix_temporal_pattern_unique',
-            'timeline_start_pct', 'timeline_end_pct', 'team',
-            unique=True
+            "ix_temporal_pattern_unique",
+            "timeline_start_pct",
+            "timeline_end_pct",
+            "team",
+            unique=True,
         ),
     )
 

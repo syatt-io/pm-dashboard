@@ -718,7 +718,10 @@ class TodoScheduler:
                             # 3. Are watching at least one project (JOIN with user_watched_projects)
                             opted_in_users = (
                                 db_session.query(User)
-                                .join(UserWatchedProject, User.id == UserWatchedProject.user_id)
+                                .join(
+                                    UserWatchedProject,
+                                    User.id == UserWatchedProject.user_id,
+                                )
                                 .filter(
                                     User.notify_project_hours_forecast == True,
                                     User.slack_user_id.isnot(None),
@@ -740,12 +743,15 @@ class TodoScheduler:
                             for user in opted_in_users:
                                 try:
                                     # Get user's watched project keys
-                                    watched_project_keys = {wp.project_key for wp in user.watched_projects}
+                                    watched_project_keys = {
+                                        wp.project_key for wp in user.watched_projects
+                                    }
 
                                     # Filter project_summary to only include user's watched projects
                                     user_projects = [
-                                        proj for proj in project_summary
-                                        if proj['key'] in watched_project_keys
+                                        proj
+                                        for proj in project_summary
+                                        if proj["key"] in watched_project_keys
                                     ]
 
                                     # Skip if user has no relevant projects in this summary (edge case)
@@ -756,7 +762,9 @@ class TodoScheduler:
                                         continue
 
                                     # Build personalized summary
-                                    personalized_body = f"✅ *Tempo Hours Sync Completed*\n\n"
+                                    personalized_body = (
+                                        f"✅ *Tempo Hours Sync Completed*\n\n"
+                                    )
                                     personalized_body += f"• Projects Updated: {stats['projects_updated']}\n"
                                     personalized_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
                                     personalized_body += f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
@@ -775,7 +783,9 @@ class TodoScheduler:
                                         else:
                                             # No forecast - just show actual hours
                                             personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
-                                            personalized_body += f"  • (No forecast set)\n"
+                                            personalized_body += (
+                                                f"  • (No forecast set)\n"
+                                            )
 
                                     await self.notifier._send_slack_dm(
                                         slack_user_id=user.slack_user_id,

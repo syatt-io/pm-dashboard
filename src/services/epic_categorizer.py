@@ -53,7 +53,9 @@ class EpicCategorizer:
                 category_names.append("Uncategorized")
 
             self._valid_categories = category_names
-            logger.info(f"Loaded {len(category_names)} valid categories from database: {category_names}")
+            logger.info(
+                f"Loaded {len(category_names)} valid categories from database: {category_names}"
+            )
 
             return category_names
 
@@ -116,13 +118,17 @@ class EpicCategorizer:
         # Exact match (case-insensitive)
         for category in valid_categories:
             if category.lower() == summary_lower:
-                logger.info(f"Fuzzy matched '{epic_summary}' to '{category}' (exact match)")
+                logger.info(
+                    f"Fuzzy matched '{epic_summary}' to '{category}' (exact match)"
+                )
                 return category
 
         # Check if summary contains full category name
         for category in valid_categories:
             if category.lower() in summary_lower:
-                logger.info(f"Fuzzy matched '{epic_summary}' to '{category}' (contains match)")
+                logger.info(
+                    f"Fuzzy matched '{epic_summary}' to '{category}' (contains match)"
+                )
                 return category
 
         # No fuzzy match found
@@ -207,10 +213,13 @@ class EpicCategorizer:
         }
 
         # Build prompt with categories from database
-        categories_list = "\n".join([
-            f"- {cat}: {category_descriptions.get(cat, 'General category')}"
-            for cat in valid_categories if cat != "Uncategorized"
-        ])
+        categories_list = "\n".join(
+            [
+                f"- {cat}: {category_descriptions.get(cat, 'General category')}"
+                for cat in valid_categories
+                if cat != "Uncategorized"
+            ]
+        )
 
         system_prompt = f"""You are an expert at categorizing software development epics for e-commerce and web development projects.
 
@@ -299,12 +308,14 @@ Example responses:
             # Remove common prefixes
             for prefix in ["Category: ", "Answer: ", "Result: "]:
                 if category.startswith(prefix):
-                    category = category[len(prefix):].strip()
+                    category = category[len(prefix) :].strip()
 
             # Check if extracted category is valid
             if category in valid_categories:
                 if category != raw_response:
-                    logger.info(f"AI returned verbose response, extracted category: {category}")
+                    logger.info(
+                        f"AI returned verbose response, extracted category: {category}"
+                    )
                 else:
                     logger.info(f"AI categorized epic as: {category}")
                 return category
@@ -312,7 +323,9 @@ Example responses:
             # Try to find any valid category mentioned in the response
             for valid_cat in valid_categories:
                 if valid_cat in raw_response:
-                    logger.info(f"AI returned invalid format, but found valid category '{valid_cat}' in response")
+                    logger.info(
+                        f"AI returned invalid format, but found valid category '{valid_cat}' in response"
+                    )
                     return valid_cat
 
             # No valid category found

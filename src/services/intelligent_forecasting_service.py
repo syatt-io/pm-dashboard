@@ -639,18 +639,49 @@ IMPORTANT:
             logger.info(f"AI response received ({len(response_text)} characters)")
             logger.info(f"Raw AI response (first 500 chars): {response_text[:500]}...")
 
-            # Parse AI response
-            # Remove markdown code blocks if present
-            response_text = response_text.strip()
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
+            # Parse AI response with robust JSON extraction
             response_text = response_text.strip()
 
-            ai_forecast = json.loads(response_text)
+            # Try to extract JSON from markdown code blocks
+            if "```json" in response_text:
+                # Extract content between ```json and ```
+                start = response_text.find("```json") + 7
+                end = response_text.find("```", start)
+                if end > start:
+                    response_text = response_text[start:end].strip()
+            elif response_text.startswith("```"):
+                # Generic code block
+                response_text = response_text[3:]
+                if response_text.endswith("```"):
+                    response_text = response_text[:-3]
+                response_text = response_text.strip()
+
+            # Log cleaned response for debugging
+            logger.info(f"Cleaned response (first 500 chars): {response_text[:500]}...")
+
+            try:
+                ai_forecast = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing failed at position {e.pos}: {e.msg}")
+                logger.error(
+                    f"Response around error position: ...{response_text[max(0, e.pos-100):min(len(response_text), e.pos+100)]}..."
+                )
+
+                # Try to fix common JSON issues
+                # 1. Try to find and extract just the JSON object
+                import re
+
+                json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+                if json_match:
+                    potential_json = json_match.group(0)
+                    try:
+                        ai_forecast = json.loads(potential_json)
+                        logger.warning("Successfully extracted JSON after regex fix")
+                    except json.JSONDecodeError:
+                        logger.error("Regex extraction also failed")
+                        raise
+                else:
+                    raise
 
             logger.info(f"\nAI forecast parsed successfully:")
             logger.info(

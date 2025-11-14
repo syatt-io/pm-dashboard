@@ -52,7 +52,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def get_unique_epics(session: Session, project_key: str = None) -> List[Tuple[str, str, str]]:
+def get_unique_epics(
+    session: Session, project_key: str = None
+) -> List[Tuple[str, str, str]]:
     """Get list of unique epics from epic_hours table.
 
     Args:
@@ -210,9 +212,9 @@ def recategorize_epics(
             categorizer._save_mapping(epic_key, new_category)
 
             # Also update epic_hours table
-            session.query(EpicHours).filter(
-                EpicHours.epic_key == epic_key
-            ).update({"epic_category": new_category}, synchronize_session=False)
+            session.query(EpicHours).filter(EpicHours.epic_key == epic_key).update(
+                {"epic_category": new_category}, synchronize_session=False
+            )
             session.commit()
 
         # Progress update
@@ -227,7 +229,9 @@ def recategorize_epics(
     print(f"Fuzzy matches (no AI call): {fuzzy_matches}")
     print(f"AI categorizations: {ai_categorizations}")
     print(f"No change needed: {no_change}")
-    print(f"New categorizations: {len([c for c in changes if c['change_type'] == 'new'])}")
+    print(
+        f"New categorizations: {len([c for c in changes if c['change_type'] == 'new'])}"
+    )
     print(
         f"Updated categorizations: {len([c for c in changes if c['change_type'] == 'updated'])}"
     )
@@ -237,7 +241,9 @@ def recategorize_epics(
     if save_preview and changes:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         csv_path = Path(f"recategorization_preview_{timestamp}.csv")
-        save_preview_to_csv([c for c in changes if c["change_type"] != "no_change"], csv_path)
+        save_preview_to_csv(
+            [c for c in changes if c["change_type"] != "no_change"], csv_path
+        )
 
     # Show sample changes
     if changes:
@@ -301,7 +307,9 @@ def main():
     )
 
     if args.dry_run:
-        print("\n✅ Dry run complete. Review the preview CSV and re-run without --dry-run to apply changes.")
+        print(
+            "\n✅ Dry run complete. Review the preview CSV and re-run without --dry-run to apply changes."
+        )
     else:
         print("\n✅ Re-categorization complete!")
 

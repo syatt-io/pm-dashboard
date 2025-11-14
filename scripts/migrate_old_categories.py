@@ -20,6 +20,7 @@ from typing import Dict
 
 # Add parent directory to path for imports
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.utils.database import get_session
@@ -28,8 +29,7 @@ from src.models.epic_category_mapping import EpicCategoryMapping
 from sqlalchemy import func
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -43,13 +43,11 @@ CATEGORY_MIGRATION_MAP: Dict[str, str] = {
     "Design": "Design",  # Keep as is
     "UX": "UX",  # Keep as is
     "PM": "Project Oversight",  # Explicit PM work
-
     # Handle any other legacy values
     "Frontend": "UI Dev",
     "Backend": "Project Oversight",
     "Testing": "Project Oversight",
     "Infrastructure": "Project Oversight",
-
     # Keep current valid categories as-is
     "Project Oversight": "Project Oversight",
     "UI Dev": "UI Dev",
@@ -75,8 +73,7 @@ def get_category_statistics(session) -> Dict[str, int]:
     """
     results = (
         session.query(
-            EpicHours.epic_category,
-            func.count(func.distinct(EpicHours.epic_key))
+            EpicHours.epic_category, func.count(func.distinct(EpicHours.epic_key))
         )
         .group_by(EpicHours.epic_category)
         .order_by(EpicHours.epic_category)
@@ -109,7 +106,9 @@ def migrate_categories(dry_run: bool = True):
     migrations_needed = []
     for old_cat, count in stats_before.items():
         if old_cat and old_cat not in CATEGORY_MIGRATION_MAP:
-            logger.warning(f"Unknown category '{old_cat}' not in migration map! Will treat as 'Uncategorized'")
+            logger.warning(
+                f"Unknown category '{old_cat}' not in migration map! Will treat as 'Uncategorized'"
+            )
             migrations_needed.append((old_cat, "Uncategorized", count))
         elif old_cat and CATEGORY_MIGRATION_MAP.get(old_cat) != old_cat:
             new_cat = CATEGORY_MIGRATION_MAP[old_cat]
@@ -196,7 +195,7 @@ def main():
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Preview changes without saving to database"
+        help="Preview changes without saving to database",
     )
 
     args = parser.parse_args()
@@ -213,7 +212,9 @@ def main():
     migrate_categories(dry_run=args.dry_run)
 
     if args.dry_run:
-        print("\n✅ Dry run complete. Review the changes above and re-run without --dry-run to apply.")
+        print(
+            "\n✅ Dry run complete. Review the changes above and re-run without --dry-run to apply."
+        )
     else:
         print("\n✅ Migration complete!")
 
