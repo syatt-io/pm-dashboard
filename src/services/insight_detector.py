@@ -841,10 +841,15 @@ class InsightDetector:
             return []
 
 
-def detect_insights_for_all_users() -> Dict[str, Any]:
+def detect_insights_for_all_users(db: Optional[Session] = None) -> Dict[str, Any]:
     """Detect insights for all active users.
 
     This is the main entry point for the scheduled job.
+
+    Args:
+        db: Optional database session to use. If not provided, creates a new one.
+            IMPORTANT: When called from Celery tasks, always pass the tracker's session
+            to avoid duplicate sessions and potential hangs.
 
     Returns:
         Dictionary with detection statistics
@@ -856,7 +861,11 @@ def detect_insights_for_all_users() -> Dict[str, Any]:
         "errors": [],
     }
 
-    db = next(get_db())
+    # Use provided session or create new one
+    should_close_db = False
+    if db is None:
+        db = next(get_db())
+        should_close_db = True
 
     try:
         # Get all active users with watched projects
@@ -887,6 +896,8 @@ def detect_insights_for_all_users() -> Dict[str, Any]:
         logger.error(f"Error in insight detection job: {e}", exc_info=True)
         stats["errors"].append(str(e))
     finally:
-        db.close()
+        # Only close if we created the session
+        if should_close_db:
+            db.close()
 
     return stats

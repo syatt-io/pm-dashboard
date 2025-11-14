@@ -1290,6 +1290,9 @@ def detect_proactive_insights(self):
     Scheduled to run every 4 hours during work hours (8am, 12pm, 4pm EST).
 
     Migrated from Python scheduler to Celery Beat for better reliability.
+
+    IMPORTANT: Uses a single database session shared between the tracker and
+    insight detection to prevent duplicate sessions and potential hangs.
     """
     from src.services.job_execution_tracker import track_celery_task
     from src.utils.database import get_db
@@ -1304,7 +1307,8 @@ def detect_proactive_insights(self):
             from src.managers.notifications import NotificationManager
             from config.settings import settings
 
-            stats = detect_insights_for_all_users()
+            # Pass db session to avoid duplicate sessions (prevents hangs)
+            stats = detect_insights_for_all_users(db=db)
             logger.info(f"✅ Insight detection complete: {stats}")
 
             # Send Slack notification if insights detected
