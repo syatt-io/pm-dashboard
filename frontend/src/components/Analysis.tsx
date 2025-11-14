@@ -64,11 +64,13 @@ const CreateJiraTicketDialog = ({
   open,
   onClose,
   item,
+  meetingTitle,
   onSuccess
 }: {
   open: boolean;
   onClose: () => void;
   item: any;
+  meetingTitle?: string;
   onSuccess: () => void;
 }) => {
   const [assignees, setAssignees] = useState<any[]>([]);
@@ -101,6 +103,86 @@ const CreateJiraTicketDialog = ({
       loadIssueTypes(selectedProject);
     }
   }, [selectedProject]);
+
+  // Auto-select project based on meeting title when dialog opens
+  useEffect(() => {
+    if (open && meetingTitle && projects.length > 0) {
+      determineProjectFromMeeting(meetingTitle).then(projectKey => {
+        if (projectKey) {
+          console.log(`[INFO] Auto-selected project: ${projectKey} based on meeting title: "${meetingTitle}"`);
+          setSelectedProject(projectKey);
+        }
+      });
+    }
+  }, [open, meetingTitle, projects]);
+
+  // Function to determine Jira project from meeting title using resource mappings
+  const determineProjectFromMeeting = async (meetingTitle: string): Promise<string | null> => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) return null;
+
+      // Step 1: Match meeting title against project keywords (already loaded in projects state)
+      const titleLower = meetingTitle.toLowerCase();
+      let matchedProjectKey = null;
+      let bestMatchLength = 0;
+
+      const KEYWORD_BLACKLIST = ['syatt'];
+
+      const matchesKeyword = (text: string, keyword: string): boolean => {
+        const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+        return pattern.test(text);
+      };
+
+      for (const project of projects) {
+        if (project.is_active !== true) continue;
+
+        if (project.keywords && Array.isArray(project.keywords)) {
+          for (const keyword of project.keywords) {
+            const keywordLower = keyword.toLowerCase();
+
+            if (KEYWORD_BLACKLIST.includes(keywordLower)) {
+              continue;
+            }
+
+            if (matchesKeyword(titleLower, keywordLower)) {
+              if (keywordLower.length > bestMatchLength) {
+                bestMatchLength = keywordLower.length;
+                matchedProjectKey = project.key;
+              }
+            }
+          }
+        }
+      }
+
+      if (!matchedProjectKey) return null;
+
+      // Step 2: Get resource mappings to find the correct Jira project key
+      const mappingsResponse = await fetch(`${API_BASE_URL}/api/project-resource-mappings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!mappingsResponse.ok) return matchedProjectKey;
+
+      const mappingsData = await mappingsResponse.json();
+      const mappings = mappingsData.mappings || [];
+
+      const mapping = mappings.find((m: any) => m.project_key === matchedProjectKey);
+
+      if (mapping && mapping.jira_project_keys && mapping.jira_project_keys.length > 0) {
+        return mapping.jira_project_keys[0];
+      }
+
+      return matchedProjectKey;
+    } catch (error) {
+      console.error('Error determining project from meeting:', error);
+      return null;
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -191,7 +273,7 @@ const CreateJiraTicketDialog = ({
         priority: item.priority || 'Medium'
       };
 
-      const response = await fetch(`${API_BASE_URL}/api/process`, {
+      const response = await fetch(`${API_BASE_URL}/api/jira/tickets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -541,6 +623,7 @@ const ActionItemsList = ({ actionItems, meetingTitle }: { actionItems: any[]; me
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         item={selectedItem}
+        meetingTitle={meetingTitle}
         onSuccess={handleDialogSuccess}
       />
     </>

@@ -414,6 +414,11 @@ if limiter:
     limiter.exempt(historical_import_bp)
     logger.info("✅ Historical Import endpoints exempted from rate limiting")
 
+# ✅ SECURITY: Exempt Meetings endpoints from CSRF protection
+# Meetings endpoints are called from React frontend with JWT auth
+csrf.exempt(meetings_bp)
+logger.info("✅ Meetings endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)

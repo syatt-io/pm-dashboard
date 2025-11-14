@@ -1153,3 +1153,65 @@ def update_project_forecasts(project_key):
     except Exception as e:
         logger.error(f"Error updating forecasts for project {project_key}: {e}")
         return error_response(str(e), status_code=500)
+
+
+@jira_bp.route("/tickets", methods=["POST"])
+async def create_jira_ticket():
+    """Create a single Jira ticket from meeting action item.
+
+    Expected JSON payload:
+    {
+        "title": "Ticket summary",
+        "description": "Ticket description",
+        "project": "PROJECT_KEY",
+        "issueType": "Task",
+        "priority": "Medium",
+        "assignee": "user@example.com" (optional)
+    }
+    """
+    try:
+        data = request.json
+
+        # Validate required fields
+        if not data.get('title'):
+            return error_response("Title is required", status_code=400)
+        if not data.get('project'):
+            return error_response("Project is required", status_code=400)
+        if not data.get('issueType'):
+            return error_response("Issue type is required", status_code=400)
+
+        # Create Jira ticket object
+        from src.integrations.jira_mcp import JiraTicket
+
+        ticket = JiraTicket(
+            summary=data['title'],
+            description=data.get('description', ''),
+            project_key=data['project'],
+            issue_type=data['issueType'],
+            priority=data.get('priority', 'Medium'),
+            assignee=data.get('assignee')
+        )
+
+        # Initialize Jira client and create the ticket
+        async with JiraMCPClient(
+            jira_url=settings.jira.url,
+            username=settings.jira.username,
+            api_token=settings.jira.api_token
+        ) as jira_client:
+            result = await jira_client.create_ticket(ticket)
+
+        logger.info(f"Created Jira ticket: {result.get('key')} for '{data['title']}'")
+
+        return success_response(
+            data={
+                "ticket_key": result.get('key'),
+                "ticket_url": f"{settings.jira.url}/browse/{result.get('key')}"
+            },
+            message=f"Successfully created ticket {result.get('key')}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error creating Jira ticket: {e}")
+        import traceback
+        traceback.print_exc()
+        return error_response(str(e), status_code=500)
