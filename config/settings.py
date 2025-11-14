@@ -268,7 +268,7 @@ class Settings:
 
         if provider == "openai":
             api_key = os.getenv("OPENAI_API_KEY")
-            model = os.getenv("OPENAI_MODEL", "gpt-4")
+            model = os.getenv("OPENAI_MODEL", "gpt-5")
         elif provider == "anthropic":
             api_key = os.getenv("ANTHROPIC_API_KEY")
             model = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")
