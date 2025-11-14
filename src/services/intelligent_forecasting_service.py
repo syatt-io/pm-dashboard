@@ -847,10 +847,14 @@ IMPORTANT:
                 team_hours, estimated_months, lifecycle, team, start_date
             )
 
+            # Recalculate total_hours to match the sum of monthly_breakdown after proration
+            # This ensures consistency between team totals and monthly distribution
+            actual_total_hours = sum(month["hours"] for month in monthly_breakdown)
+
             teams_data.append(
                 {
                     "team": team,
-                    "total_hours": round(team_hours, 2),
+                    "total_hours": round(actual_total_hours, 2),
                     "percentage": round(allocation.get("percentage", 0), 2),
                     "monthly_breakdown": monthly_breakdown,
                     "reasoning": allocation.get("reasoning", ""),
