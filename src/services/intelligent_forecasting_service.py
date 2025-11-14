@@ -847,9 +847,25 @@ IMPORTANT:
                 team_hours, estimated_months, lifecycle, team, start_date
             )
 
-            # Recalculate total_hours to match the sum of monthly_breakdown after proration
-            # This ensures consistency between team totals and monthly distribution
+            # FINAL VALIDATION: Ensure monthly breakdown maintains AI allocation
+            # This is the last line of defense against pattern normalization issues
             actual_total_hours = sum(month["hours"] for month in monthly_breakdown)
+            expected_hours = team_hours
+
+            if abs(actual_total_hours - expected_hours) > 0.01:
+                logger.warning(
+                    f"{team}: Monthly breakdown sum ({actual_total_hours:.2f}h) != "
+                    f"AI allocation ({expected_hours:.2f}h). Scaling to match allocation."
+                )
+                scale_factor = (
+                    expected_hours / actual_total_hours
+                    if actual_total_hours > 0
+                    else 1.0
+                )
+                for month in monthly_breakdown:
+                    month["hours"] = round(month["hours"] * scale_factor, 2)
+                actual_total_hours = sum(month["hours"] for month in monthly_breakdown)
+                logger.info(f"{team}: After scaling, total = {actual_total_hours:.2f}h")
 
             teams_data.append(
                 {

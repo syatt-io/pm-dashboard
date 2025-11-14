@@ -212,9 +212,35 @@ def aggregate_patterns(
             }
         )
 
-    logger.info(f"Created {len(baselines)} baseline patterns")
+    logger.info(f"Created {len(baselines)} baseline patterns (before normalization)")
 
-    return baselines
+    # CRITICAL: Normalize each team's patterns to sum to 100%
+    # Without this, patterns can sum to >100% causing budget loss when distributing hours
+    baselines_by_team = defaultdict(list)
+    for baseline in baselines:
+        baselines_by_team[baseline["team"]].append(baseline)
+
+    normalized_baselines = []
+    for team, team_baselines in baselines_by_team.items():
+        # Calculate current total
+        total = sum(b["work_pct"] for b in team_baselines)
+
+        logger.info(f"  {team}: patterns sum to {total:.2f}% (normalizing to 100%)")
+
+        # Normalize to 100%
+        if total > 0:
+            for baseline in team_baselines:
+                original_pct = baseline["work_pct"]
+                normalized_pct = (baseline["work_pct"] / total) * 100.0
+                baseline["work_pct"] = round(normalized_pct, 2)
+
+        normalized_baselines.extend(team_baselines)
+
+    logger.info(
+        f"Normalized {len(normalized_baselines)} baseline patterns to maintain 100% budget"
+    )
+
+    return normalized_baselines
 
 
 def display_pattern_summary(baselines: List[Dict]):

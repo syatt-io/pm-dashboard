@@ -382,15 +382,17 @@ class ForecastingService:
                 pass
 
         # Use learned temporal patterns from historical data
-        # NOTE: Proration disabled to maintain full project budget
-        # Mid-month starts should extend timeline, not reduce total hours
+        # Proration handles mid-month starts correctly:
+        # - Reduces first month hours for partial month
+        # - Redistributes those hours to remaining months
+        # - Normalization ensures total budget is maintained
         distributions = self.temporal_pattern_service.distribute_hours_by_month(
             total_hours=total_hours,
             team=team_name,
             duration_months=num_months,
             start_date=start_date_obj,
-            prorate_first_month=False,  # Disabled: maintain full budget
-            prorate_last_month=False,  # Disabled: maintain full budget
+            prorate_first_month=True,  # Re-enabled with normalization fix
+            prorate_last_month=True,  # Re-enabled with normalization fix
         )
 
         # Transform to expected format with phase labels
