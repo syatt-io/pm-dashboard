@@ -44,13 +44,15 @@ class TempoWorklog(Base):
     # Metadata
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     __table_args__ = (
-        Index('ix_tempo_project_date', 'project_key', 'start_date'),
-        Index('ix_tempo_epic_date', 'epic_key', 'start_date'),
-        Index('ix_tempo_team_date', 'team', 'start_date'),
-        Index('ix_tempo_account_team', 'account_id', 'team'),
+        Index("ix_tempo_project_date", "project_key", "start_date"),
+        Index("ix_tempo_epic_date", "epic_key", "start_date"),
+        Index("ix_tempo_team_date", "team", "start_date"),
+        Index("ix_tempo_account_team", "account_id", "team"),
     )
 
     def __repr__(self):
