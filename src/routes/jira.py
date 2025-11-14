@@ -1156,7 +1156,7 @@ def update_project_forecasts(project_key):
 
 
 @jira_bp.route("/tickets", methods=["POST"])
-async def create_jira_ticket():
+def create_jira_ticket():
     """Create a single Jira ticket from meeting action item.
 
     Expected JSON payload:
@@ -1193,12 +1193,15 @@ async def create_jira_ticket():
         )
 
         # Initialize Jira client and create the ticket
-        async with JiraMCPClient(
-            jira_url=settings.jira.url,
-            username=settings.jira.username,
-            api_token=settings.jira.api_token,
-        ) as jira_client:
-            result = await jira_client.create_ticket(ticket)
+        async def create_ticket_async():
+            async with JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token,
+            ) as jira_client:
+                return await jira_client.create_ticket(ticket)
+
+        result = asyncio.run(create_ticket_async())
 
         logger.info(f"Created Jira ticket: {result.get('key')} for '{data['title']}'")
 
