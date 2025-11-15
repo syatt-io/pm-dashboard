@@ -163,15 +163,21 @@ class JobExecutionTracker:
         # Use provided result_data or stored result_data
         final_result = result_data or self._result_data
 
-        completed_at = datetime.now(timezone.utc)
-        duration = int((completed_at - self.execution.started_at).total_seconds())
-
-        self.execution.status = "success"
-        self.execution.completed_at = completed_at
-        self.execution.duration_seconds = duration
-        self.execution.result_data = final_result
-
         try:
+            # Refresh execution object to reattach it to the session
+            # This is critical when the job creates its own database sessions
+            # (e.g., TodoScheduler, run_tempo_sync) which can cause the
+            # tracker's execution object to become detached
+            self.db_session.refresh(self.execution)
+
+            completed_at = datetime.now(timezone.utc)
+            duration = int((completed_at - self.execution.started_at).total_seconds())
+
+            self.execution.status = "success"
+            self.execution.completed_at = completed_at
+            self.execution.duration_seconds = duration
+            self.execution.result_data = final_result
+
             # Verify session is still active before committing
             if not self.db_session.is_active:
                 logger.error(
@@ -221,17 +227,21 @@ class JobExecutionTracker:
             )
             return
 
-        completed_at = datetime.now(timezone.utc)
-        duration = int((completed_at - self.execution.started_at).total_seconds())
-
-        self.execution.status = "failed"
-        self.execution.completed_at = completed_at
-        self.execution.duration_seconds = duration
-        self.execution.error_message = str(error)
-        self.execution.error_traceback = traceback.format_exc()
-        self.execution.retry_count = retry_count
-
         try:
+            # Refresh execution object to reattach it to the session
+            # This is critical when the job creates its own database sessions
+            self.db_session.refresh(self.execution)
+
+            completed_at = datetime.now(timezone.utc)
+            duration = int((completed_at - self.execution.started_at).total_seconds())
+
+            self.execution.status = "failed"
+            self.execution.completed_at = completed_at
+            self.execution.duration_seconds = duration
+            self.execution.error_message = str(error)
+            self.execution.error_traceback = traceback.format_exc()
+            self.execution.retry_count = retry_count
+
             # Verify session is still active
             if not self.db_session.is_active:
                 logger.error(
