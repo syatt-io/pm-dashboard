@@ -380,8 +380,11 @@ class TempoAPIClient:
                 )
             else:
                 logger.warning(
-                    f"Could not get project ID for {project_key}, fetching all worklogs"
+                    f"Could not get project ID for {project_key}, skipping project (likely inactive or invalid)"
                 )
+                # Return empty list instead of fetching ALL worklogs (which is extremely slow)
+                # If project ID can't be found, the project is likely inactive or doesn't exist
+                return []
 
         all_worklogs = []
 
