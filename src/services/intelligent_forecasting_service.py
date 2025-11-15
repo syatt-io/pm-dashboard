@@ -690,6 +690,13 @@ IMPORTANT:
 """
 
         try:
+            # DEBUG: Log historical context to verify what AI sees
+            logger.info(f"\n{'='*80}")
+            logger.info(f"DEBUG: Historical Context Sent to AI")
+            logger.info(f"{'='*80}")
+            logger.info(f"\n{historical_context[:2000]}...")  # First 2000 chars
+            logger.info(f"{'='*80}\n")
+
             # Call LLM based on configured provider
             logger.info(
                 f"\nCalling AI ({settings.ai.provider}) for forecast analysis..."
