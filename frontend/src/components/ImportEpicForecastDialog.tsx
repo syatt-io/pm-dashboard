@@ -477,6 +477,33 @@ const ImportEpicForecastDialog: React.FC<ImportEpicForecastDialogProps> = ({
           (v) => v
         ).length;
 
+        // Build detailed import items list
+        const importItems = [
+          // Matched epics that will be updated
+          ...editedMappings.flatMap((mapping) =>
+            mapping.matched_epics.map((epic) => ({
+              epic_key: epic.epic_key,
+              epic_summary: epic.epic_summary,
+              hours: epic.allocated_hours,
+              source: mapping.forecast_epic,
+              action: 'update' as const,
+            }))
+          ),
+          // Placeholder epics that will be created
+          ...Object.entries(placeholderChoices)
+            .filter(([_, create]) => create)
+            .map(([epic, _]) => {
+              const forecastEpic = forecastEpics.find((e) => e.epic === epic);
+              return {
+                epic_key: `${selectedProject?.key}-FORECAST-?`,
+                epic_summary: epic,
+                hours: forecastEpic?.total_hours || 0,
+                source: epic,
+                action: 'create_placeholder' as const,
+              };
+            }),
+        ];
+
         return (
           <Box>
             <Alert severity="info" sx={{ mb: 2 }}>
@@ -494,6 +521,51 @@ const ImportEpicForecastDialog: React.FC<ImportEpicForecastDialogProps> = ({
                 Total hours to import: <strong>{totalHours.toFixed(1)}h</strong>
               </Typography>
             </Alert>
+
+            {/* Detailed breakdown table */}
+            <TableContainer component={Paper} sx={{ mb: 2 }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Epic</TableCell>
+                    <TableCell>Hours</TableCell>
+                    <TableCell>Source Category</TableCell>
+                    <TableCell>Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {importItems.map((item, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {item.epic_key}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {item.epic_summary}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="medium">
+                          {item.hours.toFixed(1)}h
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">
+                          {item.source}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={item.action === 'update' ? 'Update' : 'Create Placeholder'}
+                          color={item.action === 'update' ? 'primary' : 'default'}
+                          size="small"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
             <Typography variant="body2" color="text.secondary">
               Ready to import forecast epics into project{' '}
