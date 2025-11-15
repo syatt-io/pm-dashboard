@@ -89,15 +89,15 @@ class IntelligentForecastingService:
                 "Using HARDCODED epic ranges in AI prompt (no learned data available)"
             )
             return """Common epic categories for web application projects:
-- **Project Oversight** (10-20%): Planning, meetings, stakeholder management, project coordination
-- **FE Dev** (30-45%): Frontend implementation, React/Vue components, UI development
-- **BE Dev** (15-30%): Backend APIs, database design, business logic, server-side code
-- **Design** (8-15%): Visual design, mockups, style guides, UI/UX design work
-- **UX** (3-8%): User research, usability testing, user flows, personas
-- **Infrastructure** (3-8%): DevOps, deployment pipelines, hosting setup, CI/CD
-- **Authentication** (5-10%): Login systems, user management, permissions, security
-- **Search** (3-8%): Search functionality, filters, indexing (if applicable)
-- **Cart/Checkout** (5-12%): E-commerce features, payment integration (if applicable)"""
+- **Project Oversight**: Planning, meetings, stakeholder management, project coordination
+- **FE Dev**: Frontend implementation, React/Vue components, UI development
+- **BE Dev**: Backend APIs, database design, business logic, server-side code
+- **Design**: Visual design, mockups, style guides, UI/UX design work
+- **UX**: User research, usability testing, user flows, personas
+- **Infrastructure**: DevOps, deployment pipelines, hosting setup, CI/CD
+- **Authentication**: Login systems, user management, permissions, security
+- **Search**: Search functionality, filters, indexing (if applicable)
+- **Cart/Checkout**: E-commerce features, payment integration (if applicable)"""
 
     def generate_intelligent_forecast(
         self,
@@ -520,7 +520,7 @@ The characteristic scales above describe WHAT work is involved. To determine HOW
 3. **ADJUST proportionally** - if new project has higher/lower characteristics, scale allocations accordingly
 4. **TRUST THE DATA** - historical patterns reflect this company's actual efficiency and work distribution
 
-Example: If historical projects with custom_designs=3 allocated 8% to Design, and the new project also has custom_designs=3, allocate approximately 8% to Design (not more, not less, unless other factors differ significantly).
+Example: If historical projects with custom_designs=3 allocated X% to Design, and the new project also has custom_designs=3, allocate approximately X% to Design (scaling proportionally if other characteristics differ significantly).
 
 # New Project Details
 
@@ -562,23 +562,21 @@ manually distribute hours across months. The system will handle temporal distrib
 
 ⚠️ **PRIMARY DIRECTIVE**: The new project's characteristics are MORE IMPORTANT than historical patterns!
 
-1. **ADJUST FOR CHARACTERISTIC DIFFERENCES**:
-   - If new project has be_integrations=1 but similar projects have 4-5:
-     → REDUCE BE Dev allocation by 70-90% from their pattern (NOT just 20-30%!)
-   - If new project has custom_designs=5 but similar projects have 2-3:
-     → INCREASE Design allocation by 100-150% from their pattern
+1. **USE HISTORICAL PATTERNS AS BASELINE**:
+   - Start with the actual allocation percentages from the most similar historical projects
+   - If projects with matching characteristics exist, use their allocations directly
+   - Projects are ordered by similarity score - prioritize learning from highest-scoring matches
 
-2. **MAGNITUDE OF ADJUSTMENTS**:
-   - 1-point difference: Adjust by 20-40%
-   - 2-point difference: Adjust by 50-80%
-   - 3-point difference: Adjust by 80-120%
-   - 4-point difference: Adjust by 150-200%
+2. **ADJUST PROPORTIONALLY FOR CHARACTERISTIC DIFFERENCES**:
+   - When new project characteristics differ from similar projects, scale allocations proportionally
+   - Consider the magnitude of characteristic differences (1-point vs 4-point gap)
+   - Be guided by the relative intensity of characteristics, not arbitrary multipliers
+   - Example: If similar projects have be_integrations=4 and THIS project has be_integrations=1 (minimal), allocate proportionally less to BE Devs
 
-3. **DO NOT SIMPLY AVERAGE** historical projects:
-   - Historical patterns are STARTING POINTS, not final answers
-   - The specific characteristics of THIS project must drive your predictions
-   - Example: If all historical projects allocated 30% to BE Devs but THIS project has be_integrations=1,
-     you MUST predict ~5-10% BE Devs, NOT 25-30%!
+3. **CROSS-REFERENCE MULTIPLE SIMILAR PROJECTS**:
+   - Don't rely on a single project - analyze patterns across all provided similar projects
+   - Look for consistency in allocation patterns
+   - If allocations vary widely, weight towards projects with higher similarity scores
 
 4. **CONFIDENCE SCORING**:
    - High confidence (0.8-1.0): Similar projects with matching characteristics exist
