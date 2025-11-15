@@ -24,6 +24,11 @@ import {
   Checkbox,
   Collapse,
   Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Chip,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -35,8 +40,10 @@ import {
   CloudDownload as ImportIcon,
   Info as InfoIcon,
   TrendingUp as TrendingUpIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
+import { epicBudgetsApi } from '../api/epicBudgets';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL ||
   (window.location.hostname === 'localhost'
@@ -55,6 +62,9 @@ interface EpicBudget {
   pct_complete: number;
   actuals_by_month: { [month: string]: number };
   is_budgeted: boolean;
+  is_placeholder?: boolean;
+  imported_at?: string | null;
+  import_source?: string | null;
 }
 
 interface ProjectBudgetActualsProps {
@@ -78,6 +88,13 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     open: false,
     message: ''
   });
+
+  // Link placeholder to Jira epic dialog state
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [selectedPlaceholder, setSelectedPlaceholder] = useState<EpicBudget | null>(null);
+  const [jiraEpicKey, setJiraEpicKey] = useState('');
+  const [jiraEpicSummary, setJiraEpicSummary] = useState('');
+  const [linkingPlaceholder, setLinkingPlaceholder] = useState(false);
 
   // Group budgets by category
   const groupedBudgets = useMemo(() => {
@@ -353,6 +370,43 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     } catch (err: any) {
       console.error('Error deleting budget:', err);
       alert(err.response?.data?.error || 'Failed to delete budget');
+    }
+  };
+
+  const handleOpenLinkDialog = (budget: EpicBudget) => {
+    setSelectedPlaceholder(budget);
+    setJiraEpicKey('');
+    setJiraEpicSummary('');
+    setLinkDialogOpen(true);
+  };
+
+  const handleLinkToJira = async () => {
+    if (!selectedPlaceholder) return;
+
+    if (!jiraEpicKey.trim()) {
+      alert('Please enter a Jira epic key');
+      return;
+    }
+
+    try {
+      setLinkingPlaceholder(true);
+
+      await epicBudgetsApi.linkPlaceholderToJira(selectedPlaceholder.id, {
+        jira_epic_key: jiraEpicKey.trim(),
+        jira_epic_summary: jiraEpicSummary.trim() || undefined,
+      });
+
+      // Success! Reload budgets
+      await loadBudgets();
+      setLinkDialogOpen(false);
+      setSelectedPlaceholder(null);
+      setJiraEpicKey('');
+      setJiraEpicSummary('');
+    } catch (err: any) {
+      console.error('Error linking placeholder to Jira epic:', err);
+      alert(err.message || 'Failed to link placeholder to Jira epic');
+    } finally {
+      setLinkingPlaceholder(false);
     }
   };
 
@@ -898,6 +952,17 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                               </Typography>
                             </Tooltip>
                           )}
+                          {budget.is_placeholder && (
+                            <Tooltip title={`Forecasted epic imported on ${budget.imported_at ? new Date(budget.imported_at).toLocaleDateString() : 'unknown date'}. Link to a real Jira epic when created.`}>
+                              <Chip
+                                label="Forecasted"
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                                sx={{ fontSize: '0.65rem', height: 20 }}
+                              />
+                            </Tooltip>
+                          )}
                         </Box>
                       </TableCell>
                       <TableCell>
@@ -986,6 +1051,17 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
                         </Typography>
                       </TableCell>
                       <TableCell>
+                        {budget.is_placeholder && (
+                          <Tooltip title="Link to real Jira epic">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenLinkDialog(budget)}
+                              color="primary"
+                            >
+                              <LinkIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         <Tooltip title="Delete epic budget">
                           <IconButton
                             size="small"
@@ -1198,6 +1274,62 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
           {successSnackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Link Placeholder to Jira Dialog */}
+      <Dialog
+        open={linkDialogOpen}
+        onClose={() => !linkingPlaceholder && setLinkDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Link Forecast Epic to Jira</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Link the forecasted epic <strong>{selectedPlaceholder?.epic_key}</strong> to
+              an existing Jira epic. This will replace the placeholder key with the real
+              Jira epic key.
+            </Typography>
+
+            <TextField
+              label="Jira Epic Key"
+              placeholder="e.g., SUBS-123"
+              value={jiraEpicKey}
+              onChange={(e) => setJiraEpicKey(e.target.value)}
+              fullWidth
+              required
+              sx={{ mb: 2 }}
+              disabled={linkingPlaceholder}
+            />
+
+            <TextField
+              label="Epic Summary (optional)"
+              placeholder="Brief description of the epic"
+              value={jiraEpicSummary}
+              onChange={(e) => setJiraEpicSummary(e.target.value)}
+              fullWidth
+              multiline
+              rows={2}
+              disabled={linkingPlaceholder}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setLinkDialogOpen(false)}
+            disabled={linkingPlaceholder}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleLinkToJira}
+            variant="contained"
+            disabled={linkingPlaceholder || !jiraEpicKey.trim()}
+          >
+            {linkingPlaceholder ? <CircularProgress size={24} /> : 'Link Epic'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 };

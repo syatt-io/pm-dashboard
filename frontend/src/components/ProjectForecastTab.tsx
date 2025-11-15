@@ -33,8 +33,9 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
-import { Download } from '@mui/icons-material';
+import { Download, Upload } from '@mui/icons-material';
 import axios from 'axios';
+import ImportEpicForecastDialog from './ImportEpicForecastDialog';
 import {
   BarChart,
   Bar,
@@ -115,6 +116,9 @@ const ProjectForecastTab: React.FC = () => {
   const [teamForecast, setTeamForecast] = useState<ForecastResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Import dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState<boolean>(false);
 
 
   // Helper functions
@@ -649,6 +653,15 @@ const ProjectForecastTab: React.FC = () => {
                 <CardHeader
                   title="AI Epic Category Forecast"
                   subheader="AI-predicted distribution by epic category based on project characteristics"
+                  action={
+                    <Button
+                      variant="contained"
+                      startIcon={<Upload />}
+                      onClick={() => setImportDialogOpen(true)}
+                    >
+                      Import to Project
+                    </Button>
+                  }
                 />
                 <CardContent>
                   {/* Epic Allocation Summary Cards */}
@@ -730,6 +743,17 @@ const ProjectForecastTab: React.FC = () => {
           </Box>
         )}
       </Grid>
+
+      {/* Import Forecast Dialog */}
+      <ImportEpicForecastDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        forecastEpics={teamForecast?.epics || []}
+        onSuccess={() => {
+          // Show success message or redirect
+          alert('Forecast imported successfully!');
+        }}
+      />
     </Grid>
   );
 };
