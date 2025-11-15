@@ -782,8 +782,8 @@ IMPORTANT:
                 ai_total_hours = 0
                 ai_total_percentage = 0
                 for team, alloc in ai_forecast["team_allocations"].items():
-                    team_hours = alloc.get('total_hours', 0)
-                    team_pct = alloc.get('percentage', 0)
+                    team_hours = alloc.get("total_hours", 0)
+                    team_pct = alloc.get("percentage", 0)
                     ai_total_hours += team_hours
                     ai_total_percentage += team_pct
                     logger.info(f"    - {team}: {team_hours:.2f}h ({team_pct:.1f}%)")
@@ -791,7 +791,9 @@ IMPORTANT:
                 logger.info(f"\n  📊 Budget Validation:")
                 logger.info(f"    Requested Budget: {total_hours:.2f}h")
                 logger.info(f"    AI Total Hours:   {ai_total_hours:.2f}h")
-                logger.info(f"    Difference:       {ai_total_hours - total_hours:+.2f}h ({((ai_total_hours/total_hours - 1) * 100):+.1f}%)")
+                logger.info(
+                    f"    Difference:       {ai_total_hours - total_hours:+.2f}h ({((ai_total_hours/total_hours - 1) * 100):+.1f}%)"
+                )
                 logger.info(f"    Total Percentage: {ai_total_percentage:.1f}%")
 
                 if abs(ai_total_hours - total_hours) > 0.1:
@@ -949,7 +951,9 @@ IMPORTANT:
                 f"!= requested budget ({total_hours:.2f}h). "
                 f"Scaling all teams by {total_hours/actual_budget_total:.4f} to enforce budget."
             )
-            budget_scale_factor = total_hours / actual_budget_total if actual_budget_total > 0 else 1.0
+            budget_scale_factor = (
+                total_hours / actual_budget_total if actual_budget_total > 0 else 1.0
+            )
 
             for team_data in teams_data:
                 old_total = team_data["total_hours"]
@@ -960,7 +964,9 @@ IMPORTANT:
                     month["hours"] = round(month["hours"] * budget_scale_factor, 2)
 
                 # Recalculate percentage based on new total
-                team_data["percentage"] = round((team_data["total_hours"] / total_hours) * 100, 2)
+                team_data["percentage"] = round(
+                    (team_data["total_hours"] / total_hours) * 100, 2
+                )
 
                 logger.info(
                     f"  - {team_data['team']}: {old_total:.2f}h → {team_data['total_hours']:.2f}h "
