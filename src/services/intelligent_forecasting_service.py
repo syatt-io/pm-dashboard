@@ -372,8 +372,12 @@ class IntelligentForecastingService:
                 for category, hours in sorted(
                     project["epic_breakdown"].items(), key=lambda x: -x[1]
                 )[:5]:
-                    epic_percentage = (hours / epic_total * 100) if epic_total > 0 else 0
-                    context_lines.append(f"  - {category}: {hours}h ({epic_percentage:.1f}%)")
+                    epic_percentage = (
+                        (hours / epic_total * 100) if epic_total > 0 else 0
+                    )
+                    context_lines.append(
+                        f"  - {category}: {hours}h ({epic_percentage:.1f}%)"
+                    )
 
             # Monthly pattern (show first 3 months as example)
             if project["monthly_distribution"]:
