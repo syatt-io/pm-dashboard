@@ -131,28 +131,30 @@ class TempoSyncJob:
         finally:
             session.close()
 
-    def _get_all_time_hours_optimized(self, active_projects: list) -> Dict[str, float]:
+    def _get_ytd_hours_optimized(self, active_projects: list) -> Dict[str, float]:
         """
-        Get cumulative all-time hours for specific projects using server-side filtering.
+        Get year-to-date hours for specific projects using server-side filtering.
 
         This is optimized to query each project individually using Tempo API v4's
-        projectId parameter, reducing data transfer by ~98.8% compared to fetching
+        projectId parameter, reducing data transfer compared to fetching
         all worklogs and filtering client-side.
 
         Args:
             active_projects: List of project keys to fetch hours for
 
         Returns:
-            Dictionary mapping project keys to cumulative hours
+            Dictionary mapping project keys to YTD hours
         """
         from datetime import datetime
 
-        start_date = "2020-01-01"
-        today = datetime.now().strftime("%Y-%m-%d")
-        all_hours = {}
+        # Year-to-date: Jan 1 of current year to today
+        now = datetime.now()
+        start_date = now.replace(month=1, day=1).strftime("%Y-%m-%d")
+        today = now.strftime("%Y-%m-%d")
+        ytd_hours = {}
 
         logger.info(
-            f"Fetching all-time hours for {len(active_projects)} projects individually..."
+            f"Fetching YTD hours ({start_date} to {today}) for {len(active_projects)} projects individually..."
         )
 
         for idx, project_key in enumerate(active_projects, 1):
@@ -173,13 +175,13 @@ class TempoSyncJob:
 
                 # Store hours for this project (should only have one key)
                 if project_key in project_hours:
-                    all_hours[project_key] = project_hours[project_key]
+                    ytd_hours[project_key] = project_hours[project_key]
                     logger.info(
                         f"  ✅ {project_key}: {project_hours[project_key]:.2f}h ({len(worklogs)} worklogs)"
                     )
                 else:
                     # No worklogs for this project
-                    all_hours[project_key] = 0.0
+                    ytd_hours[project_key] = 0.0
                     logger.info(f"  ℹ️  {project_key}: 0.00h (no worklogs)")
 
             except Exception as e:
@@ -187,10 +189,10 @@ class TempoSyncJob:
                     f"  ❌ Error fetching hours for {project_key}: {e}", exc_info=True
                 )
                 # Continue with next project instead of failing entire sync
-                all_hours[project_key] = 0.0
+                ytd_hours[project_key] = 0.0
 
-        logger.info(f"Completed fetching hours for {len(all_hours)} projects")
-        return all_hours
+        logger.info(f"Completed fetching hours for {len(ytd_hours)} projects")
+        return ytd_hours
 
     def run(self) -> Dict:
         """
@@ -211,14 +213,13 @@ class TempoSyncJob:
             logger.info("Fetching current month hours from Tempo...")
             current_month_hours = self.tempo_client.get_current_month_hours()
 
-            # Fetch all-time hours per project using server-side filtering
+            # Fetch year-to-date hours per project using server-side filtering
             # OPTIMIZATION: Query each project individually instead of fetching ALL worklogs
-            # Previous: Fetched ~59,556 worklogs for all projects (took 53 minutes)
-            # Now: Fetches only worklogs per project using projectId filter (98.8% reduction)
+            # Uses Tempo API v4 projectId filter to reduce data transfer
             logger.info(
-                f"Fetching all-time hours from Tempo for {len(active_projects)} projects (optimized)..."
+                f"Fetching year-to-date hours from Tempo for {len(active_projects)} projects (optimized)..."
             )
-            cumulative_hours = self._get_all_time_hours_optimized(active_projects)
+            cumulative_hours = self._get_ytd_hours_optimized(active_projects)
 
             # Update database
             logger.info("Updating database...")
