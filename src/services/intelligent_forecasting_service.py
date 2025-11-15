@@ -368,10 +368,12 @@ class IntelligentForecastingService:
             # Epic breakdown
             if project["epic_breakdown"]:
                 context_lines.append("\n**Epic Categories**:")
+                epic_total = sum(project["epic_breakdown"].values())
                 for category, hours in sorted(
                     project["epic_breakdown"].items(), key=lambda x: -x[1]
                 )[:5]:
-                    context_lines.append(f"  - {category}: {hours}h")
+                    epic_percentage = (hours / epic_total * 100) if epic_total > 0 else 0
+                    context_lines.append(f"  - {category}: {hours}h ({epic_percentage:.1f}%)")
 
             # Monthly pattern (show first 3 months as example)
             if project["monthly_distribution"]:
@@ -589,15 +591,12 @@ In addition to team allocation, predict EPIC CATEGORY distribution based on proj
 
 {self._generate_epic_category_prompt_section()}
 
-Scale epic categories based on characteristics:
-- **High be_integrations (4-5)** → increase "BE Dev" epic to 25-35%
-- **Low be_integrations (1-2)** → reduce "BE Dev" epic to 8-15%
-- **High custom_designs (4-5)** → increase "Design" epic to 12-18%
-- **Low custom_designs (1-2)** → reduce "Design" epic to 4-8%
-- **High ux_research (4-5)** → increase "UX" epic to 8-12%
-- **Low ux_research (1-2)** → reduce "UX" epic to 2-4%
-- **High project_oversight (4-5)** → increase "Project Oversight" epic to 15-25%
-- **Low project_oversight (1-2)** → reduce "Project Oversight" epic to 8-12%
+**CRITICAL - Data-Driven Epic Allocation:**
+- Analyze the epic category percentages shown in the historical projects above
+- Look for patterns: which epic categories get more/less budget based on characteristics?
+- Scale epic allocations proportionally based on characteristic intensity (1-5 scale)
+- Example: If similar projects with custom_designs=3 allocated X% to "Design" epic, and the new project also has custom_designs=3, allocate approximately X% to "Design" epic
+- If new project has higher/lower characteristics, scale the epic allocation proportionally
 
 # Your Task
 
