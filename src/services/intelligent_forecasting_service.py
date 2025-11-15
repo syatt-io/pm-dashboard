@@ -473,34 +473,54 @@ class IntelligentForecastingService:
 
 # CHARACTERISTIC SCALE DEFINITIONS (CRITICAL - READ CAREFULLY!)
 
-The 1-5 scale represents the INTENSITY of each requirement. You MUST adjust allocations proportionally:
+The 1-5 scale represents the INTENSITY of each requirement. Use these definitions to understand project scope:
 
-**1 = MINIMAL/ALMOST NONE** → 0-10% of budget for affected team
-- BE Integrations 1/5 → Minimal backend → Allocate 3-10% to BE Devs (NOT 20-30%!)
-- Custom Designs 1/5 → Minimal design → Allocate 3-8% to Design (NOT 15-20%!)
-- UX Research 1/5 → Minimal UX → Allocate 1-5% to UX
+**1 = MINIMAL/ALMOST NONE**
+- BE Integrations 1/5: Minimal backend work (few or no third-party integrations)
+- Custom Designs 1/5: Minimal custom design (mostly standard templates/components)
+- UX Research 1/5: Minimal UX research (little to no user testing)
+- Custom Theme 1/5: Minimal theme customization
+- Extensive Customizations 1/5: Minimal custom features
 
-**2 = BELOW AVERAGE** → 40-60% of typical allocation
-- BE Integrations 2/5 → Light backend → Allocate 10-18% to BE Devs
-- Custom Designs 2/5 → Less design → Allocate 8-14% to Design
-- UX Research 2/5 → Light UX → Allocate 3-7% to UX
+**2 = BELOW AVERAGE**
+- BE Integrations 2/5: Light backend (1-2 simple integrations)
+- Custom Designs 2/5: Some custom design work (few custom screens)
+- UX Research 2/5: Light UX research (limited testing)
+- Custom Theme 2/5: Some theme customization
+- Extensive Customizations 2/5: Few custom features
 
-**3 = TYPICAL/STANDARD** → Use historical baseline percentages
-- BE Integrations 3/5 → Standard backend → Allocate 18-28% to BE Devs
-- Custom Designs 3/5 → Standard design → Allocate 12-20% to Design
-- UX Research 3/5 → Standard UX → Allocate 5-10% to UX
+**3 = TYPICAL/STANDARD** (most common baseline)
+- BE Integrations 3/5: Standard backend (2-3 standard integrations)
+- Custom Designs 3/5: Standard custom design work
+- UX Research 3/5: Standard UX research phase
+- Custom Theme 3/5: Standard theme customization
+- Extensive Customizations 3/5: Standard custom features
 
-**4 = ABOVE AVERAGE** → 140-180% of typical allocation
-- BE Integrations 4/5 → Heavy backend → Allocate 28-38% to BE Devs
-- Custom Designs 4/5 → Heavy design → Allocate 18-28% to Design
-- UX Research 4/5 → Heavy UX → Allocate 10-15% to UX
+**4 = ABOVE AVERAGE**
+- BE Integrations 4/5: Heavy backend (3-5 complex integrations)
+- Custom Designs 4/5: Heavy custom design (many custom screens)
+- UX Research 4/5: Extensive UX research and iteration
+- Custom Theme 4/5: Significant theme customization
+- Extensive Customizations 4/5: Many custom features
 
-**5 = EXTENSIVE/MAXIMUM** → 200-300%+ of typical allocation
-- BE Integrations 5/5 → Complex backend → Allocate 35-50%+ to BE Devs
-- Custom Designs 5/5 → Extensive design → Allocate 25-35%+ to Design
-- UX Research 5/5 → Extensive UX → Allocate 15-25%+ to UX
+**5 = EXTENSIVE/MAXIMUM** (highest complexity)
+- BE Integrations 5/5: Very complex backend (5+ integrations, complex workflows)
+- Custom Designs 5/5: Fully custom design system creation
+- UX Research 5/5: Comprehensive multi-phase UX research
+- Custom Theme 5/5: Complete custom theme development
+- Extensive Customizations 5/5: Highly custom solution
 
-⚠️  CRITICAL: These percentage ranges are MANDATORY. Do NOT use historical patterns blindly - ADJUST for characteristic differences!
+**Project Oversight**: Level of PM/oversight needed (1=minimal, 3=standard, 5=high-touch management)
+
+🎯 **CRITICAL - DATA-DRIVEN ALLOCATION APPROACH**:
+The characteristic scales above describe WHAT work is involved. To determine HOW MUCH budget to allocate:
+
+1. **ANALYZE the historical projects below** - they show ACTUAL allocations from similar completed projects
+2. **IDENTIFY patterns** - what % did similar projects allocate to each team?
+3. **ADJUST proportionally** - if new project has higher/lower characteristics, scale allocations accordingly
+4. **TRUST THE DATA** - historical patterns reflect this company's actual efficiency and work distribution
+
+Example: If historical projects with custom_designs=3 allocated 8% to Design, and the new project also has custom_designs=3, allocate approximately 8% to Design (not more, not less, unless other factors differ significantly).
 
 # New Project Details
 
@@ -510,10 +530,10 @@ The 1-5 scale represents the INTENSITY of each requirement. You MUST adjust allo
 **Teams Available**: {', '.join(teams_selected)}
 
 **NEW PROJECT CHARACTERISTICS:**
-- Backend Integrations: {project_characteristics.get('be_integrations', 3)}/5 → {"MINIMAL backend (expect 3-10% BE Devs)" if project_characteristics.get('be_integrations', 3) == 1 else "BELOW AVG backend (expect 10-20% BE Devs)" if project_characteristics.get('be_integrations', 3) == 2 else "TYPICAL backend (use baseline ~20-30% BE Devs)" if project_characteristics.get('be_integrations', 3) == 3 else "HEAVY backend (expect 30-40% BE Devs)" if project_characteristics.get('be_integrations', 3) == 4 else "EXTENSIVE backend (expect 40-50%+ BE Devs)"}
-- Custom Theme: {project_characteristics.get('custom_theme', 3)}/5 → {"MINIMAL theme work" if project_characteristics.get('custom_theme', 3) <= 2 else "TYPICAL theme work" if project_characteristics.get('custom_theme', 3) == 3 else "HEAVY theme work"}
-- Custom Designs: {project_characteristics.get('custom_designs', 3)}/5 → {"MINIMAL design needs" if project_characteristics.get('custom_designs', 3) <= 2 else "TYPICAL design needs" if project_characteristics.get('custom_designs', 3) == 3 else "EXTENSIVE design work"}
-- UX Research: {project_characteristics.get('ux_research', 3)}/5 → {"MINIMAL UX" if project_characteristics.get('ux_research', 3) <= 2 else "TYPICAL UX" if project_characteristics.get('ux_research', 3) == 3 else "HEAVY UX work"}
+- Backend Integrations: {project_characteristics.get('be_integrations', 3)}/5 → {"MINIMAL" if project_characteristics.get('be_integrations', 3) == 1 else "BELOW AVERAGE" if project_characteristics.get('be_integrations', 3) == 2 else "TYPICAL" if project_characteristics.get('be_integrations', 3) == 3 else "ABOVE AVERAGE" if project_characteristics.get('be_integrations', 3) == 4 else "EXTENSIVE"}
+- Custom Theme: {project_characteristics.get('custom_theme', 3)}/5 → {"MINIMAL" if project_characteristics.get('custom_theme', 3) <= 2 else "TYPICAL" if project_characteristics.get('custom_theme', 3) == 3 else "ABOVE AVERAGE" if project_characteristics.get('custom_theme', 3) == 4 else "EXTENSIVE"}
+- Custom Designs: {project_characteristics.get('custom_designs', 3)}/5 → {"MINIMAL" if project_characteristics.get('custom_designs', 3) <= 2 else "TYPICAL" if project_characteristics.get('custom_designs', 3) == 3 else "ABOVE AVERAGE" if project_characteristics.get('custom_designs', 3) == 4 else "EXTENSIVE"}
+- UX Research: {project_characteristics.get('ux_research', 3)}/5 → {"MINIMAL" if project_characteristics.get('ux_research', 3) <= 2 else "TYPICAL" if project_characteristics.get('ux_research', 3) == 3 else "ABOVE AVERAGE" if project_characteristics.get('ux_research', 3) == 4 else "EXTENSIVE"}
 - Extensive Customizations: {project_characteristics.get('extensive_customizations', 3)}/5
 - Project Oversight: {project_characteristics.get('project_oversight', 3)}/5
 
