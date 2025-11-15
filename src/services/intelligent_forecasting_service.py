@@ -473,27 +473,34 @@ class IntelligentForecastingService:
 
 # CHARACTERISTIC SCALE DEFINITIONS (CRITICAL - READ CAREFULLY!)
 
-The 1-5 scale represents the INTENSITY of each requirement:
+The 1-5 scale represents the INTENSITY of each requirement. You MUST adjust allocations proportionally:
 
-**1 = MINIMAL/ALMOST NONE**
-- Expect 0-10% allocation compared to typical projects
-- Example: BE Integrations 1/5 → Minimal backend work → 3-10% BE Devs (NOT 25-30%!)
+**1 = MINIMAL/ALMOST NONE** → 0-10% of budget for affected team
+- BE Integrations 1/5 → Minimal backend → Allocate 3-10% to BE Devs (NOT 20-30%!)
+- Custom Designs 1/5 → Minimal design → Allocate 3-8% to Design (NOT 15-20%!)
+- UX Research 1/5 → Minimal UX → Allocate 1-5% to UX
 
-**2 = BELOW AVERAGE**
-- Expect 40-60% of typical allocation
-- Example: Custom Designs 2/5 → Less design than usual → 4-8% Design
+**2 = BELOW AVERAGE** → 40-60% of typical allocation
+- BE Integrations 2/5 → Light backend → Allocate 10-18% to BE Devs
+- Custom Designs 2/5 → Less design → Allocate 8-14% to Design
+- UX Research 2/5 → Light UX → Allocate 3-7% to UX
 
-**3 = TYPICAL/STANDARD**
-- Use historical baseline averages
-- Example: Custom Theme 3/5 → Standard theme work → Use similar project patterns
+**3 = TYPICAL/STANDARD** → Use historical baseline percentages
+- BE Integrations 3/5 → Standard backend → Allocate 18-28% to BE Devs
+- Custom Designs 3/5 → Standard design → Allocate 12-20% to Design
+- UX Research 3/5 → Standard UX → Allocate 5-10% to UX
 
-**4 = ABOVE AVERAGE**
-- Expect 140-180% of typical allocation
-- Example: UX Research 4/5 → Heavy UX work → 8-12% UX
+**4 = ABOVE AVERAGE** → 140-180% of typical allocation
+- BE Integrations 4/5 → Heavy backend → Allocate 28-38% to BE Devs
+- Custom Designs 4/5 → Heavy design → Allocate 18-28% to Design
+- UX Research 4/5 → Heavy UX → Allocate 10-15% to UX
 
-**5 = EXTENSIVE/MAXIMUM**
-- Expect 200-300%+ of typical allocation
-- Example: BE Integrations 5/5 → Complex backend → 35-50% BE Devs
+**5 = EXTENSIVE/MAXIMUM** → 200-300%+ of typical allocation
+- BE Integrations 5/5 → Complex backend → Allocate 35-50%+ to BE Devs
+- Custom Designs 5/5 → Extensive design → Allocate 25-35%+ to Design
+- UX Research 5/5 → Extensive UX → Allocate 15-25%+ to UX
+
+⚠️  CRITICAL: These percentage ranges are MANDATORY. Do NOT use historical patterns blindly - ADJUST for characteristic differences!
 
 # New Project Details
 
@@ -617,12 +624,28 @@ Return your analysis as a JSON object with this exact structure:
   "overall_reasoning": "<comprehensive explanation noting that temporal distribution is automatically handled by learned patterns>"
 }}
 
+🚨 CRITICAL BUDGET CONSTRAINT 🚨
+**MANDATORY**: Team allocations MUST sum to EXACTLY {total_hours} hours!
+
+Before returning your JSON, you MUST:
+1. Calculate total_allocated = sum of all team_allocations.*.total_hours
+2. If total_allocated ≠ {total_hours}:
+   - Calculate scale_factor = {total_hours} / total_allocated
+   - Multiply EVERY team's total_hours by scale_factor
+   - Recalculate percentages to match scaled hours
+3. Verify: sum of all total_hours = {total_hours} (±0.1h tolerance)
+4. If verification fails, repeat step 2
+
+Your final JSON output MUST satisfy:
+sum(team_allocations["BE Devs"].total_hours + team_allocations["FE Devs"].total_hours + ...) = {total_hours}
+
 IMPORTANT:
 1. Return ONLY the JSON object, no additional text before or after.
 2. Do NOT include "monthly_distribution_pattern" - the system automatically applies learned temporal patterns.
 3. Focus on team and epic allocation percentages - the system handles monthly distribution.
 4. **CRITICAL**: Keep ALL reasoning strings SHORT (max 100 characters) and use ONLY plain text - no quotes, newlines, or special characters that could break JSON parsing.
 5. Use simple, concise explanations in reasoning fields.
+6. **BUDGET ENFORCEMENT**: Team total_hours MUST sum to exactly {total_hours} - validate before returning!
 """
 
         try:
@@ -726,21 +749,44 @@ IMPORTANT:
                     else:
                         raise
 
-            logger.info(f"\nAI forecast parsed successfully:")
+            logger.info(f"\n{'='*60}")
+            logger.info(f"AI FORECAST RAW OUTPUT - Budget Validation Check")
+            logger.info(f"{'='*60}")
             logger.info(
                 f"  Confidence score: {ai_forecast.get('confidence_score', 'N/A')}"
             )
             logger.info(
                 f"  Overall reasoning: {ai_forecast.get('overall_reasoning', '')[:200]}..."
             )
+
             if "team_allocations" in ai_forecast:
-                logger.info(f"  Team allocations:")
+                logger.info(f"\n  Team Allocations (Raw AI Output):")
+                ai_total_hours = 0
+                ai_total_percentage = 0
                 for team, alloc in ai_forecast["team_allocations"].items():
-                    logger.info(f"    - {team}: {alloc.get('percentage', 0):.1f}%")
+                    team_hours = alloc.get('total_hours', 0)
+                    team_pct = alloc.get('percentage', 0)
+                    ai_total_hours += team_hours
+                    ai_total_percentage += team_pct
+                    logger.info(f"    - {team}: {team_hours:.2f}h ({team_pct:.1f}%)")
+
+                logger.info(f"\n  📊 Budget Validation:")
+                logger.info(f"    Requested Budget: {total_hours:.2f}h")
+                logger.info(f"    AI Total Hours:   {ai_total_hours:.2f}h")
+                logger.info(f"    Difference:       {ai_total_hours - total_hours:+.2f}h ({((ai_total_hours/total_hours - 1) * 100):+.1f}%)")
+                logger.info(f"    Total Percentage: {ai_total_percentage:.1f}%")
+
+                if abs(ai_total_hours - total_hours) > 0.1:
+                    logger.warning(f"    ⚠️  AI VIOLATED BUDGET CONSTRAINT!")
+                else:
+                    logger.info(f"    ✅ Budget constraint satisfied")
+
             if "epic_allocations" in ai_forecast:
-                logger.info(f"  Epic allocations:")
+                logger.info(f"\n  Epic Allocations:")
                 for epic, alloc in ai_forecast["epic_allocations"].items():
                     logger.info(f"    - {epic}: {alloc.get('percentage', 0):.1f}%")
+
+            logger.info(f"{'='*60}\n")
 
             # Validate and structure the forecast
             structured_forecast = self._structure_ai_forecast(
@@ -774,7 +820,7 @@ IMPORTANT:
                 },
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.5,  # Balanced temperature for creative adjustments while maintaining structure
+            temperature=0.0,  # Deterministic - ensures consistent forecasts for same inputs
             max_tokens=2000,
         )
 
@@ -790,7 +836,7 @@ IMPORTANT:
         response = client.messages.create(
             model=settings.ai.model or "claude-3-5-sonnet-20241022",
             max_tokens=2000,
-            temperature=0.5,  # Balanced temperature for creative adjustments while maintaining structure
+            temperature=0.0,  # Deterministic - ensures consistent forecasts for same inputs
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -875,6 +921,43 @@ IMPORTANT:
                     "monthly_breakdown": monthly_breakdown,
                     "reasoning": allocation.get("reasoning", ""),
                 }
+            )
+
+        # 🚨 CRITICAL FIX: Enforce total budget constraint
+        actual_budget_total = sum(team["total_hours"] for team in teams_data)
+        if abs(actual_budget_total - total_hours) > 0.1:
+            logger.warning(
+                f"⚠️  BUDGET VIOLATION DETECTED: AI allocation sum ({actual_budget_total:.2f}h) "
+                f"!= requested budget ({total_hours:.2f}h). "
+                f"Scaling all teams by {total_hours/actual_budget_total:.4f} to enforce budget."
+            )
+            budget_scale_factor = total_hours / actual_budget_total if actual_budget_total > 0 else 1.0
+
+            for team_data in teams_data:
+                old_total = team_data["total_hours"]
+                team_data["total_hours"] = round(old_total * budget_scale_factor, 2)
+
+                # Also scale monthly breakdown
+                for month in team_data["monthly_breakdown"]:
+                    month["hours"] = round(month["hours"] * budget_scale_factor, 2)
+
+                # Recalculate percentage based on new total
+                team_data["percentage"] = round((team_data["total_hours"] / total_hours) * 100, 2)
+
+                logger.info(
+                    f"  - {team_data['team']}: {old_total:.2f}h → {team_data['total_hours']:.2f}h "
+                    f"({team_data['percentage']:.1f}%)"
+                )
+
+            # Verify final total
+            final_budget_total = sum(team["total_hours"] for team in teams_data)
+            logger.info(
+                f"✅ After budget enforcement: {final_budget_total:.2f}h "
+                f"(target: {total_hours:.2f}h, diff: {abs(final_budget_total - total_hours):.2f}h)"
+            )
+        else:
+            logger.info(
+                f"✅ Budget constraint satisfied: {actual_budget_total:.2f}h = {total_hours:.2f}h"
             )
 
         # Extract epic allocations from AI forecast
