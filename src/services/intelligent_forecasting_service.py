@@ -249,21 +249,19 @@ class IntelligentForecastingService:
             # Normalize to 0-1 range
             similarity_score = max(0, 1 - (distance_squared**0.5) / 9.8)
 
-            # Get team hours for this project
+            # Get team hours for this project (use ALL project hours, not filtered by forecast dates)
             team_hours = (
                 self.session.query(
                     EpicHours.team, func.sum(EpicHours.hours).label("total_hours")
                 )
                 .filter(
                     EpicHours.project_key == char.project_key,
-                    EpicHours.month >= config.forecasting_start_date,
-                    EpicHours.month <= config.forecasting_end_date,
                 )
                 .group_by(EpicHours.team)
                 .all()
             )
 
-            # Get monthly distribution for this project
+            # Get monthly distribution for this project (use ALL months)
             monthly_hours = (
                 self.session.query(
                     EpicHours.month,
@@ -272,23 +270,19 @@ class IntelligentForecastingService:
                 )
                 .filter(
                     EpicHours.project_key == char.project_key,
-                    EpicHours.month >= config.forecasting_start_date,
-                    EpicHours.month <= config.forecasting_end_date,
                 )
                 .group_by(EpicHours.month, EpicHours.team)
                 .order_by(EpicHours.month)
                 .all()
             )
 
-            # Get epic breakdown for this project
+            # Get epic breakdown for this project (use ALL epics)
             epic_breakdown = (
                 self.session.query(
                     EpicHours.epic_category, func.sum(EpicHours.hours).label("hours")
                 )
                 .filter(
                     EpicHours.project_key == char.project_key,
-                    EpicHours.month >= config.forecasting_start_date,
-                    EpicHours.month <= config.forecasting_end_date,
                     EpicHours.epic_category.isnot(None),
                 )
                 .group_by(EpicHours.epic_category)
@@ -296,6 +290,11 @@ class IntelligentForecastingService:
             )
 
             total_project_hours = sum(hours for _, hours in team_hours)
+
+            # Calculate actual project date range from monthly data
+            months = [month for month, _, _ in monthly_hours]
+            project_start = str(min(months)) if months else "N/A"
+            project_end = str(max(months)) if months else "N/A"
 
             similar_projects.append(
                 {
@@ -319,8 +318,8 @@ class IntelligentForecastingService:
                         category: round(hours, 2) for category, hours in epic_breakdown
                     },
                     "date_range": {
-                        "start": str(config.forecasting_start_date),
-                        "end": str(config.forecasting_end_date),
+                        "start": project_start,
+                        "end": project_end,
                     },
                 }
             )
