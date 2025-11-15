@@ -199,6 +199,14 @@ def get_jira_projects():
             logger.warning(f"Could not enhance projects with database data: {e}")
             enhanced_projects = jira_projects
 
+        # Filter by is_active if requested
+        is_active_param = request.args.get("is_active")
+        if is_active_param is not None:
+            is_active_bool = is_active_param.lower() in ["true", "1", "yes"]
+            enhanced_projects = [
+                p for p in enhanced_projects if p.get("is_active") == is_active_bool
+            ]
+
         return success_response(data={"projects": enhanced_projects})
     except Exception as e:
         logger.error(f"Error fetching Jira projects: {e}")

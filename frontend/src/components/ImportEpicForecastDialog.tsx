@@ -98,11 +98,11 @@ const ImportEpicForecastDialog: React.FC<ImportEpicForecastDialogProps> = ({
       setLoadingProjects(true);
       setError(null);
 
-      const response = await axios.get(`${API_BASE_URL}/api/projects`, {
+      const response = await axios.get(`${API_BASE_URL}/api/jira/projects`, {
         params: { is_active: true },
       });
 
-      setProjects(response.data.projects || []);
+      setProjects(response.data.data?.projects || []);
     } catch (err: any) {
       console.error('Error fetching projects:', err);
       setError(err.response?.data?.error || 'Failed to load active projects');
