@@ -286,6 +286,17 @@ celery_app.conf.beat_schedule = {
     #     'task': 'src.tasks.notification_tasks.celery_health_check',
     #     'schedule': crontab(minute=0)  # Every hour at :00
     # },
+    # ========== Cleanup Tasks ==========
+    # Cleanup stuck job executions - every 6 hours
+    "cleanup-stuck-jobs": {
+        "task": "src.tasks.cleanup_tasks.cleanup_stuck_job_executions",
+        "schedule": crontab(hour="*/6", minute=15),  # 12:15am, 6:15am, 12:15pm, 6:15pm
+    },
+    # Cleanup old job executions - weekly on Sundays at 2 AM EST (6:00 UTC)
+    "cleanup-old-jobs": {
+        "task": "src.tasks.cleanup_tasks.cleanup_old_job_executions",
+        "schedule": crontab(day_of_week=0, hour=6, minute=0),
+    },
 }
 
 # Register worker startup signal handler for missed task recovery

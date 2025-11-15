@@ -155,6 +155,17 @@ class JobExecutionTracker:
         self.execution.result_data = final_result
 
         try:
+            # Verify session is still active before committing
+            if not self.db_session.is_active:
+                logger.error(
+                    f"⚠️ Database session is not active for {self.job_name}. "
+                    f"Cannot commit job completion. Session may have been closed prematurely."
+                )
+                # Try to reconnect or raise error
+                raise Exception(
+                    f"Database session inactive - cannot record job completion for {self.job_name}"
+                )
+
             self.db_session.commit()
             logger.info(
                 f"✅ Job completed: {self.job_name} "
@@ -169,9 +180,12 @@ class JobExecutionTracker:
                 )
         except Exception as e:
             logger.error(
-                f"Failed to update job execution record for {self.job_name}: {e}"
+                f"❌ CRITICAL: Failed to commit job completion for {self.job_name}: {e}",
+                exc_info=True,
             )
             self.db_session.rollback()
+            # Re-raise to ensure the caller knows the commit failed
+            raise
 
     def fail(
         self,
@@ -201,6 +215,16 @@ class JobExecutionTracker:
         self.execution.retry_count = retry_count
 
         try:
+            # Verify session is still active
+            if not self.db_session.is_active:
+                logger.error(
+                    f"⚠️ Database session is not active for {self.job_name}. "
+                    f"Cannot commit job failure record."
+                )
+                raise Exception(
+                    f"Database session inactive - cannot record job failure for {self.job_name}"
+                )
+
             self.db_session.commit()
             logger.error(
                 f"❌ Job failed: {self.job_name} "
@@ -208,9 +232,12 @@ class JobExecutionTracker:
             )
         except Exception as e:
             logger.error(
-                f"Failed to update job execution record for {self.job_name}: {e}"
+                f"❌ CRITICAL: Failed to commit job failure for {self.job_name}: {e}",
+                exc_info=True,
             )
             self.db_session.rollback()
+            # Re-raise to ensure the caller knows the commit failed
+            raise
 
     def timeout(self) -> None:
         """Mark job execution as timed out.

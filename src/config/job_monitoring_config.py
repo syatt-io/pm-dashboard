@@ -275,6 +275,25 @@ JOBS: Dict[str, JobConfig] = {
         description="Auto-escalation of stale insights (12 AM EST)",
         alert_on_failure=False,  # Digest only
     ),
+    # ========================================================================
+    # 8. CLEANUP TASKS (2 Tasks) - LOW
+    # ========================================================================
+    "cleanup-stuck-jobs": JobConfig(
+        job_name="cleanup-stuck-jobs",
+        category="maintenance",
+        priority=LOW,
+        expected_duration_seconds=60,  # 1 minute
+        description="Cleanup job executions stuck in running state (every 6 hours)",
+        alert_on_failure=False,  # Digest only
+    ),
+    "cleanup-old-jobs": JobConfig(
+        job_name="cleanup-old-jobs",
+        category="maintenance",
+        priority=LOW,
+        expected_duration_seconds=120,  # 2 minutes
+        description="Delete old job execution records (weekly on Sundays)",
+        alert_on_failure=False,  # Digest only
+    ),
 }
 
 
