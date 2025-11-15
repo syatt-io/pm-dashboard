@@ -128,7 +128,6 @@ class InsightDetector:
         insights = []
 
         try:
-            from src.database import SessionLocal
             from sqlalchemy import text
 
             # Get project budget status from tempo_hours_log and projects
@@ -399,6 +398,11 @@ class InsightDetector:
 
         except Exception as e:
             logger.error(f"Error detecting hours anomaly for {project_key}: {e}")
+            # Rollback transaction if DB error occurred to prevent "InFailedSqlTransaction" errors
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return None
 
         return None
@@ -486,6 +490,11 @@ class InsightDetector:
 
         except Exception as e:
             logger.error(f"Error detecting velocity anomaly for {project_key}: {e}")
+            # Rollback transaction if DB error occurred to prevent "InFailedSqlTransaction" errors
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return None
 
         return None
@@ -589,6 +598,11 @@ class InsightDetector:
 
         except Exception as e:
             logger.error(f"Error detecting meeting anomaly for {project_key}: {e}")
+            # Rollback transaction if DB error occurred to prevent "InFailedSqlTransaction" errors
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return None
 
         return None
@@ -742,6 +756,11 @@ class InsightDetector:
 
         except Exception as e:
             logger.error(f"Error checking recent alerts: {e}")
+            # Rollback transaction if DB error occurred to prevent "InFailedSqlTransaction" errors
+            try:
+                self.db.rollback()
+            except Exception:
+                pass
             return False
 
     def store_insights(self, insights: List[ProactiveInsight]) -> int:
