@@ -716,8 +716,11 @@ class TodoScheduler:
                             # 1. Have notify_project_hours_forecast enabled
                             # 2. Have a Slack user ID configured
                             # 3. Are watching at least one project (JOIN with user_watched_projects)
+                            from sqlalchemy.orm import joinedload
+
                             opted_in_users = (
                                 db_session.query(User)
+                                .options(joinedload(User.watched_projects))  # Eagerly load watched_projects
                                 .join(
                                     UserWatchedProject,
                                     User.id == UserWatchedProject.user_id,
@@ -731,6 +734,7 @@ class TodoScheduler:
                             )
 
                             # Detach users from session to use them outside the context
+                            # NOTE: We eagerly loaded watched_projects above, so they'll be available after expunge
                             for user in opted_in_users:
                                 db_session.expunge(user)
 
