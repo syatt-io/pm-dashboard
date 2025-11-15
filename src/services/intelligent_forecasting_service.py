@@ -589,23 +589,43 @@ manually distribute hours across months. The system will handle temporal distrib
    - Medium confidence (0.5-0.7): Some adjustment needed from historical patterns
    - Low confidence (0.2-0.4): Significant differences, major adjustments required
 
+# CRITICAL: TEAM vs EPIC ALLOCATION DISTINCTION
+
+⚠️ **TEAMS** and **EPICS** are DIFFERENT concepts:
+
+**TEAM ALLOCATIONS** (Primary - use these percentages for team predictions):
+- Shows which PEOPLE work on the project (Design team, FE Devs team, BE Devs team, etc.)
+- A "Design" team member might work on various epic categories (UI Dev, Design, Customizations, etc.)
+- **Use "Team Hours Distribution" percentages from historical projects to predict team allocations**
+- Example: BEVS shows "Design: 53.5h (6.98%)" in Team Hours - use 6.98% for Design TEAM allocation
+
+**EPIC CATEGORY ALLOCATIONS** (Secondary - describes work breakdown):
+- Shows which TYPE OF WORK gets done (UI Dev epic, Design epic, Backend epic, etc.)
+- Multiple teams can work on the same epic (Design team + FE team both work on "UI Dev" epic)
+- **Use "Epic Categories" percentages to predict epic distribution, but DO NOT confuse with team allocations**
+- Example: BEVS shows "Design: 31h (4.05%)" in Epic Categories - this is just design-focused work, not total Design team allocation
+
+🎯 **YOUR TASK - TEAM ALLOCATIONS:**
+Predict team allocations by analyzing **"Team Hours Distribution"** percentages from historical projects.
+- If similar projects allocated 7% to Design TEAM, allocate ~7% to Design team (not 4% from Design epic!)
+- Scale based on characteristic differences
+- Prioritize TEAM percentages over EPIC percentages
+
 # EPIC CATEGORY ALLOCATION
 
 In addition to team allocation, predict EPIC CATEGORY distribution based on project characteristics.
 
 {self._generate_epic_category_prompt_section()}
 
-**CRITICAL - Data-Driven Epic Allocation:**
+**Data-Driven Epic Allocation:**
 - Analyze the epic category percentages shown in the historical projects above
-- Look for patterns: which epic categories get more/less budget based on characteristics?
-- Scale epic allocations proportionally based on characteristic intensity (1-5 scale)
-- Example: If similar projects with custom_designs=3 allocated X% to "Design" epic, and the new project also has custom_designs=3, allocate approximately X% to "Design" epic
-- If new project has higher/lower characteristics, scale the epic allocation proportionally
+- Look for patterns in "Epic Categories" section (NOT "Team Hours Distribution")
+- Scale epic allocations based on characteristic intensity
 
 # Your Task
 
 Analyze the historical projects above, then predict the optimal team allocation AND epic category allocation for the NEW project.
-REMEMBER: Adjust heavily based on the characteristic differences explained above!
+**CRITICAL**: For team allocations, learn from "Team Hours Distribution" percentages. For epic allocations, learn from "Epic Categories" percentages. These are DIFFERENT!
 
 Return your analysis as a JSON object with this exact structure:
 
