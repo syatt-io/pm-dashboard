@@ -753,16 +753,47 @@ class InsightDetector:
         Returns:
             Number of insights stored
         """
-        try:
-            for insight in insights:
-                self.db.add(insight)
+        if not insights:
+            logger.warning("No insights to store (empty list)")
+            return 0
 
+        try:
+            logger.info(f"Attempting to store {len(insights)} insights...")
+            stored_count = 0
+
+            for idx, insight in enumerate(insights):
+                try:
+                    logger.debug(
+                        f"Adding insight {idx+1}/{len(insights)}: "
+                        f"type={insight.insight_type}, "
+                        f"user_id={insight.user_id}, "
+                        f"project={insight.project_key}, "
+                        f"severity={insight.severity}"
+                    )
+                    self.db.add(insight)
+                    stored_count += 1
+                except Exception as insight_error:
+                    logger.error(
+                        f"Failed to add insight {idx+1}/{len(insights)}: "
+                        f"{insight.insight_type} for user {insight.user_id} - "
+                        f"Error: {insight_error}",
+                        exc_info=True
+                    )
+                    # Continue to next insight instead of failing all
+                    continue
+
+            # Commit all successfully added insights
             self.db.commit()
-            logger.info(f"Stored {len(insights)} insights")
-            return len(insights)
+            logger.info(f"✅ Successfully stored {stored_count}/{len(insights)} insights")
+            return stored_count
 
         except Exception as e:
-            logger.error(f"Error storing insights: {e}", exc_info=True)
+            logger.error(
+                f"❌ Error during insight storage commit: {e}\n"
+                f"Insights attempted: {len(insights)}\n"
+                f"First insight type: {insights[0].insight_type if insights else 'N/A'}",
+                exc_info=True
+            )
             self.db.rollback()
             return 0
 
@@ -826,22 +857,33 @@ def detect_insights_for_all_users(db: Optional[Session] = None) -> Dict[str, Any
     try:
         # Get all active users with watched projects
         users = db.query(User).filter(User.is_active == True).all()
+        logger.info(f"Processing insights for {len(users)} active users")
 
         for user in users:
             try:
+                logger.info(f"Processing user {user.id} ({user.email})...")
                 detector = InsightDetector(db)
                 insights = detector.detect_insights_for_user(user)
 
                 if insights:
+                    logger.info(f"Detected {len(insights)} insights for user {user.id}")
                     stored = detector.store_insights(insights)
                     stats["insights_detected"] += len(insights)
                     stats["insights_stored"] += stored
+
+                    if stored < len(insights):
+                        error_msg = f"Only {stored}/{len(insights)} insights stored for user {user.id}"
+                        logger.warning(error_msg)
+                        stats["errors"].append(error_msg)
+                else:
+                    logger.info(f"No insights detected for user {user.id}")
 
                 stats["users_processed"] += 1
 
             except Exception as e:
                 logger.error(
-                    f"Error detecting insights for user {user.id}: {e}", exc_info=True
+                    f"❌ Error detecting insights for user {user.id} ({user.email}): {e}",
+                    exc_info=True
                 )
                 stats["errors"].append(f"User {user.id}: {str(e)}")
                 # CRITICAL: Rollback transaction to prevent "InFailedSqlTransaction" errors
@@ -849,6 +891,7 @@ def detect_insights_for_all_users(db: Optional[Session] = None) -> Dict[str, Any
                 # subsequent operations will fail
                 try:
                     db.rollback()
+                    logger.info(f"Rolled back transaction for user {user.id}")
                 except Exception as rollback_error:
                     logger.error(f"Error rolling back transaction: {rollback_error}")
                 continue
