@@ -6,6 +6,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     DateTime,
+    Boolean,
     UniqueConstraint,
     Index,
 )
@@ -30,6 +31,11 @@ class EpicBudget(Base):
     epic_key = Column(String(50), nullable=False, index=True)
     epic_summary = Column(String(500))
     estimated_hours = Column(Numeric(10, 2), nullable=False)
+
+    # Import tracking (for AI forecast imports)
+    is_placeholder = Column(Boolean, default=False, nullable=False)
+    imported_at = Column(DateTime(timezone=True), nullable=True)
+    import_source = Column(String(50), nullable=True)  # 'ai_forecast', etc.
 
     # Metadata
     created_at = Column(
@@ -64,6 +70,9 @@ class EpicBudget(Base):
             "estimated_hours": (
                 float(self.estimated_hours) if self.estimated_hours else 0.0
             ),
+            "is_placeholder": self.is_placeholder,
+            "imported_at": self.imported_at.isoformat() if self.imported_at else None,
+            "import_source": self.import_source,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
