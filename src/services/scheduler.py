@@ -735,7 +735,11 @@ class TodoScheduler:
 
                             # Detach users from session to use them outside the context
                             # NOTE: We eagerly loaded watched_projects above, so they'll be available after expunge
+                            # CRITICAL: Access project_key on each watched_project to materialize it in memory BEFORE expunge
                             for user in opted_in_users:
+                                # Force-load all watched_project data by accessing their attributes
+                                for wp in user.watched_projects:
+                                    _ = wp.project_key  # Materialize project_key in memory
                                 db_session.expunge(user)
 
                         logger.info(
