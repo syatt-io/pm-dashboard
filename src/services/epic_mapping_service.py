@@ -2,8 +2,7 @@
 
 import json
 import logging
-from typing import Dict, List, Any
-from anthropic import Anthropic
+from typing import Dict, List, Any, Union
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -16,8 +15,28 @@ class EpicMappingService:
     """
 
     def __init__(self):
-        """Initialize the service with Anthropic client."""
-        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        """Initialize the service with configured AI provider."""
+        if not settings.ai:
+            raise ValueError(
+                "AI configuration not found. Please configure AI_PROVIDER and API key in environment."
+            )
+
+        self.provider = settings.ai.provider
+        self.model = settings.ai.model
+        self.api_key = settings.ai.api_key
+
+        # Initialize provider-specific client
+        if self.provider == "anthropic":
+            from anthropic import Anthropic
+            self.client = Anthropic(api_key=self.api_key)
+        elif self.provider == "openai":
+            from openai import OpenAI
+            self.client = OpenAI(api_key=self.api_key)
+        else:
+            raise ValueError(
+                f"Unsupported AI provider for epic mapping: {self.provider}. "
+                f"Supported providers: anthropic, openai"
+            )
 
     def suggest_mappings(
         self,
@@ -76,16 +95,27 @@ class EpicMappingService:
         )
 
         try:
-            # Call Claude AI
-            response = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=4000,
-                temperature=0.3,  # Lower temperature for more consistent mapping
-                messages=[{"role": "user", "content": prompt}],
-            )
+            # Call AI provider
+            if self.provider == "anthropic":
+                response = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4000,
+                    temperature=0.3,  # Lower temperature for more consistent mapping
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                response_text = response.content[0].text.strip()
+            elif self.provider == "openai":
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    max_tokens=4000,
+                    temperature=0.3,  # Lower temperature for more consistent mapping
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                response_text = response.choices[0].message.content.strip()
+            else:
+                raise ValueError(f"Unsupported provider: {self.provider}")
 
             # Extract JSON from response
-            response_text = response.content[0].text.strip()
 
             # Remove markdown code fences if present
             if response_text.startswith("```json"):
