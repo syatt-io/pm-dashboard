@@ -1652,8 +1652,8 @@ def celery_health_check():
         raise
 
 
-@shared_task(name="src.tasks.notification_tasks.send_job_monitoring_digest")
-def send_job_monitoring_digest():
+@shared_task(name="src.tasks.notification_tasks.send_job_monitoring_digest", bind=True)
+def send_job_monitoring_digest(self):
     """
     Send daily job monitoring digest via email and Slack (Celery task wrapper).
     Scheduled to run at 9 AM EST (13:00 UTC).
@@ -1667,17 +1667,18 @@ def send_job_monitoring_digest():
 
     This replaces individual job success notifications to prevent alert fatigue.
     """
+    from src.services.job_execution_tracker import track_celery_task
+    from src.utils.database import get_db
+    from src.services.job_monitoring_digest import JobMonitoringDigestService
+    from src.managers.notifications import NotificationManager
+    from config.settings import settings
+
+    logger.info("📊 Starting job monitoring digest task...")
+    db = next(get_db())
+
     try:
-        logger.info("📊 Starting job monitoring digest task...")
-        from src.utils.database import get_db
-        from src.services.job_monitoring_digest import JobMonitoringDigestService
-        from src.managers.notifications import NotificationManager
-        from config.settings import settings
-
-        # Get database session
-        db = next(get_db())
-
-        try:
+        tracker = track_celery_task(self, db, "job-monitoring-digest")
+        with tracker:
             # Generate digest
             digest_service = JobMonitoringDigestService(db)
             digest = digest_service.generate_daily_digest(hours_back=24)
@@ -1758,7 +1759,8 @@ def send_job_monitoring_digest():
 
             logger.info("✅ Job monitoring digest completed")
 
-            return {
+            # Set result data for tracker
+            result = {
                 "success": True,
                 "task": "job_monitoring_digest",
                 "executions_analyzed": digest["summary"]["total_executions"],
@@ -1766,10 +1768,10 @@ def send_job_monitoring_digest():
                 "failures": len(digest["failures"]),
                 "slow_jobs": len(digest["slow_jobs"]),
             }
-
-        finally:
-            db.close()
+            tracker.set_result(result)
 
     except Exception as e:
         logger.error(f"❌ Error in job monitoring digest task: {e}", exc_info=True)
         raise
+    finally:
+        db.close()

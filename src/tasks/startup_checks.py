@@ -146,7 +146,12 @@ def should_retry_task(task_name: str, minutes_since: int) -> bool:
         max_age = critical_tasks[task_name]
         return minutes_since <= max_age
 
-    # Don't retry notification tasks (not critical, will run on next schedule)
+    # Special case: job-monitoring-digest is critical (monitors all jobs)
+    # Retry if missed within last 2 hours
+    if task_name == "job-monitoring-digest":
+        return minutes_since <= 120
+
+    # Don't retry other notification tasks (not critical, will run on next schedule)
     if "reminder" in task_name.lower() or "digest" in task_name.lower():
         return False
 
