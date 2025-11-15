@@ -88,11 +88,28 @@ class JobExecutionTracker:
     def start(self) -> JobExecution:
         """Record job execution start.
 
-        Creates a new JobExecution record with status='running'.
+        Creates a new JobExecution record with status='running', or reuses
+        existing record if task_id already exists (for Celery retries).
 
         Returns:
-            JobExecution: The created execution record
+            JobExecution: The created or existing execution record
         """
+        # Check if execution already exists for this task_id (Celery retry case)
+        if self.task_id:
+            existing = (
+                self.db_session.query(JobExecution)
+                .filter(JobExecution.task_id == self.task_id)
+                .first()
+            )
+            if existing:
+                logger.info(
+                    f"Reusing existing job execution record for {self.job_name} "
+                    f"(task_id={self.task_id}, likely a retry)"
+                )
+                self.execution = existing
+                return self.execution
+
+        # Create new execution record
         self.execution = JobExecution(
             job_name=self.job_name,
             job_category=self.job_category,
