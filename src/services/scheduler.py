@@ -735,11 +735,13 @@ class TodoScheduler:
 
                             # Detach users from session to use them outside the context
                             # NOTE: We eagerly loaded watched_projects above, so they'll be available after expunge
-                            # CRITICAL: Access project_key on each watched_project to materialize it in memory BEFORE expunge
+                            # CRITICAL: Convert watched_projects to simple data structure BEFORE expunge
+                            # This avoids SQLAlchemy detached instance errors when accessing wp.project_key later
                             for user in opted_in_users:
-                                # Force-load all watched_project data by accessing their attributes
-                                for wp in user.watched_projects:
-                                    _ = wp.project_key  # Materialize project_key in memory
+                                # Store project_keys as a simple list of strings attached to user object
+                                user.watched_project_keys = [
+                                    wp.project_key for wp in user.watched_projects
+                                ]
                                 db_session.expunge(user)
 
                         logger.info(
@@ -750,10 +752,8 @@ class TodoScheduler:
                         async def send_dms():
                             for user in opted_in_users:
                                 try:
-                                    # Get user's watched project keys
-                                    watched_project_keys = {
-                                        wp.project_key for wp in user.watched_projects
-                                    }
+                                    # Get user's watched project keys (materialized before expunge)
+                                    watched_project_keys = set(user.watched_project_keys)
 
                                     # Filter project_summary to only include user's watched projects
                                     user_projects = [
