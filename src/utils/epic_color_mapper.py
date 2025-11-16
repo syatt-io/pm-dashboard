@@ -7,35 +7,27 @@ EPIC_COLOR_MAP = {
     "blue": "#0052CC",
     "bold blue": "#0747A6",
     "subtle blue": "#4C9AFF",
-
     # Teals
     "teal": "#00875A",
     "bold teal": "#006644",
     "subtle teal": "#79F2C0",
-
     # Greens
     "green": "#36B37E",
     "bold green": "#00875A",
-
     # Yellows
     "yellow": "#FFAB00",
-
     # Oranges
     "orange": "#FF8B00",
     "bold orange": "#FF5630",
-
     # Purples
     "purple": "#6554C0",
     "bold purple": "#403294",
-
     # Reds
     "red": "#DE350B",
     "subtle red": "#FFEBE6",
-
     # Grays
     "gray": "#97A0AF",
     "grey": "#97A0AF",
-
     # Default
     "": "#6554C0",  # Default to purple if not specified
     None: "#6554C0",

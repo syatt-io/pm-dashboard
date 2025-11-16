@@ -116,7 +116,11 @@ def parse_csv_and_seed(csv_path: str, clear_existing: bool = False):
 
 if __name__ == "__main__":
     # Default CSV path
-    csv_path = Path(__file__).parent.parent / "docs" / "Jira Ticket Import (SPCZ Suggestions) - New Build _ Wyatt (1).csv"
+    csv_path = (
+        Path(__file__).parent.parent
+        / "docs"
+        / "Jira Ticket Import (SPCZ Suggestions) - New Build _ Wyatt (1).csv"
+    )
 
     # Check if CSV exists
     if not csv_path.exists():

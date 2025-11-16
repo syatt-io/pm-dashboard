@@ -12,7 +12,9 @@ from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-jira_templates_bp = Blueprint("jira_templates", __name__, url_prefix="/api/jira-templates")
+jira_templates_bp = Blueprint(
+    "jira_templates", __name__, url_prefix="/api/jira-templates"
+)
 
 
 @jira_templates_bp.route("/epics", methods=["GET"])
@@ -259,9 +261,7 @@ def import_templates_to_project(user, project_key):
 
             except Exception as epic_error:
                 logger.error(f"Error creating epic '{epic.epic_name}': {epic_error}")
-                errors.append(
-                    {"epic_name": epic.epic_name, "error": str(epic_error)}
-                )
+                errors.append({"epic_name": epic.epic_name, "error": str(epic_error)})
 
         session.close()
 
