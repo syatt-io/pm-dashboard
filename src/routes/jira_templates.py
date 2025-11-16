@@ -4,7 +4,7 @@ import logging
 import asyncio
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
-from src.middleware.auth import auth_required
+from src.services.auth import auth_required
 from src.utils.database import get_session
 from src.models import TemplateEpic, TemplateTicket
 from src.integrations.jira_mcp import JiraMCPClient
