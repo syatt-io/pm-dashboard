@@ -1,0 +1,873 @@
+Epic Name,Epic Link,Issue Type,Summary,Description,Epic Color
+Project Oversight / Support,,Epic,Project Oversight / Support,,Subtle Blue
+Environment Setup,,Epic,Environment Setup,,Gray
+Launch Support,,Epic,Launch Support,,Yellow
+3rd Party Apps,,Epic,3rd Party Apps,,Subtle teal
+SEO,,Epic,SEO,,Bold purple
+Design,,Epic,Design,,Teal
+Globals,,Epic,Globals,,Green
+Header,,Epic,Header,,Blue
+Navigation,,Epic,Navigation,,Bold blue
+Footer,,Epic,Footer,,Subtle red
+Content Sections,,Epic,Content Sections,,Bold green
+Cart,,Epic,Cart,,Purple
+PLP / SRP,,Epic,PLP / SRP,,Orange
+Collection,,Epic,Collection,,Orange
+Search,,Epic,Search,,Bold orange
+PDP Image & Summary,,Epic,PDP Image & Summary,,Bold teal
+PDP Details,,Epic,PDP Details,,
+Upsells / Cross Sells,,Epic,Upsells / Cross Sells,,Teal
+Blog,,Epic,Blog,TODO: Add considerations for implementation team,Gray
+Reviews,,Epic,Reviews,TODO: Add considerations for implementation team,Gray
+Wishlist,,Epic,Wishlist,TODO: Add considerations for implementation team,Gray
+Store Locations,,Epic,Store Locations,TODO: Add considerations for implementation team,Gray
+Pages,,Epic,Pages,TODO: Add considerations for implementation team,Gray
+,Project Oversight / Support,Task,Project / Product Management,,
+,Project Oversight / Support,Task,Client Communication / Meetings,,
+,Project Oversight / Support,Task,Internal Meeting,,
+,Project Oversight / Support,Task,Technical Discovery / Research,,
+,Project Oversight / Support,Task,Code Reviews,,
+,Project Oversight / Support,Task,Kick Off,,
+,Project Oversight / Support,Task,Document Apps in Theme README,,
+,Project Oversight / Support,Task,Help & Mentoring,,
+,Project Oversight / Support,UI/UX,Visual QA / Support,,
+,Environment Setup,Task,Deployments,,
+,Environment Setup,Task,Set Up Github Repo,,
+,Environment Setup,Task,Set up Wyatt,,
+,Launch Support,Task,Cutover Plan,,
+,3rd Party Apps,Task,Install 3rd Party Apps,,
+,SEO,New Feature,Redirects,,
+,Design,UI/UX,Creative Discovery / Research,,
+,Design,UI/UX,Design System,,
+,Design,UI/UX,Design Header UI,,
+,Design,UI/UX,Design Footer UI,,
+,Design,UI/UX,Design Homepage Sections,,
+,Design,UI/UX,Design PDP,,
+,Design,UI/UX,Design PLP / Search Results,,
+,Design,UI/UX,Design Content Modal,,
+,Design,UI/UX,Design Cart,,
+,Globals,New/Change Feature,Design System | Branding,"Update theme styles to match the branding section of the figma design system.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+* Match design
+
+h3. Technical Details
+* Logo. Upload via editor & pull theme settings
+* Fonts
+* Colors
+* Spacing
+
+h3. Attachments",
+,Globals,New/Change Feature,Design System | Text Styles,"Update theme styles to match the text styles section of the figma design system.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+* Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Globals,New/Change Feature,Design System | Elements,"Update theme styles to match the elements section of the figma design system.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Buttons
+- Icons
+- Form elements
+- Remaining elements likely to be handled by other tickets
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | accordion,"Update HTML, CSS, and JS as needed for the `accordion` component. 
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | back-to-top,"Update HTML, CSS, and JS as needed for the `back-to-top` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | drawer,"Update HTML, CSS, and JS as needed for the `drawer` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | loading,"Update HTML, CSS, and JS as needed for the `loading` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | localization-form,"Update HTML, CSS, and JS as needed for the `localization-form` component. Consider removing (including theme settings) if not in use.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | modal,"Update HTML, CSS, and JS as needed for the `modal` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | page-content,"Update CSS for the `.page-content` component
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Confirm `vw` margins on `.content-wrapper` with designs
+- Look for any top/bottom padding present on majority of pages, and apply that to this component
+- Use `.template-[TEMPLATE-NAME]` classes on `html` element to add template specific CSS
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | slider,"Update HTML, CSS, and JS as needed for the `slider` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | tabs,"Update HTML, CSS, and JS as needed for the `tabs` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- If the component doesn't exist in design system, style based on an element somewhere else in the design
+- If there are no instances of component in designs, make best judgement based on the rest of the designs
+
+h3. Attachments",
+,Globals,New/Change Feature,Component | breadcrumbs,"Update HTML, CSS, and JS as needed for the `breadcrumbs` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Header,New/Change Feature,Layout | page-header,"Update HTML, CSS, and JS as needed for the `.page-header` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can upload logo
+- User can adjust logo size
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- This is essentially a layout ticket.
+- Does not include `search-form`, `utility-nav`, `primary-nav`, `mobile-nav` components (or any of their children)
+
+h3. Attachments",
+,Header,New/Change Feature,Component | utility-nav,"Update HTML, CSS, and JS as needed for the `.utility-nav` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Does not include `mini-cart`.
+
+h3. Attachments",
+,Header,New/Change Feature,Component | announcement-bar,"Update HTML, CSS, and JS as needed for the `.announcement-bar` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add multiple announcement content blocks. Each block:
+  - User can add, style, align, and link a plain text string
+- User can toggle slider UI for multiple announcements
+- User can adjust section vertical spacing & background
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Header,New/Change Feature,Component | search-form,"Update HTML, CSS, and JS as needed for the `.search-form` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Includes predictive search
+
+h3. Attachments",
+,Header,New/Change Feature,Component | primary-nav,"Update HTML, CSS, and JS as needed for the `.primary-nav` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can select a menu
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Does not include dropdowns.
+
+h3. Attachments",
+,Header,Bug,Internal UAT,Add all UAT notes below,
+,Navigation,New/Change Feature,Component | mega-menu,"Update HTML, CSS, and JS as needed for the `.mega-menu` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can select a menu and attach to a top level nav item
+- User can choose to populate mega menu with top level menu item children or select a separate menu
+- User can control number of columns for mega menu items
+- User can toggle mega menu full width
+- User can add content
+  - User can choose left or right placement
+  - User can add image, text, and link
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Navigation,New/Change Feature,Component | mobile-nav,"Update HTML, CSS, and JS as needed for the `.mobile-nav` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can choose which direction drawer slides in from
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Mobile nav uses same menus and content as primary nav
+
+h3. Attachments",
+,Navigation,Bug,Internal UAT,Add all UAT notes below,
+,Footer,New/Change Feature,Layout | page-footer,"Update HTML, CSS, and JS as needed for the `.page-footer` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- This is essentially a layout ticket.
+- Does not include `footer-email`, `footer-social`, `footer-menus`, `footer-utility` or their child components
+
+h3. Attachments",
+,Footer,New/Change Feature,Component | footer-menus,"Update HTML, CSS, and JS as needed for the `.footer-menus` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add multiple menus with heading text
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Footer,New/Change Feature,Component | footer-email,"Update HTML, CSS, and JS as needed for the `.footer-email` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add and align header content
+- User can add and align text content
+- User can adjust input placeholder text
+- User can adjust submit button text
+h4. Storefront
+- Match design
+- User can successfully submit their email
+- Success and error messages are displayed properly
+
+h3. Technical Details
+
+h3. Attachments",
+,Footer,New/Change Feature,Component | footer-social,"Update HTML, CSS, and JS as needed for the `.footer-social` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add URLs for social networks
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Footer,New/Change Feature,Component | footer-utility,"Update HTML, CSS, and JS as needed for the `.footer-utility` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can select a menu
+- User can toggle automatic display of policy system page
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Footer,Bug,Internal UAT,Add all UAT notes below,
+,Content Sections,New/Change Feature,Component | article-list,"Update HTML, CSS, and JS as needed for the `.article-list` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add and style Heading content
+- User can add and style Text content
+- User can add and style Buttons
+- User can adjust section vertical spacing & background
+- User can adjust layout columns
+- User can adjust whether layout is a slider or not
+- User can add and position any number of articles as section blocks
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | callout-list,"Update HTML, CSS, and JS as needed for the `.callout-list` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add and style Heading content
+- User can add and style Text content
+- User can add and style Buttons
+- User can adjust section vertical spacing & background
+- User can adjust layout columns
+- User can adjust whether layout is a slider or not
+- User can add and position any number of cards as section blocks. In each card:
+  - User can add and style rich text content
+  - User can add and style Buttons
+  - User can adjust padding & background styling
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | contact-form,"Update HTML, CSS, and JS as needed for the `.contact-form` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add Heading text
+- User can add rich text content
+- User can toggle input for phone number
+- User can adjust submit button text
+- User can adjust section vertical spacing & background
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | divider,"Update HTML, CSS, and JS as needed for the `.divider` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can adjust divider line thickness
+- User can adjust section vertical spacing & background
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | featured-collection,"Update HTML, CSS, and JS as needed for the `.featured-collection` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can select a collection
+- User can add accompanying content
+  - User can select a content background image
+  - User can add, style, and position Heading content block
+  - User can add, style, and position Text content block
+  - User can add, style and position Buttons block
+- User can adjust section vertical spacing & background
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | hero,"Update HTML, CSS, and JS as needed for the `.hero` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can select a height for the section
+- User can select a mobile & desktop image or a video
+  - Video can either be a file upload or a url (YouTube or Vimeo)
+- User can adjust section vertical spacing & background
+- User can add, style, and position Heading content block
+- User can add, style, and position Text content block
+- User can add, style and position Buttons block
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | list,"Update HTML, CSS, and JS as needed for the `.list` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add and style Heading content
+- User can add and style Text content
+- User can add and style Buttons
+- User can adjust section vertical spacing & background
+- User can adjust layout columns
+- User can adjust whether layout is a slider or not
+- User can add and position any number of list items as section blocks. In each list item:
+  - User can manually add:
+    - Image
+    - Text with alignment option
+    - Button with style and alignment option
+  - Or this content can populated from a collection, via a collection picker
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | media-with-text,"Update HTML, CSS, and JS as needed for the `.media-with-text` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can choose order media & text columns
+- User can choose relative width of columns
+- User can adjust section vertical spacing & background
+- User can choose an image or video
+- Video can be a file upload or url (YouTube or Vimeo)
+- User can control video playback settings
+- User can add and style Heading content
+- User can add and style Text content
+- User can add and style Buttons
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | product-list,"Update HTML, CSS, and JS as needed for the `.product-list` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add and style Heading content
+- User can add and style Text content
+- User can adjust section vertical spacing & background
+- User can select multiple product lists via section blocks. Each list:
+  - User can add a title
+  - User can choose number of columns in layout
+  - User can toggle a slider UI
+  - User can select products either manually or via a collection
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | recent-views,"Update HTML, CSS, and JS as needed for the `.recent-views` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can adjust section vertical spacing & background
+- User can add and style Heading content
+- User can choose number of columns in layout
+- User can choose max number of products to retrieve from customer's recent views
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | rich-text,"Update HTML, CSS, and JS as needed for the `.rich-text` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add and style multiple blocks of rich text content
+- User can add and style Buttons
+- User can adjust section vertical spacing & background
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,New/Change Feature,Component | video,"Update HTML, CSS, and JS as needed for the `.video` component. Remove from theme if not used and not styled.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can add and style Heading content
+- User can add and style Text content
+- User can add and style Buttons
+- User can choose an image or video
+- Video can be a file upload or url (YouTube or Vimeo)
+- User can add a thumbnail image for external videos
+- User can control video playback settings
+- User can adjust section vertical spacing & background
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Content Sections,Bug,Internal UAT,Add all UAT notes below,
+,Cart,New/Change Feature,Component | drawer,"Update HTML, CSS, and JS as needed for the cart drawer.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can choose which direction drawer slides in from
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Does not include `cart-items`, `cart-totals`, or `cart-checkout` components.
+
+h3. Attachments",
+,Cart,New/Change Feature,Component | cart-items,"Update HTML, CSS, and JS as needed for the `cart-items` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Make sure to account for all discounting logic and rendering. Connect with designer if these elements are not explicity designed
+
+h3. Attachments",
+,Cart,New/Change Feature,Component | cart-totals,"Update HTML, CSS, and JS as needed for the `cart-totals` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Make sure to account for all discounting logic and rendering. Connect with designer if these elements are not explicity designed
+
+h3. Attachments",
+,Cart,New/Change Feature,Component | cart-recommendations,"Update HTML, CSS, and JS as needed for the `cart-recommendations` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can manually curate products or select a collection
+h4. Storefront
+- Match design
+- Recommendations do not display any products that are already in user's cart
+
+h3. Technical Details
+
+h3. Attachments",
+,Cart,New/Change Feature,Component | cart-checkout,"Update HTML, CSS, and JS as needed for the `cart-checkout` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Cart,New/Change Feature,Component | cart,"Update HTML, CSS, and JS as needed for the `cart` component. This is on the full cart template.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Likely no design, but should have same styles and functionality as mini cart
+
+h3. Technical Details
+- Might not require any additional styling after globals and other cart tickets.
+
+h3. Attachments",
+,Cart,New/Change Feature,Free Shipping Threshold,"This is not an OOB feature. Remove if not part of implementation. Otherwise update this ticket as needed.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Cart,Bug,Internal UAT,Add all UAT notes below,
+,PLP / SRP,New/Change Feature,Component | browsing-controls,"Update HTML, CSS, and JS as needed for the `browsing-controls` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- During customizations, ensure sort-by form remains functional (updates the page async) on both desktop and mobile
+
+h3. Attachments",
+,PLP / SRP,New/Change Feature,Component | filters,"Update HTML, CSS, and JS as needed for the `filters` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can choose which direction mobile filters slide in from
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- During customizations, ensure filters form remains functional (updates the page async) on both desktop and mobile
+
+h3. Attachments",
+,PLP / SRP,New/Change Feature,Component | filters - Mobile,"Update HTML, CSS, and JS as needed for the `filters` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can choose which direction mobile filters slide in from
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- During customizations, ensure filters form remains functional (updates the page async) on both desktop and mobile
+
+h3. Attachments",
+,PLP / SRP,New/Change Feature,Component | product-grid,"Update HTML, CSS, and JS as needed for the `product-grid` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,PLP / SRP,New/Change Feature,Component | product-summary,"Update HTML, CSS, and JS as needed for the `product-summary` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can set image aspect ratio
+- User can manage badges
+  - Max number
+  - Days for product to be classified as ""new""
+  - UI position
+  - Horizontal or stacked layout
+- User can manage price display
+  - For products with multiple prices, display as range or lowest only, and specific a prefix (ex: ""from $..."")
+  - If on sale, toggle display of amount off, and whether it's a dollar amount or percentage
+  - Set a threshold for when to stop showing the amount off
+- User can toggle showing the product's 2nd image on hover
+- User can toggle ""quick add"" functionality
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Depending on order of work, this component may already be complete.
+
+h3. Attachments",
+,PLP / SRP,New/Change Feature,Component | pagination,"Update HTML, CSS, and JS as needed for the `pagination` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,PLP / SRP,New/Change Feature,Component | quick-add,"Update HTML, CSS, and JS as needed for the `quick-add` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- Majority of styles should be handled via PDP and global components
+
+h3. Attachments",
+,PLP / SRP,New/Change Feature,Product Grid Content,"This is not an OOB feature. Remove if not part of implementation. Otherwise update this ticket as needed.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can set image, text, and link
+- User can set position in grid
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,PLP / SRP,Bug,Internal UAT,Add all UAT notes below,
+,Collection,New/Change Feature,Layout | collection,"Update HTML, CSS, and JS as needed for the `collection` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can adjust products per page
+- User can adjust products per row on mobile and desktop
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- This is essentially a layout ticket, as all child components are handled by other tickets.
+
+h3. Attachments",
+,Collection,New/Change Feature,Secondary Navigation,"This is not an OOB feature. Remove if not part of implementation. Otherwise update this ticket as needed.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Search,New/Change Feature,Layout | search,"Update HTML, CSS, and JS as needed for the `search` component.
+
+h3. Acceptance Criteria
+h4. Admin
+- User can adjust products per page
+- User can adjust products per row on mobile and desktop
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- This is essentially a layout ticket, as most child components are handled by other tickets.
+
+h3. Attachments",
+,Search,New/Change Feature,Component | search-navigation,"Update HTML, CSS, and JS as needed for the `search-navigation` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Search,New/Change Feature,Component | article-summary,"Update HTML, CSS, and JS as needed for the `article-summary` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Search,New/Change Feature,Component | page-summary,"Update HTML, CSS, and JS as needed for the `page-summary` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,Search,Bug,Internal UAT,Add all UAT notes below,
+,PDP Image & Summary,New/Change Feature,Component | product-media,"Update HTML, CSS, and JS as needed for the `product-media` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,PDP Image & Summary,New/Change Feature,Product Media Zoom,"This is not an OOB feature. Remove if not part of implementation. Otherwise update this ticket as needed.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,PDP Details,New/Change Feature,Layout | product-details,"Update HTML, CSS, and JS as needed for the `page-details` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+- This is essentially a layout ticket, as most child components are handled by other tickets.
+
+h3. Attachments",
+,PDP Details,New/Change Feature,Component | product-info,"Update HTML, CSS, and JS as needed for the `product-info` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,PDP Details,New/Change Feature,Size Guide,"This is not an OOB feature. Remove if not part of implementation. Otherwise update this ticket as needed.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",
+,PDP Details,Bug,Internal UAT,Add all UAT notes for the PDP below,
+,Upsells / Cross Sells,New/Change Feature,Component | product-recommendations,"Update HTML, CSS, and JS as needed for the `product-recommendations` component.
+
+h3. Acceptance Criteria
+h4. Admin
+h4. Storefront
+- Match design
+
+h3. Technical Details
+
+h3. Attachments",

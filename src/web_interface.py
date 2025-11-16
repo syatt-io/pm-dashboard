@@ -330,6 +330,7 @@ from src.api.forecasts import forecasts_bp
 from src.api.epic_budgets import epic_budgets_bp
 from src.api.epic_categories import epic_categories_bp
 from src.routes.epic_templates import epic_templates_bp
+from src.routes.jira_templates import jira_templates_bp
 
 app.register_blueprint(health_bp)
 
@@ -399,6 +400,11 @@ logger.info("✅ Epic Categories endpoints exempted from CSRF protection")
 csrf.exempt(epic_templates_bp)
 logger.info("✅ Epic Templates endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt Jira Templates endpoints from CSRF protection
+# Jira Templates endpoints are called from React frontend with JWT auth
+csrf.exempt(jira_templates_bp)
+logger.info("✅ Jira Templates endpoints exempted from CSRF protection")
+
 # ✅ SECURITY: Exempt Backfill endpoints from CSRF protection
 # Backfill endpoints use X-Admin-Key header authentication (called from GitHub Actions)
 csrf.exempt(backfill_bp)
@@ -439,6 +445,7 @@ app.register_blueprint(forecasts_bp)
 app.register_blueprint(epic_budgets_bp)
 app.register_blueprint(epic_categories_bp)
 app.register_blueprint(epic_templates_bp)
+app.register_blueprint(jira_templates_bp)
 app.register_blueprint(historical_import_bp)
 
 

@@ -90,6 +90,184 @@ class JiraMCPClient:
             logger.error(f"Error creating Jira ticket: {e}")
             return {"success": False, "error": str(e)}
 
+    async def create_epic(
+        self,
+        project_key: str,
+        epic_name: str,
+        summary: str = "",
+        description: str = "",
+        color: str = "#6554C0",
+    ) -> Dict[str, Any]:
+        """
+        Create an epic in Jira using direct REST API.
+
+        Args:
+            project_key: Project key (e.g., "SUBS")
+            epic_name: Epic name (short title)
+            summary: Full summary (defaults to epic_name if not provided)
+            description: Detailed description
+            color: Epic color hex code (default purple)
+
+        Returns:
+            Dict with success flag, epic key, and epic ID
+        """
+        try:
+            if not self.jira_url or not self.username or not self.api_token:
+                return {
+                    "success": False,
+                    "error": "Jira credentials not configured for direct API",
+                }
+
+            import base64
+
+            auth_string = base64.b64encode(
+                f"{self.username}:{self.api_token}".encode()
+            ).decode()
+
+            # Build epic creation payload
+            # Epic Name is stored in customfield (need to query for the field ID)
+            # For now, we'll use summary as epic name
+            payload = {
+                "fields": {
+                    "project": {"key": project_key},
+                    "summary": summary or epic_name,
+                    "description": {
+                        "type": "doc",
+                        "version": 1,
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": description or ""}],
+                            }
+                        ],
+                    },
+                    "issuetype": {"name": "Epic"},
+                }
+            }
+
+            # Create the epic
+            response = await self.client.post(
+                f"{self.jira_url}/rest/api/3/issue",
+                json=payload,
+                headers={
+                    "Authorization": f"Basic {auth_string}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            epic_key = result.get("key")
+            epic_id = result.get("id")
+
+            logger.info(f"Created Jira epic: {epic_key} (ID: {epic_id})")
+
+            return {
+                "success": True,
+                "key": epic_key,
+                "id": epic_id,
+                "self": result.get("self"),
+            }
+
+        except Exception as e:
+            logger.error(f"Error creating Jira epic: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": str(e)}
+
+    async def create_issue_with_epic_link(
+        self,
+        project_key: str,
+        issue_type: str,
+        summary: str,
+        description: str,
+        epic_key: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a Jira issue and optionally link it to an epic.
+
+        Args:
+            project_key: Project key (e.g., "SUBS")
+            issue_type: Issue type (e.g., "Task", "Bug", "Story")
+            summary: Issue summary
+            description: Issue description
+            epic_key: Optional epic key to link to (e.g., "SUBS-123")
+
+        Returns:
+            Dict with success flag, issue key, and issue ID
+        """
+        try:
+            if not self.jira_url or not self.username or not self.api_token:
+                return {
+                    "success": False,
+                    "error": "Jira credentials not configured for direct API",
+                }
+
+            import base64
+
+            auth_string = base64.b64encode(
+                f"{self.username}:{self.api_token}".encode()
+            ).decode()
+
+            # Build issue creation payload
+            payload = {
+                "fields": {
+                    "project": {"key": project_key},
+                    "summary": summary,
+                    "description": {
+                        "type": "doc",
+                        "version": 1,
+                        "content": [
+                            {
+                                "type": "paragraph",
+                                "content": [{"type": "text", "text": description or ""}],
+                            }
+                        ],
+                    },
+                    "issuetype": {"name": issue_type},
+                }
+            }
+
+            # Add epic link if provided
+            if epic_key:
+                payload["fields"]["parent"] = {"key": epic_key}
+
+            # Create the issue
+            response = await self.client.post(
+                f"{self.jira_url}/rest/api/3/issue",
+                json=payload,
+                headers={
+                    "Authorization": f"Basic {auth_string}",
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            issue_key = result.get("key")
+            issue_id = result.get("id")
+
+            logger.info(
+                f"Created Jira issue: {issue_key} (ID: {issue_id}, Epic: {epic_key or 'None'})"
+            )
+
+            return {
+                "success": True,
+                "key": issue_key,
+                "id": issue_id,
+                "self": result.get("self"),
+            }
+
+        except Exception as e:
+            logger.error(f"Error creating Jira issue: {e}")
+            import traceback
+
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return {"success": False, "error": str(e)}
+
     async def update_ticket(
         self, ticket_key: str, updates: Dict[str, Any]
     ) -> Dict[str, Any]:

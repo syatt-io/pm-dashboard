@@ -23,8 +23,10 @@ import {
   CloudDownload as ImportIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
+  Assignment as TemplateIcon,
 } from '@mui/icons-material';
 import { useNotify } from 'react-admin';
+import ImportJiraTemplatesDialog from './ImportJiraTemplatesDialog';
 
 interface Epic {
   key: string;
@@ -47,6 +49,7 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
   const [importing, setImporting] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true); // Auto-expand by default for easier access
   const [error, setError] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const notify = useNotify();
 
   const fetchEpics = async () => {
@@ -199,6 +202,14 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button
             variant="outlined"
+            startIcon={<TemplateIcon />}
+            onClick={() => setImportDialogOpen(true)}
+            disabled={loading || importing}
+          >
+            Import from Templates
+          </Button>
+          <Button
+            variant="outlined"
             startIcon={loading ? <CircularProgress size={20} /> : <RefreshIcon />}
             onClick={fetchEpics}
             disabled={loading || importing}
@@ -304,6 +315,16 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
           </>
         )}
       </Collapse>
+
+      <ImportJiraTemplatesDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        projectKey={projectKey}
+        onSuccess={() => {
+          setImportDialogOpen(false);
+          fetchEpics(); // Refresh the epics list after import
+        }}
+      />
     </Box>
   );
 };
