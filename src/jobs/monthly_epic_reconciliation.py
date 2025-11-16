@@ -74,7 +74,6 @@ class MonthlyEpicReconciliationJob:
                 SELECT key
                 FROM projects
                 WHERE is_active = true
-                AND project_work_type = 'project-based'
                 ORDER BY key
             """
                 )

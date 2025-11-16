@@ -98,14 +98,6 @@ def get_jira_projects():
                         SELECT
                             p.key,
                             p.is_active,
-                            p.project_work_type,
-                            p.total_hours,
-                            p.cumulative_hours,
-                            p.weekly_meeting_day,
-                            p.retainer_hours,
-                            p.send_meeting_emails,
-                            p.start_date,
-                            p.launch_date,
                             pmf.forecasted_hours,
                             pmf.actual_monthly_hours
                         FROM projects p
@@ -142,26 +134,8 @@ def get_jira_projects():
                         project_key = row[0]
                         project_data_map[project_key] = {
                             "is_active": bool(row[1]) if row[1] is not None else True,
-                            "project_work_type": row[2] if row[2] else "project-based",
-                            "total_hours": float(row[3]) if row[3] else 0,
-                            "cumulative_hours": float(row[4]) if row[4] else 0,
-                            "weekly_meeting_day": row[5] if row[5] else None,
-                            "retainer_hours": float(row[6]) if row[6] else 0,
-                            "send_meeting_emails": (
-                                bool(row[7]) if row[7] is not None else False
-                            ),
-                            "start_date": (
-                                row[8].isoformat()
-                                if (row[8] and hasattr(row[8], "isoformat"))
-                                else None
-                            ),
-                            "launch_date": (
-                                row[9].isoformat()
-                                if (row[9] and hasattr(row[9], "isoformat"))
-                                else None
-                            ),
-                            "forecasted_hours_month": float(row[10]) if row[10] else 0,
-                            "current_month_hours": float(row[11]) if row[11] else 0,
+                            "forecasted_hours_month": float(row[2]) if row[2] else 0,
+                            "current_month_hours": float(row[3]) if row[3] else 0,
                             "keywords": keywords_map.get(project_key, []),
                         }
 
@@ -176,14 +150,6 @@ def get_jira_projects():
                         else:
                             # No database record - use defaults
                             enhanced_project["is_active"] = True
-                            enhanced_project["project_work_type"] = "project-based"
-                            enhanced_project["total_hours"] = 0
-                            enhanced_project["cumulative_hours"] = 0
-                            enhanced_project["weekly_meeting_day"] = None
-                            enhanced_project["retainer_hours"] = 0
-                            enhanced_project["send_meeting_emails"] = False
-                            enhanced_project["start_date"] = None
-                            enhanced_project["launch_date"] = None
                             enhanced_project["forecasted_hours_month"] = 0
                             enhanced_project["current_month_hours"] = 0
                             enhanced_project["keywords"] = keywords_map.get(
@@ -269,15 +235,6 @@ def get_jira_project(project_key):
                         """
                     SELECT
                         p.is_active,
-                        p.project_work_type,
-                        p.total_hours,
-                        p.cumulative_hours,
-                        p.weekly_meeting_day,
-                        p.retainer_hours,
-                        p.description,
-                        p.send_meeting_emails,
-                        p.start_date,
-                        p.launch_date,
                         pmf.forecasted_hours,
                         pmf.actual_monthly_hours
                     FROM projects p
@@ -294,53 +251,15 @@ def get_jira_project(project_key):
                     enhanced_project["is_active"] = (
                         bool(result[0]) if result[0] is not None else True
                     )
-                    enhanced_project["project_work_type"] = (
-                        result[1] if result[1] else "project-based"
-                    )
-                    enhanced_project["total_hours"] = (
-                        float(result[2]) if result[2] else 0
-                    )
-                    enhanced_project["cumulative_hours"] = (
-                        float(result[3]) if result[3] else 0
-                    )
-                    enhanced_project["weekly_meeting_day"] = (
-                        result[4] if result[4] else None
-                    )
-                    enhanced_project["retainer_hours"] = (
-                        float(result[5]) if result[5] else 0
-                    )
-                    enhanced_project["description"] = result[6] if result[6] else None
-                    enhanced_project["send_meeting_emails"] = (
-                        bool(result[7]) if result[7] is not None else False
-                    )
-                    enhanced_project["start_date"] = (
-                        result[8].isoformat()
-                        if (result[8] and hasattr(result[8], "isoformat"))
-                        else None
-                    )
-                    enhanced_project["launch_date"] = (
-                        result[9].isoformat()
-                        if (result[9] and hasattr(result[9], "isoformat"))
-                        else None
-                    )
                     enhanced_project["forecasted_hours_month"] = (
-                        float(result[10]) if result[10] else 0
+                        float(result[1]) if result[1] else 0
                     )
                     enhanced_project["current_month_hours"] = (
-                        float(result[11]) if result[11] else 0
+                        float(result[2]) if result[2] else 0
                     )
                 else:
                     # No database record - use defaults
                     enhanced_project["is_active"] = True
-                    enhanced_project["project_work_type"] = "project-based"
-                    enhanced_project["total_hours"] = 0
-                    enhanced_project["cumulative_hours"] = 0
-                    enhanced_project["weekly_meeting_day"] = None
-                    enhanced_project["retainer_hours"] = 0
-                    enhanced_project["description"] = None
-                    enhanced_project["send_meeting_emails"] = False
-                    enhanced_project["start_date"] = None
-                    enhanced_project["launch_date"] = None
                     enhanced_project["forecasted_hours_month"] = 0
                     enhanced_project["current_month_hours"] = 0
         except Exception as e:
