@@ -5,6 +5,7 @@ Revises: 2d04705c7c32
 Create Date: 2025-11-16 13:20:29.956556
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -12,8 +13,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '2069b8009924'
-down_revision: Union[str, Sequence[str], None] = '2d04705c7c32'
+revision: str = "2069b8009924"
+down_revision: Union[str, Sequence[str], None] = "2d04705c7c32"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -21,7 +22,8 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Restore columns that were incorrectly dropped from projects table."""
     # Add back all the columns that were dropped
-    op.execute("""
+    op.execute(
+        """
         DO $$
         BEGIN
             -- project_work_type
@@ -120,26 +122,29 @@ def upgrade() -> None:
                 ALTER TABLE todo_items ADD COLUMN source VARCHAR(100);
             END IF;
         END $$;
-    """)
+    """
+    )
 
     # Recreate indexes
-    op.execute("""
+    op.execute(
+        """
         CREATE INDEX IF NOT EXISTS idx_projects_project_work_type ON projects(project_work_type);
-    """)
+    """
+    )
 
 
 def downgrade() -> None:
     """Remove the restored columns (NOT RECOMMENDED - data loss!)."""
-    op.drop_column('todo_items', 'source')
-    op.drop_index('idx_projects_project_work_type', table_name='projects')
-    op.drop_column('projects', 'show_budget_tab')
-    op.drop_column('projects', 'lead')
-    op.drop_column('projects', 'description')
-    op.drop_column('projects', 'launch_date')
-    op.drop_column('projects', 'start_date')
-    op.drop_column('projects', 'send_meeting_emails')
-    op.drop_column('projects', 'retainer_hours')
-    op.drop_column('projects', 'weekly_meeting_day')
-    op.drop_column('projects', 'cumulative_hours')
-    op.drop_column('projects', 'total_hours')
-    op.drop_column('projects', 'project_work_type')
+    op.drop_column("todo_items", "source")
+    op.drop_index("idx_projects_project_work_type", table_name="projects")
+    op.drop_column("projects", "show_budget_tab")
+    op.drop_column("projects", "lead")
+    op.drop_column("projects", "description")
+    op.drop_column("projects", "launch_date")
+    op.drop_column("projects", "start_date")
+    op.drop_column("projects", "send_meeting_emails")
+    op.drop_column("projects", "retainer_hours")
+    op.drop_column("projects", "weekly_meeting_day")
+    op.drop_column("projects", "cumulative_hours")
+    op.drop_column("projects", "total_hours")
+    op.drop_column("projects", "project_work_type")

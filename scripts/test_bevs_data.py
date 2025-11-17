@@ -44,18 +44,20 @@ if bevs:
     print(f"Date Range: {bevs['date_range']['start']} to {bevs['date_range']['end']}")
     print(f"\nTeam Hours:")
     for team, hours in sorted(bevs["team_hours"].items(), key=lambda x: -x[1]):
-        pct = (hours / bevs['total_hours'] * 100) if bevs['total_hours'] > 0 else 0
+        pct = (hours / bevs["total_hours"] * 100) if bevs["total_hours"] > 0 else 0
         print(f"  - {team}: {hours}h ({pct:.1f}%)")
 
     # Check Design allocation
     design_hours = bevs["team_hours"].get("Design", 0)
-    design_pct = (design_hours / bevs['total_hours'] * 100) if bevs['total_hours'] > 0 else 0
+    design_pct = (
+        (design_hours / bevs["total_hours"] * 100) if bevs["total_hours"] > 0 else 0
+    )
 
     print(f"\n🎯 Design Allocation Test:")
     print(f"   Expected: 53.5h (6.98%)")
     print(f"   Actual:   {design_hours}h ({design_pct:.2f}%)")
 
-    if abs(design_hours - 53.5) < 1 and abs(bevs['total_hours'] - 766.25) < 1:
+    if abs(design_hours - 53.5) < 1 and abs(bevs["total_hours"] - 766.25) < 1:
         print("\n✅✅✅ FIX SUCCESSFUL! Data matches expected values!")
     else:
         print(f"\n❌ FIX FAILED! Data still incorrect.")
