@@ -12,6 +12,102 @@ from dataclasses import dataclass, asdict
 logger = logging.getLogger(__name__)
 
 
+def convert_jira_wiki_to_adf(text: str) -> Dict[str, Any]:
+    """
+    Convert Jira Wiki markup to Atlassian Document Format (ADF).
+
+    Supports:
+    - h3. Heading 3
+    - h4. Heading 4
+    - * Bullet lists
+    - Plain paragraphs
+
+    Args:
+        text: Jira Wiki markup text
+
+    Returns:
+        ADF document structure
+    """
+    if not text or not text.strip():
+        return {
+            "type": "doc",
+            "version": 1,
+            "content": [{"type": "paragraph", "content": []}],
+        }
+
+    content = []
+    lines = text.split("\n")
+    i = 0
+
+    while i < len(lines):
+        line = lines[i].strip()
+
+        # Skip empty lines
+        if not line:
+            i += 1
+            continue
+
+        # h3. Heading
+        if line.startswith("h3."):
+            heading_text = line[3:].strip()
+            content.append(
+                {
+                    "type": "heading",
+                    "attrs": {"level": 3},
+                    "content": [{"type": "text", "text": heading_text}],
+                }
+            )
+
+        # h4. Heading
+        elif line.startswith("h4."):
+            heading_text = line[3:].strip()
+            content.append(
+                {
+                    "type": "heading",
+                    "attrs": {"level": 4},
+                    "content": [{"type": "text", "text": heading_text}],
+                }
+            )
+
+        # * Bullet list
+        elif line.startswith("*"):
+            # Collect all consecutive bullet items
+            list_items = []
+            while i < len(lines) and lines[i].strip().startswith("*"):
+                bullet_text = lines[i].strip()[1:].strip()  # Remove * and trim
+                if bullet_text:  # Only add non-empty items
+                    list_items.append(
+                        {
+                            "type": "listItem",
+                            "content": [
+                                {
+                                    "type": "paragraph",
+                                    "content": [{"type": "text", "text": bullet_text}],
+                                }
+                            ],
+                        }
+                    )
+                i += 1
+
+            if list_items:
+                content.append({"type": "bulletList", "content": list_items})
+            continue  # Skip the i += 1 at the end since we already incremented
+
+        # Regular paragraph
+        else:
+            content.append(
+                {"type": "paragraph", "content": [{"type": "text", "text": line}]}
+            )
+
+        i += 1
+
+    # If no content was generated, add empty paragraph
+    if not content:
+        content = [{"type": "paragraph", "content": []}]
+
+    return {"type": "doc", "version": 1, "content": content}
+
+
 @dataclass
 class JiraTicket:
     """Jira ticket structure."""
@@ -131,18 +227,7 @@ class JiraMCPClient:
                 "fields": {
                     "project": {"key": project_key},
                     "summary": summary or epic_name,
-                    "description": {
-                        "type": "doc",
-                        "version": 1,
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [
-                                    {"type": "text", "text": description or ""}
-                                ],
-                            }
-                        ],
-                    },
+                    "description": convert_jira_wiki_to_adf(description or ""),
                     "issuetype": {"name": "Epic"},
                 }
             }
@@ -218,18 +303,7 @@ class JiraMCPClient:
                 "fields": {
                     "project": {"key": project_key},
                     "summary": summary,
-                    "description": {
-                        "type": "doc",
-                        "version": 1,
-                        "content": [
-                            {
-                                "type": "paragraph",
-                                "content": [
-                                    {"type": "text", "text": description or ""}
-                                ],
-                            }
-                        ],
-                    },
+                    "description": convert_jira_wiki_to_adf(description or ""),
                     "issuetype": {"name": issue_type},
                 }
             }
