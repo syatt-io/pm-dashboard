@@ -9,6 +9,7 @@ Common issues and their solutions for the Agent PM application.
 - [Docker Issues](#docker-issues)
 - [Database Issues](#database-issues)
 - [CSRF Protection](#csrf-protection)
+- [Celery Jobs and Notifications](#celery-jobs-and-notifications)
 
 ---
 
@@ -205,6 +206,68 @@ grep "your_feature_bp" src/web_interface.py
 ```
 
 **Detailed Guide**: See [CSRF Protection Guide](CSRF_PROTECTION_GUIDE.md) for complete troubleshooting steps.
+
+---
+
+## Celery Jobs and Notifications
+
+### Issue: Silent Notification Failures in Celery Jobs
+**Symptom**:
+- Celery job completes successfully (appears in `job_executions` table)
+- Expected Slack notifications are NOT sent
+- No error logs appear in production logs
+- Difficult to diagnose because exception is silently caught
+
+**Root Cause**: NotificationManager initialization missing required config parameter
+
+**Solution**: Pass `None` as config parameter when using environment variables
+```python
+# ❌ Wrong - Missing required parameter
+notifier = NotificationManager()
+
+# ✅ Correct - Pass None to use environment variables
+notifier = NotificationManager(None)
+```
+
+**Files Affected**: Any Celery job file that sends notifications (e.g., `src/jobs/tempo_sync.py`)
+
+**Diagnostic Technique**: When notifications fail silently, add print() statements at method entry
+```python
+def send_slack_notification(self, stats: Dict):
+    # Add BOTH print() and logger at the very start
+    print(f"[DEBUG] send_slack_notification() called with stats: {stats}")
+    logger.info(f"[DEBUG] send_slack_notification() method invoked")
+
+    try:
+        # ... rest of method
+```
+
+**Why print() instead of logger?**
+- print() writes to stdout/stderr immediately
+- Bypasses any logging configuration issues
+- Helps identify if method is even being called
+- Can reveal exceptions caught by broad exception handlers
+
+**Example from tempo_sync.py Fix**:
+```python
+# Line 333-334 - Correct initialization
+# Pass None since NotificationManager uses environment variables for config
+notifier = NotificationManager(None)
+```
+
+**Common Pattern in Codebase**:
+```python
+# With config object
+notifier = NotificationManager(settings.notifications)
+
+# With environment variables (recommended for jobs)
+notifier = NotificationManager(None)
+```
+
+**Verification**:
+1. Check database for successful job execution: `SELECT * FROM job_executions WHERE job_name = 'tempo-sync' ORDER BY completed_at DESC LIMIT 1;`
+2. Search logs for notification confirmation: `doctl apps logs YOUR_APP_ID --type=run | grep "notification"`
+3. If no logs appear, add diagnostic print() statements and redeploy
 
 ---
 
