@@ -147,7 +147,9 @@ def get_jira_projects():
                             "weekly_meeting_day": row[4],
                             "retainer_hours": float(row[5]) if row[5] else 0,
                             "total_hours": float(row[6]) if row[6] else 0,
-                            "send_meeting_emails": bool(row[7]) if row[7] is not None else False,
+                            "send_meeting_emails": (
+                                bool(row[7]) if row[7] is not None else False
+                            ),
                             "start_date": row[8].isoformat() if row[8] else None,
                             "launch_date": row[9].isoformat() if row[9] else None,
                             "forecasted_hours_month": float(row[10]) if row[10] else 0,
