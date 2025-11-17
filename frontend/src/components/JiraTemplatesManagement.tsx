@@ -72,7 +72,7 @@ const JiraTemplatesManagement: React.FC = () => {
   const fetchEpics = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${getApiUrl()}/api/jira-templates/epics`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -111,7 +111,7 @@ const JiraTemplatesManagement: React.FC = () => {
     if (!editingEpic) return;
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(
         `${getApiUrl()}/api/jira-templates/epics/${editingEpic.id}`,
         {

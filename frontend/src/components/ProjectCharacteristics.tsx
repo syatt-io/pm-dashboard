@@ -51,7 +51,7 @@ const ProjectCharacteristics: React.FC<ProjectCharacteristicsProps> = ({ project
 
   const fetchCharacteristics = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(
         `${getApiUrl()}/api/projects/${projectKey}/characteristics`,
         {
@@ -81,7 +81,7 @@ const ProjectCharacteristics: React.FC<ProjectCharacteristicsProps> = ({ project
   const saveCharacteristics = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(
         `${getApiUrl()}/api/projects/${projectKey}/characteristics`,
         {
