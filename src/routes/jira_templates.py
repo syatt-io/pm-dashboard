@@ -108,6 +108,9 @@ def update_template_ticket(user, ticket_id):
             ticket.description = data["description"]
         if "issue_type" in data:
             ticket.issue_type = data["issue_type"]
+        if "template_epic_id" in data:
+            # Allow reassigning ticket to different epic
+            ticket.template_epic_id = data["template_epic_id"]
 
         session.commit()
         result = ticket.to_dict()
@@ -117,6 +120,149 @@ def update_template_ticket(user, ticket_id):
 
     except Exception as e:
         logger.error(f"Error updating template ticket: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@jira_templates_bp.route("/epics", methods=["POST"])
+@auth_required
+def create_template_epic(user):
+    """Create a new template epic."""
+    try:
+        session = get_session()
+        data = request.get_json()
+
+        # Validate required fields
+        if not data.get("epic_name"):
+            return jsonify({"success": False, "error": "Epic name is required"}), 400
+
+        # Get max sort_order to append new epic at end
+        max_sort = session.query(TemplateEpic).count()
+
+        epic = TemplateEpic(
+            epic_name=data["epic_name"],
+            summary=data.get("summary", ""),
+            description=data.get("description", ""),
+            epic_color=data.get("epic_color", "#6554C0"),
+            epic_category=data.get("epic_category", ""),
+            sort_order=max_sort,
+        )
+
+        session.add(epic)
+        session.commit()
+        result = epic.to_dict()
+        session.close()
+
+        logger.info(f"Created template epic: {epic.epic_name}")
+        return jsonify({"success": True, "epic": result})
+
+    except Exception as e:
+        logger.error(f"Error creating template epic: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@jira_templates_bp.route("/epics/<int:epic_id>", methods=["DELETE"])
+@auth_required
+def delete_template_epic(user, epic_id):
+    """Delete a template epic (cascade deletes its tickets)."""
+    try:
+        session = get_session()
+
+        epic = session.query(TemplateEpic).filter(TemplateEpic.id == epic_id).first()
+        if not epic:
+            return jsonify({"success": False, "error": "Epic not found"}), 404
+
+        epic_name = epic.epic_name
+
+        # Delete associated tickets first (manual cascade)
+        session.query(TemplateTicket).filter(
+            TemplateTicket.template_epic_id == epic_id
+        ).delete()
+
+        # Delete the epic
+        session.delete(epic)
+        session.commit()
+        session.close()
+
+        logger.info(f"Deleted template epic: {epic_name} (ID: {epic_id})")
+        return jsonify({"success": True, "message": f"Deleted epic: {epic_name}"})
+
+    except Exception as e:
+        logger.error(f"Error deleting template epic: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@jira_templates_bp.route("/tickets", methods=["POST"])
+@auth_required
+def create_template_ticket(user):
+    """Create a new template ticket."""
+    try:
+        session = get_session()
+        data = request.get_json()
+
+        # Validate required fields
+        if not data.get("summary"):
+            return jsonify({"success": False, "error": "Summary is required"}), 400
+        if not data.get("issue_type"):
+            return jsonify({"success": False, "error": "Issue type is required"}), 400
+
+        # Get max sort_order for this epic to append ticket at end
+        epic_id = data.get("template_epic_id")
+        if epic_id:
+            max_sort = (
+                session.query(TemplateTicket)
+                .filter(TemplateTicket.template_epic_id == epic_id)
+                .count()
+            )
+        else:
+            max_sort = 0
+
+        ticket = TemplateTicket(
+            template_epic_id=epic_id,
+            issue_type=data["issue_type"],
+            summary=data["summary"],
+            description=data.get("description", ""),
+            sort_order=max_sort,
+        )
+
+        session.add(ticket)
+        session.commit()
+        result = ticket.to_dict()
+        session.close()
+
+        logger.info(f"Created template ticket: {ticket.summary}")
+        return jsonify({"success": True, "ticket": result})
+
+    except Exception as e:
+        logger.error(f"Error creating template ticket: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@jira_templates_bp.route("/tickets/<int:ticket_id>", methods=["DELETE"])
+@auth_required
+def delete_template_ticket(user, ticket_id):
+    """Delete a template ticket."""
+    try:
+        session = get_session()
+
+        ticket = (
+            session.query(TemplateTicket).filter(TemplateTicket.id == ticket_id).first()
+        )
+        if not ticket:
+            return jsonify({"success": False, "error": "Ticket not found"}), 404
+
+        ticket_summary = ticket.summary
+
+        session.delete(ticket)
+        session.commit()
+        session.close()
+
+        logger.info(f"Deleted template ticket: {ticket_summary} (ID: {ticket_id})")
+        return jsonify(
+            {"success": True, "message": f"Deleted ticket: {ticket_summary}"}
+        )
+
+    except Exception as e:
+        logger.error(f"Error deleting template ticket: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
