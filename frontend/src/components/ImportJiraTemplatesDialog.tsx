@@ -72,7 +72,7 @@ const ImportJiraTemplatesDialog: React.FC<ImportJiraTemplatesDialogProps> = ({
   const fetchTemplates = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`${getApiUrl()}/api/jira-templates/epics`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -123,7 +123,7 @@ const ImportJiraTemplatesDialog: React.FC<ImportJiraTemplatesDialogProps> = ({
 
     try {
       setImporting(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(
         `${getApiUrl()}/api/jira-templates/import/${projectKey}`,
         {
