@@ -147,6 +147,7 @@ class TempoSyncJob:
             Dictionary mapping project keys to YTD hours
         """
         from datetime import datetime
+        import time
 
         # Year-to-date: Jan 1 of current year to today
         now = datetime.now()
@@ -154,15 +155,19 @@ class TempoSyncJob:
         today = now.strftime("%Y-%m-%d")
         ytd_hours = {}
 
+        # Track overall progress
+        fetch_start_time = time.time()
         logger.info(
-            f"Fetching YTD hours ({start_date} to {today}) for {len(active_projects)} projects individually..."
+            f"Starting YTD fetch ({start_date} to {today}) for {len(active_projects)} projects at {now.strftime('%H:%M:%S')}"
         )
 
         for idx, project_key in enumerate(active_projects, 1):
             try:
+                project_start_time = time.time()
                 logger.info(
                     f"[{idx}/{len(active_projects)}] Fetching hours for {project_key}..."
                 )
+                logger.debug(f"  Calling Tempo API for {project_key}...")
 
                 # Use server-side project filtering (Tempo API v4 projectId parameter)
                 worklogs = self.tempo_client.get_worklogs(
@@ -174,25 +179,51 @@ class TempoSyncJob:
                     worklogs
                 )
 
+                # Calculate elapsed time for this project
+                project_elapsed = time.time() - project_start_time
+
                 # Store hours for this project (should only have one key)
                 if project_key in project_hours:
                     ytd_hours[project_key] = project_hours[project_key]
                     logger.info(
-                        f"  ✅ {project_key}: {project_hours[project_key]:.2f}h ({len(worklogs)} worklogs)"
+                        f"  ✅ {project_key}: {project_hours[project_key]:.2f}h ({len(worklogs)} worklogs, {project_elapsed:.1f}s)"
                     )
                 else:
                     # No worklogs for this project
                     ytd_hours[project_key] = 0.0
-                    logger.info(f"  ℹ️  {project_key}: 0.00h (no worklogs)")
+                    logger.info(
+                        f"  ℹ️  {project_key}: 0.00h (no worklogs, {project_elapsed:.1f}s)"
+                    )
+
+                # Log progress every project
+                total_elapsed = time.time() - fetch_start_time
+                avg_time_per_project = total_elapsed / idx
+                estimated_remaining = avg_time_per_project * (len(active_projects) - idx)
+                logger.info(
+                    f"  📊 Progress: {idx}/{len(active_projects)} complete | "
+                    f"Elapsed: {total_elapsed/60:.1f}min | "
+                    f"Avg: {avg_time_per_project:.1f}s/project | "
+                    f"Est. remaining: {estimated_remaining/60:.1f}min"
+                )
 
             except Exception as e:
+                project_elapsed = time.time() - project_start_time
                 logger.error(
-                    f"  ❌ Error fetching hours for {project_key}: {e}", exc_info=True
+                    f"  ❌ Error fetching hours for {project_key} after {project_elapsed:.1f}s: {e}",
+                    exc_info=True,
                 )
                 # Continue with next project instead of failing entire sync
                 ytd_hours[project_key] = 0.0
 
-        logger.info(f"Completed fetching hours for {len(ytd_hours)} projects")
+        total_time = time.time() - fetch_start_time
+        if len(active_projects) > 0:
+            avg_per_project = total_time / len(active_projects)
+            logger.info(
+                f"✅ Completed fetching hours for {len(ytd_hours)} projects in {total_time/60:.1f} minutes "
+                f"(avg {avg_per_project:.1f}s per project)"
+            )
+        else:
+            logger.info(f"✅ Completed fetching hours for 0 projects in {total_time:.2f}s")
         return ytd_hours
 
     def _get_project_hours_summary(self):
