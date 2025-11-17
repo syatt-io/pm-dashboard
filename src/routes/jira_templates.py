@@ -172,9 +172,9 @@ def import_templates_to_project(user, project_key):
 
         # Initialize Jira client
         jira_client = JiraMCPClient(
-            jira_url=settings.jira.jira_url,
-            username=settings.jira.jira_username,
-            api_token=settings.jira.jira_api_token,
+            jira_url=settings.jira.url,
+            username=settings.jira.username,
+            api_token=settings.jira.api_token,
         )
 
         details = []
