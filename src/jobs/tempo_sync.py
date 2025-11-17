@@ -272,10 +272,6 @@ class TempoSyncJob:
         Args:
             stats: Dictionary containing job execution statistics
         """
-        # Log IMMEDIATELY before any other operations
-        print(f"[TEMPO_SYNC_DEBUG] send_slack_notification() called with stats: {stats}")
-        logger.info(f"[TEMPO_SYNC_DEBUG] send_slack_notification() method invoked")
-
         try:
             logger.info("Preparing Tempo sync notification...")
 
@@ -330,7 +326,8 @@ class TempoSyncJob:
             from sqlalchemy.orm import joinedload
 
             # Get notification manager instance
-            notifier = NotificationManager()
+            # Pass None since NotificationManager uses environment variables for config
+            notifier = NotificationManager(None)
 
             # Get opted-in users
             opted_in_users = []
@@ -488,17 +485,13 @@ class TempoSyncJob:
             logger.info(f"Stats: {stats}")
 
             # Send Slack notification on success
-            logger.info("[TEMPO_SYNC_DEBUG] About to call send_slack_notification()")
-            print(f"[TEMPO_SYNC_DEBUG] About to call send_slack_notification() with stats: {stats}")
             try:
                 self.send_slack_notification(stats)
-                logger.info("[TEMPO_SYNC_DEBUG] send_slack_notification() completed successfully")
             except Exception as notif_error:
                 logger.error(
-                    f"[TEMPO_SYNC_DEBUG] Failed to send success notification (job still succeeded): {notif_error}",
+                    f"Failed to send success notification (job still succeeded): {notif_error}",
                     exc_info=True,
                 )
-                print(f"[TEMPO_SYNC_DEBUG] Exception in send_slack_notification: {notif_error}")
 
             return stats
 
