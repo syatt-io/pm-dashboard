@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Gunicorn server settings
 bind = f"0.0.0.0:{os.getenv('PORT', '8080')}"
 workers = 4
-timeout = 120
+timeout = 300  # 5 minutes to accommodate large Jira template imports with rate limiting
 worker_class = "sync"
 
 # Logging
