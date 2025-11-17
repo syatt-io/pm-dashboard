@@ -235,6 +235,14 @@ def get_jira_project(project_key):
                         """
                     SELECT
                         p.is_active,
+                        p.project_work_type,
+                        p.description,
+                        p.weekly_meeting_day,
+                        p.retainer_hours,
+                        p.total_hours,
+                        p.send_meeting_emails,
+                        p.start_date,
+                        p.launch_date,
                         pmf.forecasted_hours,
                         pmf.actual_monthly_hours
                     FROM projects p
@@ -251,11 +259,29 @@ def get_jira_project(project_key):
                     enhanced_project["is_active"] = (
                         bool(result[0]) if result[0] is not None else True
                     )
+                    enhanced_project["project_work_type"] = result[1]
+                    enhanced_project["description"] = result[2]
+                    enhanced_project["weekly_meeting_day"] = result[3]
+                    enhanced_project["retainer_hours"] = (
+                        float(result[4]) if result[4] else 0
+                    )
+                    enhanced_project["total_hours"] = (
+                        float(result[5]) if result[5] else 0
+                    )
+                    enhanced_project["send_meeting_emails"] = (
+                        bool(result[6]) if result[6] is not None else False
+                    )
+                    enhanced_project["start_date"] = (
+                        result[7].isoformat() if result[7] else None
+                    )
+                    enhanced_project["launch_date"] = (
+                        result[8].isoformat() if result[8] else None
+                    )
                     enhanced_project["forecasted_hours_month"] = (
-                        float(result[1]) if result[1] else 0
+                        float(result[9]) if result[9] else 0
                     )
                     enhanced_project["current_month_hours"] = (
-                        float(result[2]) if result[2] else 0
+                        float(result[10]) if result[10] else 0
                     )
                 else:
                     # No database record - use defaults
