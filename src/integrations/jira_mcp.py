@@ -229,6 +229,7 @@ class JiraMCPClient:
                     "summary": summary or epic_name,
                     "description": convert_jira_wiki_to_adf(description or ""),
                     "issuetype": {"name": "Epic"},
+                    "assignee": None,  # Explicitly set to unassigned
                 }
             }
 
@@ -305,6 +306,7 @@ class JiraMCPClient:
                     "summary": summary,
                     "description": convert_jira_wiki_to_adf(description or ""),
                     "issuetype": {"name": issue_type},
+                    "assignee": None,  # Explicitly set to unassigned
                 }
             }
 
