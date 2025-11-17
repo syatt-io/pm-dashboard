@@ -98,6 +98,14 @@ def get_jira_projects():
                         SELECT
                             p.key,
                             p.is_active,
+                            p.project_work_type,
+                            p.description,
+                            p.weekly_meeting_day,
+                            p.retainer_hours,
+                            p.total_hours,
+                            p.send_meeting_emails,
+                            p.start_date,
+                            p.launch_date,
                             pmf.forecasted_hours,
                             pmf.actual_monthly_hours
                         FROM projects p
@@ -134,8 +142,16 @@ def get_jira_projects():
                         project_key = row[0]
                         project_data_map[project_key] = {
                             "is_active": bool(row[1]) if row[1] is not None else True,
-                            "forecasted_hours_month": float(row[2]) if row[2] else 0,
-                            "current_month_hours": float(row[3]) if row[3] else 0,
+                            "project_work_type": row[2],
+                            "description": row[3],
+                            "weekly_meeting_day": row[4],
+                            "retainer_hours": float(row[5]) if row[5] else 0,
+                            "total_hours": float(row[6]) if row[6] else 0,
+                            "send_meeting_emails": bool(row[7]) if row[7] is not None else False,
+                            "start_date": row[8].isoformat() if row[8] else None,
+                            "launch_date": row[9].isoformat() if row[9] else None,
+                            "forecasted_hours_month": float(row[10]) if row[10] else 0,
+                            "current_month_hours": float(row[11]) if row[11] else 0,
                             "keywords": keywords_map.get(project_key, []),
                         }
 
