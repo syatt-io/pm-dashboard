@@ -4,10 +4,12 @@ import logging
 import asyncio
 from flask import Blueprint, jsonify, request
 from sqlalchemy import select
+from celery.result import AsyncResult
 from src.services.auth import auth_required
 from src.utils.database import get_session
 from src.models import TemplateEpic, TemplateTicket
 from src.integrations.jira_mcp import JiraMCPClient
+from src.tasks.template_import_tasks import import_jira_templates_task
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -122,7 +124,7 @@ def update_template_ticket(user, ticket_id):
 @auth_required
 def import_templates_to_project(user, project_key):
     """
-    Import selected templates to a Jira project.
+    Trigger async import of selected templates to a Jira project.
 
     Request body:
     {
@@ -133,152 +135,10 @@ def import_templates_to_project(user, project_key):
     Returns:
     {
         "success": true,
-        "imported": {
-            "epics": 3,
-            "tickets": 15
-        },
-        "details": [
-            {
-                "template_epic_id": 1,
-                "epic_name": "Header",
-                "epic_key": "SUBS-150",
-                "status": "created",
-                "tickets_created": 5
-            }
-        ],
-        "errors": []
+        "task_id": "abc123-def456",  # Celery task ID for status polling
+        "message": "Import started"
     }
     """
-
-    async def process_imports():
-        """
-        Async function to handle all Jira API calls in a single event loop.
-        This prevents 'Event loop is closed' errors.
-        """
-        details = []
-        errors = []
-        total_epics = 0
-        total_tickets = 0
-
-        # Process each epic
-        for epic in epics:
-            try:
-                logger.info(
-                    f"Creating epic '{epic.epic_name}' in project {project_key}"
-                )
-
-                # Create epic in Jira
-                epic_result = await jira_client.create_epic(
-                    project_key=project_key,
-                    epic_name=epic.epic_name,
-                    summary=epic.summary or epic.epic_name,
-                    description=epic.description or "",
-                    color=epic.epic_color or "#6554C0",
-                )
-
-                if not epic_result.get("success"):
-                    error_msg = epic_result.get("error", "Unknown error")
-                    logger.error(
-                        f"Failed to create epic '{epic.epic_name}': {error_msg}"
-                    )
-                    errors.append(
-                        {
-                            "epic_name": epic.epic_name,
-                            "error": error_msg,
-                        }
-                    )
-                    continue
-
-                epic_key = epic_result.get("key")
-                total_epics += 1
-                logger.info(f"✓ Created epic '{epic.epic_name}' as {epic_key}")
-
-                # Import tickets if requested
-                tickets_created = 0
-                ticket_errors = []
-                if import_tickets:
-                    tickets = (
-                        session.query(TemplateTicket)
-                        .filter(TemplateTicket.template_epic_id == epic.id)
-                        .order_by(TemplateTicket.sort_order)
-                        .all()
-                    )
-
-                    logger.info(
-                        f"Creating {len(tickets)} tickets for epic '{epic.epic_name}'"
-                    )
-
-                    for idx, ticket in enumerate(tickets, 1):
-                        try:
-                            ticket_result = (
-                                await jira_client.create_issue_with_epic_link(
-                                    project_key=project_key,
-                                    issue_type=ticket.issue_type,
-                                    summary=ticket.summary,
-                                    description=ticket.description or "",
-                                    epic_key=epic_key,
-                                )
-                            )
-
-                            if ticket_result.get("success"):
-                                tickets_created += 1
-                                total_tickets += 1
-                                ticket_key = ticket_result.get("key", "")
-                                logger.info(
-                                    f"  ✓ Created ticket {idx}/{len(tickets)}: {ticket_key} - {ticket.summary}"
-                                )
-                            else:
-                                error_msg = ticket_result.get("error", "Unknown error")
-                                logger.warning(
-                                    f"  ✗ Failed to create ticket '{ticket.summary}': {error_msg}"
-                                )
-                                ticket_errors.append(
-                                    {"summary": ticket.summary, "error": error_msg}
-                                )
-
-                            # Rate limiting: 0.5 seconds between ticket creations
-                            # Jira Cloud: 10 requests/second per app, so 0.5s = 2 req/s is conservative
-                            await asyncio.sleep(0.5)
-
-                        except Exception as ticket_error:
-                            logger.error(
-                                f"  ✗ Exception creating ticket '{ticket.summary}': {ticket_error}"
-                            )
-                            ticket_errors.append(
-                                {"summary": ticket.summary, "error": str(ticket_error)}
-                            )
-
-                    logger.info(
-                        f"Completed epic '{epic.epic_name}': {tickets_created}/{len(tickets)} tickets created"
-                    )
-
-                details.append(
-                    {
-                        "template_epic_id": epic.id,
-                        "epic_name": epic.epic_name,
-                        "epic_key": epic_key,
-                        "status": "created",
-                        "tickets_created": tickets_created,
-                        "ticket_errors": ticket_errors if ticket_errors else None,
-                    }
-                )
-
-                # Rate limiting between epics (1 second)
-                await asyncio.sleep(1.0)
-
-            except Exception as epic_error:
-                logger.error(
-                    f"Exception creating epic '{epic.epic_name}': {epic_error}"
-                )
-                errors.append({"epic_name": epic.epic_name, "error": str(epic_error)})
-
-        return {
-            "total_epics": total_epics,
-            "total_tickets": total_tickets,
-            "details": details,
-            "errors": errors,
-        }
-
     try:
         data = request.get_json()
         epic_ids = data.get("epic_ids", [])
@@ -287,54 +147,86 @@ def import_templates_to_project(user, project_key):
         if not epic_ids:
             return jsonify({"success": False, "error": "No epics selected"}), 400
 
-        session = get_session()
-
-        # Fetch selected epics
-        epics = (
-            session.query(TemplateEpic)
-            .filter(TemplateEpic.id.in_(epic_ids))
-            .order_by(TemplateEpic.sort_order)
-            .all()
-        )
-
-        if not epics:
-            return jsonify({"success": False, "error": "No valid epics found"}), 404
+        # Trigger async Celery task
+        task = import_jira_templates_task.delay(project_key, epic_ids, import_tickets)
 
         logger.info(
-            f"Starting template import to {project_key}: {len(epics)} epics, import_tickets={import_tickets}"
-        )
-
-        # Initialize Jira client
-        jira_client = JiraMCPClient(
-            jira_url=settings.jira.url,
-            username=settings.jira.username,
-            api_token=settings.jira.api_token,
-        )
-
-        # Run all async operations in a single event loop
-        result = asyncio.run(process_imports())
-
-        session.close()
-
-        logger.info(
-            f"Template import completed: {result['total_epics']} epics, {result['total_tickets']} tickets"
+            f"Started template import task {task.id} for project {project_key}: {len(epic_ids)} epics"
         )
 
         return jsonify(
             {
                 "success": True,
-                "imported": {
-                    "epics": result["total_epics"],
-                    "tickets": result["total_tickets"],
-                },
-                "details": result["details"],
-                "errors": result["errors"],
+                "task_id": task.id,
+                "message": "Import started in background. Use task_id to check status.",
             }
         )
 
     except Exception as e:
-        logger.error(f"Error importing templates: {e}")
-        import traceback
-
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Error starting template import: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@jira_templates_bp.route("/import-status/<task_id>", methods=["GET"])
+@auth_required
+def get_import_status(user, task_id):
+    """
+    Get the status of a template import task.
+
+    Returns:
+    {
+        "state": "PROGRESS" | "SUCCESS" | "FAILURE" | "PENDING",
+        "current": 50,  # Items processed so far
+        "total": 100,   # Total items to process
+        "status": "Creating ticket 50/100...",  # Current status message
+        "epics_created": 10,
+        "tickets_created": 45,
+        "result": {...}  # Final result when SUCCESS
+    }
+    """
+    try:
+        task = AsyncResult(task_id)
+
+        if task.state == "PENDING":
+            response = {
+                "state": task.state,
+                "current": 0,
+                "total": 1,
+                "status": "Task is waiting to start...",
+            }
+        elif task.state == "PROGRESS":
+            response = {
+                "state": task.state,
+                "current": task.info.get("current", 0),
+                "total": task.info.get("total", 1),
+                "status": task.info.get("status", ""),
+                "epics_created": task.info.get("epics_created", 0),
+                "tickets_created": task.info.get("tickets_created", 0),
+            }
+        elif task.state == "SUCCESS":
+            response = {
+                "state": task.state,
+                "current": 100,
+                "total": 100,
+                "status": "Import completed!",
+                "result": task.result,
+            }
+        elif task.state == "FAILURE":
+            response = {
+                "state": task.state,
+                "current": 0,
+                "total": 1,
+                "status": f"Task failed: {str(task.info)}",
+                "error": str(task.info),
+            }
+        else:
+            response = {
+                "state": task.state,
+                "status": f"Unknown state: {task.state}",
+            }
+
+        return jsonify(response)
+
+    except Exception as e:
+        logger.error(f"Error getting task status: {e}")
+        return jsonify({"state": "FAILURE", "error": str(e)}), 500

@@ -59,6 +59,14 @@ const ImportJiraTemplatesDialog: React.FC<ImportJiraTemplatesDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{
+    current: number;
+    total: number;
+    status: string;
+    epics_created: number;
+    tickets_created: number;
+  } | null>(null);
   const notify = useNotify();
 
   // Fetch templates when dialog opens
@@ -66,8 +74,76 @@ const ImportJiraTemplatesDialog: React.FC<ImportJiraTemplatesDialogProps> = ({
     if (open) {
       fetchTemplates();
       setImportResult(null);
+      setTaskId(null);
+      setProgress(null);
     }
   }, [open]);
+
+  // Poll task status when importing
+  useEffect(() => {
+    if (!taskId || !importing) {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(
+          `${getApiUrl()}/api/jira-templates/import-status/${taskId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch import status');
+        }
+
+        const data = await response.json();
+
+        if (data.state === 'PROGRESS') {
+          setProgress({
+            current: data.current || 0,
+            total: data.total || 1,
+            status: data.status || '',
+            epics_created: data.epics_created || 0,
+            tickets_created: data.tickets_created || 0,
+          });
+        } else if (data.state === 'SUCCESS') {
+          setImportResult(data.result);
+          setImporting(false);
+          setProgress(null);
+          clearInterval(pollInterval);
+
+          if (data.result?.success) {
+            notify(
+              `Successfully imported ${data.result.imported.epics} epics and ${data.result.imported.tickets} tickets`,
+              { type: 'success' }
+            );
+            if (onSuccess) {
+              onSuccess();
+            }
+          }
+        } else if (data.state === 'FAILURE') {
+          setImporting(false);
+          setProgress(null);
+          clearInterval(pollInterval);
+          notify(`Import failed: ${data.error || 'Unknown error'}`, { type: 'error' });
+        }
+      } catch (error: any) {
+        console.error('Error polling task status:', error);
+        // Don't stop polling on transient errors, but notify user
+        if (error.message !== 'Failed to fetch import status') {
+          notify(`Error checking import status: ${error.message}`, { type: 'error' });
+        }
+      }
+    }, 1500); // Poll every 1.5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [taskId, importing, notify, onSuccess]);
 
   const fetchTemplates = async () => {
     try {
@@ -140,24 +216,20 @@ const ImportJiraTemplatesDialog: React.FC<ImportJiraTemplatesDialogProps> = ({
       );
 
       if (!response.ok) {
-        throw new Error('Failed to import templates');
+        throw new Error('Failed to start import');
       }
 
       const result = await response.json();
-      setImportResult(result);
 
-      if (result.success) {
-        notify(
-          `Successfully imported ${result.imported.epics} epics and ${result.imported.tickets} tickets`,
-          { type: 'success' }
-        );
-        if (onSuccess) {
-          onSuccess();
-        }
+      if (result.success && result.task_id) {
+        // Start polling for progress
+        setTaskId(result.task_id);
+        notify('Import started. This may take a few minutes...', { type: 'info' });
+      } else {
+        throw new Error(result.error || 'Failed to start import');
       }
     } catch (error: any) {
-      notify(`Error importing templates: ${error.message}`, { type: 'error' });
-    } finally {
+      notify(`Error starting import: ${error.message}`, { type: 'error' });
       setImporting(false);
     }
   };
@@ -319,10 +391,50 @@ const ImportJiraTemplatesDialog: React.FC<ImportJiraTemplatesDialogProps> = ({
 
         {importing && (
           <Box mt={2}>
-            <LinearProgress />
-            <Typography variant="body2" color="text.secondary" mt={1} textAlign="center">
-              Creating epics and tickets in Jira...
-            </Typography>
+            <Box mb={1}>
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                Import Progress
+              </Typography>
+              <LinearProgress
+                variant={progress ? 'determinate' : 'indeterminate'}
+                value={progress ? (progress.current / progress.total) * 100 : 0}
+                sx={{ height: 8, borderRadius: 1 }}
+              />
+            </Box>
+
+            {progress && (
+              <Box>
+                <Box display="flex" justifyContent="space-between" mb={1}>
+                  <Typography variant="body2" color="text.secondary">
+                    {progress.status}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {progress.current} / {progress.total} items
+                  </Typography>
+                </Box>
+
+                <Box display="flex" gap={2}>
+                  <Chip
+                    label={`${progress.epics_created} epics created`}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={`${progress.tickets_created} tickets created`}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  />
+                </Box>
+              </Box>
+            )}
+
+            {!progress && (
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                Starting import...
+              </Typography>
+            )}
           </Box>
         )}
       </DialogContent>
