@@ -82,6 +82,7 @@ celery_app = Celery(
         "src.tasks.vector_tasks",
         "src.tasks.notification_tasks",
         "src.tasks.backfill_tasks",  # Include backfill tasks for data synchronization
+        "src.tasks.template_import_tasks",  # Include Jira template import tasks
         "src.webhooks.fireflies_webhook",  # Include webhook task for Fireflies meeting processing
     ],
 )
