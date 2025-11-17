@@ -111,6 +111,14 @@ def upgrade() -> None:
             ) THEN
                 ALTER TABLE projects ADD COLUMN show_budget_tab BOOLEAN DEFAULT true;
             END IF;
+
+            -- todo_items.source (also dropped by same migration)
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'todo_items' AND column_name = 'source'
+            ) THEN
+                ALTER TABLE todo_items ADD COLUMN source VARCHAR(100);
+            END IF;
         END $$;
     """)
 
@@ -122,6 +130,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove the restored columns (NOT RECOMMENDED - data loss!)."""
+    op.drop_column('todo_items', 'source')
     op.drop_index('idx_projects_project_work_type', table_name='projects')
     op.drop_column('projects', 'show_budget_tab')
     op.drop_column('projects', 'lead')
