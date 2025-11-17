@@ -633,7 +633,12 @@ class TodoScheduler:
             logger.error(f"Error sending weekly hours reports: {e}")
 
     def sync_tempo_hours(self):
-        """Sync Tempo hours to database (synchronous wrapper)."""
+        """
+        Sync Tempo hours to database (synchronous wrapper).
+
+        NOTE: Notifications are now handled by the TempoSyncJob itself.
+        This method just calls the job and returns the stats.
+        """
         try:
             logger.info("Starting scheduled Tempo hours sync")
             stats = run_tempo_sync()
@@ -643,232 +648,14 @@ class TodoScheduler:
                     f"Tempo sync completed successfully: "
                     f"{stats['projects_updated']} projects updated in {stats['duration_seconds']:.2f}s"
                 )
-
-                # Get project hours summary from database
-                project_summary = self._get_project_hours_summary()
-
-                # Send notification about sync completion with project status
-                summary_body = f"✅ *Tempo Hours Sync Completed*\n\n"
-                summary_body += f"• Projects Updated: {stats['projects_updated']}\n"
-                summary_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
-                summary_body += (
-                    f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
-                )
-
-                if stats.get("unique_projects_tracked", 0) > 0:
-                    summary_body += f"• Unique Projects Tracked: {stats['unique_projects_tracked']}\n"
-
-                # Add project hours summary if available
-                if project_summary:
-                    summary_body += (
-                        f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary:*\n"
-                    )
-
-                    for project in project_summary:
-                        status_emoji = project["emoji"]
-                        summary_body += (
-                            f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
-                        )
-
-                        if project["forecasted_hours"] > 0:
-                            summary_body += (
-                                f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
-                            )
-                            summary_body += (
-                                f"  • Actual: {project['actual_hours']:.1f}h\n"
-                            )
-                            summary_body += f"  • Usage: {project['percentage']:.1f}%\n"
-                        else:
-                            # No forecast - just show actual hours
-                            summary_body += (
-                                f"  • Actual: {project['actual_hours']:.1f}h\n"
-                            )
-                            summary_body += f"  • (No forecast set)\n"
-
-                # Only send notification if in production
-                import os
-
-                flask_env = os.getenv("FLASK_ENV")
-                logger.info(
-                    f"FLASK_ENV={flask_env}, checking if should send notification..."
-                )
-                if flask_env == "production":
-                    logger.info("Sending Tempo sync notification to Slack...")
-                    content = NotificationContent(
-                        title="Tempo Hours Sync", body=summary_body, priority="normal"
-                    )
-                    try:
-                        # CHANNEL BROADCAST DISABLED - DM-only by design
-                        # Notifications are now sent ONLY as DMs to opted-in users (via notify_project_hours_forecast preference)
-                        # This prevents notification fatigue and respects user opt-in preferences.
-                        # Channel broadcasts were removed to eliminate duplicate notifications.
-                        #
-                        # asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
-                        # logger.info("✅ Tempo sync notification sent to channel successfully")
-
-                        # Send individual DMs to opted-in users
-                        from src.utils.database import session_scope
-                        from src.models.user import User, UserWatchedProject
-
-                        opted_in_users = []
-                        with session_scope() as db_session:
-                            # CRITICAL FIX: Only notify users who:
-                            # 1. Have notify_project_hours_forecast enabled
-                            # 2. Have a Slack user ID configured
-                            # 3. Are watching at least one project (JOIN with user_watched_projects)
-                            from sqlalchemy.orm import joinedload
-
-                            opted_in_users = (
-                                db_session.query(User)
-                                .options(joinedload(User.watched_projects))  # Eagerly load watched_projects
-                                .join(
-                                    UserWatchedProject,
-                                    User.id == UserWatchedProject.user_id,
-                                )
-                                .filter(
-                                    User.notify_project_hours_forecast == True,
-                                    User.slack_user_id.isnot(None),
-                                )
-                                .distinct()  # Avoid duplicates if user watches multiple projects
-                                .all()
-                            )
-
-                            # Detach users from session to use them outside the context
-                            # NOTE: We eagerly loaded watched_projects above, so they'll be available after expunge
-                            # CRITICAL: Convert watched_projects to simple data structure BEFORE expunge
-                            # This avoids SQLAlchemy detached instance errors when accessing wp.project_key later
-                            for user in opted_in_users:
-                                # Store project_keys as a simple list of strings attached to user object
-                                user.watched_project_keys = [
-                                    wp.project_key for wp in user.watched_projects
-                                ]
-                                db_session.expunge(user)
-
-                        logger.info(
-                            f"Found {len(opted_in_users)} users opted in for project hours forecast with watched projects"
-                        )
-
-                        # Send DMs to opted-in users with personalized project summaries
-                        async def send_dms():
-                            for user in opted_in_users:
-                                try:
-                                    # Get user's watched project keys (materialized before expunge)
-                                    watched_project_keys = set(user.watched_project_keys)
-
-                                    # Filter project_summary to only include user's watched projects
-                                    user_projects = [
-                                        proj
-                                        for proj in project_summary
-                                        if proj["key"] in watched_project_keys
-                                    ]
-
-                                    # Skip if user has no relevant projects in this summary (edge case)
-                                    if not user_projects:
-                                        logger.info(
-                                            f"Skipping user {user.email} - no watched projects in current summary"
-                                        )
-                                        continue
-
-                                    # Build personalized summary
-                                    personalized_body = (
-                                        f"✅ *Tempo Hours Sync Completed*\n\n"
-                                    )
-                                    personalized_body += f"• Projects Updated: {stats['projects_updated']}\n"
-                                    personalized_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
-                                    personalized_body += f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
-
-                                    # Add personalized project hours summary
-                                    personalized_body += f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary* (Your Watched Projects):\n"
-
-                                    for project in user_projects:
-                                        status_emoji = project["emoji"]
-                                        personalized_body += f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
-
-                                        if project["forecasted_hours"] > 0:
-                                            personalized_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
-                                            personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
-                                            personalized_body += f"  • Usage: {project['percentage']:.1f}%\n"
-                                        else:
-                                            # No forecast - just show actual hours
-                                            personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
-                                            personalized_body += (
-                                                f"  • (No forecast set)\n"
-                                            )
-
-                                    await self.notifier._send_slack_dm(
-                                        slack_user_id=user.slack_user_id,
-                                        message=personalized_body,
-                                    )
-                                    logger.info(
-                                        f"Sent personalized project hours forecast DM to user {user.email} ({len(user_projects)} projects)"
-                                    )
-                                except Exception as user_error:
-                                    logger.error(
-                                        f"Error sending project hours forecast to user {user.email}: {user_error}"
-                                    )
-
-                        asyncio.run(send_dms())
-                        logger.info(
-                            f"✅ Sent project hours forecast to {len(opted_in_users)} users"
-                        )
-
-                    except Exception as notif_error:
-                        logger.error(
-                            f"❌ Failed to send Tempo sync notification: {notif_error}",
-                            exc_info=True,
-                        )
-                        # Re-raise to ensure Celery task is marked as failed
-                        raise
-                else:
-                    logger.info(
-                        f"Skipping notification (not in production, FLASK_ENV={flask_env})"
-                    )
             else:
                 error_msg = stats.get("error", "Unknown error")
                 logger.error(f"Tempo sync failed: {error_msg}")
-
-                # CHANNEL BROADCAST DISABLED - Error notifications also DM-only by design
-                # Error notifications are logged but not sent to avoid notification fatigue.
-                # Ops teams should monitor logs or set up alerting based on log aggregation.
-                #
-                # content = NotificationContent(
-                #     title="⚠️ Tempo Hours Sync Failed",
-                #     body=f"Error: {error_msg}\n\nPlease check logs for details.",
-                #     priority="high"
-                # )
-                #
-                # import os
-                # if os.getenv('FLASK_ENV') == 'production':
-                #     try:
-                #         asyncio.run(self.notifier.send_notification(content, channels=["slack"]))
-                #     except Exception as notif_error:
-                #         logger.error(f"❌ Failed to send error notification: {notif_error}", exc_info=True)
-
                 # Raise exception to mark Celery task as failed
                 raise Exception(f"Tempo sync failed: {error_msg}")
 
         except Exception as e:
             logger.error(f"Error in scheduled Tempo sync: {e}", exc_info=True)
-
-            # Send critical error notification
-            import os
-
-            if os.getenv("FLASK_ENV") == "production":
-                try:
-                    content = NotificationContent(
-                        title="🚨 Tempo Hours Sync Critical Error",
-                        body=f"Critical error occurred during Tempo sync:\n\n{str(e)}\n\nPlease check logs immediately.",
-                        priority="urgent",
-                    )
-                    asyncio.run(
-                        self.notifier.send_notification(content, channels=["slack"])
-                    )
-                except Exception as notif_error:
-                    logger.error(
-                        f"❌ Failed to send critical error notification: {notif_error}",
-                        exc_info=True,
-                    )
-
             # Re-raise exception to ensure Celery task is marked as failed
             raise
 

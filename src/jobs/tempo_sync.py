@@ -5,6 +5,7 @@ Scheduled job to update current month and YTD hours from Tempo for all projects.
 Runs nightly at 4am EST.
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Optional
@@ -194,6 +195,244 @@ class TempoSyncJob:
         logger.info(f"Completed fetching hours for {len(ytd_hours)} projects")
         return ytd_hours
 
+    def _get_project_hours_summary(self):
+        """Get summary of actual vs forecasted hours for current month."""
+        try:
+            now = datetime.now()
+            current_month = datetime(now.year, now.month, 1).date()
+
+            with self.engine.connect() as conn:
+                result = conn.execute(
+                    text(
+                        """
+                    SELECT
+                        p.key,
+                        p.name,
+                        pmf.forecasted_hours,
+                        pmf.actual_monthly_hours
+                    FROM projects p
+                    LEFT JOIN project_monthly_forecast pmf
+                        ON p.key = pmf.project_key
+                        AND pmf.month_year = :current_month
+                    WHERE p.is_active = true
+                        AND (
+                            pmf.actual_monthly_hours > 0
+                            OR pmf.forecasted_hours > 0
+                        )
+                    ORDER BY p.name
+                """
+                    ),
+                    {"current_month": current_month},
+                )
+
+                projects = []
+                for row in result:
+                    forecasted = float(row[2]) if row[2] else 0
+                    actual = float(row[3]) if row[3] else 0
+
+                    # Show all projects with actual hours or forecasted hours
+                    if actual > 0 or forecasted > 0:
+                        if forecasted > 0:
+                            percentage = (actual / forecasted) * 100
+
+                            # Color coding based on usage
+                            if percentage >= 100:
+                                emoji = "🔴"  # Red - over budget
+                            elif percentage >= 80:
+                                emoji = "🟡"  # Yellow - close to budget
+                            else:
+                                emoji = "🟢"  # Green - well within budget
+                        else:
+                            # No forecast, just show actual hours
+                            percentage = 0
+                            emoji = "⚪"  # White - no forecast
+
+                        projects.append(
+                            {
+                                "key": row[0],
+                                "name": row[1],
+                                "forecasted_hours": forecasted,
+                                "actual_hours": actual,
+                                "percentage": percentage,
+                                "emoji": emoji,
+                            }
+                        )
+
+                return projects
+
+        except Exception as e:
+            logger.error(f"Error getting project hours summary: {e}")
+            return []
+
+    def send_slack_notification(self, stats: Dict):
+        """
+        Send Slack notification about Tempo sync completion.
+        Sends personalized DMs to opted-in users with their watched projects.
+
+        Args:
+            stats: Dictionary containing job execution statistics
+        """
+        try:
+            logger.info("Preparing Tempo sync notification...")
+
+            # Get project hours summary from database
+            project_summary = self._get_project_hours_summary()
+
+            # Build summary message
+            summary_body = f"✅ *Tempo Hours Sync Completed*\n\n"
+            summary_body += f"• Projects Updated: {stats['projects_updated']}\n"
+            summary_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
+            summary_body += (
+                f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+            )
+
+            if stats.get("unique_projects_tracked", 0) > 0:
+                summary_body += f"• Unique Projects Tracked: {stats['unique_projects_tracked']}\n"
+
+            # Add project hours summary if available
+            if project_summary:
+                summary_body += (
+                    f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary:*\n"
+                )
+
+                for project in project_summary:
+                    status_emoji = project["emoji"]
+                    summary_body += (
+                        f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
+                    )
+
+                    if project["forecasted_hours"] > 0:
+                        summary_body += (
+                            f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
+                        )
+                        summary_body += (
+                            f"  • Actual: {project['actual_hours']:.1f}h\n"
+                        )
+                        summary_body += f"  • Usage: {project['percentage']:.1f}%\n"
+                    else:
+                        # No forecast - just show actual hours
+                        summary_body += (
+                            f"  • Actual: {project['actual_hours']:.1f}h\n"
+                        )
+                        summary_body += f"  • (No forecast set)\n"
+
+            # Send notification to opted-in users
+            logger.info("Sending Tempo sync notification to opted-in users...")
+
+            # Import notification manager
+            from src.managers.notifications import NotificationManager
+            from src.utils.database import session_scope
+            from src.models.user import User, UserWatchedProject
+            from sqlalchemy.orm import joinedload
+
+            # Get notification manager instance
+            notifier = NotificationManager()
+
+            # Get opted-in users
+            opted_in_users = []
+            with session_scope() as db_session:
+                # Get users who:
+                # 1. Have notify_project_hours_forecast enabled
+                # 2. Have a Slack user ID configured
+                # 3. Are watching at least one project
+                opted_in_users = (
+                    db_session.query(User)
+                    .options(joinedload(User.watched_projects))  # Eagerly load watched_projects
+                    .join(
+                        UserWatchedProject,
+                        User.id == UserWatchedProject.user_id,
+                    )
+                    .filter(
+                        User.notify_project_hours_forecast == True,
+                        User.slack_user_id.isnot(None),
+                    )
+                    .distinct()  # Avoid duplicates if user watches multiple projects
+                    .all()
+                )
+
+                # Convert watched_projects to simple data structure BEFORE expunge
+                # This avoids SQLAlchemy detached instance errors
+                for user in opted_in_users:
+                    user.watched_project_keys = [
+                        wp.project_key for wp in user.watched_projects
+                    ]
+                    db_session.expunge(user)
+
+            logger.info(
+                f"Found {len(opted_in_users)} users opted in for project hours forecast"
+            )
+
+            # Send DMs to opted-in users with personalized project summaries
+            async def send_dms():
+                for user in opted_in_users:
+                    try:
+                        # Get user's watched project keys
+                        watched_project_keys = set(user.watched_project_keys)
+
+                        # Filter project_summary to only include user's watched projects
+                        user_projects = [
+                            proj
+                            for proj in project_summary
+                            if proj["key"] in watched_project_keys
+                        ]
+
+                        # Skip if user has no relevant projects in this summary
+                        if not user_projects:
+                            logger.info(
+                                f"Skipping user {user.email} - no watched projects in current summary"
+                            )
+                            continue
+
+                        # Build personalized summary
+                        personalized_body = (
+                            f"✅ *Tempo Hours Sync Completed*\n\n"
+                        )
+                        personalized_body += f"• Projects Updated: {stats['projects_updated']}\n"
+                        personalized_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
+                        personalized_body += f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+
+                        # Add personalized project hours summary
+                        personalized_body += f"\n📊 *{datetime.now().strftime('%B %Y')} Hours Summary* (Your Watched Projects):\n"
+
+                        for project in user_projects:
+                            status_emoji = project["emoji"]
+                            personalized_body += f"\n{status_emoji} *{project['name']}* ({project['key']})\n"
+
+                            if project["forecasted_hours"] > 0:
+                                personalized_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
+                                personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                                personalized_body += f"  • Usage: {project['percentage']:.1f}%\n"
+                            else:
+                                # No forecast - just show actual hours
+                                personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
+                                personalized_body += (
+                                    f"  • (No forecast set)\n"
+                                )
+
+                        await notifier._send_slack_dm(
+                            slack_user_id=user.slack_user_id,
+                            message=personalized_body,
+                        )
+                        logger.info(
+                            f"Sent personalized project hours forecast DM to user {user.email} ({len(user_projects)} projects)"
+                        )
+                    except Exception as user_error:
+                        logger.error(
+                            f"Error sending project hours forecast to user {user.email}: {user_error}"
+                        )
+
+            asyncio.run(send_dms())
+            logger.info(
+                f"✅ Sent project hours forecast to {len(opted_in_users)} users"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"❌ Failed to send Tempo sync notification: {e}",
+                exc_info=True,
+            )
+            # Don't re-raise - notification failure shouldn't fail the job
+
     def run(self) -> Dict:
         """
         Execute the Tempo sync job.
@@ -244,6 +483,15 @@ class TempoSyncJob:
             logger.info(f"Tempo sync job completed successfully in {duration:.2f}s")
             logger.info(f"Stats: {stats}")
 
+            # Send Slack notification on success
+            try:
+                self.send_slack_notification(stats)
+            except Exception as notif_error:
+                logger.error(
+                    f"Failed to send success notification (job still succeeded): {notif_error}",
+                    exc_info=True,
+                )
+
             return stats
 
         except Exception as e:
@@ -252,13 +500,24 @@ class TempoSyncJob:
 
             logger.error(f"Tempo sync job failed after {duration:.2f}s: {e}")
 
-            return {
+            error_stats = {
                 "success": False,
                 "start_time": start_time.isoformat(),
                 "end_time": end_time.isoformat(),
                 "duration_seconds": duration,
                 "error": str(e),
             }
+
+            # Send Slack notification on failure
+            try:
+                self.send_slack_notification(error_stats)
+            except Exception as notif_error:
+                logger.error(
+                    f"Failed to send failure notification: {notif_error}",
+                    exc_info=True,
+                )
+
+            return error_stats
 
 
 def run_tempo_sync():
