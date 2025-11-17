@@ -36,6 +36,7 @@ import {
 } from '@mui/icons-material';
 import { getApiUrl } from '../config';
 import { useNotify } from 'react-admin';
+import { jiraApi, JiraIssueType } from '../api/jira';
 
 interface TemplateTicket {
   id: number;
@@ -59,11 +60,11 @@ interface TemplateEpic {
   ticket_count: number;
 }
 
-const ISSUE_TYPES = ['Story', 'Task', 'Bug', 'Epic', 'Subtask'];
-
 const JiraTemplatesManagement: React.FC = () => {
   const [epics, setEpics] = useState<TemplateEpic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [issueTypes, setIssueTypes] = useState<JiraIssueType[]>([]);
+  const [loadingIssueTypes, setLoadingIssueTypes] = useState(false);
 
   // Epic editing state
   const [epicDialogOpen, setEpicDialogOpen] = useState(false);
@@ -117,8 +118,29 @@ const JiraTemplatesManagement: React.FC = () => {
     }
   };
 
+  const fetchIssueTypes = async () => {
+    try {
+      setLoadingIssueTypes(true);
+      const types = await jiraApi.fetchIssueTypes();
+      setIssueTypes(types);
+    } catch (error: any) {
+      notify(`Error loading issue types: ${error.message}`, { type: 'error' });
+      // Set default fallback issue types if API fails
+      setIssueTypes([
+        { id: '1', name: 'Story' },
+        { id: '2', name: 'Task' },
+        { id: '3', name: 'Bug' },
+        { id: '4', name: 'Epic' },
+        { id: '5', name: 'Subtask' },
+      ]);
+    } finally {
+      setLoadingIssueTypes(false);
+    }
+  };
+
   useEffect(() => {
     fetchEpics();
+    fetchIssueTypes();
   }, []);
 
   // ========== EPIC CRUD HANDLERS ==========
@@ -523,7 +545,7 @@ const JiraTemplatesManagement: React.FC = () => {
         <DialogTitle>{editingTicket ? 'Edit Ticket Template' : 'Create Ticket Template'}</DialogTitle>
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            <FormControl fullWidth>
+            <FormControl fullWidth disabled={loadingIssueTypes}>
               <InputLabel>Issue Type</InputLabel>
               <Select
                 value={ticketForm.issue_type}
@@ -532,12 +554,17 @@ const JiraTemplatesManagement: React.FC = () => {
                   setTicketForm({ ...ticketForm, issue_type: e.target.value })
                 }
               >
-                {ISSUE_TYPES.map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {type}
+                {issueTypes.map((issueType) => (
+                  <MenuItem key={issueType.id} value={issueType.name}>
+                    {issueType.name}
                   </MenuItem>
                 ))}
               </Select>
+              {loadingIssueTypes && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                  <CircularProgress size={20} />
+                </Box>
+              )}
             </FormControl>
             <TextField
               label="Summary"
