@@ -264,12 +264,10 @@ const ImportJiraTemplatesDialog: React.FC<ImportJiraTemplatesDialogProps> = ({
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableRow>
-                      <TableCell>Epic Name</TableCell>
-                      <TableCell>Epic Key</TableCell>
-                      <TableCell>Tickets Created</TableCell>
-                      <TableCell>Status</TableCell>
-                    </TableRow>
+                    <TableCell>Epic Name</TableCell>
+                    <TableCell>Epic Key</TableCell>
+                    <TableCell>Tickets Created</TableCell>
+                    <TableCell>Status</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
