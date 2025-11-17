@@ -28,9 +28,11 @@ class EpicMappingService:
         # Initialize provider-specific client
         if self.provider == "anthropic":
             from anthropic import Anthropic
+
             self.client = Anthropic(api_key=self.api_key)
         elif self.provider == "openai":
             from openai import OpenAI
+
             self.client = OpenAI(api_key=self.api_key)
         else:
             raise ValueError(

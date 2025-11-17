@@ -137,7 +137,9 @@ class JiraMCPClient:
                         "content": [
                             {
                                 "type": "paragraph",
-                                "content": [{"type": "text", "text": description or ""}],
+                                "content": [
+                                    {"type": "text", "text": description or ""}
+                                ],
                             }
                         ],
                     },
@@ -222,7 +224,9 @@ class JiraMCPClient:
                         "content": [
                             {
                                 "type": "paragraph",
-                                "content": [{"type": "text", "text": description or ""}],
+                                "content": [
+                                    {"type": "text", "text": description or ""}
+                                ],
                             }
                         ],
                     },

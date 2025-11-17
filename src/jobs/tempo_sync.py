@@ -198,7 +198,9 @@ class TempoSyncJob:
                 # Log progress every project
                 total_elapsed = time.time() - fetch_start_time
                 avg_time_per_project = total_elapsed / idx
-                estimated_remaining = avg_time_per_project * (len(active_projects) - idx)
+                estimated_remaining = avg_time_per_project * (
+                    len(active_projects) - idx
+                )
                 logger.info(
                     f"  📊 Progress: {idx}/{len(active_projects)} complete | "
                     f"Elapsed: {total_elapsed/60:.1f}min | "
@@ -223,7 +225,9 @@ class TempoSyncJob:
                 f"(avg {avg_per_project:.1f}s per project)"
             )
         else:
-            logger.info(f"✅ Completed fetching hours for 0 projects in {total_time:.2f}s")
+            logger.info(
+                f"✅ Completed fetching hours for 0 projects in {total_time:.2f}s"
+            )
         return ytd_hours
 
     def _get_project_hours_summary(self):
@@ -318,7 +322,9 @@ class TempoSyncJob:
             )
 
             if stats.get("unique_projects_tracked", 0) > 0:
-                summary_body += f"• Unique Projects Tracked: {stats['unique_projects_tracked']}\n"
+                summary_body += (
+                    f"• Unique Projects Tracked: {stats['unique_projects_tracked']}\n"
+                )
 
             # Add project hours summary if available
             if project_summary:
@@ -336,15 +342,11 @@ class TempoSyncJob:
                         summary_body += (
                             f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
                         )
-                        summary_body += (
-                            f"  • Actual: {project['actual_hours']:.1f}h\n"
-                        )
+                        summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
                         summary_body += f"  • Usage: {project['percentage']:.1f}%\n"
                     else:
                         # No forecast - just show actual hours
-                        summary_body += (
-                            f"  • Actual: {project['actual_hours']:.1f}h\n"
-                        )
+                        summary_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
                         summary_body += f"  • (No forecast set)\n"
 
             # Send notification to opted-in users
@@ -369,7 +371,9 @@ class TempoSyncJob:
                 # 3. Are watching at least one project
                 opted_in_users = (
                     db_session.query(User)
-                    .options(joinedload(User.watched_projects))  # Eagerly load watched_projects
+                    .options(
+                        joinedload(User.watched_projects)
+                    )  # Eagerly load watched_projects
                     .join(
                         UserWatchedProject,
                         User.id == UserWatchedProject.user_id,
@@ -416,11 +420,13 @@ class TempoSyncJob:
                             continue
 
                         # Build personalized summary
-                        personalized_body = (
-                            f"✅ *Tempo Hours Sync Completed*\n\n"
+                        personalized_body = f"✅ *Tempo Hours Sync Completed*\n\n"
+                        personalized_body += (
+                            f"• Projects Updated: {stats['projects_updated']}\n"
                         )
-                        personalized_body += f"• Projects Updated: {stats['projects_updated']}\n"
-                        personalized_body += f"• Duration: {stats['duration_seconds']:.1f}s\n"
+                        personalized_body += (
+                            f"• Duration: {stats['duration_seconds']:.1f}s\n"
+                        )
                         personalized_body += f"• Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
 
                         # Add personalized project hours summary
@@ -432,14 +438,18 @@ class TempoSyncJob:
 
                             if project["forecasted_hours"] > 0:
                                 personalized_body += f"  • Forecasted: {project['forecasted_hours']:.1f}h\n"
-                                personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
-                                personalized_body += f"  • Usage: {project['percentage']:.1f}%\n"
+                                personalized_body += (
+                                    f"  • Actual: {project['actual_hours']:.1f}h\n"
+                                )
+                                personalized_body += (
+                                    f"  • Usage: {project['percentage']:.1f}%\n"
+                                )
                             else:
                                 # No forecast - just show actual hours
-                                personalized_body += f"  • Actual: {project['actual_hours']:.1f}h\n"
                                 personalized_body += (
-                                    f"  • (No forecast set)\n"
+                                    f"  • Actual: {project['actual_hours']:.1f}h\n"
                                 )
+                                personalized_body += f"  • (No forecast set)\n"
 
                         await notifier._send_slack_dm(
                             slack_user_id=user.slack_user_id,
