@@ -28,9 +28,19 @@ class MeetingPrepDeliveryService:
         Args:
             db: Database session (optional, will create if not provided)
         """
-        self.db = db or next(get_db())
-        self.notification_manager = NotificationManager(settings)
-        self.aggregator = ProjectActivityAggregator()
+        logger.info("🔧 Initializing MeetingPrepDeliveryService")
+        try:
+            self.db = db or next(get_db())
+            logger.info("✅ Database session initialized")
+
+            self.notification_manager = NotificationManager(settings)
+            logger.info("✅ NotificationManager initialized")
+
+            self.aggregator = ProjectActivityAggregator()
+            logger.info("✅ ProjectActivityAggregator initialized")
+        except Exception as e:
+            logger.error(f"❌ ERROR during initialization: {e}", exc_info=True)
+            raise
 
     def send_meeting_prep_digests(self) -> Dict[str, Any]:
         """Send meeting prep digests to all users watching projects with meetings today.
@@ -40,6 +50,8 @@ class MeetingPrepDeliveryService:
         Returns:
             Dictionary with delivery statistics
         """
+        logger.info("🚀 Starting send_meeting_prep_digests")
+
         stats = {
             "projects_with_meetings_today": [],
             "digests_sent_slack": 0,
@@ -49,8 +61,12 @@ class MeetingPrepDeliveryService:
         }
 
         try:
+            logger.info("📊 Fetching projects with meetings scheduled today...")
             # Get projects with meetings scheduled today
             projects_with_meetings = self._get_projects_with_meetings_today()
+            logger.info(
+                f"✅ Successfully fetched {len(projects_with_meetings)} projects"
+            )
             stats["projects_with_meetings_today"] = [
                 p["key"] for p in projects_with_meetings
             ]
@@ -159,22 +175,37 @@ class MeetingPrepDeliveryService:
         Returns:
             List of project dictionaries with key and name
         """
-        # Get current weekday name (lowercase: "monday", "tuesday", etc.)
-        today_weekday = datetime.now(timezone.utc).strftime("%A").lower()
+        try:
+            # Get current weekday name (lowercase: "monday", "tuesday", etc.)
+            today_weekday = datetime.now(timezone.utc).strftime("%A").lower()
+            logger.info(f"🗓️  Today is: {today_weekday}")
 
-        query = text(
+            query = text(
+                """
+                SELECT key, name
+                FROM projects
+                WHERE LOWER(weekly_meeting_day) = :today_weekday
+                AND is_active = TRUE
             """
-            SELECT key, name
-            FROM projects
-            WHERE LOWER(weekly_meeting_day) = :today_weekday
-            AND is_active = TRUE
-        """
-        )
+            )
 
-        result = self.db.execute(query, {"today_weekday": today_weekday})
-        projects = [{"key": row.key, "name": row.name} for row in result.fetchall()]
+            logger.info(
+                f"🔍 Executing SQL query for projects with weekly_meeting_day = {today_weekday}"
+            )
+            result = self.db.execute(query, {"today_weekday": today_weekday})
+            logger.info("✅ SQL query executed successfully, fetching results...")
 
-        return projects
+            projects = [{"key": row.key, "name": row.name} for row in result.fetchall()]
+            logger.info(
+                f"✅ Fetched {len(projects)} projects: {[p['key'] for p in projects]}"
+            )
+
+            return projects
+        except Exception as e:
+            logger.error(
+                f"❌ ERROR in _get_projects_with_meetings_today: {e}", exc_info=True
+            )
+            raise
 
     def _get_project_watchers(self, project_key: str) -> List[User]:
         """Get users watching a specific project.
@@ -213,27 +244,42 @@ class MeetingPrepDeliveryService:
         Returns:
             True if already sent today, False otherwise
         """
-        query = text(
+        try:
+            logger.info(
+                f"🔍 Checking if already sent to user {user_id} for project {project_key} today"
+            )
+
+            query = text(
+                """
+                SELECT COUNT(*) as count
+                FROM meeting_prep_deliveries
+                WHERE user_id = :user_id
+                AND project_key = :project_key
+                AND DATE(delivered_at) = :today
             """
-            SELECT COUNT(*) as count
-            FROM meeting_prep_deliveries
-            WHERE user_id = :user_id
-            AND project_key = :project_key
-            AND DATE(delivered_at) = :today
-        """
-        )
+            )
 
-        result = self.db.execute(
-            query,
-            {
-                "user_id": user_id,
-                "project_key": project_key,
-                "today": date.today(),
-            },
-        )
+            result = self.db.execute(
+                query,
+                {
+                    "user_id": user_id,
+                    "project_key": project_key,
+                    "today": date.today(),
+                },
+            )
 
-        count = result.fetchone().count
-        return count > 0
+            count = result.fetchone().count
+            already_sent = count > 0
+            logger.info(
+                f"✅ Deduplication check result: already_sent={already_sent} (count={count})"
+            )
+            return already_sent
+        except Exception as e:
+            logger.error(
+                f"❌ ERROR in _already_sent_today for user {user_id}, project {project_key}: {e}",
+                exc_info=True,
+            )
+            raise
 
     def _generate_digest_for_user(
         self, user: User, project_key: str, project_name: str
