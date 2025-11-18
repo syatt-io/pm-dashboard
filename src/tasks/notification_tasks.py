@@ -1575,7 +1575,7 @@ def run_time_tracking_compliance(self):
                 logger.info(
                     f"✅ Time Tracking Compliance completed: "
                     f"{stats['total_users']} users checked, {stats['compliance_percentage']:.1f}% compliant, "
-                    f"{stats['notifications_sent']} notifications sent in {stats['duration_seconds']:.2f}s"
+                    f"completed in {stats['duration_seconds']:.2f}s"
                 )
                 result = {"success": True, "task": "time_tracking_compliance", **stats}
                 tracker.set_result(result)
