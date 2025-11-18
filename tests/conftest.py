@@ -19,14 +19,18 @@ os.environ["ENCRYPTION_KEY"] = "test-encryption-key-32-bytes-long!"
 # ✅ FIXED: Add JWT_SECRET_KEY for tests (required after removing fallback)
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-32-bytes-long-for-testing-only!"
 
-from src.web_interface import app as flask_app
 from src.models import Base, User, UserRole, Learning, TodoItem
 from src.utils.database import get_engine
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def app():
-    """Create Flask app for testing."""
+    """Create Flask app for testing with lazy initialization."""
+    # Import Flask app lazily to avoid triggering full initialization at module load time
+    # This prevents the expensive database setup, blueprint registration, and middleware
+    # initialization that happens when web_interface.py is imported
+    from src.web_interface import app as flask_app
+
     flask_app.config["TESTING"] = True
     flask_app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
     yield flask_app
@@ -38,9 +42,9 @@ def client(app):
     return app.test_client()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def db_engine():
-    """Create in-memory database engine for testing."""
+    """Create in-memory database engine ONCE for entire test session."""
     engine = create_engine("sqlite:///:memory:", echo=False)
     Base.metadata.create_all(engine)
     yield engine
@@ -49,11 +53,21 @@ def db_engine():
 
 @pytest.fixture
 def db_session(db_engine):
-    """Create database session for testing."""
-    SessionLocal = sessionmaker(bind=db_engine)
+    """Create database session with transaction rollback for test isolation."""
+    # Create connection and begin transaction
+    connection = db_engine.connect()
+    transaction = connection.begin()
+
+    # Create session bound to connection
+    SessionLocal = sessionmaker(bind=connection)
     session = SessionLocal()
+
     yield session
+
+    # Rollback transaction to clean up test data without recreating schema
     session.close()
+    transaction.rollback()
+    connection.close()
 
 
 @pytest.fixture
@@ -113,8 +127,22 @@ def auth_headers(mock_user):
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
+@pytest.fixture(scope="module")
+def csrf_token(client):
+    """Get CSRF token ONCE per test module to avoid redundant HTTP calls."""
+    response = client.get("/api/csrf-token")
+    if response.status_code == 200:
+        data = response.get_json()
+        return data.get("csrf_token", "")
+    return ""
+
+
 def get_csrf_token(client):
-    """Helper function to get CSRF token from the test client."""
+    """Helper function to get CSRF token from the test client.
+
+    DEPRECATED: Use the csrf_token fixture instead for better performance.
+    This function is kept for backwards compatibility with existing tests.
+    """
     response = client.get("/api/csrf-token")
     if response.status_code == 200:
         data = response.get_json()

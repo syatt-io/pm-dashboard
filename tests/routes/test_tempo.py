@@ -158,8 +158,19 @@ class TestProjectDigest:
 
     @patch("src.routes.tempo.asyncio.run")
     @patch("src.services.project_activity_aggregator.ProjectActivityAggregator")
-    def test_generate_digest_success(self, mock_aggregator_class, mock_async, client):
+    @patch("src.utils.database.get_session")
+    def test_generate_digest_success(
+        self, mock_get_session, mock_aggregator_class, mock_async, client
+    ):
         """Test successful project digest generation."""
+        # Mock database session to return no cache (cache miss)
+        mock_session = MagicMock()
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_order_by = mock_filter.order_by.return_value
+        mock_order_by.first.return_value = None  # No cache entry
+        mock_get_session.return_value = mock_session
+
         mock_aggregator = MagicMock()
         mock_aggregator_class.return_value = mock_aggregator
 
@@ -212,8 +223,16 @@ class TestProjectDigest:
         assert "formatted_agenda" in data
 
     @patch("src.routes.tempo.asyncio.run")
-    def test_generate_digest_default_params(self, mock_async, client):
+    @patch("src.utils.database.get_session")
+    def test_generate_digest_default_params(self, mock_get_session, mock_async, client):
         """Test digest generation with default parameters."""
+        # Mock database session to return no cache (cache miss)
+        mock_session = MagicMock()
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_order_by = mock_filter.order_by.return_value
+        mock_order_by.first.return_value = None  # No cache entry
+        mock_get_session.return_value = mock_session
 
         def async_side_effect(coro):
             return {
@@ -238,8 +257,16 @@ class TestProjectDigest:
         assert data["days_back"] == 7  # Default value
 
     @patch("src.routes.tempo.asyncio.run")
-    def test_generate_digest_custom_days(self, mock_async, client):
+    @patch("src.utils.database.get_session")
+    def test_generate_digest_custom_days(self, mock_get_session, mock_async, client):
         """Test digest generation with custom days parameter."""
+        # Mock database session to return no cache (cache miss)
+        mock_session = MagicMock()
+        mock_query = mock_session.query.return_value
+        mock_filter = mock_query.filter.return_value
+        mock_order_by = mock_filter.order_by.return_value
+        mock_order_by.first.return_value = None  # No cache entry
+        mock_get_session.return_value = mock_session
 
         def async_side_effect(coro):
             return {

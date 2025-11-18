@@ -165,9 +165,14 @@ class TempoSyncJob:
         cache_stats = self.tempo_client.warm_jira_cache(
             active_projects, lookback_days=90
         )
+        duration_seconds = (
+            float(cache_stats.get("duration_seconds", 0))
+            if cache_stats.get("duration_seconds") is not None
+            else 0.0
+        )
         logger.info(
             f"Cache warming: {cache_stats.get('issues_cached', 0)} issues, "
-            f"{cache_stats.get('epics_cached', 0)} epics in {cache_stats.get('duration_seconds', 0):.1f}s"
+            f"{cache_stats.get('epics_cached', 0)} epics in {duration_seconds:.1f}s"
         )
 
         for idx, project_key in enumerate(active_projects, 1):

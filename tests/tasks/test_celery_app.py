@@ -294,6 +294,7 @@ class TestCeleryConfiguration:
             "src.tasks.vector_tasks",
             "src.tasks.notification_tasks",
             "src.tasks.backfill_tasks",
+            "src.tasks.template_import_tasks",
             "src.webhooks.fireflies_webhook",
         ]
         assert celery_app.conf.include == expected_includes

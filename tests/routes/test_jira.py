@@ -69,23 +69,23 @@ def test_get_jira_projects_with_database_enhancement(client, mocker):
     mock_engine.return_value.connect.return_value.__enter__.return_value = mock_conn
 
     # Mock the fetchall result (batch query) - returns list of row tuples
-    # Order matches the SELECT in jira.py lines 88-107
-    # key, is_active, project_work_type, total_hours, cumulative_hours, weekly_meeting_day,
-    # retainer_hours, send_meeting_emails, start_date, launch_date, forecasted_hours, actual_monthly_hours
+    # ✅ FIXED: Order matches the SELECT in jira.py lines 98-110
+    # key, is_active, project_work_type, description, weekly_meeting_day, retainer_hours,
+    # total_hours, send_meeting_emails, start_date, launch_date, forecasted_hours, actual_monthly_hours
     mock_result_row = Mock()
     mock_result_row.__getitem__ = lambda self, idx: [
-        "TEST",
-        True,
-        "project-based",
-        120.0,
-        155.0,
-        "Monday",
-        0,
-        False,
-        None,
-        None,
-        40.0,
-        35.0,
+        "TEST",  # key
+        True,  # is_active
+        "project-based",  # project_work_type
+        "Test project",  # description (was missing!)
+        "Monday",  # weekly_meeting_day (moved from index 5 to 4)
+        160.0,  # retainer_hours (was 0 at index 6, now float at index 5)
+        155.0,  # total_hours (was 120.0 at index 3, moved to index 6)
+        False,  # send_meeting_emails
+        None,  # start_date
+        None,  # launch_date
+        40.0,  # forecasted_hours (pmf.forecasted_hours)
+        35.0,  # actual_monthly_hours (pmf.actual_monthly_hours)
     ][idx]
     mock_conn.execute.return_value.fetchall.return_value = [mock_result_row]
 
