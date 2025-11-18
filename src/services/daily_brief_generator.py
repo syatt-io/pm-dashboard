@@ -120,8 +120,8 @@ class DailyBriefGenerator:
 
         # Footer
         dashboard_url = (
-            f"{settings.app.base_url}/insights"
-            if hasattr(settings.app, "base_url")
+            f"{settings.web.base_url}/insights"
+            if hasattr(settings.web, "base_url")
             else None
         )
         if dashboard_url:
@@ -226,8 +226,8 @@ class DailyBriefGenerator:
 
         # Footer
         dashboard_url = (
-            f"{settings.app.base_url}/insights"
-            if hasattr(settings.app, "base_url")
+            f"{settings.web.base_url}/insights"
+            if hasattr(settings.web, "base_url")
             else "#"
         )
         html_parts.append(
