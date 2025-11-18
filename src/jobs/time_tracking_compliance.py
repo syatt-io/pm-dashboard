@@ -500,7 +500,9 @@ class TimeTrackingComplianceJob:
         message = "\n".join(message_lines)
 
         # Send to PM channel (configured in settings or environment)
-        pm_channel = os.getenv("SLACK_PM_CHANNEL", "#pm-alerts")
+        pm_channel = os.getenv(
+            "SLACK_PM_CHANNEL", os.getenv("SLACK_CHANNEL", "#mikes-minion")
+        )
 
         try:
             # Use the Slack client directly for channel messages
