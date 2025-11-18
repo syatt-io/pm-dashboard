@@ -534,10 +534,11 @@ class MeetingPrepDeliveryService:
                     "digest_cache_id": digest_cache_id,
                 },
             )
-            self.db.commit()
+            # Note: Do NOT commit here - let the caller/tracker manage the transaction
 
         except Exception as e:
             logger.error(
                 f"Error recording delivery for user {user_id} / {project_key}: {e}"
             )
-            self.db.rollback()
+            # Note: Do NOT rollback here - let the caller/tracker handle transaction management
+            raise  # Re-raise so the tracker knows to rollback
