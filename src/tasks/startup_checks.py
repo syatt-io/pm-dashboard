@@ -120,6 +120,47 @@ def get_last_scheduled_time(
     return None
 
 
+def task_ran_successfully_today(job_name: str) -> bool:
+    """
+    Check if a task ran successfully today by querying the job_executions table.
+
+    Args:
+        job_name: The job name to check (e.g., 'job-monitoring-digest')
+
+    Returns:
+        True if the task ran successfully today, False otherwise
+    """
+    try:
+        from src.utils.database import get_session
+        from src.models import JobExecution
+        from datetime import datetime, timedelta
+
+        session = get_session()
+        try:
+            # Check for successful executions in the last 24 hours
+            cutoff_time = datetime.utcnow() - timedelta(hours=24)
+
+            successful_run = (
+                session.query(JobExecution)
+                .filter(
+                    JobExecution.job_name == job_name,
+                    JobExecution.status == "success",
+                    JobExecution.started_at >= cutoff_time,
+                )
+                .first()
+            )
+
+            return successful_run is not None
+
+        finally:
+            session.close()
+
+    except Exception as e:
+        logger.error(f"Error checking if task ran successfully: {e}")
+        # If we can't check, err on the side of caution and don't retry
+        return True
+
+
 def should_retry_task(task_name: str, minutes_since: int) -> bool:
     """
     Determine if a missed task should be retried.
@@ -146,10 +187,23 @@ def should_retry_task(task_name: str, minutes_since: int) -> bool:
         max_age = critical_tasks[task_name]
         return minutes_since <= max_age
 
-    # Special case: job-monitoring-digest is critical (monitors all jobs)
-    # Retry if missed within last 2 hours
+    # Special case: job-monitoring-digest is critical but we need to check if it actually ran
+    # This prevents duplicate digests after deployments
     if task_name == "job-monitoring-digest":
-        return minutes_since <= 120
+        if minutes_since <= 120:
+            # Check database to see if it actually ran successfully today
+            already_ran = task_ran_successfully_today("job-monitoring-digest")
+            if already_ran:
+                logger.info(
+                    f"⏭️  Skipping {task_name} retry - already ran successfully today"
+                )
+                return False
+            else:
+                logger.info(
+                    f"✅ {task_name} should be retried - no successful run found today"
+                )
+                return True
+        return False
 
     # Don't retry other notification tasks (not critical, will run on next schedule)
     if "reminder" in task_name.lower() or "digest" in task_name.lower():
