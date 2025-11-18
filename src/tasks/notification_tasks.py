@@ -1426,16 +1426,21 @@ def send_meeting_prep_digests(self):
     from src.utils.database import get_db
 
     logger.info("📅 Starting meeting prep digest delivery task...")
-    db = next(get_db())
+
+    # Create separate database sessions for tracker and service
+    # This prevents transaction poisoning - if one fails, the other can still complete
+    tracker_db = next(get_db())
+    service_db = next(get_db())
 
     try:
-        tracker = track_celery_task(self, db, "meeting-prep-digests")
+        tracker = track_celery_task(self, tracker_db, "meeting-prep-digests")
         with tracker:
             from src.services.meeting_prep_service import MeetingPrepDeliveryService
             from src.managers.notifications import NotificationManager
             from config.settings import settings
 
-            service = MeetingPrepDeliveryService(db)
+            # Service uses its own database session
+            service = MeetingPrepDeliveryService(service_db)
             stats = service.send_meeting_prep_digests()
             logger.info(f"✅ Meeting prep delivery complete: {stats}")
 
@@ -1476,7 +1481,9 @@ def send_meeting_prep_digests(self):
         logger.error(f"❌ Meeting prep delivery failed: {e}", exc_info=True)
         raise
     finally:
-        db.close()
+        # Close both database sessions
+        tracker_db.close()
+        service_db.close()
 
 
 @shared_task(name="src.tasks.notification_tasks.send_daily_briefs", bind=True)
