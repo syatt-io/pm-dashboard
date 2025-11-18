@@ -358,6 +358,78 @@ def trigger_celery_meeting_analysis_sync():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@scheduler_bp.route("/scheduler/celery/trigger-job", methods=["POST"])
+@admin_or_api_key_required
+def trigger_generic_celery_job():
+    """
+    Generic endpoint to trigger any scheduled job via Celery task.
+
+    Request JSON:
+    {
+        "job_name": "tempo-sync" | "time-tracking-compliance" | "meeting-analysis-sync"
+    }
+
+    Supported jobs:
+    - tempo-sync: Sync Tempo hours for all active projects
+    - time-tracking-compliance: Weekly time tracking compliance check
+    - meeting-analysis-sync: Analyze meetings from active projects
+
+    Authentication: Requires either admin JWT or X-Admin-Key header.
+    """
+    try:
+        from src.tasks.celery_app import celery_app
+
+        data = request.json or {}
+        job_name = data.get("job_name")
+
+        # Map job names to Celery task paths
+        job_mapping = {
+            "tempo-sync": "src.tasks.notification_tasks.sync_tempo_hours",
+            "time-tracking-compliance": "src.tasks.notification_tasks.run_time_tracking_compliance",
+            "meeting-analysis-sync": "src.tasks.notification_tasks.analyze_meetings",
+        }
+
+        if not job_name:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "job_name is required",
+                        "supported_jobs": list(job_mapping.keys()),
+                    }
+                ),
+                400,
+            )
+
+        task_path = job_mapping.get(job_name)
+        if not task_path:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": f"Unknown job: {job_name}",
+                        "supported_jobs": list(job_mapping.keys()),
+                    }
+                ),
+                400,
+            )
+
+        task = celery_app.send_task(task_path)
+        logger.info(f"Triggered job '{job_name}' with task ID: {task.id}")
+
+        return jsonify(
+            {
+                "success": True,
+                "message": f"{job_name} task queued",
+                "task_id": task.id,
+                "job_name": job_name,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error queuing job: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @scheduler_bp.route("/scheduler/celery/test-all", methods=["POST"])
 def trigger_all_celery_tasks():
     """Trigger all notification tasks via Celery for testing."""
