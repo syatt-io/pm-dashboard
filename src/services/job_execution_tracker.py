@@ -164,12 +164,9 @@ class JobExecutionTracker:
         final_result = result_data or self._result_data
 
         try:
-            # Merge execution object back into session to reattach it
-            # This is critical when the job creates its own database sessions
-            # (e.g., TodoScheduler, run_tempo_sync) which can cause the
-            # tracker's execution object to become detached or non-persistent
-            # merge() will either reattach or fetch a fresh copy from the database
-            self.execution = self.db_session.merge(self.execution)
+            # NOTE: merge() removed - the execution object is already attached to the session
+            # from the start() method. With separate database sessions for tracker and service,
+            # merge() was causing transaction failures instead of helping.
 
             completed_at = datetime.now(timezone.utc)
             duration = int((completed_at - self.execution.started_at).total_seconds())
@@ -229,10 +226,9 @@ class JobExecutionTracker:
             return
 
         try:
-            # Merge execution object back into session to reattach it
-            # This is critical when the job creates its own database sessions
-            # merge() will either reattach or fetch a fresh copy from the database
-            self.execution = self.db_session.merge(self.execution)
+            # NOTE: merge() removed - the execution object is already attached to the session
+            # from the start() method. With separate database sessions for tracker and service,
+            # merge() was causing transaction failures instead of helping.
 
             completed_at = datetime.now(timezone.utc)
             duration = int((completed_at - self.execution.started_at).total_seconds())
