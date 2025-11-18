@@ -210,7 +210,7 @@ class TimeTrackingComplianceJob:
         session = self.Session()
         try:
             for user_data in all_users:
-                is_compliant = user_data["hours"] >= self.COMPLIANT_THRESHOLD
+                is_compliant = user_data["hours"] >= user_data["threshold"]
 
                 # Upsert compliance record
                 existing = (
