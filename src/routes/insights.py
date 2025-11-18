@@ -6,7 +6,12 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy.orm import Session
 
 from src.utils.database import get_db
-from src.models import ProactiveInsight, User, UserNotificationPreferences
+from src.models import (
+    ProactiveInsight,
+    User,
+    UserNotificationPreferences,
+    UserWatchedProject,
+)
 from src.services.auth import auth_required
 
 logger = logging.getLogger(__name__)
@@ -24,6 +29,8 @@ def list_insights(user):
     - severity: Filter by severity (critical, warning, info)
     - insight_type: Filter by type (stale_pr, budget_alert, etc.)
     - limit: Max number to return (default: 50)
+    - all_projects: 'true' to show all projects (admin only, default: false)
+    - user_id: Filter by specific user (admin only)
 
     Returns:
         JSON response with list of insights
@@ -31,8 +38,36 @@ def list_insights(user):
     db: Session = next(get_db())
 
     try:
-        # Build query
-        query = db.query(ProactiveInsight).filter(ProactiveInsight.user_id == user.id)
+        # Check admin-only parameters
+        all_projects = request.args.get("all_projects", "false").lower() == "true"
+        filter_user_id = request.args.get("user_id")
+
+        # Build query - start with user filter
+        if user.is_admin() and filter_user_id:
+            # Admin viewing specific user's insights
+            query = db.query(ProactiveInsight).filter(
+                ProactiveInsight.user_id == filter_user_id
+            )
+        else:
+            # Default: current user's insights
+            query = db.query(ProactiveInsight).filter(
+                ProactiveInsight.user_id == user.id
+            )
+
+        # Filter by watched projects (unless admin with all_projects=true)
+        if not (user.is_admin() and all_projects):
+            watched_projects = (
+                db.query(UserWatchedProject)
+                .filter(UserWatchedProject.user_id == user.id)
+                .all()
+            )
+            watched_keys = [wp.project_key for wp in watched_projects]
+
+            if watched_keys:
+                query = query.filter(ProactiveInsight.project_key.in_(watched_keys))
+            else:
+                # User has no watched projects - return empty result
+                return jsonify({"insights": [], "total": 0}), 200
 
         # Filter by dismissed status
         include_dismissed = request.args.get("dismissed", "false").lower() == "true"
@@ -224,6 +259,9 @@ def act_on_insight(user: User, insight_id: str):
 def get_insight_stats(user: User):
     """Get insight statistics for the current user.
 
+    Query parameters:
+    - all_projects: 'true' to include all projects (admin only, default: false)
+
     Returns:
         JSON response with stats:
         - total_insights
@@ -235,15 +273,64 @@ def get_insight_stats(user: User):
     db: Session = next(get_db())
 
     try:
-        # Get all non-dismissed insights
-        insights = (
-            db.query(ProactiveInsight)
-            .filter(
-                ProactiveInsight.user_id == user.id,
-                ProactiveInsight.dismissed_at.is_(None),
-            )
-            .all()
+        # Check admin-only parameters
+        all_projects = request.args.get("all_projects", "false").lower() == "true"
+
+        # Build base query for non-dismissed insights
+        query = db.query(ProactiveInsight).filter(
+            ProactiveInsight.user_id == user.id,
+            ProactiveInsight.dismissed_at.is_(None),
         )
+
+        # Filter by watched projects (unless admin with all_projects=true)
+        if not (user.is_admin() and all_projects):
+            watched_projects = (
+                db.query(UserWatchedProject)
+                .filter(UserWatchedProject.user_id == user.id)
+                .all()
+            )
+            watched_keys = [wp.project_key for wp in watched_projects]
+
+            if watched_keys:
+                query = query.filter(ProactiveInsight.project_key.in_(watched_keys))
+            else:
+                # User has no watched projects - return empty stats
+                return (
+                    jsonify(
+                        {
+                            "total_insights": 0,
+                            "by_severity": {"critical": 0, "warning": 0, "info": 0},
+                            "by_type": {},
+                            "dismissed_count": 0,
+                            "acted_on_count": 0,
+                        }
+                    ),
+                    200,
+                )
+
+        insights = query.all()
+
+        # Build dismissed count query
+        dismissed_query = db.query(ProactiveInsight).filter(
+            ProactiveInsight.user_id == user.id,
+            ProactiveInsight.dismissed_at.isnot(None),
+        )
+        if not (user.is_admin() and all_projects):
+            if watched_keys:
+                dismissed_query = dismissed_query.filter(
+                    ProactiveInsight.project_key.in_(watched_keys)
+                )
+
+        # Build acted on count query
+        acted_on_query = db.query(ProactiveInsight).filter(
+            ProactiveInsight.user_id == user.id,
+            ProactiveInsight.acted_on_at.isnot(None),
+        )
+        if not (user.is_admin() and all_projects):
+            if watched_keys:
+                acted_on_query = acted_on_query.filter(
+                    ProactiveInsight.project_key.in_(watched_keys)
+                )
 
         # Calculate stats
         stats = {
@@ -254,18 +341,8 @@ def get_insight_stats(user: User):
                 "info": sum(1 for i in insights if i.severity == "info"),
             },
             "by_type": {},
-            "dismissed_count": db.query(ProactiveInsight)
-            .filter(
-                ProactiveInsight.user_id == user.id,
-                ProactiveInsight.dismissed_at.isnot(None),
-            )
-            .count(),
-            "acted_on_count": db.query(ProactiveInsight)
-            .filter(
-                ProactiveInsight.user_id == user.id,
-                ProactiveInsight.acted_on_at.isnot(None),
-            )
-            .count(),
+            "dismissed_count": dismissed_query.count(),
+            "acted_on_count": acted_on_query.count(),
         }
 
         # Count by type

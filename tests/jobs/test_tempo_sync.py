@@ -424,3 +424,256 @@ class TestTempoSyncJob:
         assert notif.slack_client is not None  # But Slack should be configured from env
 
         monkeypatch_env.undo()
+
+
+class TestCacheWarming:
+    """Tests for Jira cache warming optimization"""
+
+    @patch("src.integrations.tempo.requests.get")
+    def test_warm_jira_cache_success(self, mock_get, monkeypatch):
+        """Test successful cache warming with mock Jira response."""
+        from src.integrations.tempo import TempoAPIClient
+
+        # Set up environment variables
+        monkeypatch.setenv("TEMPO_API_TOKEN", "test-tempo-token")
+        monkeypatch.setenv("JIRA_URL", "https://test.atlassian.net")
+        monkeypatch.setenv("JIRA_USERNAME", "test@example.com")
+        monkeypatch.setenv("JIRA_API_TOKEN", "test-jira-token")
+
+        # Mock Jira API response with typical issue data
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "issues": [
+                {
+                    "id": "10001",
+                    "key": "SUBS-123",
+                    "fields": {
+                        "customfield_10014": "SUBS-100",  # Epic Link
+                        "parent": None,
+                        "issuetype": {"name": "Story"},
+                    },
+                },
+                {
+                    "id": "10002",
+                    "key": "BEVS-456",
+                    "fields": {
+                        "customfield_10014": None,
+                        "parent": {
+                            "key": "BEVS-400",
+                            "fields": {"issuetype": {"name": "Epic"}},
+                        },
+                        "issuetype": {"name": "Task"},
+                    },
+                },
+                {
+                    "id": "10003",
+                    "key": "RNWL-789",
+                    "fields": {
+                        "customfield_10014": None,
+                        "parent": None,
+                        "issuetype": {"name": "Bug"},
+                    },
+                },
+            ]
+        }
+        mock_get.return_value = mock_response
+
+        # Initialize client
+        client = TempoAPIClient()
+
+        # Warm cache
+        project_keys = ["SUBS", "BEVS", "RNWL"]
+        stats = client.warm_jira_cache(project_keys, lookback_days=90)
+
+        # Verify API was called with correct JQL
+        mock_get.assert_called_once()
+        call_args = mock_get.call_args
+        assert "jql" in call_args.kwargs["params"]
+        jql = call_args.kwargs["params"]["jql"]
+        assert "updated >= -90d" in jql
+        assert "project in (SUBS,BEVS,RNWL)" in jql
+
+        # Verify cache statistics
+        assert stats["issues_cached"] == 3
+        assert stats["epics_cached"] == 2  # SUBS-123 and BEVS-456 have epics
+        assert stats["api_calls"] == 1
+
+        # Verify issue cache populated
+        assert client.issue_cache["10001"] == "SUBS-123"
+        assert client.issue_cache["10002"] == "BEVS-456"
+        assert client.issue_cache["10003"] == "RNWL-789"
+
+        # Verify epic cache populated
+        assert client.epic_cache["SUBS-123"] == "SUBS-100"  # Epic Link
+        assert client.epic_cache["BEVS-456"] == "BEVS-400"  # Parent Epic
+        assert client.epic_cache["RNWL-789"] is None  # No epic
+
+    @patch("src.integrations.tempo.requests.get")
+    def test_warm_jira_cache_empty_projects(self, mock_get, monkeypatch):
+        """Test cache warming with empty project list."""
+        from src.integrations.tempo import TempoAPIClient
+
+        # Set up environment variables
+        monkeypatch.setenv("TEMPO_API_TOKEN", "test-tempo-token")
+        monkeypatch.setenv("JIRA_URL", "https://test.atlassian.net")
+        monkeypatch.setenv("JIRA_USERNAME", "test@example.com")
+        monkeypatch.setenv("JIRA_API_TOKEN", "test-jira-token")
+
+        client = TempoAPIClient()
+
+        stats = client.warm_jira_cache([], lookback_days=90)
+
+        # Should not make API call
+        mock_get.assert_not_called()
+
+        # Should return zero stats
+        assert stats["issues_cached"] == 0
+        assert stats["epics_cached"] == 0
+        assert stats["api_calls"] == 0
+
+    @patch("src.integrations.tempo.requests.get")
+    def test_warm_jira_cache_api_error(self, mock_get, monkeypatch):
+        """Test cache warming handles API errors gracefully."""
+        from src.integrations.tempo import TempoAPIClient
+
+        # Set up environment variables
+        monkeypatch.setenv("TEMPO_API_TOKEN", "test-tempo-token")
+        monkeypatch.setenv("JIRA_URL", "https://test.atlassian.net")
+        monkeypatch.setenv("JIRA_USERNAME", "test@example.com")
+        monkeypatch.setenv("JIRA_API_TOKEN", "test-jira-token")
+
+        # Mock API error
+        mock_get.side_effect = Exception("Jira API timeout")
+
+        client = TempoAPIClient()
+
+        stats = client.warm_jira_cache(["SUBS"], lookback_days=90)
+
+        # Should return error stats but not raise exception
+        assert stats["issues_cached"] == 0
+        assert stats["epics_cached"] == 0
+        assert stats["api_calls"] == 0
+        assert "error" in stats
+        assert "Jira API timeout" in stats["error"]
+
+    @patch("src.integrations.tempo.requests.get")
+    def test_warm_jira_cache_no_issues(self, mock_get, monkeypatch):
+        """Test cache warming with no issues in response."""
+        from src.integrations.tempo import TempoAPIClient
+
+        # Set up environment variables
+        monkeypatch.setenv("TEMPO_API_TOKEN", "test-tempo-token")
+        monkeypatch.setenv("JIRA_URL", "https://test.atlassian.net")
+        monkeypatch.setenv("JIRA_USERNAME", "test@example.com")
+        monkeypatch.setenv("JIRA_API_TOKEN", "test-jira-token")
+
+        # Mock empty response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"issues": []}
+        mock_get.return_value = mock_response
+
+        client = TempoAPIClient()
+
+        stats = client.warm_jira_cache(["SUBS"], lookback_days=90)
+
+        # Should make API call but cache nothing
+        assert stats["issues_cached"] == 0
+        assert stats["epics_cached"] == 0
+        assert stats["api_calls"] == 1
+
+    @patch("src.integrations.tempo.requests.get")
+    def test_tempo_sync_calls_cache_warming(self, mock_get, monkeypatch):
+        """Test that cache warming method is called correctly with project list."""
+        from src.integrations.tempo import TempoAPIClient
+
+        # Set up environment
+        monkeypatch.setenv("TEMPO_API_TOKEN", "test-tempo-token")
+        monkeypatch.setenv("JIRA_URL", "https://test.atlassian.net")
+        monkeypatch.setenv("JIRA_USERNAME", "test@example.com")
+        monkeypatch.setenv("JIRA_API_TOKEN", "test-jira-token")
+
+        # Mock Jira cache warming response
+        cache_response = MagicMock()
+        cache_response.status_code = 200
+        cache_response.json.return_value = {
+            "issues": [
+                {
+                    "id": "10001",
+                    "key": "SUBS-123",
+                    "fields": {
+                        "customfield_10014": "SUBS-100",
+                        "parent": None,
+                        "issuetype": {"name": "Story"},
+                    },
+                }
+            ]
+        }
+        mock_get.return_value = cache_response
+
+        # Create client and test cache warming
+        client = TempoAPIClient()
+        project_keys = ["SUBS", "BEVS"]
+
+        # Call cache warming
+        stats = client.warm_jira_cache(project_keys, lookback_days=90)
+
+        # Verify it was called with correct parameters
+        assert mock_get.call_count == 1
+        call_args = mock_get.call_args
+        jql = call_args.kwargs["params"]["jql"]
+        assert "project in (SUBS,BEVS)" in jql
+        assert "updated >= -90d" in jql
+
+        # Verify stats
+        assert stats["issues_cached"] == 1
+        assert stats["api_calls"] == 1
+
+    @patch("src.integrations.tempo.requests.get")
+    def test_cache_reduces_subsequent_api_calls(self, mock_get, monkeypatch):
+        """Test that cached data reduces subsequent API calls."""
+        from src.integrations.tempo import TempoAPIClient
+
+        # Set up environment variables
+        monkeypatch.setenv("TEMPO_API_TOKEN", "test-tempo-token")
+        monkeypatch.setenv("JIRA_URL", "https://test.atlassian.net")
+        monkeypatch.setenv("JIRA_USERNAME", "test@example.com")
+        monkeypatch.setenv("JIRA_API_TOKEN", "test-jira-token")
+
+        # Mock initial cache warming response
+        warm_response = MagicMock()
+        warm_response.status_code = 200
+        warm_response.json.return_value = {
+            "issues": [
+                {
+                    "id": "10001",
+                    "key": "SUBS-123",
+                    "fields": {
+                        "customfield_10014": "SUBS-100",
+                        "parent": None,
+                        "issuetype": {"name": "Story"},
+                    },
+                }
+            ]
+        }
+
+        mock_get.return_value = warm_response
+
+        client = TempoAPIClient()
+
+        # Warm cache
+        client.warm_jira_cache(["SUBS"], lookback_days=90)
+
+        # Reset mock to count subsequent calls
+        mock_get.reset_mock()
+
+        # Get issue key (should use cache, not make API call)
+        issue_key = client.get_issue_key_from_jira("10001")
+        assert issue_key == "SUBS-123"
+        mock_get.assert_not_called()
+
+        # Get epic key (should use cache, not make API call)
+        epic_key = client.get_epic_from_jira("SUBS-123")
+        assert epic_key == "SUBS-100"
+        mock_get.assert_not_called()

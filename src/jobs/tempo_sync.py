@@ -161,6 +161,15 @@ class TempoSyncJob:
             f"Starting YTD fetch ({start_date} to {today}) for {len(active_projects)} projects at {now.strftime('%H:%M:%S')}"
         )
 
+        # Warm Jira cache with recent issues to dramatically reduce API calls
+        cache_stats = self.tempo_client.warm_jira_cache(
+            active_projects, lookback_days=90
+        )
+        logger.info(
+            f"Cache warming: {cache_stats.get('issues_cached', 0)} issues, "
+            f"{cache_stats.get('epics_cached', 0)} epics in {cache_stats.get('duration_seconds', 0):.1f}s"
+        )
+
         for idx, project_key in enumerate(active_projects, 1):
             try:
                 project_start_time = time.time()

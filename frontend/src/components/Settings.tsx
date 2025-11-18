@@ -35,6 +35,8 @@ import {
   Paper,
   Switch,
   FormControlLabel,
+  Grid,
+  Tooltip,
 } from '@mui/material';
 import {
   Save,
@@ -53,6 +55,8 @@ import {
   TrendingUp as EscalationIcon,
   Category as CategoryIcon,
   Assignment as TemplateIcon,
+  Check,
+  Close,
 } from '@mui/icons-material';
 import { Loading, Title, useDataProvider, useNotify, useRedirect } from 'react-admin';
 import { getApiUrl } from '../config';
@@ -124,6 +128,33 @@ interface EscalationPreferences {
   dm_threshold_days: number;
   channel_threshold_days: number;
   critical_threshold_days: number;
+}
+
+interface ProactiveInsight {
+  id: string;
+  user_id: number;
+  project_key: string | null;
+  insight_type: string;
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  description: string;
+  metadata_json: any;
+  created_at: string;
+  dismissed_at: string | null;
+  acted_on_at: string | null;
+  action_taken: string | null;
+}
+
+interface InsightStats {
+  total_insights: number;
+  by_severity: {
+    critical: number;
+    warning: number;
+    info: number;
+  };
+  by_type: Record<string, number>;
+  dismissed_count: number;
+  acted_on_count: number;
 }
 
 interface ApiResponse {
@@ -237,6 +268,17 @@ export const Settings = () => {
   const [loadingEscalation, setLoadingEscalation] = useState(false);
   const [savingEscalation, setSavingEscalation] = useState(false);
 
+  // Insights state
+  const [insights, setInsights] = useState<ProactiveInsight[]>([]);
+  const [insightStats, setInsightStats] = useState<InsightStats | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  const [insightFilter, setInsightFilter] = useState({
+    severity: 'all',
+    type: 'all',
+    dismissed: false
+  });
+
   // Load user settings on component mount
   useEffect(() => {
     loadSettings();
@@ -268,13 +310,24 @@ export const Settings = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabValue]);
 
-  // Load escalation preferences when Auto-Escalation tab is accessed
+  // Load escalation preferences and insights when Insights & Escalation tab is accessed
   useEffect(() => {
-    if (tabValue === 3) { // Auto-Escalation tab (index 3)
+    if (tabValue === 3) { // Insights & Escalation tab (index 3)
       loadEscalationPreferences();
+      loadInsights();
+      loadInsightStats();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabValue]);
+
+  // Reload insights when filters or showAllProjects change
+  useEffect(() => {
+    if (tabValue === 3) {
+      loadInsights();
+      loadInsightStats();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insightFilter, showAllProjects]);
 
   // Handle OAuth callback messages from URL
   useEffect(() => {
@@ -500,6 +553,112 @@ export const Settings = () => {
       showSnackbar(error instanceof Error ? error.message : 'Error saving escalation preferences', 'error');
     } finally {
       setSavingEscalation(false);
+    }
+  };
+
+  // Insights loading functions
+  const loadInsights = async () => {
+    try {
+      setLoadingInsights(true);
+      const params = new URLSearchParams();
+
+      if (insightFilter.severity !== 'all') {
+        params.append('severity', insightFilter.severity);
+      }
+      if (insightFilter.type !== 'all') {
+        params.append('insight_type', insightFilter.type);
+      }
+      params.append('dismissed', insightFilter.dismissed.toString());
+
+      if (settings?.user?.role === 'admin' && showAllProjects) {
+        params.append('all_projects', 'true');
+      }
+
+      const response = await fetch(getApiUrl(`/api/insights?${params.toString()}`), {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to load insights');
+      }
+
+      const data: ApiResponse = await response.json();
+      if (data.success && data.data) {
+        setInsights(data.data.insights || []);
+      }
+    } catch (error) {
+      console.error('Error loading insights:', error);
+      showSnackbar('Error loading insights', 'error');
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
+  const loadInsightStats = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (settings?.user?.role === 'admin' && showAllProjects) {
+        params.append('all_projects', 'true');
+      }
+
+      const response = await fetch(getApiUrl(`/api/insights/stats?${params.toString()}`), {
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to load insight stats');
+      }
+
+      const data: ApiResponse = await response.json();
+      if (data.success && data.data) {
+        setInsightStats(data.data);
+      }
+    } catch (error) {
+      console.error('Error loading insight stats:', error);
+    }
+  };
+
+  const dismissInsight = async (insightId: string) => {
+    try {
+      const response = await fetch(getApiUrl(`/api/insights/${insightId}/dismiss`), {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to dismiss insight');
+      }
+
+      showSnackbar('Insight dismissed successfully!', 'success');
+      loadInsights();
+      loadInsightStats();
+    } catch (error) {
+      console.error('Error dismissing insight:', error);
+      showSnackbar('Error dismissing insight', 'error');
+    }
+  };
+
+  const actOnInsight = async (insightId: string, action: string = 'acted_on') => {
+    try {
+      const response = await fetch(getApiUrl(`/api/insights/${insightId}/act`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ action_taken: action }),
+      });
+
+      if (!response.ok) {
+        throw new globalThis.Error('Failed to update insight');
+      }
+
+      showSnackbar('Insight marked as acted upon!', 'success');
+      loadInsights();
+      loadInsightStats();
+    } catch (error) {
+      console.error('Error updating insight:', error);
+      showSnackbar('Error updating insight', 'error');
     }
   };
 
@@ -1055,7 +1214,7 @@ export const Settings = () => {
           <Tab icon={<SettingsIcon />} label="My Integrations" iconPosition="start" />
           <Tab icon={<WorkIcon />} label="Project Settings" iconPosition="start" />
           <Tab icon={<NotificationsIcon />} label="Notifications" iconPosition="start" />
-          <Tab icon={<EscalationIcon />} label="Auto-Escalation" iconPosition="start" />
+          <Tab icon={<EscalationIcon />} label="Insights & Escalation" iconPosition="start" />
           {settings.user.role === 'admin' && <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />}
           {settings.user.role === 'admin' && <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />}
           {settings.user.role === 'admin' && <Tab icon={<CategoryIcon />} label="Epic Categories" iconPosition="start" />}
@@ -1832,7 +1991,7 @@ export const Settings = () => {
         )}
       </TabPanel>
 
-      {/* Tab 4: Auto-Escalation */}
+      {/* Tab 4: Insights & Escalation */}
       <TabPanel value={tabValue} index={3}>
         {loadingEscalation ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
@@ -2031,6 +2190,260 @@ export const Settings = () => {
         ) : (
           <Alert severity="info">No escalation preferences configured yet.</Alert>
         )}
+
+        {/* Insights List Section */}
+        <Box sx={{ mt: 4 }}>
+          <Typography variant="h5" fontWeight={600} sx={{ mb: 3 }}>
+            Proactive Insights
+          </Typography>
+
+          {/* Stats Cards */}
+          {insightStats && (
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ bgcolor: '#fff3f3', border: '1px solid #ffcccc' }}>
+                  <CardContent>
+                    <Typography variant="h4" color="error" fontWeight={700}>
+                      {insightStats.by_severity.critical}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Critical
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ bgcolor: '#fff8e1', border: '1px solid #ffe082' }}>
+                  <CardContent>
+                    <Typography variant="h4" color="warning.dark" fontWeight={700}>
+                      {insightStats.by_severity.warning}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Warning
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ bgcolor: '#e3f2fd', border: '1px solid #90caf9' }}>
+                  <CardContent>
+                    <Typography variant="h4" color="info.dark" fontWeight={700}>
+                      {insightStats.by_severity.info}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Info
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Card sx={{ bgcolor: '#f5f5f5', border: '1px solid #e0e0e0' }}>
+                  <CardContent>
+                    <Typography variant="h4" color="text.primary" fontWeight={700}>
+                      {insightStats.total_insights}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Total Active
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          )}
+
+          {/* Filters and Controls */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Severity</InputLabel>
+                    <Select
+                      value={insightFilter.severity}
+                      label="Severity"
+                      onChange={(e) => setInsightFilter({ ...insightFilter, severity: e.target.value })}
+                    >
+                      <MenuItem value="all">All Severities</MenuItem>
+                      <MenuItem value="critical">Critical</MenuItem>
+                      <MenuItem value="warning">Warning</MenuItem>
+                      <MenuItem value="info">Info</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Type</InputLabel>
+                    <Select
+                      value={insightFilter.type}
+                      label="Type"
+                      onChange={(e) => setInsightFilter({ ...insightFilter, type: e.target.value })}
+                    >
+                      <MenuItem value="all">All Types</MenuItem>
+                      <MenuItem value="budget_alert">Budget Alert</MenuItem>
+                      <MenuItem value="anomaly">Anomaly</MenuItem>
+                      <MenuItem value="stale_pr">Stale PR</MenuItem>
+                      <MenuItem value="meeting_prep">Meeting Prep</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={insightFilter.dismissed}
+                        onChange={(e) => setInsightFilter({ ...insightFilter, dismissed: e.target.checked })}
+                      />
+                    }
+                    label="Show Dismissed"
+                  />
+                </Grid>
+                {settings.user.role === 'admin' && (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={showAllProjects}
+                          onChange={(e) => setShowAllProjects(e.target.checked)}
+                        />
+                      }
+                      label="All Projects"
+                    />
+                  </Grid>
+                )}
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* Insights Table */}
+          <Card>
+            <CardContent>
+              {loadingInsights ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                  <CircularProgress />
+                </Box>
+              ) : insights.length === 0 ? (
+                <Alert severity="info">No insights found matching your filters.</Alert>
+              ) : (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell width="5%"></TableCell>
+                        <TableCell width="15%">Project</TableCell>
+                        <TableCell width="35%">Title</TableCell>
+                        <TableCell width="10%">Type</TableCell>
+                        <TableCell width="15%">Created</TableCell>
+                        <TableCell width="10%">Status</TableCell>
+                        <TableCell width="10%">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {insights.map((insight) => (
+                        <TableRow key={insight.id}>
+                          <TableCell>
+                            {insight.severity === 'critical' && (
+                              <Chip label="🔴" size="small" sx={{ bgcolor: '#ffebee', color: '#c62828' }} />
+                            )}
+                            {insight.severity === 'warning' && (
+                              <Chip label="⚠️" size="small" sx={{ bgcolor: '#fff8e1', color: '#f57f17' }} />
+                            )}
+                            {insight.severity === 'info' && (
+                              <Chip label="ℹ️" size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={insight.project_key || 'N/A'}
+                              size="small"
+                              sx={{ bgcolor: '#f5f5f5' }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight={500}>
+                              {insight.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {insight.description}
+                            </Typography>
+                            {insight.metadata_json && Object.keys(insight.metadata_json).length > 0 && (
+                              <Box sx={{ mt: 1, p: 1, bgcolor: '#f9f9f9', borderRadius: 1 }}>
+                                {insight.insight_type === 'budget_alert' && (
+                                  <Typography variant="caption" component="div">
+                                    <strong>Budget Used:</strong> {insight.metadata_json.budget_used_pct?.toFixed(1)}% |{' '}
+                                    <strong>Time Passed:</strong> {insight.metadata_json.time_passed_pct?.toFixed(1)}%
+                                  </Typography>
+                                )}
+                                {insight.insight_type === 'anomaly' && (
+                                  <Typography variant="caption" component="div">
+                                    <strong>Anomaly:</strong> {insight.metadata_json.anomaly_type} |{' '}
+                                    <strong>Deviation:</strong> {Math.abs(insight.metadata_json.deviation_pct || 0).toFixed(1)}% |{' '}
+                                    <strong>Current:</strong> {insight.metadata_json.current_week_hours?.toFixed(1)}h |{' '}
+                                    <strong>Baseline:</strong> {insight.metadata_json.baseline_hours?.toFixed(1)}h
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={insight.insight_type.replace('_', ' ')}
+                              size="small"
+                              sx={{
+                                bgcolor: insight.insight_type === 'budget_alert' ? '#ffe0b2' :
+                                        insight.insight_type === 'anomaly' ? '#f3e5f5' : '#e0f2f1',
+                                textTransform: 'capitalize'
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="caption">
+                              {new Date(insight.created_at).toLocaleDateString()}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            {insight.dismissed_at ? (
+                              <Chip label="Dismissed" size="small" sx={{ bgcolor: '#e0e0e0' }} />
+                            ) : insight.acted_on_at ? (
+                              <Chip label="Acted On" size="small" sx={{ bgcolor: '#c8e6c9' }} />
+                            ) : (
+                              <Chip label="Active" size="small" sx={{ bgcolor: '#bbdefb' }} />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              {!insight.dismissed_at && (
+                                <Tooltip title="Dismiss">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => dismissInsight(insight.id)}
+                                    sx={{ color: 'text.secondary' }}
+                                  >
+                                    <Close fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              {!insight.acted_on_at && (
+                                <Tooltip title="Mark as Acted On">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => actOnInsight(insight.id)}
+                                    sx={{ color: 'success.main' }}
+                                  >
+                                    <Check fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
       </TabPanel>
 
       {/* Tab 5: AI Configuration (Admin Only) */}

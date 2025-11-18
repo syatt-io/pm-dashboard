@@ -1342,6 +1342,7 @@ def detect_proactive_insights(self):
             if stats["insights_detected"] > 0:
                 try:
                     from src.managers.notifications import NotificationContent
+                    from src.models import ProactiveInsight
 
                     notifier = NotificationManager(settings.notifications)
                     message = (
@@ -1351,6 +1352,40 @@ def detect_proactive_insights(self):
                     )
                     if stats.get("errors"):
                         message += f"• Errors: {len(stats['errors'])}\n"
+
+                    # Fetch critical insights to include in notification
+                    critical_insights = (
+                        db.query(ProactiveInsight)
+                        .filter(
+                            ProactiveInsight.severity == "critical",
+                            ProactiveInsight.dismissed_at.is_(None),
+                        )
+                        .order_by(ProactiveInsight.created_at.desc())
+                        .limit(5)
+                        .all()
+                    )
+
+                    if critical_insights:
+                        message += "\n🔴 CRITICAL INSIGHTS:\n"
+                        for insight in critical_insights:
+                            # Format metadata for concise display
+                            project = insight.project_key or "N/A"
+                            metadata = insight.metadata_json or {}
+
+                            if insight.insight_type == "budget_alert":
+                                budget_used = metadata.get("budget_used_pct", 0)
+                                time_passed = metadata.get("time_passed_pct", 0)
+                                message += f"• {project}: {budget_used:.0f}% budget used ({time_passed:.0f}% time passed)\n"
+                            elif insight.insight_type == "anomaly":
+                                anomaly_type = metadata.get("anomaly_type", "unknown")
+                                deviation = abs(metadata.get("deviation_pct", 0))
+                                current = metadata.get("current_week_hours", 0)
+                                baseline = metadata.get("baseline_hours", 0)
+                                action = "spike" if "spike" in anomaly_type else "drop"
+                                message += f"• {project}: {deviation:.0f}% hours {action} ({current:.1f}h vs {baseline:.1f}h avg)\n"
+                            else:
+                                # Generic format for other types
+                                message += f"• {project}: {insight.title}\n"
 
                     content = NotificationContent(
                         title="🔍 Proactive Insight Detection Complete",

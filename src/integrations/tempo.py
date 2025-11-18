@@ -80,6 +80,125 @@ class TempoAPIClient:
 
         self.last_jira_request_time = time.time()
 
+    def warm_jira_cache(
+        self, project_keys: List[str], lookback_days: int = 90
+    ) -> Dict[str, int]:
+        """
+        Pre-populate Jira caches with a single batch query to dramatically reduce API calls.
+
+        This method fetches recent issues from all active projects in ONE JQL query,
+        then pre-populates the issue_cache and epic_cache dictionaries. This eliminates
+        the need for thousands of individual API calls during worklog processing.
+
+        Args:
+            project_keys: List of project keys to cache (e.g., ["SUBS", "BEVS", "RNWL"])
+            lookback_days: Number of days to look back for recent issues (default 90)
+
+        Returns:
+            Dict with cache statistics: {"issues_cached": N, "epics_cached": M, "api_calls": 1}
+        """
+        if not project_keys:
+            logger.info("No projects to warm cache for")
+            return {"issues_cached": 0, "epics_cached": 0, "api_calls": 0}
+
+        try:
+            cache_start_time = time.time()
+
+            # Build JQL query for all active projects
+            project_list = ",".join(project_keys)
+            jql = f"updated >= -{lookback_days}d AND project in ({project_list})"
+
+            logger.info(
+                f"Warming Jira cache for {len(project_keys)} projects (last {lookback_days} days)..."
+            )
+            logger.debug(f"JQL: {jql}")
+
+            # Rate limit before making the request
+            self._rate_limit()
+
+            # Fetch up to 1000 recent issues in ONE batch call
+            # Fields: key (issue key), parent (for epic hierarchy), customfield_10014 (epic link)
+            url = f"{self.jira_url}/rest/api/3/search"
+            params = {
+                "jql": jql,
+                "maxResults": 1000,
+                "fields": "key,parent,customfield_10014,issuetype",
+            }
+
+            response = requests.get(
+                url, headers=self.jira_headers, params=params, timeout=30
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            issues = data.get("issues", [])
+
+            # Pre-populate caches
+            issues_cached = 0
+            epics_cached = 0
+
+            for issue in issues:
+                issue_id = issue.get("id")
+                issue_key = issue.get("key")
+                fields = issue.get("fields", {})
+
+                # Cache issue ID -> key mapping
+                if issue_id and issue_key:
+                    self.issue_cache[issue_id] = issue_key
+                    issues_cached += 1
+
+                # Cache epic key mapping (check both Epic Link and parent)
+                epic_key = None
+
+                # Try Epic Link field first (legacy)
+                epic_link = fields.get("customfield_10014")
+                if epic_link and isinstance(epic_link, str) and "-" in epic_link:
+                    # Validate it's actually an issue key (PROJECT-NUMBER format)
+                    parts = epic_link.split("-")
+                    if len(parts) == 2 and parts[0].isalpha() and parts[1].isdigit():
+                        epic_key = epic_link
+
+                # Try parent field (modern Jira hierarchy)
+                if not epic_key:
+                    parent = fields.get("parent")
+                    if parent:
+                        parent_key = parent.get("key")
+                        parent_fields = parent.get("fields", {})
+                        parent_issue_type = parent_fields.get("issuetype", {})
+                        if parent_issue_type.get("name") == "Epic":
+                            epic_key = parent_key
+
+                # Cache the epic mapping
+                if issue_key:
+                    self.epic_cache[issue_key] = epic_key
+                    if epic_key:
+                        epics_cached += 1
+
+            cache_duration = time.time() - cache_start_time
+
+            logger.info(
+                f"✅ Cache warmed in {cache_duration:.1f}s: "
+                f"{issues_cached} issues, {epics_cached} epics cached "
+                f"(1 API call for {len(project_keys)} projects)"
+            )
+
+            return {
+                "issues_cached": issues_cached,
+                "epics_cached": epics_cached,
+                "api_calls": 1,
+                "duration_seconds": cache_duration,
+            }
+
+        except Exception as e:
+            logger.error(f"Error warming Jira cache: {e}", exc_info=True)
+            # Don't fail the job if cache warming fails - fallback to individual lookups
+            return {
+                "issues_cached": 0,
+                "epics_cached": 0,
+                "api_calls": 0,
+                "error": str(e),
+            }
+
     @retry_with_backoff(max_retries=3, base_delay=1.0)
     def get_project_id(self, project_key: str) -> Optional[str]:
         """
