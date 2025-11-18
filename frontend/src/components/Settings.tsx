@@ -582,10 +582,8 @@ export const Settings = () => {
         throw new globalThis.Error('Failed to load insights');
       }
 
-      const data: ApiResponse = await response.json();
-      if (data.success && data.data) {
-        setInsights(data.data.insights || []);
-      }
+      const data: any = await response.json();
+      setInsights(data.insights || []);
     } catch (error) {
       console.error('Error loading insights:', error);
       showSnackbar('Error loading insights', 'error');
@@ -609,10 +607,8 @@ export const Settings = () => {
         throw new globalThis.Error('Failed to load insight stats');
       }
 
-      const data: ApiResponse = await response.json();
-      if (data.success && data.data) {
-        setInsightStats(data.data);
-      }
+      const data: any = await response.json();
+      setInsightStats(data);
     } catch (error) {
       console.error('Error loading insight stats:', error);
     }
