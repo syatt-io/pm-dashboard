@@ -226,23 +226,17 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=8, minute=0),
     },
     # ========== Proactive Agent Tasks (Migrated from Python Scheduler) ==========
-    # Proactive insight detection every 4 hours during work hours (8am, 12pm, 4pm EST)
-    "proactive-insights-8am": {
-        "task": "src.tasks.notification_tasks.detect_proactive_insights",
-        "schedule": crontab(hour=12, minute=0),  # 8 AM EST = 12:00 UTC
+    # Meeting prep digests - 9 AM EST (13:00 UTC)
+    # Sends project digests to users watching projects with meetings today
+    "meeting-prep-digests": {
+        "task": "src.tasks.notification_tasks.send_meeting_prep_digests",
+        "schedule": crontab(hour=13, minute=0),  # 9:00 AM EST = 13:00 UTC
     },
-    "proactive-insights-12pm": {
-        "task": "src.tasks.notification_tasks.detect_proactive_insights",
-        "schedule": crontab(hour=16, minute=0),  # 12 PM EST = 16:00 UTC
-    },
-    "proactive-insights-4pm": {
-        "task": "src.tasks.notification_tasks.detect_proactive_insights",
-        "schedule": crontab(hour=20, minute=0),  # 4 PM EST = 20:00 UTC
-    },
-    # Daily brief delivery - 9 AM EST (13:00 UTC)
+    # Daily brief delivery - 9:05 AM EST (13:05 UTC)
+    # Aggregates all other insights (budget alerts, anomalies, compliance)
     "daily-briefs": {
         "task": "src.tasks.notification_tasks.send_daily_briefs",
-        "schedule": crontab(hour=13, minute=0),
+        "schedule": crontab(hour=13, minute=5),  # 9:05 AM EST = 13:05 UTC
     },
     # Auto-escalation checks every 6 hours (6am, 12pm, 6pm, 12am EST)
     "auto-escalation-6am": {

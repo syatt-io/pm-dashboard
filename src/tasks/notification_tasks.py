@@ -1412,11 +1412,78 @@ def detect_proactive_insights(self):
         db.close()
 
 
+@shared_task(name="src.tasks.notification_tasks.send_meeting_prep_digests", bind=True)
+def send_meeting_prep_digests(self):
+    """
+    Send meeting prep digests to users watching projects with meetings today.
+    Scheduled to run at 9 AM EST (before daily brief).
+
+    Checks projects with meetings scheduled for today (based on weekly_meeting_day),
+    generates personalized weekly digests for each project, and delivers via Slack/Email
+    to users watching those projects.
+    """
+    from src.services.job_execution_tracker import track_celery_task
+    from src.utils.database import get_db
+
+    logger.info("📅 Starting meeting prep digest delivery task...")
+    db = next(get_db())
+
+    try:
+        tracker = track_celery_task(self, db, "meeting-prep-digests")
+        with tracker:
+            from src.services.meeting_prep_service import MeetingPrepDeliveryService
+            from src.managers.notifications import NotificationManager
+            from config.settings import settings
+
+            service = MeetingPrepDeliveryService(db)
+            stats = service.send_meeting_prep_digests()
+            logger.info(f"✅ Meeting prep delivery complete: {stats}")
+
+            # Send Slack notification if digests sent
+            if stats["digests_sent_slack"] > 0 or stats["digests_sent_email"] > 0:
+                try:
+                    from src.managers.notifications import NotificationContent
+
+                    notifier = NotificationManager(settings.notifications)
+                    projects_str = (
+                        ", ".join(stats["projects_with_meetings_today"])
+                        if stats["projects_with_meetings_today"]
+                        else "none"
+                    )
+                    message = (
+                        f"• Projects with meetings today: {projects_str}\n"
+                        f"• Digests sent via Slack: {stats['digests_sent_slack']}\n"
+                        f"• Digests sent via Email: {stats['digests_sent_email']}\n"
+                        f"• Total users notified: {stats['total_users_notified']}\n"
+                    )
+                    if stats.get("errors"):
+                        message += f"• Errors: {len(stats['errors'])}\n"
+
+                    content = NotificationContent(
+                        title="📅 Meeting Prep Delivery Complete",
+                        body=message,
+                        priority="normal",
+                    )
+
+                    import asyncio
+
+                    asyncio.run(notifier.send_notification(content))
+                except Exception as e:
+                    logger.error(f"Error sending notification: {e}")
+
+            return stats
+    except Exception as e:
+        logger.error(f"❌ Meeting prep delivery failed: {e}", exc_info=True)
+        raise
+    finally:
+        db.close()
+
+
 @shared_task(name="src.tasks.notification_tasks.send_daily_briefs", bind=True)
 def send_daily_briefs(self):
     """
     Send daily briefs to all users (Celery task wrapper).
-    Scheduled to run at 9 AM EST (primary delivery).
+    Scheduled to run at 9:05 AM EST (after meeting prep).
 
     Migrated from Python scheduler to Celery Beat for better reliability.
     """

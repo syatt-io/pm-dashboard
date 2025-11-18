@@ -366,14 +366,15 @@ def trigger_generic_celery_job():
 
     Request JSON:
     {
-        "job_name": "tempo-sync" | "time-tracking-compliance" | "meeting-analysis-sync" | "daily-briefs"
+        "job_name": "tempo-sync" | "time-tracking-compliance" | "meeting-analysis-sync" | "meeting-prep-digests" | "daily-briefs"
     }
 
     Supported jobs:
     - tempo-sync: Sync Tempo hours for all active projects
     - time-tracking-compliance: Weekly time tracking compliance check
     - meeting-analysis-sync: Analyze meetings from active projects
-    - daily-briefs: Send daily brief digests to all users (meeting prep, insights, etc.)
+    - meeting-prep-digests: Send project digests to users watching projects with meetings today
+    - daily-briefs: Send daily brief digests to all users (budget alerts, anomalies, compliance)
 
     Authentication: Requires either admin JWT or X-Admin-Key header.
     """
@@ -388,6 +389,7 @@ def trigger_generic_celery_job():
             "tempo-sync": "src.tasks.notification_tasks.sync_tempo_hours",
             "time-tracking-compliance": "src.tasks.notification_tasks.run_time_tracking_compliance",
             "meeting-analysis-sync": "src.tasks.notification_tasks.analyze_meetings",
+            "meeting-prep-digests": "src.tasks.notification_tasks.send_meeting_prep_digests",
             "daily-briefs": "src.tasks.notification_tasks.send_daily_briefs",
         }
 

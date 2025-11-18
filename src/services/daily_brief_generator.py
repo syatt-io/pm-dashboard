@@ -386,9 +386,11 @@ def send_daily_briefs() -> Dict[str, Any]:
 
         for user in users:
             try:
-                # Get undelivered insights
+                # Get undelivered insights (excluding meeting_prep which is handled separately)
                 detector = InsightDetector(db)
-                insights = detector.get_undelivered_insights(user.id)
+                insights = detector.get_undelivered_insights(
+                    user.id, exclude_types=["meeting_prep"]
+                )
 
                 if not insights:
                     logger.debug(f"No undelivered insights for user {user.id}")

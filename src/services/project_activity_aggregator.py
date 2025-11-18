@@ -2708,16 +2708,6 @@ Keep each point concise and actionable. Format as a JSON array of strings."""
 {self._format_section_content(activity.blockers_and_asks, "")}
 """
 
-        # Format progress notes section (conditional)
-        progress_section = ""
-        if activity.progress_notes:
-            progress_content = activity.progress_notes
-            if isinstance(progress_content, str) and progress_content.strip():
-                progress_section = f"""
-## 📈 Progress Notes
-{self._format_section_content(activity.progress_notes, "")}
-"""
-
         # Format follow-up section (conditional)
         followup_section = ""
         if activity.followup_on_meeting:
@@ -2728,7 +2718,7 @@ Keep each point concise and actionable. Format as a JSON array of strings."""
 {self._format_section_content(activity.followup_on_meeting, "")}
 """
 
-        # New 7-section Weekly Recap format
+        # Updated 5-section Weekly Recap format (removed Achievements and Progress Notes)
         agenda = f"""
 # Weekly Recap: {activity.project_name}
 **Period:** {activity.start_date[:10]} to {activity.end_date[:10]} ({days} days)
@@ -2736,15 +2726,12 @@ Keep each point concise and actionable. Format as a JSON array of strings."""
 ## 📊 Executive Summary
 {self._format_section_content(activity.executive_summary, "No summary available")}
 {followup_section}
-## ✅ This Week's Achievements
-{self._format_section_content(activity.achievements, "No achievements recorded this period")}
-
 ## 🔄 Active Work & Next Week
 {self._format_section_content(activity.active_work, "No active work tracked")}
 {blockers_section}
 ## 📋 Proposed Agenda for Upcoming Call
 {self._format_section_content(activity.proposed_agenda, "No agenda items identified")}
-{progress_section}{github_section}{time_section}
+{github_section}{time_section}
 ---
 
 **Team Activity:** {len(activity.meetings)} meetings • {activity.total_hours:.1f}h logged • {len(activity.completed_tickets)} tickets completed

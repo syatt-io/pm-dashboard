@@ -785,29 +785,33 @@ class InsightDetector:
             self.db.rollback()
             return 0
 
-    def get_undelivered_insights(self, user_id: int) -> List[ProactiveInsight]:
+    def get_undelivered_insights(
+        self, user_id: int, exclude_types: List[str] = None
+    ) -> List[ProactiveInsight]:
         """Get insights that haven't been delivered to user yet.
 
         Args:
             user_id: User ID
+            exclude_types: Optional list of insight types to exclude (e.g., ['meeting_prep'])
 
         Returns:
             List of undelivered insights
         """
         try:
-            insights = (
-                self.db.query(ProactiveInsight)
-                .filter(
-                    ProactiveInsight.user_id == user_id,
-                    ProactiveInsight.dismissed_at.is_(None),
-                    ProactiveInsight.delivered_via_slack.is_(None),
-                    ProactiveInsight.delivered_via_email.is_(None),
-                )
-                .order_by(
-                    ProactiveInsight.severity.desc(), ProactiveInsight.created_at.desc()
-                )
-                .all()
+            query = self.db.query(ProactiveInsight).filter(
+                ProactiveInsight.user_id == user_id,
+                ProactiveInsight.dismissed_at.is_(None),
+                ProactiveInsight.delivered_via_slack.is_(None),
+                ProactiveInsight.delivered_via_email.is_(None),
             )
+
+            # Exclude specified types if provided
+            if exclude_types:
+                query = query.filter(~ProactiveInsight.insight_type.in_(exclude_types))
+
+            insights = query.order_by(
+                ProactiveInsight.severity.desc(), ProactiveInsight.created_at.desc()
+            ).all()
 
             return insights
 
