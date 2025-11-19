@@ -309,3 +309,18 @@ def role_required(role):
 def admin_required(f):
     """Decorator to require admin role for routes."""
     return role_required(UserRole.ADMIN)(f)
+
+
+def get_current_user():
+    """Get current authenticated user from request context.
+
+    This function should only be called within routes decorated with @auth_required.
+    The @auth_required decorator sets request.current_user before calling the route.
+
+    Returns:
+        User: The currently authenticated user
+
+    Raises:
+        AttributeError: If called outside of @auth_required decorated route
+    """
+    return request.current_user
