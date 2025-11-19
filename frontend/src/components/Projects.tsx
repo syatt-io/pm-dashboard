@@ -635,7 +635,7 @@ const ProjectDetailDialog = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <WorkIcon color="action" />
                   <Typography variant="body1">
-                    <strong>Total Hours:</strong> {(project.cumulative_hours || 0).toFixed(1)}h
+                    <strong>Total Hours:</strong> {Math.round(project.cumulative_hours || 0)}h
                   </Typography>
                 </Box>
               )}
@@ -1770,7 +1770,7 @@ export const ProjectList = () => {
                             {workType === 'project-based' && (
                               <TableCell>
                                 <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                                  {`${(project.cumulative_hours || 0).toFixed(1)}h`}
+                                  {`${Math.round(project.cumulative_hours || 0)}h`}
                                 </Typography>
                               </TableCell>
                             )}
@@ -2529,10 +2529,10 @@ const ProjectShowContent = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      {record.cumulative_hours || 0}h
+                      {Math.round(record.cumulative_hours || 0)}h
                     </Typography>
                     <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                      / {record.total_hours || 0}h
+                      / {Math.round(record.total_hours || 0)}h
                     </Typography>
                   </Box>
                   <LinearProgress
@@ -2813,7 +2813,7 @@ const ProjectShowContent = () => {
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      {record.cumulative_hours || 0}h
+                      {Math.round(record.cumulative_hours || 0)}h
                     </Typography>
                     <TrendingUpIcon sx={{ fontSize: 18, color: 'success.main' }} />
                   </Box>
