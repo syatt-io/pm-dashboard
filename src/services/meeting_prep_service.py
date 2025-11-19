@@ -221,8 +221,7 @@ class MeetingPrepDeliveryService:
             SELECT u.*
             FROM users u
             JOIN user_watched_projects uwp ON uwp.user_id = u.id
-            JOIN projects p ON p.id = uwp.project_id
-            WHERE p.key = :project_key
+            WHERE uwp.project_key = :project_key
             AND u.is_active = TRUE
         """
         )
