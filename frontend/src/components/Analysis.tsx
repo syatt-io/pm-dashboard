@@ -1060,8 +1060,10 @@ const AnalysisShowErrorFallback = ({ error }: { error: any }) => {
 
 const AnalysisShowTitle = () => {
   const record = useRecordContext();
+  console.log('[AnalysisShowTitle] record:', record);
   if (!record) return <>Meeting Analysis</>;
   const title = record.meeting_title || 'Untitled Meeting';
+  console.log('[AnalysisShowTitle] title:', title, 'date:', record.date);
   if (record.date) {
     const date = new Date(record.date);
     const estDate = date.toLocaleString('en-US', {
@@ -1073,7 +1075,9 @@ const AnalysisShowTitle = () => {
       minute: '2-digit',
       hour12: true
     });
-    return <>{title} - {estDate} EST</>;
+    const result = `${title} - ${estDate} EST`;
+    console.log('[AnalysisShowTitle] returning:', result);
+    return <>{result}</>;
   }
   return <>{title}</>;
 };
