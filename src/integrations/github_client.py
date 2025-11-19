@@ -4,7 +4,6 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import httpx
-import jwt
 import time
 
 logger = logging.getLogger(__name__)
@@ -85,6 +84,15 @@ class GitHubClient:
         Returns:
             Installation access token
         """
+        # Lazy import jwt to avoid module-level import failure
+        try:
+            import jwt
+        except ImportError as e:
+            raise ImportError(
+                "PyJWT is required for GitHub App authentication. "
+                "Install it with: pip install PyJWT cryptography"
+            ) from e
+
         # Return cached token if still valid (with 5 min buffer)
         if self.installation_token and time.time() < (self.token_expires_at - 300):
             return self.installation_token

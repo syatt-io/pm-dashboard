@@ -983,7 +983,14 @@ class ProjectActivityAggregator:
                 is_configured = True
 
             if not is_configured:
-                logger.info("GitHub not configured - skipping PR collection")
+                logger.warning(
+                    "GitHub not configured - skipping PR collection. "
+                    "Set GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID "
+                    "or GITHUB_API_TOKEN to enable GitHub integration."
+                )
+                activity.github_prs_merged = []
+                activity.github_prs_in_review = []
+                activity.github_prs_open = []
                 return
 
             # Initialize GitHub client
@@ -1099,7 +1106,7 @@ class ProjectActivityAggregator:
             )
 
         except Exception as e:
-            logger.warning(f"Error collecting GitHub activity: {e}")
+            logger.error(f"Error collecting GitHub activity: {e}", exc_info=True)
             # Don't fail the entire aggregation if GitHub fails
             activity.github_prs_merged = []
             activity.github_prs_in_review = []
