@@ -1179,6 +1179,24 @@ export const AnalysisShow = () => {
         <AnalysisShowErrorFallback error={error} />
       ) : (
         <Show
+          title={(record: any) => {
+            if (!record) return 'Meeting Analysis';
+            const title = record.meeting_title || 'Untitled Meeting';
+            if (record.date) {
+              const date = new Date(record.date);
+              const estDate = date.toLocaleString('en-US', {
+                timeZone: 'America/New_York',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+              });
+              return `${title} - ${estDate} EST`;
+            }
+            return title;
+          }}
           queryOptions={{
             onError: (err: any) => {
               console.error('Error loading meeting:', err);
