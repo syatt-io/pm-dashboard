@@ -420,7 +420,7 @@ class MeetingPrepDeliveryService:
     def _format_slack_message(
         self, project_key: str, project_name: str, formatted_agenda: str
     ) -> str:
-        """Format digest as Slack message.
+        """Format digest as Slack message with proper mrkdwn syntax.
 
         Args:
             project_key: Project key
@@ -428,17 +428,31 @@ class MeetingPrepDeliveryService:
             formatted_agenda: Markdown formatted digest
 
         Returns:
-            Formatted Slack message
+            Formatted Slack message with proper mrkdwn formatting
         """
+        import re
+
         # Get today's day name for display
         today = datetime.now(timezone.utc).strftime("%A")
 
         # Add header
         message = f"📅 *{project_name} ({project_key}) Meeting Prep - {today}*\n\n"
 
-        # Convert markdown sections to Slack format
-        # The formatted_agenda is already in markdown, we can send it directly
-        message += formatted_agenda
+        # Convert standard markdown to Slack mrkdwn syntax
+        slack_content = formatted_agenda
+
+        # Convert ## headers to *bold* (Slack doesn't support header syntax)
+        # Match at start of line only
+        slack_content = re.sub(r"^## (.+)$", r"*\1*", slack_content, flags=re.MULTILINE)
+        slack_content = re.sub(r"^# (.+)$", r"*\1*", slack_content, flags=re.MULTILINE)
+
+        # Convert **bold** to *bold* (Slack uses single asterisks for bold)
+        slack_content = re.sub(r"\*\*(.+?)\*\*", r"*\1*", slack_content)
+
+        # Convert bullet points from * to • for cleaner rendering
+        slack_content = re.sub(r"^\* ", "• ", slack_content, flags=re.MULTILINE)
+
+        message += slack_content
 
         # Add footer with link to project
         if hasattr(settings.web, "base_url"):
@@ -460,17 +474,65 @@ class MeetingPrepDeliveryService:
         Returns:
             HTML email body
         """
+        import re
+
         today = datetime.now(timezone.utc).strftime("%A, %B %d, %Y")
 
-        # Convert markdown to HTML (basic conversion)
-        # In production, you might want to use a proper markdown-to-HTML library
-        html_content = formatted_agenda.replace("\n## ", "\n<h2>").replace(
-            "\n# ", "\n<h1>"
+        # Convert markdown to HTML with proper regex to avoid unclosed tags
+        html_content = formatted_agenda
+
+        # Convert headers with proper closing tags (multiline mode)
+        html_content = re.sub(
+            r"^## (.+)$", r"<h2>\1</h2>", html_content, flags=re.MULTILINE
         )
-        html_content = html_content.replace("\n**", "\n<strong>").replace(
-            "**\n", "</strong>\n"
+        html_content = re.sub(
+            r"^# (.+)$", r"<h1>\1</h1>", html_content, flags=re.MULTILINE
         )
-        html_content = html_content.replace("\n*", "\n<li>").replace("*\n", "</li>\n")
+
+        # Convert bold text with non-greedy matching
+        html_content = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html_content)
+
+        # Convert bullet lists - find consecutive * lines and wrap in <ul>
+        def convert_bullet_list(text):
+            # Split by double newlines to preserve paragraph breaks
+            sections = text.split("\n\n")
+            result = []
+
+            for section in sections:
+                lines = section.split("\n")
+                in_list = False
+                list_items = []
+                other_lines = []
+
+                for line in lines:
+                    if line.strip().startswith("* "):
+                        if not in_list:
+                            # Start new list
+                            if other_lines:
+                                result.append("\n".join(other_lines))
+                                other_lines = []
+                            in_list = True
+                        # Add list item
+                        list_items.append(f"<li>{line.strip()[2:]}</li>")
+                    else:
+                        if in_list:
+                            # End current list
+                            result.append("<ul>\n" + "\n".join(list_items) + "\n</ul>")
+                            list_items = []
+                            in_list = False
+                        other_lines.append(line)
+
+                # Close any remaining list
+                if in_list and list_items:
+                    result.append("<ul>\n" + "\n".join(list_items) + "\n</ul>")
+                elif other_lines:
+                    result.append("\n".join(other_lines))
+
+            return "\n\n".join(result)
+
+        html_content = convert_bullet_list(html_content)
+
+        # Convert remaining newlines to <br> (do this LAST to avoid breaking other conversions)
         html_content = html_content.replace("\n", "<br>\n")
 
         html = f"""
