@@ -1233,6 +1233,10 @@ export const AnalysisShow = () => {
               </Box>
               <TextField source="meeting_title" label="Title" />
               <FunctionField
+                label="Meeting Date"
+                render={(record: any) => formatESTDateTime(record.date)}
+              />
+              <FunctionField
                 label="Analyzed At"
                 render={(record: any) => formatESTDateTime(record.analyzed_at)}
               />

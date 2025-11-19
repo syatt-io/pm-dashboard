@@ -19,6 +19,8 @@ class ProcessedMeetingDTO:
     date: Optional[datetime] = None
     processed_at: Optional[datetime] = None
     analyzed_at: Optional[datetime] = None
+    ai_provider: Optional[str] = None
+    ai_model: Optional[str] = None
     # Topic-based structure (NEW)
     topics: List[Dict[str, Any]] = field(default_factory=list)
     action_items: List[Dict[str, Any]] = field(default_factory=list)
@@ -64,6 +66,8 @@ class ProcessedMeetingDTO:
             date=meeting.date,
             processed_at=meeting.processed_at,
             analyzed_at=meeting.analyzed_at,
+            ai_provider=getattr(meeting, "ai_provider", None),
+            ai_model=getattr(meeting, "ai_model", None),
             # Topic-based structure (NEW)
             topics=parse_json_field(getattr(meeting, "topics", None), []),
             action_items=parse_json_field(meeting.action_items, []),
