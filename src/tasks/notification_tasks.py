@@ -212,6 +212,9 @@ def sync_tempo_hours(self):
     Sync Tempo hours to database (Celery task wrapper).
     Scheduled to run at 4 AM EST (8:00 UTC).
 
+    Deduplication: Only runs once per 23-hour window, even if triggered multiple times
+    by celery-beat restarts during deployments.
+
     Resilience features:
     - Auto-retry up to 3 times with exponential backoff
     - 5-minute initial wait, up to 30-minute max backoff
@@ -219,6 +222,10 @@ def sync_tempo_hours(self):
     """
     from src.services.job_execution_tracker import track_celery_task
     from src.utils.database import get_db
+    from src.models.scheduled_job_lock import ScheduledJobLock
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import and_
+    import socket
 
     retry_info = (
         f" (attempt {self.request.retries + 1}/4)" if self.request.retries > 0 else ""
@@ -226,27 +233,115 @@ def sync_tempo_hours(self):
     logger.info(f"⏰ Starting Tempo hours sync task{retry_info}...")
 
     db = next(get_db())
+    job_name = "tempo-sync"
+    worker_id = f"{socket.gethostname()}-{self.request.id}"
+    start_time = datetime.now(timezone.utc)
+
     try:
-        tracker = track_celery_task(self, db, "tempo-sync-daily")
-        with tracker:
-            from src.services.scheduler import TodoScheduler
+        # === DEDUPLICATION CHECK ===
+        # Check if job ran successfully in last 23 hours
+        cutoff_time = start_time - timedelta(hours=23)
 
-            scheduler = TodoScheduler()
-            scheduler.sync_tempo_hours()
-            logger.info("✅ Tempo hours sync completed")
+        lock = (
+            db.query(ScheduledJobLock)
+            .filter(ScheduledJobLock.job_name == job_name)
+            .first()
+        )
 
-            result = {
-                "success": True,
-                "task": "tempo_sync",
-                "retries": self.request.retries,
-            }
-            tracker.set_result(result)
-            return result
+        if lock:
+            # Check if already locked by another worker
+            if lock.is_locked:
+                logger.warning(
+                    f"⚠️  Tempo sync already running (locked by {lock.locked_by} at {lock.locked_at}). "
+                    "Skipping this execution."
+                )
+                return {
+                    "success": False,
+                    "skipped": True,
+                    "reason": "already_locked",
+                    "locked_by": lock.locked_by,
+                }
+
+            # Check if ran recently (within 23 hours)
+            if lock.last_run_at and lock.last_run_at > cutoff_time:
+                time_since_last_run = start_time - lock.last_run_at
+                hours_since = time_since_last_run.total_seconds() / 3600
+                logger.warning(
+                    f"⚠️  Tempo sync already ran {hours_since:.1f} hours ago (at {lock.last_run_at}). "
+                    "Skipping duplicate execution. Next run allowed after 23 hours."
+                )
+                return {
+                    "success": False,
+                    "skipped": True,
+                    "reason": "ran_recently",
+                    "last_run_at": lock.last_run_at.isoformat(),
+                    "hours_since_last_run": hours_since,
+                }
+        else:
+            # Create lock record if doesn't exist
+            lock = ScheduledJobLock(job_name=job_name)
+            db.add(lock)
+
+        # Acquire lock
+        lock.is_locked = True
+        lock.locked_at = start_time
+        lock.locked_by = worker_id
+        db.commit()
+        logger.info(f"🔒 Lock acquired for tempo-sync by {worker_id}")
+
+        try:
+            # === RUN THE ACTUAL JOB ===
+            tracker = track_celery_task(self, db, "tempo-sync-daily")
+            with tracker:
+                from src.services.scheduler import TodoScheduler
+
+                scheduler = TodoScheduler()
+                scheduler.sync_tempo_hours()
+                logger.info("✅ Tempo hours sync completed")
+
+                # Record successful execution
+                end_time = datetime.now(timezone.utc)
+                duration_seconds = int((end_time - start_time).total_seconds())
+
+                lock.last_run_at = end_time
+                lock.last_run_duration_seconds = duration_seconds
+                db.commit()
+
+                result = {
+                    "success": True,
+                    "task": "tempo_sync",
+                    "retries": self.request.retries,
+                    "duration_seconds": duration_seconds,
+                }
+                tracker.set_result(result)
+                return result
+        finally:
+            # Always release lock when done (success or failure)
+            lock.is_locked = False
+            lock.locked_by = None
+            db.commit()
+            logger.info("🔓 Lock released for tempo-sync")
+
     except Exception as e:
         logger.error(
             f"❌ Error in Tempo sync task (attempt {self.request.retries + 1}/4): {e}",
             exc_info=True,
         )
+        # Release lock on error
+        try:
+            lock = (
+                db.query(ScheduledJobLock)
+                .filter(ScheduledJobLock.job_name == job_name)
+                .first()
+            )
+            if lock and lock.is_locked:
+                lock.is_locked = False
+                lock.locked_by = None
+                db.commit()
+                logger.info("🔓 Lock released due to error")
+        except Exception as lock_error:
+            logger.error(f"Failed to release lock after error: {lock_error}")
+
         # Re-raise to trigger auto-retry
         raise
     finally:

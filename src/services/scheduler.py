@@ -104,9 +104,10 @@ class TodoScheduler:
                 self._run_async, self.check_urgent_items
             )
 
-        # Tempo hours sync at 4 AM EST (9 AM UTC)
-        # Note: This runs at 9 AM UTC which is 4 AM EST (during DST) or 10 AM UTC for standard time
-        schedule.every().day.at("09:00").do(self._run_sync, self.sync_tempo_hours)
+        # ========== DEPRECATED SCHEDULES REMOVED ==========
+        # Tempo hours sync - REMOVED (now runs via Celery Beat at 4 AM EST / 8:00 UTC)
+        # See: src/tasks/celery_app.py:224-227 ('tempo-sync-daily' schedule)
+        # See: src/tasks/notification_tasks.py:198-344 (sync_tempo_hours task with deduplication)
 
         # ========== MIGRATION COMPLETE ==========
         # Phase 1 PM Automation Jobs & Proactive Agent Jobs have been migrated to Celery Beat!
@@ -175,27 +176,35 @@ class TodoScheduler:
             # Get all active todos
             active_todos = self.todo_manager.get_active_todos(limit=100)
 
-            # Get users who have opted in for daily TODO digest
+            # Get users who have opted in for daily TODO digest (NEW NOTIFICATION PREFERENCES SYSTEM)
             from src.utils.database import session_scope
             from src.models.user import User
+            from src.services.notification_preference_checker import (
+                NotificationPreferenceChecker,
+            )
 
             opted_in_users = []
             with session_scope() as db_session:
-                opted_in_users = (
-                    db_session.query(User)
-                    .filter(
-                        User.notify_daily_todo_digest == True,
-                        User.slack_user_id.isnot(None),
-                    )
-                    .all()
+                # Initialize preference checker
+                pref_checker = NotificationPreferenceChecker(db_session)
+
+                # Get all users with Slack configured
+                all_users = (
+                    db_session.query(User).filter(User.slack_user_id.isnot(None)).all()
                 )
 
-                # Detach users from session to use them outside the context
-                for user in opted_in_users:
-                    db_session.expunge(user)
+                # Filter to only users who have enabled TODO reminders via Slack
+                # Note: Daily digest maps to the TODO reminders category
+                for user in all_users:
+                    if pref_checker.should_send_notification(
+                        user, "todo_due_today", "slack"
+                    ):
+                        opted_in_users.append(user)
+                        # Detach user from session to use outside the context
+                        db_session.expunge(user)
 
             logger.info(
-                f"Found {len(opted_in_users)} users opted in for daily TODO digest"
+                f"Found {len(opted_in_users)} users opted in for daily TODO digest (via notification preferences)"
             )
 
             # Send individual DMs to opted-in users
@@ -322,6 +331,38 @@ class TodoScheduler:
                 logger.info("No overdue TODOs found")
                 return
 
+            # Get users who have opted in (NEW NOTIFICATION PREFERENCES SYSTEM)
+            from src.utils.database import session_scope
+            from src.models.user import User
+            from src.services.notification_preference_checker import (
+                NotificationPreferenceChecker,
+            )
+
+            opted_in_users = []
+            with session_scope() as db_session:
+                pref_checker = NotificationPreferenceChecker(db_session)
+                all_users = (
+                    db_session.query(User).filter(User.slack_user_id.isnot(None)).all()
+                )
+
+                # Filter to only users who have enabled TODO reminders via Slack (overdue is Slack-only)
+                for user in all_users:
+                    if pref_checker.should_send_notification(
+                        user, "todo_overdue", "slack"
+                    ):
+                        opted_in_users.append(user)
+                        db_session.expunge(user)
+
+            if not opted_in_users:
+                logger.info(
+                    f"Found {len(overdue_todos)} overdue TODOs but no users have enabled overdue reminders"
+                )
+                return
+
+            logger.info(
+                f"Found {len(opted_in_users)} users opted in for overdue TODO reminders"
+            )
+
             # Group by assignee
             by_assignee = {}
             for todo in overdue_todos:
@@ -330,14 +371,19 @@ class TodoScheduler:
                     by_assignee[assignee] = []
                 by_assignee[assignee].append(todo)
 
-            # Send individual reminders
+            # Send individual reminders only to opted-in users
             for assignee, todos in by_assignee.items():
                 if assignee == "Unassigned":
                     continue
 
-                await self.todo_manager._send_overdue_reminder(assignee, todos)
+                # Check if this assignee has opted in
+                if any(
+                    user.slack_display_name == assignee or user.email == assignee
+                    for user in opted_in_users
+                ):
+                    await self.todo_manager._send_overdue_reminder(assignee, todos)
 
-            # Send team summary for all overdue items
+            # Send team summary for all overdue items (only if users opted in)
             if len(overdue_todos) > 3:  # Only if significant number
                 body = f"⚠️ *Team Overdue Alert*\n\n"
                 body += f"There are {len(overdue_todos)} overdue TODO items across the team.\n\n"
@@ -377,6 +423,38 @@ class TodoScheduler:
                 logger.info("No TODOs due today")
                 return
 
+            # Get users who have opted in (NEW NOTIFICATION PREFERENCES SYSTEM)
+            from src.utils.database import session_scope
+            from src.models.user import User
+            from src.services.notification_preference_checker import (
+                NotificationPreferenceChecker,
+            )
+
+            opted_in_users = []
+            with session_scope() as db_session:
+                pref_checker = NotificationPreferenceChecker(db_session)
+                all_users = (
+                    db_session.query(User).filter(User.slack_user_id.isnot(None)).all()
+                )
+
+                # Filter to only users who have enabled TODO reminders via Slack (due today is Slack-only)
+                for user in all_users:
+                    if pref_checker.should_send_notification(
+                        user, "todo_due_today", "slack"
+                    ):
+                        opted_in_users.append(user)
+                        db_session.expunge(user)
+
+            if not opted_in_users:
+                logger.info(
+                    f"Found {len(due_today)} TODOs due today but no users have enabled due today reminders"
+                )
+                return
+
+            logger.info(
+                f"Found {len(opted_in_users)} users opted in for due today TODO reminders"
+            )
+
             # Group by assignee
             by_assignee = {}
             for todo in due_today:
@@ -385,24 +463,29 @@ class TodoScheduler:
                     by_assignee[assignee] = []
                 by_assignee[assignee].append(todo)
 
-            # Send individual reminders
+            # Send individual reminders only to opted-in users
             for assignee, todos in by_assignee.items():
                 if assignee == "Unassigned":
                     continue
 
-                body = f"📅 *Items Due Today for {assignee}*\n\n"
-                for todo in todos:
-                    body += f"• {todo.title}\n"
-                    if todo.description:
-                        body += f"  _{todo.description[:100]}{'...' if len(todo.description) > 100 else ''}_\n"
+                # Check if this assignee has opted in
+                if any(
+                    user.slack_display_name == assignee or user.email == assignee
+                    for user in opted_in_users
+                ):
+                    body = f"📅 *Items Due Today for {assignee}*\n\n"
+                    for todo in todos:
+                        body += f"• {todo.title}\n"
+                        if todo.description:
+                            body += f"  _{todo.description[:100]}{'...' if len(todo.description) > 100 else ''}_\n"
 
-                body += f"\n💡 Use the TODO dashboard to manage these items."
+                    body += f"\n💡 Use the TODO dashboard to manage these items."
 
-                content = NotificationContent(
-                    title="TODOs Due Today", body=body, priority="normal"
-                )
+                    content = NotificationContent(
+                        title="TODOs Due Today", body=body, priority="normal"
+                    )
 
-                await self.notifier.send_notification(content, channels=["slack"])
+                    await self.notifier.send_notification(content, channels=["slack"])
 
             logger.info(f"Due today reminders sent for {len(due_today)} items")
 
@@ -485,9 +568,52 @@ class TodoScheduler:
                 title="Weekly TODO Summary", body=body, priority="normal"
             )
 
-            await self.notifier.send_notification(content, channels=["slack", "email"])
+            # Check which channels users have enabled (NEW NOTIFICATION PREFERENCES SYSTEM)
+            from src.utils.database import session_scope
+            from src.models.user import User
+            from src.services.notification_preference_checker import (
+                NotificationPreferenceChecker,
+            )
 
-            logger.info("Weekly summary sent")
+            channels_to_notify = []
+
+            with session_scope() as db_session:
+                pref_checker = NotificationPreferenceChecker(db_session)
+
+                # Get all users
+                all_users = db_session.query(User).all()
+
+                # Check if ANY user has enabled weekly summary via Slack
+                slack_enabled = any(
+                    pref_checker.should_send_notification(
+                        user, "weekly_summary", "slack"
+                    )
+                    for user in all_users
+                )
+
+                # Check if ANY user has enabled weekly summary via Email
+                email_enabled = any(
+                    pref_checker.should_send_notification(
+                        user, "weekly_summary", "email"
+                    )
+                    for user in all_users
+                )
+
+                if slack_enabled:
+                    channels_to_notify.append("slack")
+                if email_enabled:
+                    channels_to_notify.append("email")
+
+            # Only send if at least one user has enabled this notification
+            if channels_to_notify:
+                await self.notifier.send_notification(
+                    content, channels=channels_to_notify
+                )
+                logger.info(f"Weekly summary sent to channels: {channels_to_notify}")
+            else:
+                logger.info(
+                    "Skipping weekly summary - no users have enabled this notification"
+                )
 
         except Exception as e:
             logger.error(f"Error sending weekly summary: {e}")
@@ -507,6 +633,14 @@ class TodoScheduler:
             if not urgent_items:
                 return
 
+            # Get users who have opted in for urgent notifications (NEW NOTIFICATION PREFERENCES SYSTEM)
+            from src.utils.database import session_scope
+            from src.models.user import User
+            from src.services.notification_preference_checker import (
+                NotificationPreferenceChecker,
+            )
+
+            # Prepare message content
             body = f"🚨 *URGENT ITEMS REQUIRING ATTENTION* 🚨\n\n"
             body += f"The following high-priority items are overdue:\n\n"
 
@@ -524,11 +658,44 @@ class TodoScheduler:
                 priority="urgent",
             )
 
-            await self.notifier.send_notification(content, channels=["slack", "email"])
+            # Check which channels are enabled for urgent notifications
+            channels_to_notify = []
 
-            logger.warning(
-                f"Urgent alert sent for {len(urgent_items)} high-priority overdue items"
-            )
+            with session_scope() as db_session:
+                pref_checker = NotificationPreferenceChecker(db_session)
+
+                # Get all users
+                all_users = db_session.query(User).all()
+
+                # Check if ANY user has enabled urgent notifications via Slack
+                slack_enabled = any(
+                    pref_checker.should_send_notification(user, "urgent_items", "slack")
+                    for user in all_users
+                )
+
+                # Check if ANY user has enabled urgent notifications via Email
+                email_enabled = any(
+                    pref_checker.should_send_notification(user, "urgent_items", "email")
+                    for user in all_users
+                )
+
+                if slack_enabled:
+                    channels_to_notify.append("slack")
+                if email_enabled:
+                    channels_to_notify.append("email")
+
+            # Only send if at least one user has enabled this notification
+            if channels_to_notify:
+                await self.notifier.send_notification(
+                    content, channels=channels_to_notify
+                )
+                logger.warning(
+                    f"Urgent alert sent for {len(urgent_items)} high-priority overdue items to channels: {channels_to_notify}"
+                )
+            else:
+                logger.info(
+                    f"Found {len(urgent_items)} urgent items but no users have enabled urgent notifications"
+                )
 
         except Exception as e:
             logger.error(f"Error checking urgent items: {e}")
@@ -627,7 +794,54 @@ class TodoScheduler:
                         priority="normal",
                     )
 
-                    await self.notifier.send_notification(content, channels=["slack"])
+                    # Check which channels users have enabled (NEW NOTIFICATION PREFERENCES SYSTEM)
+                    from src.utils.database import session_scope
+                    from src.models.user import User
+                    from src.services.notification_preference_checker import (
+                        NotificationPreferenceChecker,
+                    )
+
+                    channels_to_notify = []
+
+                    with session_scope() as db_session:
+                        pref_checker = NotificationPreferenceChecker(db_session)
+
+                        # Get all users
+                        all_users = db_session.query(User).all()
+
+                        # Check if ANY user has enabled weekly hours report via Slack
+                        slack_enabled = any(
+                            pref_checker.should_send_notification(
+                                user, "weekly_hours_report", "slack"
+                            )
+                            for user in all_users
+                        )
+
+                        # Check if ANY user has enabled weekly hours report via Email
+                        email_enabled = any(
+                            pref_checker.should_send_notification(
+                                user, "weekly_hours_report", "email"
+                            )
+                            for user in all_users
+                        )
+
+                        if slack_enabled:
+                            channels_to_notify.append("slack")
+                        if email_enabled:
+                            channels_to_notify.append("email")
+
+                    # Only send if at least one user has enabled this notification
+                    if channels_to_notify:
+                        await self.notifier.send_notification(
+                            content, channels=channels_to_notify
+                        )
+                        logger.info(
+                            f"Weekly hours reports summary sent to channels: {channels_to_notify}"
+                        )
+                    else:
+                        logger.info(
+                            "Skipping weekly hours reports summary - no users have enabled this notification"
+                        )
 
         except Exception as e:
             logger.error(f"Error sending weekly hours reports: {e}")

@@ -34,6 +34,7 @@ from .characteristic_impact_baseline import CharacteristicImpactBaseline
 from .epic_allocation_baseline import EpicAllocationBaseline
 from .template_epic import TemplateEpic
 from .template_ticket import TemplateTicket
+from .scheduled_job_lock import ScheduledJobLock
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -207,6 +208,7 @@ __all__ = [
     "EpicAllocationBaseline",
     "TemplateEpic",
     "TemplateTicket",
+    "ScheduledJobLock",
     "Base",
     # DTOs
     "ProcessedMeetingDTO",
