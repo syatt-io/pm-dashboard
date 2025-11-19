@@ -1095,6 +1095,51 @@ def update_project_forecasts(project_key):
 
         # Use engine.begin() instead of connect() for auto-commit
         with engine.begin() as conn:
+            # Ensure project exists in projects table to avoid foreign key violation
+            # This handles cases where projects are renamed or newly created in Jira
+            result = conn.execute(
+                text("SELECT key FROM projects WHERE key = :key"), {"key": project_key}
+            )
+
+            if not result.fetchone():
+                logger.warning(
+                    f"Project {project_key} not found in projects table - auto-creating"
+                )
+
+                # Fetch project data from Jira to get the name
+                try:
+                    from src.integrations.jira_mcp import JiraMCPClient
+                    import asyncio
+
+                    jira_client = JiraMCPClient()
+                    jira_projects = asyncio.run(jira_client.get_projects())
+
+                    # Find matching project
+                    project_name = project_key  # Default to key if not found
+                    for proj in jira_projects:
+                        if proj.get("key") == project_key:
+                            project_name = proj.get("name", project_key)
+                            break
+
+                    # Insert project with basic data
+                    conn.execute(
+                        text(
+                            """
+                            INSERT INTO projects (key, name, is_active, created_at, updated_at)
+                            VALUES (:key, :name, true, NOW(), NOW())
+                        """
+                        ),
+                        {"key": project_key, "name": project_name},
+                    )
+                    logger.info(f"Auto-created project {project_key} in projects table")
+
+                except Exception as sync_error:
+                    logger.error(
+                        f"Failed to auto-create project {project_key}: {sync_error}"
+                    )
+                    raise
+
+            # Now insert/update forecasts
             for forecast in forecasts:
                 month_year = forecast.get("month_year")
                 forecasted_hours = forecast.get("forecasted_hours", 0)
