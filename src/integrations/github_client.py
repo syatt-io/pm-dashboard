@@ -574,7 +574,9 @@ class GitHubClient:
             query_parts.append(f"org:{self.organization}")
 
         # Add date and state filters
-        query_parts.append(f"created:>={since_date}")
+        # Use 'updated' instead of 'created' to capture PRs with recent activity
+        # (merged, commented, reviewed) regardless of when they were created
+        query_parts.append(f"updated:>={since_date}")
         query_parts.append(additional_filters)
 
         search_query = " ".join(query_parts)
