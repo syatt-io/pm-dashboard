@@ -92,8 +92,6 @@ def user_notification_prefs(db_session, sample_user):
     prefs = UserNotificationPreferences(
         user_id=sample_user.id,
         enable_escalations=True,  # Required for auto-escalation to work
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
     )
     db_session.add(prefs)
     db_session.commit()
@@ -112,8 +110,6 @@ def escalation_prefs(db_session, sample_user, user_notification_prefs):
         dm_threshold_days=3,
         channel_threshold_days=5,
         critical_threshold_days=7,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
     )
     db_session.add(prefs)
     db_session.commit()
@@ -238,11 +234,16 @@ def test_skip_insight_no_preferences(
 
 
 def test_skip_insight_auto_escalation_disabled(
-    db_session, sample_user, escalation_prefs, mock_slack_client, mock_github_client
+    db_session,
+    sample_user,
+    user_notification_prefs,
+    escalation_prefs,
+    mock_slack_client,
+    mock_github_client,
 ):
     """Test that insight is skipped when auto-escalation is disabled."""
-    # Disable auto-escalation
-    escalation_prefs.enable_auto_escalation = False
+    # Disable auto-escalation via user notification preferences
+    user_notification_prefs.enable_escalations = False
     db_session.commit()
 
     insight = create_insight(db_session, sample_user.id, 5)
