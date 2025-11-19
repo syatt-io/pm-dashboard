@@ -1179,7 +1179,7 @@ export const AnalysisShow = () => {
         <AnalysisShowErrorFallback error={error} />
       ) : (
         <Show
-          title="📊 Meeting Analysis"
+          title={<span>📊 Meeting Analysis</span>}
           queryOptions={{
             onError: (err: any) => {
               console.error('Error loading meeting:', err);
