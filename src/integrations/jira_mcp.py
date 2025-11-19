@@ -749,8 +749,16 @@ class JiraMCPClient:
                 response.raise_for_status()
 
                 issue_types = response.json()
-                logger.info(f"Retrieved {len(issue_types)} issue types via direct API")
-                return issue_types
+
+                # Filter to only global issue types (exclude project-scoped ones)
+                # Project-scoped issue types have a 'scope' field with project ID
+                global_issue_types = [it for it in issue_types if "scope" not in it]
+
+                logger.info(
+                    f"Retrieved {len(issue_types)} total issue types, "
+                    f"filtered to {len(global_issue_types)} global issue types"
+                )
+                return global_issue_types
 
             # Fallback to MCP
             mcp_request = {"method": "jira/getIssueTypes", "params": {}}
