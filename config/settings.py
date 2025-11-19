@@ -388,7 +388,9 @@ class Settings:
     @staticmethod
     def _load_web_config() -> WebConfig:
         return WebConfig(
-            base_url=os.getenv("WEB_BASE_URL", "http://localhost:3030"),
+            base_url=os.getenv(
+                "WEB_BASE_URL", "https://agent-pm-tsbbb.ondigitalocean.app"
+            ),
             port=int(os.getenv("WEB_PORT", "3030")),
             host=os.getenv("WEB_HOST", "127.0.0.1"),
             debug=os.getenv("WEB_DEBUG", "true").lower() == "true",
