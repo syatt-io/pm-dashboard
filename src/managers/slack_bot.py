@@ -28,7 +28,13 @@ class SlackTodoBot:
 
     def __init__(self, bot_token: str, signing_secret: str):
         """Initialize Slack bot."""
-        self.app = App(token=bot_token, signing_secret=signing_secret)
+        # Use token_verification_enabled=False to prevent OAuth authorization issues
+        # when app has redirect URLs configured but we're using a static token
+        self.app = App(
+            token=bot_token,
+            signing_secret=signing_secret,
+            token_verification_enabled=False,
+        )
         self.client = WebClient(token=bot_token)
         self.todo_manager = TodoManager()
         self.learning_manager = LearningManager()
