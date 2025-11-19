@@ -419,6 +419,59 @@ def create_auth_blueprint(db_session_factory, limiter=None):
         finally:
             db_session.close()
 
+    @auth_bp.route("/api/auth/users/<int:user_id>/basic-info", methods=["PUT"])
+    @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
+    @admin_required
+    def update_user_basic_info(current_user, user_id):
+        """Update user basic information (name, email) - admin only."""
+        db_session = db_session_factory()
+        try:
+            from src.models.user import User
+
+            data = request.get_json()
+
+            # Extract fields
+            name = data.get("name")
+            email = data.get("email")
+
+            # Validate required fields
+            if not name or not email:
+                return jsonify({"error": "Name and email are required"}), 400
+
+            user = db_session.query(User).filter_by(id=user_id).first()
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+
+            # Check if email already exists for another user
+            if email and email != user.email:
+                existing_user = db_session.query(User).filter_by(email=email).first()
+                if existing_user and existing_user.id != user_id:
+                    return (
+                        jsonify(
+                            {
+                                "error": f"Email already exists for user {existing_user.name}"
+                            }
+                        ),
+                        400,
+                    )
+
+            # Update fields
+            user.name = name
+            user.email = email
+
+            db_session.commit()
+
+            return jsonify(
+                {"message": "User basic info updated", "user": user.to_dict()}
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to update user basic info: {e}")
+            db_session.rollback()
+            return jsonify({"error": "Failed to update user basic info"}), 500
+        finally:
+            db_session.close()
+
     @auth_bp.route("/api/auth/users", methods=["POST"])
     @rate_limit("30 per minute")  # ✅ SECURITY: Prevent admin endpoint abuse
     @admin_required

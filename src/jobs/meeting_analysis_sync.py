@@ -19,6 +19,8 @@ from sqlalchemy.orm import sessionmaker
 from src.integrations.fireflies import FirefliesClient
 from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.managers.notifications import NotificationManager
+from src.models import User
+from src.services.notification_preference_checker import NotificationPreferenceChecker
 
 logger = logging.getLogger(__name__)
 
@@ -366,11 +368,29 @@ class MeetingAnalysisSyncJob:
                     if send_emails and self.notification_manager:
                         # Extract participant emails from meeting data
                         attendees = transcript_data.get("attendees", [])
-                        recipient_emails = [
+                        all_attendee_emails = [
                             attendee.get("email")
                             for attendee in attendees
                             if isinstance(attendee, dict) and attendee.get("email")
                         ]
+
+                        # Filter recipients based on individual user preferences
+                        pref_checker = NotificationPreferenceChecker(session)
+                        recipient_emails = []
+                        for email in all_attendee_emails:
+                            # Look up user by email
+                            user = (
+                                session.query(User).filter(User.email == email).first()
+                            )
+                            if user and pref_checker.should_send_notification(
+                                user, "meeting_analysis", "email"
+                            ):
+                                recipient_emails.append(email)
+
+                        logger.info(
+                            f"📊 Filtered {len(all_attendee_emails)} attendees to {len(recipient_emails)} "
+                            f"recipients based on meeting_analysis_email preferences"
+                        )
 
                         # ⚠️ SAFETY: Default to test mode unless explicitly set to production
                         test_mode = (

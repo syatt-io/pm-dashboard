@@ -249,29 +249,44 @@ def auth_required(f):
 
         # Get token from Authorization header
         auth_header = request.headers.get("Authorization")
+        logger.debug(
+            f"[AUTH_DEBUG] Authorization header: {auth_header[:20] if auth_header else 'None'}..."
+        )
         if auth_header:
             try:
                 token = auth_header.split(" ")[1]  # Bearer <token>
+                logger.debug(
+                    f"[AUTH_DEBUG] Token extracted from header: {token[:20]}..."
+                )
             except IndexError:
+                logger.error("[AUTH_DEBUG] Invalid authorization header format")
                 return jsonify({"error": "Invalid authorization header format"}), 401
 
         # Get token from cookie as fallback
         if not token:
             token = request.cookies.get("auth_token")
+            logger.debug(
+                f"[AUTH_DEBUG] Token from cookie: {token[:20] if token else 'None'}..."
+            )
 
         if not token:
+            logger.error("[AUTH_DEBUG] No token found in header or cookie")
             return jsonify({"error": "Authentication required"}), 401
 
         try:
             # Get auth service from app context
             auth_service = current_app.auth_service
             user = auth_service.get_current_user(token)
+            logger.debug(
+                f"[AUTH_DEBUG] User authenticated: {user.email}, role: {user.role}"
+            )
 
             # Add user to request context
             request.current_user = user
 
             return f(user, *args, **kwargs)
         except Exception as e:
+            logger.error(f"[AUTH_DEBUG] Auth failed: {str(e)}", exc_info=True)
             return jsonify({"error": str(e)}), 401
 
     return decorated_function

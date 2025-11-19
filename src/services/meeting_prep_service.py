@@ -12,6 +12,7 @@ from email.mime.multipart import MIMEMultipart
 
 from src.models import User, UserNotificationPreferences
 from src.managers.notifications import NotificationManager
+from src.services.notification_preference_checker import NotificationPreferenceChecker
 from src.services.project_activity_aggregator import ProjectActivityAggregator
 from src.utils.database import get_db
 from config.settings import settings
@@ -357,15 +358,16 @@ class MeetingPrepDeliveryService:
         results = {"slack": False, "email": False}
 
         # Get user preferences
-        prefs = (
-            self.db.query(UserNotificationPreferences)
-            .filter(UserNotificationPreferences.user_id == user.id)
-            .first()
-        )
+        # Check user preferences using NotificationPreferenceChecker
+        pref_checker = NotificationPreferenceChecker(self.db)
 
-        # Default: Slack enabled, Email disabled (unless user is ID 1 - Mike)
-        deliver_slack = prefs.daily_brief_slack if prefs else True
-        deliver_email = user.id == 1  # Only Mike gets emails
+        # Check both category toggle (enable_meeting_prep) AND channel preferences
+        deliver_slack = pref_checker.should_send_notification(
+            user, "meeting_prep", "slack"
+        )
+        deliver_email = pref_checker.should_send_notification(
+            user, "meeting_prep", "email"
+        )
 
         formatted_agenda = digest_result["formatted_agenda"]
 

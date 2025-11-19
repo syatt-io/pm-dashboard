@@ -166,28 +166,50 @@ class HoursReportAgent:
         return (actual_hours / expected_hours) * 100
 
     def get_project_subscribers(self, project_key: str) -> List[str]:
-        """Get list of email addresses subscribed to project updates."""
-        from sqlalchemy import create_engine, text
+        """Get list of email addresses subscribed to project updates.
+
+        Returns emails for users who have:
+        1. enable_weekly_reports = True (category toggle)
+        2. weekly_hours_reports_email = True (channel selection)
+        3. Watched the project in user_watched_projects
+        """
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from src.models import User, UserNotificationPreferences, UserWatchedProject
+        from src.services.notification_preference_checker import (
+            NotificationPreferenceChecker,
+        )
 
         engine = create_engine(self.database_url)
-        subscribers = []
+        Session = sessionmaker(bind=engine)
+        session = Session()
 
-        with engine.connect() as conn:
-            # Get users who have selected this project
-            result = conn.execute(
-                text(
-                    """
-                SELECT email FROM user_preferences
-                WHERE json_extract(selected_projects, '$') LIKE :project_search
-            """
-                ),
-                {"project_search": f'%"{project_key}"%'},
+        try:
+            pref_checker = NotificationPreferenceChecker(session)
+            subscribers = []
+
+            # Get all active users who are watching this project
+            watched_users = (
+                session.query(User)
+                .join(UserWatchedProject, User.id == UserWatchedProject.user_id)
+                .filter(
+                    UserWatchedProject.project_key == project_key,
+                    User.is_active == True,
+                )
+                .all()
             )
 
-            for row in result:
-                subscribers.append(row[0])
+            # Filter users by notification preferences
+            for user in watched_users:
+                if pref_checker.should_send_notification(
+                    user, "weekly_hours_reports", "email"
+                ):
+                    subscribers.append(user.email)
 
-        return subscribers
+            return subscribers
+
+        finally:
+            session.close()
 
     async def generate_project_report(self, project: Dict) -> Dict:
         """Generate a report for a single project."""

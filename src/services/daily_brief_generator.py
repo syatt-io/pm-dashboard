@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.models import ProactiveInsight, User, UserNotificationPreferences
 from src.managers.notifications import NotificationManager
+from src.services.notification_preference_checker import NotificationPreferenceChecker
 from src.utils.database import get_db
 from config.settings import settings
 import asyncio
@@ -265,16 +266,16 @@ class DailyBriefGenerator:
 
         results = {"slack": False, "email": False}
 
-        # Get user preferences
-        prefs = (
-            self.db.query(UserNotificationPreferences)
-            .filter(UserNotificationPreferences.user_id == user.id)
-            .first()
-        )
+        # Check user preferences using NotificationPreferenceChecker
+        pref_checker = NotificationPreferenceChecker(self.db)
 
-        # If no preferences set, use defaults (Slack enabled, Email disabled)
-        deliver_slack = prefs.daily_brief_slack if prefs else True
-        deliver_email = prefs.daily_brief_email if prefs else False
+        # Check both category toggle (enable_budget_alerts) AND channel preferences
+        deliver_slack = pref_checker.should_send_notification(
+            user, "daily_brief", "slack"
+        )
+        deliver_email = pref_checker.should_send_notification(
+            user, "daily_brief", "email"
+        )
 
         # Deliver via Slack
         if deliver_slack and user.slack_user_id:

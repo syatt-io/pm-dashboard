@@ -140,28 +140,55 @@ class AutoEscalationService:
             "skipped_reason": None,
         }
 
-        # Get user preferences
-        prefs = (
-            self.db.query(EscalationPreferences)
+        # Get user preferences using UserNotificationPreferences
+        from src.models import User, UserNotificationPreferences
+        from src.services.notification_preference_checker import (
+            NotificationPreferenceChecker,
+        )
+
+        user = self.db.query(User).filter_by(id=insight.user_id).first()
+        if not user:
+            logger.debug(
+                f"User {insight.user_id} not found, skipping insight {insight.id}"
+            )
+            result["skipped_reason"] = "user_not_found"
+            return result
+
+        pref_checker = NotificationPreferenceChecker(self.db)
+
+        # Check if escalations are enabled using unified preferences
+        user_prefs = (
+            self.db.query(UserNotificationPreferences)
             .filter_by(user_id=insight.user_id)
             .first()
         )
 
-        if not prefs:
-            logger.debug(
-                f"No escalation preferences for user {insight.user_id}, "
-                f"skipping insight {insight.id}"
-            )
-            result["skipped_reason"] = "no_prefs"
-            return result
-
-        if not prefs.enable_auto_escalation:
+        if not user_prefs or not user_prefs.enable_escalations:
             logger.debug(
                 f"Auto-escalation disabled for user {insight.user_id}, "
                 f"skipping insight {insight.id}"
             )
             result["skipped_reason"] = "disabled"
             return result
+
+        # For backward compatibility, still use EscalationPreferences for timing config if it exists
+        prefs = (
+            self.db.query(EscalationPreferences)
+            .filter_by(user_id=insight.user_id)
+            .first()
+        )
+
+        # If no EscalationPreferences exist, create default escalation timing
+        if not prefs:
+            prefs = EscalationPreferences(
+                user_id=insight.user_id,
+                enable_auto_escalation=True,  # Already checked via UserNotificationPreferences
+                level_1_days=2,
+                level_2_days=4,
+                level_3_days=7,
+            )
+            self.db.add(prefs)
+            self.db.commit()
 
         # Determine escalation level based on age
         # Handle both naive and aware datetimes

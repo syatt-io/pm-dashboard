@@ -331,6 +331,12 @@ from src.api.epic_budgets import epic_budgets_bp
 from src.api.epic_categories import epic_categories_bp
 from src.routes.epic_templates import epic_templates_bp
 from src.routes.jira_templates import jira_templates_bp
+from src.routes.user_notifications import create_user_notifications_blueprint
+from src.routes.admin_notifications import create_admin_notifications_blueprint
+
+# Create notification blueprints
+user_notifications_bp = create_user_notifications_blueprint()
+admin_notifications_bp = create_admin_notifications_blueprint()
 
 app.register_blueprint(health_bp)
 
@@ -425,6 +431,16 @@ if limiter:
 csrf.exempt(meetings_bp)
 logger.info("✅ Meetings endpoints exempted from CSRF protection")
 
+# ✅ SECURITY: Exempt User Notification endpoints from CSRF protection
+# User notification preference endpoints are called from React frontend with JWT auth
+csrf.exempt(user_notifications_bp)
+logger.info("✅ User Notification endpoints exempted from CSRF protection")
+
+# ✅ SECURITY: Exempt Admin Notification endpoints from CSRF protection
+# Admin notification preference endpoints are called from React frontend with JWT auth
+csrf.exempt(admin_notifications_bp)
+logger.info("✅ Admin Notification endpoints exempted from CSRF protection")
+
 app.register_blueprint(todos_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(jira_bp)
@@ -447,6 +463,8 @@ app.register_blueprint(epic_categories_bp)
 app.register_blueprint(epic_templates_bp)
 app.register_blueprint(jira_templates_bp)
 app.register_blueprint(historical_import_bp)
+app.register_blueprint(user_notifications_bp)
+app.register_blueprint(admin_notifications_bp)
 
 
 # ✅ SECURITY: CSRF token endpoint for frontend to fetch tokens
