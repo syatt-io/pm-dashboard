@@ -85,7 +85,23 @@ def sample_project(db_session):
 
 
 @pytest.fixture
-def escalation_prefs(db_session, sample_user):
+def user_notification_prefs(db_session, sample_user):
+    """Create user notification preferences (required for escalations)."""
+    from src.models import UserNotificationPreferences
+
+    prefs = UserNotificationPreferences(
+        user_id=sample_user.id,
+        enable_escalations=True,  # Required for auto-escalation to work
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(prefs)
+    db_session.commit()
+    return prefs
+
+
+@pytest.fixture
+def escalation_prefs(db_session, sample_user, user_notification_prefs):
     """Create escalation preferences for user."""
     prefs = EscalationPreferences(
         user_id=sample_user.id,
@@ -207,7 +223,7 @@ def test_get_active_insights(
 def test_skip_insight_no_preferences(
     db_session, sample_user, mock_slack_client, mock_github_client
 ):
-    """Test that insight is skipped when user has no preferences."""
+    """Test that insight is skipped when user has no UserNotificationPreferences."""
     insight = create_insight(db_session, sample_user.id, 5)
 
     service = AutoEscalationService(db_session, mock_slack_client, mock_github_client)
@@ -215,7 +231,9 @@ def test_skip_insight_no_preferences(
     result = service._process_insight_escalation(insight)
 
     assert result["escalated"] is False
-    assert result["skipped_reason"] == "no_prefs"
+    assert (
+        result["skipped_reason"] == "disabled"
+    )  # Changed from "no_prefs" to match new behavior
     mock_slack_client.chat_postMessage.assert_not_called()
 
 
