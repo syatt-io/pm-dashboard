@@ -95,7 +95,8 @@ export function AppSidebar() {
     if (path === '/' && currentPath === '/') return true;
     if (path === '/' && currentPath !== '/') return false;
 
-    const pathMatches = currentPath === path;
+    // Check for exact match or child route (e.g., /analysis matches /analysis/123)
+    const pathMatches = currentPath === path || currentPath.startsWith(path + '/');
 
     if (!tabParam) return pathMatches;
 

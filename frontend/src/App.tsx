@@ -95,6 +95,24 @@ const AdminApp = () => {
             show={AnalysisShow}
             icon={FavoriteIcon}
             options={{ label: 'My Meetings' }}
+            recordRepresentation={(record) => {
+              if (!record) return 'Meeting Analysis';
+              const title = record.meeting_title || 'Untitled Meeting';
+              if (record.date) {
+                const date = new Date(record.date);
+                const estDate = date.toLocaleString('en-US', {
+                  timeZone: 'America/New_York',
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                });
+                return `${title} - ${estDate} EST`;
+              }
+              return title;
+            }}
           />
           <Resource
             name="todos"
