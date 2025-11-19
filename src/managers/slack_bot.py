@@ -12,6 +12,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_bolt import App
 from slack_bolt.adapter.flask import SlackRequestHandler
+from slack_bolt.authorization import AuthorizeResult
 
 from config.settings import settings
 from src.managers.todo_manager import TodoManager
@@ -32,12 +33,14 @@ class SlackTodoBot:
         # Custom authorize function to bypass OAuth when using static token
         # This prevents "AuthorizeResult not found" errors when app has OAuth configured
         def authorize_with_static_token(enterprise_id, team_id, user_id):
-            return {
-                "bot_token": bot_token,
-                "bot_id": None,  # Will be populated by Slack
-                "bot_user_id": None,  # Will be populated by Slack
-                "user_id": user_id,
-            }
+            return AuthorizeResult(
+                enterprise_id=enterprise_id,
+                team_id=team_id,
+                bot_token=bot_token,
+                bot_id=None,
+                bot_user_id=None,
+                user_id=user_id,
+            )
 
         self.app = App(
             token=bot_token,
