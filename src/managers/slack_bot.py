@@ -28,12 +28,21 @@ class SlackTodoBot:
 
     def __init__(self, bot_token: str, signing_secret: str):
         """Initialize Slack bot."""
-        # Use token_verification_enabled=False to prevent OAuth authorization issues
-        # when app has redirect URLs configured but we're using a static token
+
+        # Custom authorize function to bypass OAuth when using static token
+        # This prevents "AuthorizeResult not found" errors when app has OAuth configured
+        def authorize_with_static_token(enterprise_id, team_id, user_id):
+            return {
+                "bot_token": bot_token,
+                "bot_id": None,  # Will be populated by Slack
+                "bot_user_id": None,  # Will be populated by Slack
+                "user_id": user_id,
+            }
+
         self.app = App(
             token=bot_token,
             signing_secret=signing_secret,
-            token_verification_enabled=False,
+            authorize=authorize_with_static_token,
         )
         self.client = WebClient(token=bot_token)
         self.todo_manager = TodoManager()
