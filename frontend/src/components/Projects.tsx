@@ -1423,8 +1423,6 @@ export const ProjectList = () => {
 
   return (
     <Box>
-      <WatchedProjectsHeader />
-
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -1444,10 +1442,32 @@ export const ProjectList = () => {
             </Button>
           </Box>
 
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label={`📌 My Projects (${watchedProjects.length})`} />
-            <Tab label={`⚙️ Active Projects (${activeProjects.length})`} />
-            <Tab label="📊 Monthly Forecasts" />
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '0.95rem',
+                minHeight: 48,
+                color: 'text.secondary',
+              },
+              '& .Mui-selected': {
+                color: 'primary.main',
+                fontWeight: 600,
+              },
+              '& .MuiTabs-indicator': {
+                height: 2,
+                backgroundColor: 'primary.main',
+              }
+            }}
+          >
+            <Tab label={`My Projects (${watchedProjects.length})`} />
+            <Tab label={`Active Projects (${activeProjects.length})`} />
+            <Tab label="Monthly Forecasts" />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
@@ -1813,6 +1833,8 @@ export const ProjectList = () => {
           </TabPanel>
         </CardContent>
       </Card>
+
+      <WatchedProjectsHeader />
 
       <ProjectDetailDialog
         project={selectedProject}
@@ -2442,27 +2464,31 @@ const ProjectShowContent = () => {
         onChange={handleTabChange}
         sx={{
           mb: 3,
-          backgroundColor: 'background.paper',
-          borderRadius: 2,
-          boxShadow: 1,
+          borderBottom: 1,
+          borderColor: 'divider',
           '& .MuiTab-root': {
-            fontWeight: 600,
-            fontSize: '0.95rem',
             textTransform: 'none',
-            minHeight: 56,
+            fontWeight: 500,
+            fontSize: '0.95rem',
+            minHeight: 48,
+            color: 'text.secondary',
           },
           '& .Mui-selected': {
-            backgroundColor: 'rgba(85, 77, 255, 0.08)',
+            color: 'primary.main',
+            fontWeight: 600,
           },
           '& .MuiTabs-indicator': {
-            height: 3,
-            borderRadius: '3px 3px 0 0',
+            height: 2,
+            backgroundColor: 'primary.main',
           }
         }}
       >
-        <Tab label="📋 Overview" />
+        <Tab label="Overview" />
         {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
-          <Tab label="💰 Budget & Actuals" />
+          <Tab label="Budget & Actuals" />
+        )}
+        {permissions === 'admin' && (
+          <Tab label="Import from Jira" />
         )}
       </Tabs>
 
@@ -3061,12 +3087,12 @@ const ProjectShowContent = () => {
       {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
         <TabPanel value={tabValue} index={1}>
           {/* Project Dates Section */}
-          <Card sx={{ mb: 3 }}>
-            <CardContent sx={{ pb: 2 }}>
-              <Typography variant="h6" gutterBottom>
+          <Card sx={{ mb: 3, backgroundColor: 'rgba(139, 92, 246, 0.05)' }}>
+            <CardContent sx={{ p: 1 }}>
+              <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
                 Project Timeline
               </Typography>
-              <Grid container spacing={2} sx={{ mt: 0.5 }}>
+              <Grid container spacing={2}>
                 <Grid item xs={12} sm={4}>
                   <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
                     Start Date
@@ -3097,11 +3123,6 @@ const ProjectShowContent = () => {
             </CardContent>
           </Card>
 
-          {/* Epics from Jira Section - Better Visual Integration */}
-          <Box sx={{ mb: 3 }}>
-            <ProjectEpicsTab projectKey={record.key} />
-          </Box>
-
           {/* Budget Tracking Section Header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, mt: 4 }}>
             <Analytics sx={{ color: 'primary.main' }} />
@@ -3112,6 +3133,15 @@ const ProjectShowContent = () => {
           <Divider sx={{ mb: 3 }} />
 
           <ProjectBudgetActuals projectKey={record.key} />
+        </TabPanel>
+      )}
+
+      {/* Tab Panel 2: Import from Jira (Admin Only) */}
+      {permissions === 'admin' && (
+        <TabPanel value={tabValue} index={2}>
+          <Box sx={{ mb: 3 }}>
+            <ProjectEpicsTab projectKey={record.key} />
+          </Box>
         </TabPanel>
       )}
 

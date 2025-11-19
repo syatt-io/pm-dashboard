@@ -1207,15 +1207,36 @@ export const Settings = () => {
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs value={tabValue} onChange={handleTabChange} aria-label="settings tabs">
-          <Tab icon={<SettingsIcon />} label="My Integrations" iconPosition="start" />
-          <Tab icon={<WorkIcon />} label="Project Settings" iconPosition="start" />
-          <Tab icon={<NotificationsIcon />} label="Notifications" iconPosition="start" />
-          <Tab icon={<EscalationIcon />} label="Insights & Escalation" iconPosition="start" />
-          {settings.user.role === 'admin' && <Tab icon={<SmartToy />} label="AI Configuration" iconPosition="start" />}
-          {settings.user.role === 'admin' && <Tab icon={<PeopleIcon />} label="User Management" iconPosition="start" />}
-          {settings.user.role === 'admin' && <Tab icon={<CategoryIcon />} label="Epic Categories" iconPosition="start" />}
-          {settings.user.role === 'admin' && <Tab icon={<TemplateIcon />} label="Jira Templates" iconPosition="start" />}
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          aria-label="settings tabs"
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 500,
+              fontSize: '0.95rem',
+              minHeight: 48,
+              color: 'text.secondary',
+            },
+            '& .Mui-selected': {
+              color: 'primary.main',
+              fontWeight: 600,
+            },
+            '& .MuiTabs-indicator': {
+              height: 2,
+              backgroundColor: 'primary.main',
+            }
+          }}
+        >
+          <Tab label="My Integrations" />
+          <Tab label="Project Settings" />
+          <Tab label="Notifications" />
+          <Tab label="Insights & Escalation" />
+          {settings.user.role === 'admin' && <Tab label="AI Configuration" />}
+          {settings.user.role === 'admin' && <Tab label="User Management" />}
+          {settings.user.role === 'admin' && <Tab label="Epic Categories" />}
+          {settings.user.role === 'admin' && <Tab label="Jira Templates" />}
         </Tabs>
       </Box>
 

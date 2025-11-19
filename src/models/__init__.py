@@ -35,6 +35,7 @@ from .epic_allocation_baseline import EpicAllocationBaseline
 from .template_epic import TemplateEpic
 from .template_ticket import TemplateTicket
 from .scheduled_job_lock import ScheduledJobLock
+from .slack_installation import SlackInstallation
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean
@@ -209,6 +210,7 @@ __all__ = [
     "TemplateEpic",
     "TemplateTicket",
     "ScheduledJobLock",
+    "SlackInstallation",
     "Base",
     # DTOs
     "ProcessedMeetingDTO",

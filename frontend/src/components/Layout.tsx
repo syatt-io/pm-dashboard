@@ -1,25 +1,10 @@
 import React from 'react';
-import { Layout, AppBar, Sidebar, Logout, MenuItemLink } from 'react-admin';
+import { Layout, Logout, MenuItemLink, UserMenu } from 'react-admin';
 import { Typography, Box } from '@mui/material';
-import { styled } from '@mui/material/styles';
 import SettingsIcon from '@mui/icons-material/Settings';
 import OnboardingAlert from './OnboardingAlert';
-import { CustomMenu } from './CustomMenu';
-
-// Custom AppBar with Syatt branding
-const CustomAppBar = styled(AppBar)(({ theme }) => ({
-  position: 'fixed',
-  zIndex: 1300,  // Higher than sidebar (1200) to stay on top
-  '& .RaAppBar-toolbar': {
-    backgroundColor: theme.palette.primary.main,
-  },
-  '& .RaAppBar-title': {
-    flex: 1,
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-  },
-}));
+import { SidebarProvider, SidebarTrigger } from './ui/sidebar';
+import { AppSidebar } from './AppSidebar';
 
 const SyattTitle = () => (
   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -51,18 +36,6 @@ const SyattTitle = () => (
   </Box>
 );
 
-// Custom Sidebar with enhanced styling
-const CustomSidebar = styled(Sidebar)(({ theme }) => ({
-  '& .RaSidebar-fixed': {
-    zIndex: theme.zIndex.drawer,
-  },
-  '& .MuiDrawer-paper': {
-    backgroundColor: '#FFFFFF',
-    borderRight: '1px solid rgba(101, 96, 131, 0.1)',
-    boxShadow: '4px 0 16px rgba(30, 29, 39, 0.06)',
-  },
-}));
-
 // Custom UserMenu with Settings link
 const CustomUserMenu = () => {
   return (
@@ -77,50 +50,40 @@ const CustomUserMenu = () => {
   );
 };
 
-// Create stable component instances to avoid re-rendering
-const MyAppBar = (props: any) => (
-  <CustomAppBar {...props} userMenu={<CustomUserMenu />}>
+// Custom AppBar component matching reference design
+const CustomAppBar = () => (
+  <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b px-6" style={{ backgroundColor: '#8B5CF6' }}>
+    <SidebarTrigger className="text-white -ml-2 hover:bg-white/10" />
     <SyattTitle />
-  </CustomAppBar>
-);
-
-const MySidebar = (props: any) => (
-  <CustomSidebar {...props}>
-    <CustomMenu />
-  </CustomSidebar>
+    <div className="flex-1" />
+    <UserMenu>
+      <CustomUserMenu />
+    </UserMenu>
+  </header>
 );
 
 export const CustomLayout = (props: any) => (
-  <>
-    <Layout
-      {...props}
-      appBar={MyAppBar}
-      sidebar={MySidebar}
-      sx={{
-        // Prevent horizontal scroll on the root layout container
-        '& .RaLayout-appFrame': {
-          overflow: 'hidden',  // Prevent page-level horizontal scroll
-        },
-        // Main content area with sidebar - prevent horizontal scroll here too
-        '& .RaLayout-contentWithSidebar': {
-          overflow: 'hidden',
-        },
-        // Only allow horizontal scroll within the actual content area
-        '& .RaLayout-content': {
-          overflowX: 'auto',  // Horizontal scroll only affects content area
-          overflowY: 'auto',  // Vertical scroll for content
-          position: 'relative',  // Create stacking context
-          zIndex: 1,  // Ensure content stays below sidebar
-        },
-        // Ensure sidebar stays fixed and above content
-        '& .RaSidebar-fixed': {
-          position: 'sticky',  // Sticky positioning instead of fixed
-          top: '64px',  // Start below AppBar (AppBar height is 64px)
-          zIndex: 1200,  // Higher than content to prevent overlap
-          backgroundColor: '#FFFFFF',  // Ensure background is solid
-        },
-      }}
-    />
-    <OnboardingAlert />
-  </>
+  <SidebarProvider>
+    <div className="flex min-h-screen w-full">
+      <AppSidebar />
+      <div className="flex-1">
+        <CustomAppBar />
+        <Layout
+          {...props}
+          appBar={() => null}
+          sidebar={() => null}
+          sx={{
+            '& .RaLayout-appFrame': {
+              marginTop: 0,
+              paddingTop: 0,
+            },
+            '& .RaLayout-content': {
+              padding: '24px',
+            },
+          }}
+        />
+        <OnboardingAlert />
+      </div>
+    </div>
+  </SidebarProvider>
 );

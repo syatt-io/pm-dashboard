@@ -41,8 +41,9 @@ LOW = "low"  # Nice-to-have - digest only
 # Alert Configuration
 ALERT_CONFIG = {
     "immediate_alert_priorities": [
-        CRITICAL
-    ],  # Only critical failures get immediate Slack alert
+        CRITICAL,
+        HIGH,
+    ],  # Critical and high priority failures get immediate Slack alert
     "daily_digest_time": "09:00",  # 9 AM EST
     "alert_cooldown_minutes": 15,  # Prevent duplicate alerts for same failure
     "slow_job_threshold": 1.5,  # Alert if job takes 1.5x expected duration

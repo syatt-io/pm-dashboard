@@ -58,16 +58,48 @@ const lightThemeOverrides = {
         },
       },
     },
+    MuiSelect: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+          transition: 'all 0.2s ease-in-out',
+          '&:hover': {
+            backgroundColor: 'rgba(0, 0, 0, 0.02)',
+          },
+        },
+      },
+      defaultProps: {
+        variant: 'outlined',
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+          '&:hover .MuiOutlinedInput-notchedOutline': {
+            borderColor: '#1976d2',
+          },
+        },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          borderRadius: '8px',
+          marginTop: '4px',
+        },
+      },
+    },
   },
   palette: {
     mode: 'light' as const,
     primary: {
-      main: '#1976d2',
+      main: '#8B5CF6', // Royal Purple from Syatt design system
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#dc004e',
-      contrastText: '#ffffff',
+      main: '#00FFCE', // Neon Mint from Syatt design system
+      contrastText: '#000000',
     },
     background: {
       default: '#f5f5f5',

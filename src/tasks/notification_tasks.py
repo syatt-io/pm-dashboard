@@ -251,16 +251,41 @@ def sync_tempo_hours(self):
         if lock:
             # Check if already locked by another worker
             if lock.is_locked:
-                logger.warning(
-                    f"⚠️  Tempo sync already running (locked by {lock.locked_by} at {lock.locked_at}). "
-                    "Skipping this execution."
-                )
-                return {
-                    "success": False,
-                    "skipped": True,
-                    "reason": "already_locked",
-                    "locked_by": lock.locked_by,
-                }
+                # STALE LOCK DETECTION: Check if lock is stale (held for >1 hour = worker likely crashed)
+                if lock.locked_at:
+                    lock_age = start_time - lock.locked_at
+                    lock_age_hours = lock_age.total_seconds() / 3600
+
+                    if lock_age_hours > 1.0:
+                        # Lock is stale - force release and continue
+                        logger.warning(
+                            f"⚠️  Found STALE lock (held for {lock_age_hours:.1f}h by {lock.locked_by} since {lock.locked_at}). "
+                            "Worker likely crashed. Force-releasing lock and continuing..."
+                        )
+                        lock.is_locked = False
+                        lock.locked_by = None
+                        db.commit()
+                        logger.info(
+                            "🔓 Stale lock force-released, proceeding with execution"
+                        )
+                    else:
+                        # Lock is fresh - another worker is actually running
+                        logger.warning(
+                            f"⚠️  Tempo sync already running (locked by {lock.locked_by} at {lock.locked_at} - {lock_age_hours:.1f}h ago). "
+                            "Skipping this execution."
+                        )
+                        # Create job_execution record for skipped run
+                        tracker = track_celery_task(self, db, "tempo-sync-daily")
+                        with tracker:
+                            result = {
+                                "success": False,
+                                "skipped": True,
+                                "reason": "already_locked",
+                                "locked_by": lock.locked_by,
+                                "lock_age_hours": lock_age_hours,
+                            }
+                            tracker.set_result(result)
+                            return result
 
             # Check if ran recently (within 23 hours)
             if lock.last_run_at and lock.last_run_at > cutoff_time:
@@ -270,13 +295,18 @@ def sync_tempo_hours(self):
                     f"⚠️  Tempo sync already ran {hours_since:.1f} hours ago (at {lock.last_run_at}). "
                     "Skipping duplicate execution. Next run allowed after 23 hours."
                 )
-                return {
-                    "success": False,
-                    "skipped": True,
-                    "reason": "ran_recently",
-                    "last_run_at": lock.last_run_at.isoformat(),
-                    "hours_since_last_run": hours_since,
-                }
+                # Create job_execution record for skipped run
+                tracker = track_celery_task(self, db, "tempo-sync-daily")
+                with tracker:
+                    result = {
+                        "success": False,
+                        "skipped": True,
+                        "reason": "ran_recently",
+                        "last_run_at": lock.last_run_at.isoformat(),
+                        "hours_since_last_run": hours_since,
+                    }
+                    tracker.set_result(result)
+                    return result
         else:
             # Create lock record if doesn't exist
             lock = ScheduledJobLock(job_name=job_name)
@@ -327,18 +357,27 @@ def sync_tempo_hours(self):
             f"❌ Error in Tempo sync task (attempt {self.request.retries + 1}/4): {e}",
             exc_info=True,
         )
-        # Release lock on error
+        # Release lock on error (use lock from outer scope if available)
         try:
-            lock = (
-                db.query(ScheduledJobLock)
-                .filter(ScheduledJobLock.job_name == job_name)
-                .first()
-            )
-            if lock and lock.is_locked:
-                lock.is_locked = False
-                lock.locked_by = None
-                db.commit()
-                logger.info("🔓 Lock released due to error")
+            # Try to use existing lock variable from outer scope
+            if "lock" in locals() and lock:
+                if lock.is_locked:
+                    lock.is_locked = False
+                    lock.locked_by = None
+                    db.commit()
+                    logger.info("🔓 Lock released due to error (using existing lock)")
+            else:
+                # Fallback: Query lock if not in scope
+                fallback_lock = (
+                    db.query(ScheduledJobLock)
+                    .filter(ScheduledJobLock.job_name == job_name)
+                    .first()
+                )
+                if fallback_lock and fallback_lock.is_locked:
+                    fallback_lock.is_locked = False
+                    fallback_lock.locked_by = None
+                    db.commit()
+                    logger.info("🔓 Lock released due to error (fallback query)")
         except Exception as lock_error:
             logger.error(f"Failed to release lock after error: {lock_error}")
 
@@ -1898,6 +1937,11 @@ def send_job_monitoring_digest(self):
             # Format Slack message
             slack_message = digest_service.format_slack_message(digest)
 
+            # Track notification success
+            email_sent = False
+            slack_sent = False
+            notification_errors = []
+
             # Send email if configured
             smtp_host = getattr(settings.notifications, "smtp_host", None)
             smtp_user = getattr(settings.notifications, "smtp_user", None)
@@ -1934,11 +1978,12 @@ def send_job_monitoring_digest(self):
                         server.login(smtp_user, smtp_password)
                         server.send_message(msg)
 
+                    email_sent = True
                     logger.info("✅ Email digest sent successfully")
                 except Exception as email_err:
-                    logger.error(
-                        f"Failed to send email digest: {email_err}", exc_info=True
-                    )
+                    error_msg = f"Failed to send email digest: {email_err}"
+                    logger.error(error_msg, exc_info=True)
+                    notification_errors.append(f"Email: {email_err}")
             else:
                 logger.warning(
                     f"Email not configured (smtp_host={smtp_host}, smtp_user={smtp_user}, smtp_password={'***' if smtp_password else None})"
@@ -1957,11 +2002,27 @@ def send_job_monitoring_digest(self):
                     notifier.slack_client.chat_postMessage(
                         channel=channel, text=slack_message
                     )
+                    slack_sent = True
                     logger.info("✅ Slack digest sent successfully")
                 except Exception as slack_err:
-                    logger.error(f"Failed to send Slack digest: {slack_err}")
+                    error_msg = f"Failed to send Slack digest: {slack_err}"
+                    logger.error(error_msg, exc_info=True)
+                    notification_errors.append(f"Slack: {slack_err}")
 
-            logger.info("✅ Job monitoring digest completed")
+            # CRITICAL: Fail if BOTH channels failed
+            if not email_sent and not slack_sent:
+                error_details = (
+                    "; ".join(notification_errors)
+                    if notification_errors
+                    else "No channels configured"
+                )
+                raise Exception(
+                    f"❌ Job monitoring digest failed - no notifications delivered! Errors: {error_details}"
+                )
+
+            logger.info(
+                f"✅ Job monitoring digest completed (email={email_sent}, slack={slack_sent})"
+            )
 
             # Set result data for tracker
             result = {
