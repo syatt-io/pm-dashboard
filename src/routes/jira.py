@@ -258,6 +258,7 @@ def get_jira_project(project_key):
                         p.weekly_meeting_day,
                         p.retainer_hours,
                         p.total_hours,
+                        p.cumulative_hours,
                         p.send_meeting_emails,
                         p.start_date,
                         p.launch_date,
@@ -286,24 +287,28 @@ def get_jira_project(project_key):
                     enhanced_project["total_hours"] = (
                         float(result[5]) if result[5] else 0
                     )
+                    enhanced_project["cumulative_hours"] = (
+                        float(result[6]) if result[6] else 0
+                    )
                     enhanced_project["send_meeting_emails"] = (
-                        bool(result[6]) if result[6] is not None else False
+                        bool(result[7]) if result[7] is not None else False
                     )
                     enhanced_project["start_date"] = (
-                        result[7].isoformat() if result[7] else None
-                    )
-                    enhanced_project["launch_date"] = (
                         result[8].isoformat() if result[8] else None
                     )
+                    enhanced_project["launch_date"] = (
+                        result[9].isoformat() if result[9] else None
+                    )
                     enhanced_project["forecasted_hours_month"] = (
-                        float(result[9]) if result[9] else 0
+                        float(result[10]) if result[10] else 0
                     )
                     enhanced_project["current_month_hours"] = (
-                        float(result[10]) if result[10] else 0
+                        float(result[11]) if result[11] else 0
                     )
                 else:
                     # No database record - use defaults
                     enhanced_project["is_active"] = True
+                    enhanced_project["cumulative_hours"] = 0
                     enhanced_project["forecasted_hours_month"] = 0
                     enhanced_project["current_month_hours"] = 0
         except Exception as e:
