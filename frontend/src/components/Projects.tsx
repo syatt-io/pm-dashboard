@@ -33,8 +33,6 @@ import {
   Checkbox,
   FormControlLabel,
   Alert,
-  Tabs,
-  Tab,
   Table,
   TableBody,
   TableCell,
@@ -63,6 +61,7 @@ import {
   CircularProgress,
   LinearProgress,
 } from '@mui/material';
+import { PillTabs, Tab } from './common/PillTabs';
 import {
   Star,
   StarBorder,
@@ -1442,33 +1441,14 @@ export const ProjectList = () => {
             </Button>
           </Box>
 
-          <Tabs
+          <PillTabs
             value={tabValue}
             onChange={handleTabChange}
-            sx={{
-              borderBottom: 1,
-              borderColor: 'divider',
-              '& .MuiTab-root': {
-                textTransform: 'none',
-                fontWeight: 500,
-                fontSize: '0.95rem',
-                minHeight: 48,
-                color: 'text.secondary',
-              },
-              '& .Mui-selected': {
-                color: 'primary.main',
-                fontWeight: 600,
-              },
-              '& .MuiTabs-indicator': {
-                height: 2,
-                backgroundColor: 'primary.main',
-              }
-            }}
           >
             <Tab label={`My Projects (${watchedProjects.length})`} />
             <Tab label={`Active Projects (${activeProjects.length})`} />
             <Tab label="Monthly Forecasts" />
-          </Tabs>
+          </PillTabs>
 
           <TabPanel value={tabValue} index={0}>
             {/* My Projects - Table View */}
@@ -2459,38 +2439,20 @@ const ProjectShowContent = () => {
       </Typography>
 
       {/* Tabs Navigation */}
-      <Tabs
-        value={tabValue}
-        onChange={handleTabChange}
-        sx={{
-          mb: 3,
-          borderBottom: 1,
-          borderColor: 'divider',
-          '& .MuiTab-root': {
-            textTransform: 'none',
-            fontWeight: 500,
-            fontSize: '0.95rem',
-            minHeight: 48,
-            color: 'text.secondary',
-          },
-          '& .Mui-selected': {
-            color: 'primary.main',
-            fontWeight: 600,
-          },
-          '& .MuiTabs-indicator': {
-            height: 2,
-            backgroundColor: 'primary.main',
-          }
-        }}
-      >
-        <Tab label="Overview" />
-        {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
-          <Tab label="Budget & Actuals" />
-        )}
-        {permissions === 'admin' && (
-          <Tab label="Import from Jira" />
-        )}
-      </Tabs>
+      <Box sx={{ mb: 3 }}>
+        <PillTabs
+          value={tabValue}
+          onChange={handleTabChange}
+        >
+          <Tab label="Overview" />
+          {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
+            <Tab label="Budget & Actuals" />
+          )}
+          {permissions === 'admin' && (
+            <Tab label="Import from Jira" />
+          )}
+        </PillTabs>
+      </Box>
 
       {/* Tab Panel 0: Overview */}
       <TabPanel value={tabValue} index={0}>

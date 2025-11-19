@@ -18,8 +18,6 @@ import {
   Divider,
   InputAdornment,
   IconButton,
-  Tabs,
-  Tab,
   Select,
   MenuItem,
   FormControl,
@@ -38,6 +36,7 @@ import {
   Grid,
   Tooltip,
 } from '@mui/material';
+import { PillTabs, Tab } from './common/PillTabs';
 import {
   Save,
   Delete,
@@ -1206,28 +1205,11 @@ export const Settings = () => {
       </Card>
 
       {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs
+      <Box sx={{ mb: 3 }}>
+        <PillTabs
           value={tabValue}
           onChange={handleTabChange}
           aria-label="settings tabs"
-          sx={{
-            '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 500,
-              fontSize: '0.95rem',
-              minHeight: 48,
-              color: 'text.secondary',
-            },
-            '& .Mui-selected': {
-              color: 'primary.main',
-              fontWeight: 600,
-            },
-            '& .MuiTabs-indicator': {
-              height: 2,
-              backgroundColor: 'primary.main',
-            }
-          }}
         >
           <Tab label="My Integrations" />
           <Tab label="Project Settings" />
@@ -1237,7 +1219,7 @@ export const Settings = () => {
           {settings.user.role === 'admin' && <Tab label="User Management" />}
           {settings.user.role === 'admin' && <Tab label="Epic Categories" />}
           {settings.user.role === 'admin' && <Tab label="Jira Templates" />}
-        </Tabs>
+        </PillTabs>
       </Box>
 
       {/* Tab 1: My Integrations */}
@@ -2447,15 +2429,15 @@ export const Settings = () => {
       {/* Tab 7: Epic Categories (Admin Only) */}
       {settings.user.role === 'admin' && (
         <TabPanel value={tabValue} index={6}>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-            <Tabs
+          <Box sx={{ mb: 3 }}>
+            <PillTabs
               value={epicSubTab}
               onChange={(e, newValue) => setEpicSubTab(newValue)}
               aria-label="epic categories sub-tabs"
             >
               <Tab label="Manage Categories" />
               <Tab label="Epic Mappings" />
-            </Tabs>
+            </PillTabs>
           </Box>
 
           {epicSubTab === 0 && <EpicCategoriesManagement />}

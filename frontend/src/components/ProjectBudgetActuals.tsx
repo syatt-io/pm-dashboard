@@ -629,15 +629,6 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
           </Tooltip>
         </Box>
 
-        {/* Warning about forecasting vs budget tracking */}
-        <Alert severity="info" sx={{ mb: 2 }}>
-          <Typography variant="body2">
-            <strong>Note:</strong> This sync is for budget tracking only and won't include AI categorization
-            or project characteristics. Data synced here will NOT be included in forecasting models.
-            To add historical data for forecasting, use <strong>Analytics → Import Historical Data</strong> instead.
-          </Typography>
-        </Alert>
-
         {/* Budget Summary Card */}
         <Box sx={{
           mb: 3,
