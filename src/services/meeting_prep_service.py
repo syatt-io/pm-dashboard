@@ -299,10 +299,9 @@ class MeetingPrepDeliveryService:
             result = asyncio.run(
                 self.aggregator.aggregate_project_activity(
                     project_key=project_key,
-                    days=7,
-                    user_email=user.email,
+                    project_name=project_name,
+                    days_back=7,
                     include_context=True,
-                    include_attendee_context=True,
                 )
             )
 
