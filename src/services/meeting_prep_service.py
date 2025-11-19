@@ -295,8 +295,8 @@ class MeetingPrepDeliveryService:
         """
         try:
             # Use aggregator to generate digest (uses cache if available)
-            # Days=7 for weekly digest, include_attendee_context=True for personalization
-            result = asyncio.run(
+            # aggregate_project_activity returns ProjectActivity object
+            activity = asyncio.run(
                 self.aggregator.aggregate_project_activity(
                     project_key=project_key,
                     project_name=project_name,
@@ -305,13 +305,26 @@ class MeetingPrepDeliveryService:
                 )
             )
 
-            if not result or not result.get("formatted_agenda"):
-                logger.warning(f"No digest generated for {project_key} / {user.email}")
+            if not activity:
+                logger.warning(
+                    f"No activity data generated for {project_key} / {user.email}"
+                )
+                return None
+
+            # Format the ProjectActivity object into a digest string
+            formatted_agenda = self.aggregator.format_client_agenda(
+                activity=activity, project_name=project_name
+            )
+
+            if not formatted_agenda or not formatted_agenda.strip():
+                logger.warning(
+                    f"No formatted digest generated for {project_key} / {user.email}"
+                )
                 return None
 
             return {
-                "formatted_agenda": result["formatted_agenda"],
-                "cache_id": result.get("cache_id"),
+                "formatted_agenda": formatted_agenda,
+                "cache_id": None,  # TODO: Implement caching if needed
                 "project_name": project_name,
                 "user_email": user.email,
             }
