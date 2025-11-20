@@ -1397,13 +1397,21 @@ export const AnalysisShow = () => {
               if (record.topics && record.topics.length > 0) {
                 return (
                   <>
-                    {record.topics.map((topic: any, topicIndex: number) => (
-                      <Card key={topicIndex}>
-                        <CardContent>
-                          <Typography variant="h6" gutterBottom>
-                            {topic.title}
-                          </Typography>
-                          <MuiList dense>
+                    {record.topics.map((topic: any, topicIndex: number) => {
+                      // Alternate between subtle purple and mint backgrounds
+                      const backgroundColors = [
+                        'rgba(139, 92, 246, 0.03)', // Royal Purple with 3% opacity
+                        'rgba(0, 255, 206, 0.03)',   // Neon Mint with 3% opacity
+                      ];
+                      const backgroundColor = backgroundColors[topicIndex % 2];
+
+                      return (
+                        <Card key={topicIndex} sx={{ backgroundColor }}>
+                          <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                              {topic.title}
+                            </Typography>
+                            <MuiList dense sx={{ pl: 2 }}>
                             {topic.content_items?.map((item: string, itemIndex: number) => {
                               // Check if it's a sub-bullet (starts with "  * ")
                               const isSubBullet = item.startsWith('  * ');
@@ -1416,13 +1424,12 @@ export const AnalysisShow = () => {
                                 <ListItem
                                   key={itemIndex}
                                   sx={{
-                                    pl: 2,
-                                    ml: isSubBullet ? 4 : 0,
-                                    py: 0.25,
+                                    pl: 0,
+                                    ml: isSubBullet ? 3 : 0,
+                                    py: 0,
                                     display: 'list-item',
                                     listStyleType: isSubBullet ? 'circle' : 'disc',
                                     listStylePosition: 'outside',
-                                    lineHeight: 1.4
                                   }}
                                 >
                                   <ListItemText
@@ -1430,8 +1437,8 @@ export const AnalysisShow = () => {
                                     primaryTypographyProps={{
                                       variant: isSubBullet ? 'body2' : 'body1',
                                       component: 'span',
-                                      sx: { lineHeight: 1.4 }
                                     }}
+                                    sx={{ m: 0 }}
                                   />
                                 </ListItem>
                               );
@@ -1439,7 +1446,8 @@ export const AnalysisShow = () => {
                           </MuiList>
                         </CardContent>
                       </Card>
-                    ))}
+                    );
+                  })}
                   </>
                 );
               }
