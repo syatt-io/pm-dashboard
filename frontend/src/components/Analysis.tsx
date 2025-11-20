@@ -985,16 +985,9 @@ export const AnalysisList = () => {
               label="Meeting"
               render={(record: any) => <MeetingTitle record={record} />}
             />
-            <DateField
-              source="date"
+            <FunctionField
               label="Meeting Date"
-              options={{
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }}
+              render={(record: any) => formatESTDateTime(record.date)}
             />
             <FunctionField
               label="Action Items"

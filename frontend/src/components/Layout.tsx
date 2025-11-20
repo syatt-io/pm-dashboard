@@ -1,7 +1,7 @@
 import React from 'react';
 import { Layout, Logout, MenuItemLink, UserMenu } from 'react-admin';
 import { Typography, Box } from '@mui/material';
-import SettingsIcon from '@mui/icons-material/Settings';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import OnboardingAlert from './OnboardingAlert';
 import { SidebarProvider, SidebarTrigger } from './ui/sidebar';
 import { AppSidebar } from './AppSidebar';
@@ -36,14 +36,14 @@ const SyattTitle = () => (
   </Box>
 );
 
-// Custom UserMenu with Settings link
+// Custom UserMenu with My Profile link
 const CustomUserMenu = () => {
   return (
     <>
       <MenuItemLink
-        to="/settings"
-        primaryText="Settings"
-        leftIcon={<SettingsIcon />}
+        to="/profile"
+        primaryText="My Profile"
+        leftIcon={<AccountCircleIcon />}
       />
       <Logout />
     </>

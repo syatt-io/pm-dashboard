@@ -296,23 +296,15 @@ export const Settings = () => {
 
   // Load projects when Project Settings tab is accessed
   useEffect(() => {
-    if (tabValue === 1) { // Project Settings tab
+    if (tabValue === 0) { // Project Settings tab (was 1, now 0)
       loadProjects();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabValue]);
-
-  // Load notification preferences when Notifications tab is accessed
-  useEffect(() => {
-    if (tabValue === 2) { // Notifications tab
-      loadNotificationPreferences();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabValue]);
 
   // Load escalation preferences and insights when Insights & Escalation tab is accessed
   useEffect(() => {
-    if (tabValue === 3) { // Insights & Escalation tab (index 3)
+    if (tabValue === 1) { // Insights & Escalation tab (was 3, now 1)
       loadEscalationPreferences();
       loadInsights();
       loadInsightStats();
@@ -322,7 +314,7 @@ export const Settings = () => {
 
   // Reload insights when filters or showAllProjects change
   useEffect(() => {
-    if (tabValue === 3) {
+    if (tabValue === 1) { // Insights & Escalation tab (was 3, now 1)
       loadInsights();
       loadInsightStats();
     }
@@ -1177,33 +1169,6 @@ export const Settings = () => {
     <Box p={2}>
       <Title title="Settings" />
 
-      {/* User Information */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            👤 User Information
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-            <Box>
-              <Typography variant="body2" color="text.secondary">Name</Typography>
-              <Typography variant="body1">{settings.user.name}</Typography>
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary">Email</Typography>
-              <Typography variant="body1">{settings.user.email}</Typography>
-            </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary">Role</Typography>
-              <Chip
-                label={settings.user.role}
-                color={settings.user.role === 'admin' ? 'primary' : 'default'}
-                size="small"
-              />
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
-
       {/* Tabs */}
       <Box sx={{ mb: 3 }}>
         <PillTabs
@@ -1211,9 +1176,7 @@ export const Settings = () => {
           onChange={handleTabChange}
           aria-label="settings tabs"
         >
-          <Tab label="My Integrations" />
           <Tab label="Project Settings" />
-          <Tab label="Notifications" />
           <Tab label="Insights & Escalation" />
           {settings.user.role === 'admin' && <Tab label="AI Configuration" />}
           {settings.user.role === 'admin' && <Tab label="User Management" />}
@@ -1222,417 +1185,8 @@ export const Settings = () => {
         </PillTabs>
       </Box>
 
-      {/* Tab 1: My Integrations */}
+      {/* Tab 1: Project Settings (was Tab 2) */}
       <TabPanel value={tabValue} index={0}>
-        {/* Fireflies Integration */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">
-                🔥 Fireflies.ai Integration
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Launch />}
-                onClick={handleOpenFirefliesHelp}
-              >
-                Get API Key
-              </Button>
-            </Box>
-
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Current Status
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip
-                  icon={settings.settings.has_fireflies_key ? <CheckCircle /> : <ErrorIcon />}
-                  label={settings.settings.has_fireflies_key ? 'API Key Configured' : 'No API Key'}
-                  color={settings.settings.has_fireflies_key ? 'success' : 'error'}
-                  size="small"
-                />
-                {settings.settings.has_fireflies_key && (
-                  <Chip
-                    icon={settings.settings.fireflies_key_valid ? <CheckCircle /> : <Warning />}
-                    label={settings.settings.fireflies_key_valid ? 'Valid' : 'Invalid'}
-                    color={settings.settings.fireflies_key_valid ? 'success' : 'warning'}
-                    size="small"
-                  />
-                )}
-              </Box>
-            </Box>
-
-            <Divider sx={{ my: 2 }} />
-
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Configure your Fireflies API key to access your meeting transcripts
-            </Typography>
-
-            <Box sx={{ mt: 2 }}>
-              <TextField
-                fullWidth
-                label="Fireflies API Key"
-                type={showApiKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  setValidationResult(null);
-                }}
-                placeholder="Enter your Fireflies API key"
-                helperText="Your API key will be encrypted and stored securely"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        edge="end"
-                      >
-                        {showApiKey ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 2 }}
-              />
-
-              {validationResult && (
-                <Alert
-                  severity={validationResult.valid ? 'success' : 'error'}
-                  sx={{ mb: 2 }}
-                >
-                  {validationResult.message}
-                </Alert>
-              )}
-
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => validateApiKey()}
-                  disabled={!apiKey.trim() || validating}
-                  startIcon={validating ? <CircularProgress size={16} /> : <CheckCircle />}
-                >
-                  {validating ? 'Validating...' : 'Validate'}
-                </Button>
-
-                <Button
-                  variant="contained"
-                  onClick={saveApiKey}
-                  disabled={!apiKey.trim() || saving}
-                  startIcon={saving ? <CircularProgress size={16} /> : <Save />}
-                >
-                  {saving ? 'Saving...' : 'Save API Key'}
-                </Button>
-
-                {settings.settings.has_fireflies_key && (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => setDeleteDialog(true)}
-                    startIcon={<Delete />}
-                  >
-                    Delete API Key
-                  </Button>
-                )}
-              </Box>
-            </Box>
-
-            <Alert severity="info" sx={{ mt: 3 }}>
-              <Typography variant="body2">
-                <strong>How to get your Fireflies API key:</strong>
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                1. Log into your Fireflies.ai account<br />
-                2. Go to Settings → Integrations → API<br />
-                3. Copy your API key and paste it above<br />
-                4. Click "Save API Key" to secure it
-              </Typography>
-            </Alert>
-          </CardContent>
-        </Card>
-
-        {/* Notion Integration */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">
-                📝 Notion Integration
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Launch />}
-                onClick={handleOpenNotionHelp}
-              >
-                Get API Key
-              </Button>
-            </Box>
-
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Current Status
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip
-                  icon={settings.settings.has_notion_key ? <CheckCircle /> : <ErrorIcon />}
-                  label={settings.settings.has_notion_key ? 'API Key Configured' : 'No API Key'}
-                  color={settings.settings.has_notion_key ? 'success' : 'error'}
-                  size="small"
-                />
-              </Box>
-            </Box>
-
-            <Divider sx={{ my: 2 }} />
-
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Configure your Notion API key to access your pages and databases
-            </Typography>
-
-            <Box sx={{ mt: 2 }}>
-              <TextField
-                fullWidth
-                label="Notion API Key"
-                type={showNotionKey ? 'text' : 'password'}
-                value={notionApiKey}
-                onChange={(e) => {
-                  setNotionApiKey(e.target.value);
-                  setNotionValidationResult(null);
-                }}
-                placeholder="secret_..."
-                helperText="Your API key will be encrypted and stored securely"
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowNotionKey(!showNotionKey)}
-                        edge="end"
-                      >
-                        {showNotionKey ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ mb: 2 }}
-              />
-
-              {notionValidationResult && (
-                <Alert
-                  severity={notionValidationResult.valid ? 'success' : 'error'}
-                  sx={{ mb: 2 }}
-                >
-                  {notionValidationResult.message}
-                </Alert>
-              )}
-
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => validateNotionKey()}
-                  disabled={!notionApiKey.trim() || validatingNotion}
-                  startIcon={validatingNotion ? <CircularProgress size={16} /> : <CheckCircle />}
-                >
-                  {validatingNotion ? 'Validating...' : 'Validate'}
-                </Button>
-
-                <Button
-                  variant="contained"
-                  onClick={saveNotionKey}
-                  disabled={!notionApiKey.trim() || savingNotion}
-                  startIcon={savingNotion ? <CircularProgress size={16} /> : <Save />}
-                >
-                  {savingNotion ? 'Saving...' : 'Save API Key'}
-                </Button>
-
-                {settings.settings.has_notion_key && (
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => setDeleteNotionDialog(true)}
-                    startIcon={<Delete />}
-                  >
-                    Delete API Key
-                  </Button>
-                )}
-              </Box>
-            </Box>
-
-            <Alert severity="info" sx={{ mt: 3 }}>
-              <Typography variant="body2">
-                <strong>How to get your Notion API key:</strong>
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                1. Go to <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer">My Integrations</a><br />
-                2. Click "+ New integration"<br />
-                3. Give it a name and select your workspace<br />
-                4. Copy the "Internal Integration Token"<br />
-                5. Share the pages/databases you want to access with your integration
-              </Typography>
-            </Alert>
-          </CardContent>
-        </Card>
-
-        {/* Google Workspace Integration */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">
-                📊 Google Workspace Integration
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Launch />}
-                onClick={handleOpenGoogleHelp}
-              >
-                Setup OAuth
-              </Button>
-            </Box>
-
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Current Status
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip
-                  icon={settings.settings.has_google_oauth ? <CheckCircle /> : <ErrorIcon />}
-                  label={settings.settings.has_google_oauth ? 'OAuth Configured' : 'No OAuth Token'}
-                  color={settings.settings.has_google_oauth ? 'success' : 'error'}
-                  size="small"
-                />
-              </Box>
-            </Box>
-
-            <Divider sx={{ my: 2 }} />
-
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Connect your Google account to access Docs and Sheets
-            </Typography>
-
-            <Box sx={{ mt: 2 }}>
-              {!settings.settings.has_google_oauth ? (
-                <>
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    <strong>Note:</strong> This is separate from your login credentials.
-                    To enable automatic access to your Google Docs and Sheets, you'll need to grant additional permissions.
-                  </Alert>
-                  <Button
-                    variant="contained"
-                    onClick={() => handleGoogleAuthorize()}
-                    startIcon={<Launch />}
-                    disabled={validating}
-                  >
-                    Authorize Google Workspace Access
-                  </Button>
-                </>
-              ) : (
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => setDeleteGoogleDialog(true)}
-                    startIcon={<Delete />}
-                  >
-                    Disconnect Google Account
-                  </Button>
-                </Box>
-              )}
-            </Box>
-
-            <Alert severity="info" sx={{ mt: 3 }}>
-              <Typography variant="body2">
-                <strong>Google Workspace Integration:</strong>
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                This integration allows the app to read and write Google Docs and Sheets on your behalf.
-                You will need to authorize access through Google OAuth.
-              </Typography>
-            </Alert>
-          </CardContent>
-        </Card>
-
-        {/* Slack Integration */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography variant="h6">
-                💬 Slack Integration
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Launch />}
-                onClick={handleOpenSlackHelp}
-              >
-                Setup OAuth
-              </Button>
-            </Box>
-
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Current Status
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip
-                  icon={settings.user.has_slack_user_token ? <CheckCircle /> : <ErrorIcon />}
-                  label={settings.user.has_slack_user_token ? 'Connected' : 'Not Connected'}
-                  color={settings.user.has_slack_user_token ? 'success' : 'error'}
-                  size="small"
-                />
-              </Box>
-            </Box>
-
-            <Divider sx={{ my: 2 }} />
-
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Connect your Slack account for better search results in /find-context
-            </Typography>
-
-            <Box sx={{ mt: 2 }}>
-              {!settings.user.has_slack_user_token ? (
-                <>
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    <strong>Enhanced Search:</strong> Connecting your Slack account enables the powerful search.messages API
-                    for much better results in the /find-context command, instead of the limited bot-only search.
-                  </Alert>
-                  <Button
-                    variant="contained"
-                    onClick={() => handleSlackAuthorize()}
-                    startIcon={<Launch />}
-                  >
-                    Connect Slack Account
-                  </Button>
-                </>
-              ) : (
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => setDeleteSlackDialog(true)}
-                    startIcon={<Delete />}
-                  >
-                    Disconnect Slack
-                  </Button>
-                </Box>
-              )}
-            </Box>
-
-            <Alert severity="info" sx={{ mt: 3 }}>
-              <Typography variant="body2">
-                <strong>Slack Search Integration:</strong>
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                This integration allows the /find-context Slack command to search your messages using Slack's powerful search API.
-                Without this connection, searches are limited to channels the bot has been added to.
-              </Typography>
-            </Alert>
-          </CardContent>
-        </Card>
-      </TabPanel>
-
-      {/* Tab 2: Project Settings */}
-      <TabPanel value={tabValue} index={1}>
         {loadingProjects ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
             <CircularProgress />
@@ -1706,13 +1260,8 @@ export const Settings = () => {
         )}
       </TabPanel>
 
-      {/* Tab 3: Notifications */}
-      <TabPanel value={tabValue} index={2}>
-        <NotificationPreferences />
-      </TabPanel>
-
-      {/* Tab 4: Insights & Escalation */}
-      <TabPanel value={tabValue} index={3}>
+      {/* Tab 2: Insights & Escalation (was Tab 4) */}
+      <TabPanel value={tabValue} index={1}>
         {loadingEscalation ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
             <CircularProgress />
@@ -2166,9 +1715,9 @@ export const Settings = () => {
         </Box>
       </TabPanel>
 
-      {/* Tab 5: AI Configuration (Admin Only) */}
+      {/* Tab 3: AI Configuration (Admin Only, was Tab 5) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={4}>
+        <TabPanel value={tabValue} index={2}>
           {loadingAI ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <CircularProgress />
@@ -2419,16 +1968,16 @@ export const Settings = () => {
         </TabPanel>
       )}
 
-      {/* Tab 6: User Management (Admin Only) */}
+      {/* Tab 4: User Management (Admin Only, was Tab 6) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={5}>
+        <TabPanel value={tabValue} index={3}>
           <UserManagement />
         </TabPanel>
       )}
 
-      {/* Tab 7: Epic Categories (Admin Only) */}
+      {/* Tab 5: Epic Categories (Admin Only, was Tab 7) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={6}>
+        <TabPanel value={tabValue} index={4}>
           <Box sx={{ mb: 3 }}>
             <PillTabs
               value={epicSubTab}
@@ -2445,9 +1994,9 @@ export const Settings = () => {
         </TabPanel>
       )}
 
-      {/* Tab 8: Jira Templates (Admin Only) */}
+      {/* Tab 6: Jira Templates (Admin Only, was Tab 8) */}
       {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={7}>
+        <TabPanel value={tabValue} index={5}>
           <JiraTemplatesManagement />
         </TabPanel>
       )}

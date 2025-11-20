@@ -67,15 +67,14 @@ const menuItems: MenuItem[] = [
     title: "Settings",
     url: "/settings",
     icon: SettingsIcon,
+    adminOnly: true,  // Hide entire Settings section from non-admin users
     subItems: [
-      { title: "My Integrations", url: "/settings", tabParam: "0" },  // Tab index 0
-      { title: "Project Settings", url: "/settings", tabParam: "1" },  // Tab index 1
-      { title: "Notifications", url: "/settings", tabParam: "2" },  // Tab index 2
-      { title: "Insights & Escalation", url: "/settings", tabParam: "3" },  // Tab index 3
-      { title: "AI Configuration", url: "/settings", tabParam: "4", adminOnly: true },  // Tab index 4
-      { title: "User Management", url: "/settings", tabParam: "5", adminOnly: true },  // Tab index 5
-      { title: "Epic Categories", url: "/settings", tabParam: "6", adminOnly: true },  // Tab index 6
-      { title: "Jira Templates", url: "/settings", tabParam: "7", adminOnly: true },  // Tab index 7
+      { title: "Project Settings", url: "/settings", tabParam: "0" },  // Tab index 0 (was 1)
+      { title: "Insights & Escalation", url: "/settings", tabParam: "1" },  // Tab index 1 (was 3)
+      { title: "AI Configuration", url: "/settings", tabParam: "2", adminOnly: true },  // Tab index 2 (was 4)
+      { title: "User Management", url: "/settings", tabParam: "3", adminOnly: true },  // Tab index 3 (was 5)
+      { title: "Epic Categories", url: "/settings", tabParam: "4", adminOnly: true },  // Tab index 4 (was 6)
+      { title: "Jira Templates", url: "/settings", tabParam: "5", adminOnly: true },  // Tab index 5 (was 7)
     ],
   },
 ];

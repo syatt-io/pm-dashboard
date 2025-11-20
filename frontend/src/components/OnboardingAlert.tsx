@@ -55,7 +55,8 @@ const OnboardingAlert: React.FC<OnboardingAlertProps> = ({ onDismiss }) => {
   };
 
   const handleGoToSettings = () => {
-    navigate('/settings');
+    // Navigate to My Profile -> My Integrations tab
+    navigate('/profile?profile-tab=1');
     handleDismiss();
   };
 
@@ -123,8 +124,8 @@ const OnboardingAlert: React.FC<OnboardingAlertProps> = ({ onDismiss }) => {
         </AlertTitle>
         <Typography variant="body2">
           {isInvalid
-            ? 'Your Fireflies API key is invalid. Please update it in Settings to access your meetings.'
-            : 'To get started, configure your Fireflies API key in Settings to access your meeting transcripts.'
+            ? 'Your Fireflies API key is invalid. Please update it in your Profile to access your meetings.'
+            : 'To get started, configure your Fireflies API key in your Profile to access your meeting transcripts.'
           }
         </Typography>
       </Alert>

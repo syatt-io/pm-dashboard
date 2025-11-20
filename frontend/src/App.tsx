@@ -16,6 +16,7 @@ import FeedbackIcon from '@mui/icons-material/Feedback';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CategoryIcon from '@mui/icons-material/Category';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 
 // Components
 import { MeetingShow, MeetingEdit } from './components/Meetings';
@@ -34,6 +35,7 @@ import { FeedbackCreate } from './components/FeedbackCreate';
 import { FeedbackEdit } from './components/FeedbackEdit';
 import Login from './components/Login';
 import Settings from './components/Settings';
+import MyProfile from './components/MyProfile';
 import EpicTemplates from './components/EpicTemplates';
 
 // Configure React Query to stop retrying on auth failures
@@ -137,12 +139,22 @@ const AdminApp = () => {
               options={{ label: 'Epic Templates' }}
             />
           )}
+          {/* My Profile - accessible to all users */}
           <Resource
-            name="settings"
-            list={Settings}
-            icon={SettingsIcon}
-            options={{ label: 'Settings' }}
+            name="profile"
+            list={MyProfile}
+            icon={AccountCircleIcon}
+            options={{ label: 'My Profile' }}
           />
+          {/* Settings - Admin only */}
+          {permissions === 'admin' && (
+            <Resource
+              name="settings"
+              list={Settings}
+              icon={SettingsIcon}
+              options={{ label: 'Settings' }}
+            />
+          )}
           <Resource
             name="meetings"
             show={MeetingShow}
