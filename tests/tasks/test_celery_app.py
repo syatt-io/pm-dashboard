@@ -304,8 +304,8 @@ class TestCeleryConfiguration:
         """Test that task time limit is configured correctly."""
         from src.tasks.celery_app import celery_app
 
-        # Should be 120 minutes (7200 seconds) for large backfills
-        assert celery_app.conf.task_time_limit == 120 * 60
+        # Should be 30 minutes (1800 seconds) to prevent infinite hangs
+        assert celery_app.conf.task_time_limit == 30 * 60
 
     def test_backfill_tasks_inherit_global_time_limit(self):
         """Test that backfill tasks don't override global time limit."""

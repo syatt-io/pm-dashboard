@@ -19,15 +19,20 @@ def send_daily_digest(self):
     from src.utils.database import get_db
 
     logger.info("📧 Starting daily digest task...")
-    db = next(get_db())
+
+    # Use separate database sessions for tracker and service
+    # This prevents DetachedInstanceError from inner session commits expiring outer session objects
+    tracker_db = next(get_db())
+    service_db = next(get_db())
 
     try:
-        tracker = track_celery_task(self, db, "daily-todo-digest")
+        tracker = track_celery_task(self, tracker_db, "daily-todo-digest")
         with tracker:
             from src.services.scheduler import TodoScheduler
 
             scheduler = TodoScheduler()
-            asyncio.run(scheduler.send_daily_digest())
+            # Pass service_db to avoid opening session_scope() inside
+            asyncio.run(scheduler.send_daily_digest(db=service_db))
             logger.info("✅ Daily digest completed")
 
             result = {"success": True, "task": "daily_digest"}
@@ -37,7 +42,8 @@ def send_daily_digest(self):
         logger.error(f"❌ Error in daily digest task: {e}", exc_info=True)
         raise
     finally:
-        db.close()
+        tracker_db.close()
+        service_db.close()
 
 
 @shared_task(name="src.tasks.notification_tasks.send_overdue_reminders", bind=True)
@@ -1452,24 +1458,28 @@ def detect_proactive_insights(self):
 
     Migrated from Python scheduler to Celery Beat for better reliability.
 
-    IMPORTANT: Uses a single database session shared between the tracker and
-    insight detection to prevent duplicate sessions and potential hangs.
+    IMPORTANT: Uses separate database sessions for tracker and service
+    to prevent DetachedInstanceError from inner session commits.
     """
     from src.services.job_execution_tracker import track_celery_task
     from src.utils.database import get_db
 
     logger.info("🔍 Starting proactive insight detection task...")
-    db = next(get_db())
+
+    # Use separate database sessions for tracker and service
+    # This prevents DetachedInstanceError from inner session commits expiring outer session objects
+    tracker_db = next(get_db())
+    service_db = next(get_db())
 
     try:
-        tracker = track_celery_task(self, db, "proactive-insights")
+        tracker = track_celery_task(self, tracker_db, "proactive-insights")
         with tracker:
             from src.services.insight_detector import detect_insights_for_all_users
             from src.managers.notifications import NotificationManager
             from config.settings import settings
 
-            # Pass db session to avoid duplicate sessions (prevents hangs)
-            stats = detect_insights_for_all_users(db=db)
+            # Pass service_db to avoid opening another session inside
+            stats = detect_insights_for_all_users(db=service_db)
             logger.info(f"✅ Insight detection complete: {stats}")
 
             # Send Slack notification if insights detected
@@ -1489,7 +1499,7 @@ def detect_proactive_insights(self):
 
                     # Fetch critical insights to include in notification
                     critical_insights = (
-                        db.query(ProactiveInsight)
+                        service_db.query(ProactiveInsight)
                         .filter(
                             ProactiveInsight.severity == "critical",
                             ProactiveInsight.dismissed_at.is_(None),
@@ -1543,7 +1553,8 @@ def detect_proactive_insights(self):
         )
         raise
     finally:
-        db.close()
+        tracker_db.close()
+        service_db.close()
 
 
 @shared_task(name="src.tasks.notification_tasks.send_meeting_prep_digests", bind=True)
@@ -1632,10 +1643,14 @@ def send_daily_briefs(self):
     from src.utils.database import get_db
 
     logger.info("📬 Starting daily brief delivery task...")
-    db = next(get_db())
+
+    # Use separate database sessions for tracker and service
+    # This prevents DetachedInstanceError from inner session commits expiring outer session objects
+    tracker_db = next(get_db())
+    service_db = next(get_db())
 
     try:
-        tracker = track_celery_task(self, db, "daily-briefs")
+        tracker = track_celery_task(self, tracker_db, "daily-briefs")
         with tracker:
             from src.services.daily_brief_generator import (
                 send_daily_briefs as send_briefs_func,
@@ -1643,7 +1658,8 @@ def send_daily_briefs(self):
             from src.managers.notifications import NotificationManager
             from config.settings import settings
 
-            stats = send_briefs_func()
+            # Pass service_db to avoid opening another session inside
+            stats = send_briefs_func(db=service_db)
             logger.info(f"✅ Daily brief delivery complete: {stats}")
 
             # Send Slack notification if briefs sent
@@ -1681,7 +1697,8 @@ def send_daily_briefs(self):
         logger.error(f"❌ Error in daily brief delivery task: {e}", exc_info=True)
         raise
     finally:
-        db.close()
+        tracker_db.close()
+        service_db.close()
 
 
 @shared_task(name="src.tasks.notification_tasks.run_auto_escalation", bind=True)

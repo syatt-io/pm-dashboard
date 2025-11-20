@@ -131,9 +131,7 @@ def get_active_projects_from_db() -> List[str]:
         engine = create_engine(database_url)
         with engine.connect() as conn:
             result = conn.execute(
-                text(
-                    "SELECT project_key FROM projects WHERE is_active = true ORDER BY project_key"
-                )
+                text("SELECT key FROM projects WHERE is_active = true ORDER BY key")
             )
             active_keys = [row[0] for row in result]
             logger.info(

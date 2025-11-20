@@ -168,8 +168,12 @@ class TodoScheduler:
                 logger.error(f"Scheduler error: {e}")
                 time.sleep(60)
 
-    async def send_daily_digest(self):
-        """Send daily TODO digest to all configured channels and individual DMs."""
+    async def send_daily_digest(self, db=None):
+        """Send daily TODO digest to all configured channels and individual DMs.
+
+        Args:
+            db: Database session to use (optional, for avoiding session_scope() conflicts)
+        """
         try:
             logger.info("Sending daily TODO digest")
 
@@ -177,31 +181,21 @@ class TodoScheduler:
             active_todos = self.todo_manager.get_active_todos(limit=100)
 
             # Get users who have opted in for daily TODO digest (NEW NOTIFICATION PREFERENCES SYSTEM)
-            from src.utils.database import session_scope
             from src.models.user import User
             from src.services.notification_preference_checker import (
                 NotificationPreferenceChecker,
             )
 
-            opted_in_users = []
-            with session_scope() as db_session:
-                # Initialize preference checker
-                pref_checker = NotificationPreferenceChecker(db_session)
+            # Use provided db session instead of opening session_scope()
+            # This prevents connection pool exhaustion when called from Celery tasks
+            if db is None:
+                from src.utils.database import session_scope
 
-                # Get all users with Slack configured
-                all_users = (
-                    db_session.query(User).filter(User.slack_user_id.isnot(None)).all()
-                )
-
-                # Filter to only users who have enabled TODO reminders via Slack
-                # Note: Daily digest maps to the TODO reminders category
-                for user in all_users:
-                    if pref_checker.should_send_notification(
-                        user, "todo_due_today", "slack"
-                    ):
-                        opted_in_users.append(user)
-                        # Detach user from session to use outside the context
-                        db_session.expunge(user)
+                # Fallback for non-Celery calls (e.g., direct invocation)
+                with session_scope() as db_session:
+                    opted_in_users = self._get_opted_in_users(db_session)
+            else:
+                opted_in_users = self._get_opted_in_users(db)
 
             logger.info(
                 f"Found {len(opted_in_users)} users opted in for daily TODO digest (via notification preferences)"
@@ -321,6 +315,37 @@ class TodoScheduler:
 
         except Exception as e:
             logger.error(f"Error sending daily digest: {e}")
+
+    def _get_opted_in_users(self, db_session):
+        """Get users opted in for TODO digest notifications.
+
+        Args:
+            db_session: Database session to use for queries
+
+        Returns:
+            List of detached User objects opted in for notifications
+        """
+        from src.models.user import User
+        from src.services.notification_preference_checker import (
+            NotificationPreferenceChecker,
+        )
+
+        # Initialize preference checker
+        pref_checker = NotificationPreferenceChecker(db_session)
+
+        # Get all users with Slack configured
+        all_users = db_session.query(User).filter(User.slack_user_id.isnot(None)).all()
+
+        # Filter to only users who have enabled TODO reminders via Slack
+        # Note: Daily digest maps to the TODO reminders category
+        opted_in_users = []
+        for user in all_users:
+            if pref_checker.should_send_notification(user, "todo_due_today", "slack"):
+                opted_in_users.append(user)
+                # Detach user from session to use outside the context
+                db_session.expunge(user)
+
+        return opted_in_users
 
     async def send_overdue_reminders(self):
         """Send reminders for overdue TODOs."""

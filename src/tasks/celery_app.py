@@ -100,10 +100,10 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=120
-    * 60,  # 120 minutes (2 hours) max per task (for large backfills with 20k+ items)
-    task_soft_time_limit=110
-    * 60,  # 110 minutes soft limit (gives 10 min to cleanup before hard kill)
+    task_time_limit=30
+    * 60,  # 30 minutes max per task (prevents infinite hangs from connection pool exhaustion)
+    task_soft_time_limit=25
+    * 60,  # 25 minutes soft limit (gives 5 min to cleanup before hard kill)
     worker_max_tasks_per_child=50,  # Restart worker after 50 tasks to prevent memory leaks
     # Broker connection retry settings
     broker_connection_retry_on_startup=True,

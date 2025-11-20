@@ -360,10 +360,13 @@ class DailyBriefGenerator:
         logger.info(f"Marked {len(insights)} insights as delivered")
 
 
-def send_daily_briefs() -> Dict[str, Any]:
+def send_daily_briefs(db=None) -> Dict[str, Any]:
     """Send daily briefs to all users.
 
     This is the main entry point for the scheduled job.
+
+    Args:
+        db: Database session to use (optional, for avoiding session conflicts in Celery tasks)
 
     Returns:
         Dictionary with delivery statistics
@@ -379,7 +382,13 @@ def send_daily_briefs() -> Dict[str, Any]:
         "errors": [],
     }
 
-    db = next(get_db())
+    # Use provided db session or create a new one
+    # This prevents connection pool exhaustion when called from Celery tasks
+    if db is None:
+        db = next(get_db())
+        should_close = True
+    else:
+        should_close = False
 
     try:
         # Get all active users
@@ -435,6 +444,8 @@ def send_daily_briefs() -> Dict[str, Any]:
         logger.error(f"Error in daily brief job: {e}", exc_info=True)
         stats["errors"].append(str(e))
     finally:
-        db.close()
+        # Only close if we created the session
+        if should_close:
+            db.close()
 
     return stats
