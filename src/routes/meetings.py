@@ -165,6 +165,21 @@ def get_meetings(user):
             logger.info(
                 f"Fetched {len(live_meetings)} meetings from Fireflies for user {user.id}"
             )
+
+            # Additional defensive deduplication to ensure no duplicates slip through
+            from src.utils.meeting_deduplicator import MeetingDeduplicator
+
+            deduplicator = MeetingDeduplicator()
+            live_meetings = deduplicator.deduplicate(live_meetings)
+            stats = deduplicator.get_stats()
+            if (
+                stats.get("fuzzy_duplicates_removed", 0) > 0
+                or stats.get("exact_duplicates_removed", 0) > 0
+            ):
+                logger.info(
+                    f"Additional deduplication in /api/meetings: {stats['total']} → {stats['final_count']} "
+                    f"(removed {stats['exact_duplicates_removed']} exact + {stats['fuzzy_duplicates_removed']} fuzzy)"
+                )
         except Exception as e:
             logger.error(
                 f"Failed to fetch meetings from Fireflies for user {user.id}: {e}"
