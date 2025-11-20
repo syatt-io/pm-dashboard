@@ -1104,6 +1104,7 @@ const AnalysisStatusBanner = () => {
           />
           <Typography variant="body2" color="text.secondary">
             Analyzed on {formatESTDateTime(record.analyzed_at)}
+            {record.ai_provider && record.ai_model && ` [${record.ai_provider}/${record.ai_model}]`}
             {!isRecent && " (using cached results)"}
           </Typography>
           <Box sx={{ ml: 'auto' }}>
@@ -1385,24 +1386,6 @@ export const AnalysisShow = () => {
                     </Box>
                   )}
                 />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    AI Model
-                  </Typography>
-                  <FunctionField
-                    render={(record: any) => {
-                      const provider = record.ai_provider || 'unknown';
-                      const model = record.ai_model || 'unknown';
-                      return (
-                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                          {provider}/{model}
-                        </Typography>
-                      );
-                    }}
-                  />
-                </Box>
               </Box>
             </CardContent>
           </Card>
