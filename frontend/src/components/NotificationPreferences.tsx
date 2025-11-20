@@ -3,7 +3,7 @@ import { Box, Typography, Switch, Checkbox, FormControlLabel, CircularProgress, 
 import axios from 'axios';
 import { getApiUrl } from '../config';
 
-interface NotificationPreferences {
+interface NotificationPreferencesData {
   user_id: number;
   enable_todo_reminders: boolean;
   todo_reminders_slack: boolean;
@@ -32,8 +32,12 @@ interface NotificationPreferences {
   enable_meeting_prep: boolean;
 }
 
-export const NotificationPreferences: React.FC = () => {
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+interface NotificationPreferencesProps {
+  userRole?: 'ADMIN' | 'PM' | 'MEMBER' | 'NO_ACCESS';
+}
+
+export const NotificationPreferences: React.FC<NotificationPreferencesProps> = ({ userRole = 'ADMIN' }) => {
+  const [preferences, setPreferences] = useState<NotificationPreferencesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -58,7 +62,7 @@ export const NotificationPreferences: React.FC = () => {
     }
   };
 
-  const updatePreference = async (updates: Partial<NotificationPreferences>) => {
+  const updatePreference = async (updates: Partial<NotificationPreferencesData>) => {
     if (!preferences) return;
 
     // Update local state immediately
@@ -104,6 +108,29 @@ export const NotificationPreferences: React.FC = () => {
 
   if (!preferences) return null;
 
+  // Determine which notifications to show based on user role
+  const shouldShowNotification = (notificationType: string): boolean => {
+    if (userRole === 'ADMIN') {
+      // Admins see all notifications
+      return true;
+    }
+
+    if (userRole === 'PM') {
+      // PMs see only: Weekly Hours Reports, PM Reports, and Proactive Insights
+      const pmNotifications = [
+        'weekly_hours_reports',
+        'pm_reports',
+        'budget_alerts',
+        'anomaly_alerts',
+        'meeting_prep'
+      ];
+      return pmNotifications.includes(notificationType);
+    }
+
+    // Members should not use this component (they see basic toggles in MyProfile)
+    return false;
+  };
+
   const NotificationGroup = ({
     title,
     description,
@@ -114,9 +141,9 @@ export const NotificationPreferences: React.FC = () => {
   }: {
     title: string;
     description: string;
-    enableKey: keyof NotificationPreferences;
-    slackKey?: keyof NotificationPreferences;
-    emailKey?: keyof NotificationPreferences;
+    enableKey: keyof NotificationPreferencesData;
+    slackKey?: keyof NotificationPreferencesData;
+    emailKey?: keyof NotificationPreferencesData;
     slackOnly?: boolean;
   }) => {
     const isEnabled = Boolean(preferences[enableKey]);
@@ -196,97 +223,121 @@ export const NotificationPreferences: React.FC = () => {
         )}
       </Box>
 
-      <NotificationGroup
-        title="TODO Reminders"
-        description="Daily digest at 9 AM, due today reminders at 9:30 AM, and overdue reminders at 10 AM & 2 PM EST. Lists active TODOs grouped by project."
-        enableKey="enable_todo_reminders"
-        slackKey="todo_reminders_slack"
-        emailKey="todo_reminders_email"
-      />
+      {shouldShowNotification('todo_reminders') && (
+        <NotificationGroup
+          title="TODO Reminders"
+          description="Daily digest at 9 AM, due today reminders at 9:30 AM, and overdue reminders at 10 AM & 2 PM EST. Lists active TODOs grouped by project."
+          enableKey="enable_todo_reminders"
+          slackKey="todo_reminders_slack"
+          emailKey="todo_reminders_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Urgent Notifications"
-        description="Sent every 2 hours during work hours (9 AM - 5 PM EST). Alerts for items needing immediate attention."
-        enableKey="enable_urgent_notifications"
-        slackKey="urgent_notifications_slack"
-        emailKey="urgent_notifications_email"
-      />
+      {shouldShowNotification('urgent_notifications') && (
+        <NotificationGroup
+          title="Urgent Notifications"
+          description="Sent every 2 hours during work hours (9 AM - 5 PM EST). Alerts for items needing immediate attention."
+          enableKey="enable_urgent_notifications"
+          slackKey="urgent_notifications_slack"
+          emailKey="urgent_notifications_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Weekly Summary"
-        description="Sent Mondays at 9 AM EST. Summary of completed and pending TODOs from previous week."
-        enableKey="enable_weekly_reports"
-        slackKey="weekly_summary_slack"
-        emailKey="weekly_summary_email"
-      />
+      {shouldShowNotification('weekly_summary') && (
+        <NotificationGroup
+          title="Weekly Summary"
+          description="Sent Mondays at 9 AM EST. Summary of completed and pending TODOs from previous week."
+          enableKey="enable_weekly_reports"
+          slackKey="weekly_summary_slack"
+          emailKey="weekly_summary_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Weekly Hours Reports"
-        description="Sent Mondays at 10 AM EST. Hours tracking compliance report with team member hours and compliance percentages."
-        enableKey="enable_weekly_reports"
-        slackKey="weekly_hours_reports_slack"
-        emailKey="weekly_hours_reports_email"
-      />
+      {shouldShowNotification('weekly_hours_reports') && (
+        <NotificationGroup
+          title="Weekly Hours Reports"
+          description="Sent Mondays at 10 AM EST. Hours tracking compliance report with team member hours and compliance percentages."
+          enableKey="enable_weekly_reports"
+          slackKey="weekly_hours_reports_slack"
+          emailKey="weekly_hours_reports_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Escalations"
-        description="Sent every 6 hours (6 AM, 12 PM, 6 PM, 12 AM EST). Auto-escalation of stale insights with increasing severity levels."
-        enableKey="enable_escalations"
-        slackKey="urgent_notifications_slack"
-        emailKey="urgent_notifications_email"
-      />
+      {shouldShowNotification('escalations') && (
+        <NotificationGroup
+          title="Escalations"
+          description="Sent every 6 hours (6 AM, 12 PM, 6 PM, 12 AM EST). Auto-escalation of stale insights with increasing severity levels."
+          enableKey="enable_escalations"
+          slackKey="urgent_notifications_slack"
+          emailKey="urgent_notifications_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Meeting Analysis"
-        description="Sent after nightly meeting analysis (7 AM UTC / 3 AM EST). AI-generated summary, topics, action items, and decisions."
-        enableKey="enable_meeting_notifications"
-        slackKey="meeting_analysis_slack"
-        emailKey="meeting_analysis_email"
-      />
+      {shouldShowNotification('meeting_analysis') && (
+        <NotificationGroup
+          title="Meeting Analysis"
+          description="Sent after nightly meeting analysis (7 AM UTC / 3 AM EST). AI-generated summary, topics, action items, and decisions."
+          enableKey="enable_meeting_notifications"
+          slackKey="meeting_analysis_slack"
+          emailKey="meeting_analysis_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="PM Reports"
-        description="Comprehensive PM insights including time tracking compliance (Mondays 10 AM), epic reconciliation (3rd of month 9 AM), and job monitoring digest (daily 9 AM EST)."
-        enableKey="enable_pm_reports"
-        slackKey="pm_reports_slack"
-        emailKey="pm_reports_email"
-      />
+      {shouldShowNotification('pm_reports') && (
+        <NotificationGroup
+          title="PM Reports"
+          description="Comprehensive PM insights including time tracking compliance (Mondays 10 AM), epic reconciliation (3rd of month 9 AM), and job monitoring digest (daily 9 AM EST)."
+          enableKey="enable_pm_reports"
+          slackKey="pm_reports_slack"
+          emailKey="pm_reports_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Daily Brief"
-        description="Sent daily at 9:05 AM EST. Top 5 insights grouped by severity (critical/warning/info) with dashboard link."
-        enableKey="enable_budget_alerts"
-        slackKey="daily_brief_slack"
-        emailKey="daily_brief_email"
-      />
+      {shouldShowNotification('daily_brief') && (
+        <NotificationGroup
+          title="Daily Brief"
+          description="Sent daily at 9:05 AM EST. Top 5 insights grouped by severity (critical/warning/info) with dashboard link."
+          enableKey="enable_budget_alerts"
+          slackKey="daily_brief_slack"
+          emailKey="daily_brief_email"
+        />
+      )}
 
-      <Typography variant="subtitle2" fontWeight={600} mt={3} mb={2}>
-        Proactive Insights (delivered via Daily Brief)
-      </Typography>
+      {(shouldShowNotification('budget_alerts') || shouldShowNotification('anomaly_alerts') || shouldShowNotification('meeting_prep')) && (
+        <Typography variant="subtitle2" fontWeight={600} mt={3} mb={2}>
+          Proactive Insights (delivered via Daily Brief)
+        </Typography>
+      )}
 
-      <NotificationGroup
-        title="Budget Alerts"
-        description="Projects using >75% of monthly budget with >40% time remaining."
-        enableKey="enable_budget_alerts"
-        slackKey="daily_brief_slack"
-        emailKey="daily_brief_email"
-      />
+      {shouldShowNotification('budget_alerts') && (
+        <NotificationGroup
+          title="Budget Alerts"
+          description="Projects using >75% of monthly budget with >40% time remaining."
+          enableKey="enable_budget_alerts"
+          slackKey="daily_brief_slack"
+          emailKey="daily_brief_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Anomaly Alerts"
-        description="Unusual patterns in hours, velocity, or meetings based on historical data."
-        enableKey="enable_anomaly_alerts"
-        slackKey="daily_brief_slack"
-        emailKey="daily_brief_email"
-      />
+      {shouldShowNotification('anomaly_alerts') && (
+        <NotificationGroup
+          title="Anomaly Alerts"
+          description="Unusual patterns in hours, velocity, or meetings based on historical data."
+          enableKey="enable_anomaly_alerts"
+          slackKey="daily_brief_slack"
+          emailKey="daily_brief_email"
+        />
+      )}
 
-      <NotificationGroup
-        title="Meeting Prep"
-        description="Project activity digest for meetings scheduled today."
-        enableKey="enable_meeting_prep"
-        slackKey="meeting_analysis_slack"
-        emailKey="meeting_analysis_email"
-      />
+      {shouldShowNotification('meeting_prep') && (
+        <NotificationGroup
+          title="Meeting Prep"
+          description="Project activity digest for meetings scheduled today."
+          enableKey="enable_meeting_prep"
+          slackKey="meeting_analysis_slack"
+          emailKey="meeting_analysis_email"
+        />
+      )}
     </Box>
   );
 };
