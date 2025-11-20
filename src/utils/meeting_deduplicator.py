@@ -146,10 +146,21 @@ class MeetingDeduplicator:
             # Select best from group
             if len(similar_group) > 1:
                 best_meeting = self._select_best_meeting(similar_group)
+
+                # Get discarded meeting IDs for logging
+                discarded_ids = [
+                    m.get("id")
+                    for m in similar_group
+                    if m.get("id") != best_meeting.get("id")
+                ]
+
                 logger.info(
                     f"Fuzzy duplicate group found ({len(similar_group)} meetings): "
                     f"Title='{meeting.get('title')}', "
-                    f"Kept ID={best_meeting.get('id')}"
+                    f"Date={meeting.get('date')}, "
+                    f"Kept ID={best_meeting.get('id')} "
+                    f"(longest transcript), "
+                    f"Discarded IDs={discarded_ids}"
                 )
                 final_meetings.append(best_meeting)
             else:
