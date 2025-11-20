@@ -35,6 +35,7 @@ import {
 import { Loading, Title } from 'react-admin';
 import { getApiUrl } from '../config';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
+import { NotificationPreferences } from './NotificationPreferences';
 
 interface UserSettings {
   user: {
@@ -116,19 +117,14 @@ export const MyProfile = () => {
   const [deletingSlack, setDeletingSlack] = useState(false);
   const [deleteSlackDialog, setDeleteSlackDialog] = useState(false);
 
-  // Notification preferences state (only 3 types for now)
-  const [notificationPrefs, setNotificationPrefs] = useState({
-    notify_daily_todo_digest: true,
-    enable_meeting_prep: true,
-    notify_meeting_analysis: true,
-  });
+  // Notification preferences loading state (preferences managed by NotificationPreferences component)
   const [loadingNotifPrefs, setLoadingNotifPrefs] = useState(false);
-  const [savingNotifPrefs, setSavingNotifPrefs] = useState(false);
 
   // Load user settings on component mount
   useEffect(() => {
     loadSettings();
-    loadNotificationPreferences();
+    // NotificationPreferences component handles its own data loading
+    setLoadingNotifPrefs(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -178,65 +174,6 @@ export const MyProfile = () => {
       showSnackbar('Failed to load settings', 'error');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadNotificationPreferences = async () => {
-    try {
-      setLoadingNotifPrefs(true);
-      const response = await fetch(getApiUrl('/api/user/notification-preferences'), {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new globalThis.Error('Failed to load notification preferences');
-      }
-
-      const data: ApiResponse = await response.json();
-      if (data.success && data.data) {
-        // Extract only the 3 notification types we need
-        setNotificationPrefs({
-          notify_daily_todo_digest: data.data.notify_daily_todo_digest,
-          enable_meeting_prep: data.data.enable_meeting_prep,
-          notify_meeting_analysis: data.data.notify_meeting_analysis || false,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading notification preferences:', error);
-      showSnackbar('Error loading notification preferences', 'error');
-    } finally {
-      setLoadingNotifPrefs(false);
-    }
-  };
-
-  const saveNotificationPreferences = async () => {
-    try {
-      setSavingNotifPrefs(true);
-      const response = await fetch(getApiUrl('/api/user/notification-preferences'), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(notificationPrefs),
-      });
-
-      if (!response.ok) {
-        throw new globalThis.Error('Failed to save notification preferences');
-      }
-
-      const data: ApiResponse = await response.json();
-      if (data.success) {
-        showSnackbar('Notification preferences saved successfully!', 'success');
-        await loadNotificationPreferences();
-      } else {
-        throw new globalThis.Error(data.error || 'Failed to save preferences');
-      }
-    } catch (error) {
-      console.error('Error saving notification preferences:', error);
-      showSnackbar(error instanceof Error ? error.message : 'Error saving notification preferences', 'error');
-    } finally {
-      setSavingNotifPrefs(false);
     }
   };
 
@@ -640,84 +577,8 @@ export const MyProfile = () => {
                 <CircularProgress />
               </Box>
             ) : (
-              <>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationPrefs.notify_daily_todo_digest}
-                        onChange={(e) => setNotificationPrefs({
-                          ...notificationPrefs,
-                          notify_daily_todo_digest: e.target.checked
-                        })}
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography variant="body1" fontWeight={500}>
-                          TODO Reminders
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Receive daily reminders about your pending tasks
-                        </Typography>
-                      </Box>
-                    }
-                  />
-
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationPrefs.notify_meeting_analysis}
-                        onChange={(e) => setNotificationPrefs({
-                          ...notificationPrefs,
-                          notify_meeting_analysis: e.target.checked
-                        })}
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography variant="body1" fontWeight={500}>
-                          Meeting Analysis
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Get notified when new meeting analyses are available
-                        </Typography>
-                      </Box>
-                    }
-                  />
-
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={notificationPrefs.enable_meeting_prep}
-                        onChange={(e) => setNotificationPrefs({
-                          ...notificationPrefs,
-                          enable_meeting_prep: e.target.checked
-                        })}
-                      />
-                    }
-                    label={
-                      <Box>
-                        <Typography variant="body1" fontWeight={500}>
-                          Meeting Prep
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Receive meeting preparation summaries before scheduled meetings
-                        </Typography>
-                      </Box>
-                    }
-                  />
-                </Box>
-
-                <Button
-                  variant="contained"
-                  onClick={saveNotificationPreferences}
-                  disabled={savingNotifPrefs}
-                  startIcon={savingNotifPrefs ? <CircularProgress size={16} /> : <Save />}
-                >
-                  {savingNotifPrefs ? 'Saving...' : 'Save Preferences'}
-                </Button>
-              </>
+              // All users see full NotificationPreferences component with channel selection
+              <NotificationPreferences userRole={settings.user.role.toUpperCase() as 'ADMIN' | 'PM' | 'MEMBER'} />
             )}
           </CardContent>
         </Card>

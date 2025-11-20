@@ -111,6 +111,7 @@ def create_user_notifications_blueprint():
                 "enable_pm_reports",
                 # Channel selections
                 "todo_reminders_slack",
+                "todo_reminders_email",  # Added: users can set email delivery for TODO reminders
                 "urgent_notifications_slack",
                 "urgent_notifications_email",
                 "weekly_summary_slack",
