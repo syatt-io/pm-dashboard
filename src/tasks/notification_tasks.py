@@ -1696,19 +1696,22 @@ def run_auto_escalation(self):
     from src.utils.database import get_db
 
     logger.info("🚨 Starting auto-escalation check task...")
-    db = next(get_db())
+
+    # Create separate database sessions for tracker and service
+    # This prevents session interference - when service commits, it won't affect tracker
+    tracker_db = next(get_db())
+    service_db = next(get_db())
 
     try:
-        tracker = track_celery_task(self, db, "auto-escalation")
+        tracker = track_celery_task(self, tracker_db, "auto-escalation")
         with tracker:
             from src.services.auto_escalation import AutoEscalationService
-            from src.utils.database import session_scope
             from src.managers.notifications import NotificationManager
             from config.settings import settings
 
-            with session_scope() as escalation_db:
-                escalation_service = AutoEscalationService(escalation_db)
-                stats = escalation_service.run_escalation_check()
+            # Service uses its own database session
+            escalation_service = AutoEscalationService(service_db)
+            stats = escalation_service.run_escalation_check()
 
             logger.info(f"✅ Auto-escalation check complete: {stats}")
 
@@ -1748,7 +1751,9 @@ def run_auto_escalation(self):
         logger.error(f"❌ Error in auto-escalation check task: {e}", exc_info=True)
         raise
     finally:
-        db.close()
+        # Close both database sessions
+        tracker_db.close()
+        service_db.close()
 
 
 # ========== PM Automation Tasks (Migrated from Python Scheduler) ==========
