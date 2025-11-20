@@ -34,6 +34,34 @@ doctl apps create-deployment a2255a3b-23cc-4fd0-baa8-91d622bb912a
 
 ---
 
+## 🗄️ Production Database Connection
+
+**IMPORTANT**: The production database has TWO databases on the same cluster - make sure you use the correct one!
+
+**Correct Database for agent-pm:**
+- **Host**: `app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am-do-u.e.db.ondigitalocean.com`
+- **Database**: `agentpm-db` ⚠️ NOT `defaultdb` (that's a different app!)
+- **Username**: `agentpm-db` (same as database name)
+- **Port**: 25060
+- **Password**: Stored in DigitalOcean App Platform environment variables as `DATABASE_URL`
+
+**Connection String Format:**
+```
+postgresql://agentpm-db:PASSWORD@HOST:25060/agentpm-db?sslmode=require
+```
+
+**Common Mistake to Avoid:**
+- ❌ Using `defaultdb` - This is a completely different application with tables like `sites`, `accounts`, `performance_metrics`
+- ✅ Always use `agentpm-db` - This has the correct tables: `projects`, `users`, `todo_items`, etc.
+
+**Verification Command:**
+```bash
+# Should show projects, users, todo_items, etc.
+psql -h <HOST> -U agentpm-db -d agentpm-db -p 25060 -c "\dt"
+```
+
+---
+
 ## 🛡️ CSRF Protection
 
 **CRITICAL**: Every new Flask Blueprint with API endpoints MUST be explicitly exempted from CSRF protection or you'll get 400 errors!
@@ -53,6 +81,72 @@ csrf.exempt(your_feature_bp)
 logger.info("✅ YourFeature endpoints exempted from CSRF protection")
 app.register_blueprint(your_feature_bp)
 ```
+
+---
+
+## 🔄 ALEMBIC MIGRATION SAFETY
+
+**CRITICAL**: SQLAlchemy models MUST match database reality to prevent Alembic from hallucinating column drops!
+
+### The Problem (Occurred Nov 16 & Nov 19, 2025)
+
+When running `alembic revision --autogenerate`, Alembic compares:
+1. Model definitions in `src/models/` (what SQLAlchemy thinks exists)
+2. Database schema (what actually exists)
+
+If columns exist in the database but NOT in the model, Alembic assumes they're "orphaned" and generates `DROP COLUMN` commands!
+
+### What Happened
+
+The `Project` model (`src/models/project.py`) was missing 11 columns that:
+- ✅ Existed in production database
+- ✅ Were actively used in 10-68 files each
+- ✅ Were critical for Tempo sync, forecasting, email notifications, budget tracking
+
+Result: Alembic auto-generated migrations dropped them TWICE (Nov 16, Nov 19), causing:
+- Data loss
+- Application crashes
+- Hours of recovery work
+
+### Prevention Rules
+
+**BEFORE running `alembic revision --autogenerate`:**
+
+1. ✅ **Verify model completeness**: Check that ALL columns in the database table exist in the corresponding SQLAlchemy model
+2. ✅ **Run verification test**: After adding columns to model, run autogenerate to verify it produces NO drops
+3. ✅ **NEVER blindly trust autogenerate**: ALWAYS review generated migrations before committing
+4. ✅ **Look for DROP COLUMN**: If you see ANY `op.drop_column()` commands, investigate WHY before committing
+
+**Red Flags:**
+```python
+# 🚨 DANGER: Alembic wants to drop columns - investigate before committing!
+op.drop_column("projects", "cumulative_hours")
+op.drop_column("projects", "total_hours")
+```
+
+**Safe Pattern:**
+```python
+# ✅ GOOD: Model matches database - only adding new columns
+op.add_column("projects", sa.Column("new_feature", sa.String(50)))
+```
+
+### Fixed Migration Pattern
+
+See `alembic/versions/7a2ca1bc7707_add_slack_installations_table_for_oauth_.py` for example of commenting out hallucinated drops with clear warning.
+
+### Model Maintenance Checklist
+
+When modifying the `Project` model:
+- [ ] Does model have ALL columns that exist in production database?
+- [ ] Run `alembic revision --autogenerate -m "verify"` to test
+- [ ] Review generated migration - should be EMPTY or only ADD columns
+- [ ] Delete verification migration if clean
+- [ ] Document WHY each column exists (usage count, purpose)
+
+**Related Files:**
+- `src/models/project.py` - Contains model with ALL required columns and usage docs
+- `alembic/versions/7a2ca1bc7707_*.py` - Example of fixed migration with drops commented out
+- `alembic/versions/2069b8009924_*.py` - Previous restore migration (Nov 16, 2025)
 
 ---
 

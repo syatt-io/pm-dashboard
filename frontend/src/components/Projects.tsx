@@ -2445,7 +2445,7 @@ const ProjectShowContent = () => {
           onChange={handleTabChange}
         >
           <Tab label="Overview" />
-          {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
+          {record.project_work_type === 'project-based' && (
             <Tab label="Budget & Actuals" />
           )}
           {permissions === 'admin' && (
@@ -3045,8 +3045,8 @@ const ProjectShowContent = () => {
       </Box>
       </TabPanel>
 
-      {/* Tab Panel 1: Budget & Actuals (Admin Only) */}
-      {permissions === 'admin' && (record.project_work_type === 'project-based' || record.show_budget_tab) && (
+      {/* Tab Panel 1: Budget & Actuals */}
+      {record.project_work_type === 'project-based' && (
         <TabPanel value={tabValue} index={1}>
           {/* Project Dates Section */}
           <Card sx={{ mb: 3, backgroundColor: 'rgba(139, 92, 246, 0.05)' }}>

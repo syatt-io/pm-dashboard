@@ -1,6 +1,16 @@
 """Project and ProjectCharacteristics models."""
 
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, Float
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    DateTime,
+    Boolean,
+    ForeignKey,
+    Float,
+    Text,
+    Date,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from .base import Base
@@ -11,6 +21,15 @@ class Project(Base):
     Core project table for tracking Jira projects.
 
     Stores metadata about projects including name, status, and links to related data.
+
+    CRITICAL: All columns below are actively used throughout the codebase.
+    DO NOT remove any columns without verifying they are unused in:
+    - Backend routes (src/routes/)
+    - Jobs (src/jobs/)
+    - Frontend components (frontend/src/components/)
+
+    History: These columns were accidentally dropped twice (Nov 16, Nov 19 2025)
+    due to incomplete model definitions causing Alembic autogenerate to hallucinate drops.
     """
 
     __tablename__ = "projects"
@@ -19,6 +38,33 @@ class Project(Base):
     key = Column(String(50), primary_key=True)
     name = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Project classification and settings
+    project_work_type = Column(
+        String(50), default="project-based"
+    )  # Used in 18 files - project type filtering
+    description = Column(Text)  # Used in multiple files - project metadata
+
+    # Budget and time tracking (CRITICAL - used by Tempo sync and forecasting)
+    total_hours = Column(Float, default=0)  # Used in 68 files - total allocated hours
+    cumulative_hours = Column(
+        Float, default=0
+    )  # Used in 21 files - tracked hours from Tempo
+    retainer_hours = Column(
+        Float, default=0
+    )  # Used in 15 files - retainer vs project-based differentiation
+
+    # Meeting configuration
+    weekly_meeting_day = Column(
+        String(20)
+    )  # Used in 19 files - meeting prep scheduling
+    send_meeting_emails = Column(
+        Boolean, default=False
+    )  # Used in 21 files - email notification control
+
+    # Project timeline
+    start_date = Column(Date)  # Project start date
+    launch_date = Column(Date)  # Expected/actual launch date
 
     # Timestamps
     created_at = Column(
@@ -48,6 +94,15 @@ class Project(Base):
             "key": self.key,
             "name": self.name,
             "is_active": self.is_active,
+            "project_work_type": self.project_work_type,
+            "description": self.description,
+            "total_hours": self.total_hours,
+            "cumulative_hours": self.cumulative_hours,
+            "retainer_hours": self.retainer_hours,
+            "weekly_meeting_day": self.weekly_meeting_day,
+            "send_meeting_emails": self.send_meeting_emails,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "launch_date": self.launch_date.isoformat() if self.launch_date else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "characteristics": (
