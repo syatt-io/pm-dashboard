@@ -181,7 +181,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`settings-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ py: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ py: 2 }}>{children}</Box>}
     </div>
   );
 }
@@ -1174,7 +1174,7 @@ export const Settings = () => {
   }
 
   return (
-    <Box p={3}>
+    <Box p={2}>
       <Title title="Settings" />
 
       {/* User Information */}

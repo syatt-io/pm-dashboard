@@ -196,7 +196,7 @@ const DateRangeFilter = () => {
   };
 
   return (
-    <Card sx={{ mb: 2, p: 2 }}>
+    <Card sx={{ mb: 2, p: 1.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Typography variant="h6">Filter by Date Range:</Typography>
         <FormControl size="small" sx={{ minWidth: 120 }}>
