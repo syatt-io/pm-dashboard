@@ -578,7 +578,7 @@ export const MyProfile = () => {
               </Box>
             ) : (
               // All users see full NotificationPreferences component with channel selection
-              <NotificationPreferences userRole={settings.user.role.toUpperCase() as 'ADMIN' | 'PM' | 'MEMBER'} />
+              <NotificationPreferences userRole={settings.user.role.toUpperCase() as 'ADMIN' | 'PM' | 'MEMBER' | 'NO_ACCESS'} />
             )}
           </CardContent>
         </Card>
