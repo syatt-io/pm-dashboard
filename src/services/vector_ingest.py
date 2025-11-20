@@ -454,7 +454,7 @@ class VectorIngestService:
                 parent_info = ""
                 parent_key = None
                 parent = fields.get("parent")
-                if parent:
+                if parent and isinstance(parent, dict):
                     # This is a sub-task with a parent issue
                     parent_key = parent.get("key", "")
                     parent_fields = parent.get("fields", {})
