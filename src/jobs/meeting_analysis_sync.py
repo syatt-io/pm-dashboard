@@ -354,7 +354,16 @@ class MeetingAnalysisSyncJob:
                     f"{len(analysis.action_items)} action items"
                 )
 
-                # Check if project has email notifications enabled
+                # ═══════════════════════════════════════════════════════════════
+                # FLOW 1: ATTENDEE EMAILS (Project-level setting)
+                # ═══════════════════════════════════════════════════════════════
+                # Sends emails to meeting attendees if project has send_meeting_emails=true
+                # Respects user notification preferences
+                # Supports test mode override
+
+                # Track emails sent in Flow 1 to avoid duplicates in Flow 2
+                flow1_recipients = set()
+
                 try:
                     result = session.execute(
                         text(
@@ -366,6 +375,10 @@ class MeetingAnalysisSyncJob:
                     send_emails = row[0] if row else False
 
                     if send_emails and self.notification_manager:
+                        logger.info(
+                            f"📧 Flow 1: Sending emails to meeting attendees (project {project['key']} has send_meeting_emails=true)"
+                        )
+
                         # Extract participant emails from meeting data
                         attendees = transcript_data.get("attendees", [])
                         all_attendee_emails = [
@@ -388,7 +401,7 @@ class MeetingAnalysisSyncJob:
                                 recipient_emails.append(email)
 
                         logger.info(
-                            f"📊 Filtered {len(all_attendee_emails)} attendees to {len(recipient_emails)} "
+                            f"📊 Flow 1: Filtered {len(all_attendee_emails)} attendees to {len(recipient_emails)} "
                             f"recipients based on meeting_analysis_email preferences"
                         )
 
@@ -402,28 +415,27 @@ class MeetingAnalysisSyncJob:
                         if test_mode:
                             if test_recipient:
                                 logger.warning(
-                                    f"🧪 TEST MODE: Overriding {len(recipient_emails)} recipients "
+                                    f"🧪 Flow 1 TEST MODE: Overriding {len(recipient_emails)} attendee recipients "
                                     f"with test recipient: {test_recipient}"
                                 )
                                 recipient_emails = [test_recipient]
                             else:
                                 logger.error(
-                                    "TEST MODE enabled but MEETING_EMAIL_TEST_RECIPIENT not set, "
-                                    "skipping email send"
+                                    "Flow 1: TEST MODE enabled but MEETING_EMAIL_TEST_RECIPIENT not set, "
+                                    "skipping attendee email send"
                                 )
                                 recipient_emails = []
                         else:
                             logger.info(
-                                f"📧 PRODUCTION MODE: Sending emails to {len(recipient_emails)} "
-                                f"real meeting participants"
+                                f"📧 Flow 1 PRODUCTION MODE: Sending emails to {len(recipient_emails)} "
+                                f"real meeting attendees"
                             )
 
                         if recipient_emails:
                             logger.info(
-                                f"Sending meeting analysis email to {len(recipient_emails)} participants for project {project['key']}"
+                                f"Flow 1: Sending meeting analysis email to {len(recipient_emails)} attendees for project {project['key']}"
                             )
 
-                            # Send email asynchronously
                             # Convert topics to dict format for email template
                             topics_data = (
                                 [
@@ -450,29 +462,131 @@ class MeetingAnalysisSyncJob:
                             )
 
                             if email_result.get("success"):
+                                # Track who received emails in Flow 1
+                                flow1_recipients.update(recipient_emails)
                                 logger.info(
-                                    f"✅ Meeting analysis email sent successfully to {email_result.get('recipients')}"
+                                    f"✅ Flow 1: Meeting analysis email sent successfully to {email_result.get('recipients')}"
                                 )
                             else:
                                 logger.error(
-                                    f"Failed to send meeting analysis email: {email_result.get('error')}"
+                                    f"❌ Flow 1: Failed to send meeting analysis email: {email_result.get('error')}"
                                 )
                         else:
                             logger.warning(
-                                f"No participant emails found for meeting {meeting_id}"
+                                f"Flow 1: No attendee emails found for meeting {meeting_id}"
                             )
                     elif send_emails and not self.notification_manager:
                         logger.warning(
-                            f"Email notifications enabled for project {project['key']} but notification manager not available"
+                            f"Flow 1: Email notifications enabled for project {project['key']} but notification manager not available"
                         )
                     else:
                         logger.debug(
-                            f"Email notifications disabled for project {project['key']}"
+                            f"Flow 1: Attendee emails disabled for project {project['key']} (send_meeting_emails=false)"
                         )
 
                 except Exception as email_error:
                     logger.error(
-                        f"Error sending meeting analysis email: {email_error}",
+                        f"Flow 1: Error sending attendee emails: {email_error}",
+                        exc_info=True,
+                    )
+                    # Don't fail the whole meeting analysis if email fails
+
+                # ═══════════════════════════════════════════════════════════════
+                # FLOW 2: PROJECT FOLLOWER EMAILS (User notification preferences)
+                # ═══════════════════════════════════════════════════════════════
+                # Sends emails to users watching the project who have email notifications enabled
+                # Similar to Slack DM logic but for email channel
+                # Independent of send_meeting_emails project setting
+                try:
+                    if self.notification_manager:
+                        logger.info(
+                            f"📧 Flow 2: Sending emails to project followers for {project['key']}"
+                        )
+
+                        # Query users watching this project with email notifications enabled
+                        follower_result = session.execute(
+                            text(
+                                """
+                                SELECT DISTINCT u.email, u.name
+                                FROM user_watched_projects uwp
+                                JOIN users u ON uwp.user_id = u.id
+                                JOIN user_notification_preferences unp ON u.id = unp.user_id
+                                WHERE uwp.project_key = :project_key
+                                AND u.email IS NOT NULL
+                                AND unp.enable_meeting_notifications = true
+                                AND unp.meeting_analysis_email = true
+                            """
+                            ),
+                            {"project_key": project["key"]},
+                        )
+
+                        follower_rows = follower_result.fetchall()
+                        all_follower_emails = [row[0] for row in follower_rows]
+
+                        # Remove duplicates - don't send to people who already got email in Flow 1
+                        follower_emails = [
+                            email
+                            for email in all_follower_emails
+                            if email not in flow1_recipients
+                        ]
+
+                        if flow1_recipients:
+                            logger.info(
+                                f"📊 Flow 2: Found {len(all_follower_emails)} project followers, "
+                                f"excluding {len(all_follower_emails) - len(follower_emails)} who already received attendee emails"
+                            )
+                        else:
+                            logger.info(
+                                f"📊 Flow 2: Found {len(follower_emails)} project followers with email notifications enabled"
+                            )
+
+                        if follower_emails:
+                            # Convert topics to dict format for email template
+                            topics_data = (
+                                [
+                                    {
+                                        "title": topic.title,
+                                        "content_items": topic.content_items,
+                                    }
+                                    for topic in analysis.topics
+                                ]
+                                if analysis.topics
+                                else []
+                            )
+
+                            # Send email to followers
+                            email_result = asyncio.run(
+                                self.notification_manager.send_meeting_analysis_email(
+                                    meeting_title=meeting_title,
+                                    meeting_date=meeting_date,
+                                    recipients=follower_emails,
+                                    topics=topics_data,
+                                    action_items=action_items_data,
+                                    ai_provider=ai_provider,
+                                    ai_model=ai_model,
+                                )
+                            )
+
+                            if email_result.get("success"):
+                                logger.info(
+                                    f"✅ Flow 2: Meeting analysis email sent successfully to {len(follower_emails)} project followers"
+                                )
+                            else:
+                                logger.error(
+                                    f"❌ Flow 2: Failed to send meeting analysis email to followers: {email_result.get('error')}"
+                                )
+                        else:
+                            logger.info(
+                                f"Flow 2: No project followers with email notifications enabled for {project['key']}"
+                            )
+                    else:
+                        logger.warning(
+                            "Flow 2: Notification manager not available for follower emails"
+                        )
+
+                except Exception as follower_email_error:
+                    logger.error(
+                        f"Flow 2: Error sending project follower emails: {follower_email_error}",
                         exc_info=True,
                     )
                     # Don't fail the whole meeting analysis if email fails
