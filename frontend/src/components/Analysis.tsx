@@ -1340,10 +1340,23 @@ export const AnalysisShow = () => {
           {/* Meeting Details Header */}
           <Card>
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">
-                  Meeting Details
-                </Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                <Box sx={{ flex: 1 }}>
+                  <FunctionField
+                    render={(record: any) => (
+                      <Typography variant="h6" gutterBottom>
+                        {record.meeting_title || 'Untitled Meeting'}
+                      </Typography>
+                    )}
+                  />
+                  <FunctionField
+                    render={(record: any) => (
+                      <Typography variant="body2" color="text.secondary">
+                        {formatESTDateTime(record.date)}
+                      </Typography>
+                    )}
+                  />
+                </Box>
                 <FunctionField
                   render={(record: any) => (
                     <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1374,42 +1387,6 @@ export const AnalysisShow = () => {
                 />
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Title
-                  </Typography>
-                  <FunctionField
-                    render={(record: any) => (
-                      <Typography variant="body1">
-                        {record.meeting_title || 'Untitled Meeting'}
-                      </Typography>
-                    )}
-                  />
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Meeting Date
-                  </Typography>
-                  <FunctionField
-                    render={(record: any) => (
-                      <Typography variant="body1">
-                        {formatESTDateTime(record.date)}
-                      </Typography>
-                    )}
-                  />
-                </Box>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Analyzed At
-                  </Typography>
-                  <FunctionField
-                    render={(record: any) => (
-                      <Typography variant="body1">
-                        {formatESTDateTime(record.analyzed_at)}
-                      </Typography>
-                    )}
-                  />
-                </Box>
                 <Box>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     AI Model
