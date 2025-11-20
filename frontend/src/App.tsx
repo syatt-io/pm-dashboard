@@ -22,7 +22,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { MeetingShow, MeetingEdit } from './components/Meetings';
 import { TodoList, TodoShow, TodoEdit, TodoCreate } from './components/Todos';
 import { AnalysisList, AnalysisShow } from './components/Analysis';
-import { AnalyticsList } from './components/Analytics';
+import { AnalyticsList } from './components/Forecasting';
 import { Dashboard } from './components/Dashboard';
 import { CustomLayout } from './components/Layout';
 import { ProjectList, ProjectShow, ProjectEdit } from './components/Projects';
@@ -36,7 +36,6 @@ import { FeedbackEdit } from './components/FeedbackEdit';
 import Login from './components/Login';
 import Settings from './components/Settings';
 import MyProfile from './components/MyProfile';
-import EpicTemplates from './components/EpicTemplates';
 
 // Configure React Query to stop retrying on auth failures
 const queryClient = new QueryClient({
@@ -125,20 +124,11 @@ const AdminApp = () => {
             options={{ label: 'Team Learnings' }}
           />
           <Resource
-            name="analytics"
+            name="forecasting"
             list={AnalyticsList}
-            icon={AnalyticsIcon}
-            options={{ label: 'Analytics' }}
+            icon={TrendingUpIcon}
+            options={{ label: 'Forecasting' }}
           />
-          {/* Epic Templates - Admin only */}
-          {permissions === 'admin' && (
-            <Resource
-              name="epic-templates"
-              list={EpicTemplates}
-              icon={CategoryIcon}
-              options={{ label: 'Epic Templates' }}
-            />
-          )}
           {/* My Profile - accessible to all users */}
           <Resource
             name="profile"

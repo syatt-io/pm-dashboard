@@ -8,8 +8,7 @@ import {
   CheckSquare,
   MessageSquare,
   Lightbulb,
-  BarChart3,
-  FileText,
+  TrendingUp,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { usePermissions } from 'react-admin';
@@ -61,8 +60,7 @@ const menuItems: MenuItem[] = [
   { title: "My TODOs", url: "/todos", icon: CheckSquare },
   { title: "My Feedback", url: "/feedback", icon: MessageSquare },
   { title: "Team Learnings", url: "/learnings", icon: Lightbulb },
-  { title: "Analytics", url: "/analytics", icon: BarChart3, adminOnly: true },
-  { title: "Epic Templates", url: "/epic-templates", icon: FileText, adminOnly: true },
+  { title: "Forecasting", url: "/forecasting", icon: TrendingUp, adminOnly: true },
   {
     title: "Settings",
     url: "/settings",

@@ -23,7 +23,6 @@ from .forecast import EpicForecast
 from .time_tracking_compliance import TimeTrackingCompliance
 from .monthly_reconciliation import MonthlyReconciliationReport
 from .project import Project, ProjectCharacteristics
-from .standard_epic_template import StandardEpicTemplate
 from .project_keyword import ProjectKeyword
 from .project_resource_mapping import ProjectResourceMapping
 from .project_monthly_forecast import ProjectMonthlyForecast
@@ -198,7 +197,6 @@ __all__ = [
     "MonthlyReconciliationReport",
     "Project",
     "ProjectCharacteristics",
-    "StandardEpicTemplate",
     "ProjectKeyword",
     "ProjectResourceMapping",
     "ProjectMonthlyForecast",
