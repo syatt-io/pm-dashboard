@@ -42,7 +42,7 @@ const lightThemeOverrides = {
       styleOverrides: {
         root: {
           '& .RaLayout-content': {
-            paddingTop: '12px', // Reduced from default (usually 16-24px)
+            paddingTop: '8px', // Reduced from default (usually 16-24px)
             marginTop: 0,
           },
         },

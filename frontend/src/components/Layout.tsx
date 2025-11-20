@@ -78,7 +78,7 @@ export const CustomLayout = (props: any) => (
               paddingTop: 0,
             },
             '& .RaLayout-content': {
-              padding: '24px',
+              padding: '16px',
             },
           }}
         />
