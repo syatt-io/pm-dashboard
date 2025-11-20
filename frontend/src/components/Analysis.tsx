@@ -76,14 +76,20 @@ const CreateJiraTicketDialog = ({
   const [assignees, setAssignees] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [issueTypes, setIssueTypes] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
+  const [epics, setEpics] = useState<any[]>([]);
   const [selectedAssignee, setSelectedAssignee] = useState<any>(null);
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedIssueType, setSelectedIssueType] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedEpic, setSelectedEpic] = useState<any>(null);
   const [title, setTitle] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [loadingIssueTypes, setLoadingIssueTypes] = useState(false);
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+  const [loadingEpics, setLoadingEpics] = useState(false);
   const notify = useNotify();
 
   // Load initial data when dialog opens
@@ -97,12 +103,24 @@ const CreateJiraTicketDialog = ({
     }
   }, [open, item]);
 
-  // Load issue types when project changes
+  // Load issue types and epics when project changes
   useEffect(() => {
     if (selectedProject) {
       loadIssueTypes(selectedProject);
+      loadEpics(selectedProject);
     }
   }, [selectedProject]);
+
+  // Load statuses when project AND issue type change
+  useEffect(() => {
+    if (selectedProject && selectedIssueType) {
+      loadStatuses(selectedProject, selectedIssueType);
+    } else if (selectedProject) {
+      // Clear statuses if issue type is not selected yet
+      setStatuses([]);
+      setSelectedStatus('');
+    }
+  }, [selectedProject, selectedIssueType]);
 
   // Auto-select project based on meeting title when dialog opens
   useEffect(() => {
@@ -249,6 +267,57 @@ const CreateJiraTicketDialog = ({
     }
   };
 
+  const loadStatuses = async (projectKey: string, issueType: string) => {
+    setLoadingStatuses(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/jira/statuses?project=${projectKey}&issueType=${encodeURIComponent(issueType)}`
+      );
+
+      if (!response.ok) {
+        console.error('[ERROR] Statuses API failed:', response.status, response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Handle response format: {success: true, data: {statuses: []}}
+      const statuses = data.success
+        ? (data.statuses || data.data?.statuses || [])
+        : (data.data?.statuses || []);
+      setStatuses(statuses);
+      console.log(`[INFO] Loaded ${statuses.length} statuses for issue type "${issueType}"`);
+    } catch (error) {
+      console.error('[ERROR] Failed to load statuses:', error);
+    } finally {
+      setLoadingStatuses(false);
+    }
+  };
+
+  const loadEpics = async (projectKey: string) => {
+    setLoadingEpics(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/jira/projects/${projectKey}/epics`);
+
+      if (!response.ok) {
+        console.error('[ERROR] Epics API failed:', response.status, response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Handle response format: {success: true, data: {epics: []}}
+      const epics = data.success
+        ? (data.epics || data.data?.epics || [])
+        : (data.data?.epics || []);
+      setEpics(epics);
+    } catch (error) {
+      console.error('[ERROR] Failed to load epics:', error);
+    } finally {
+      setLoadingEpics(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!title.trim()) {
       notify('Please enter a title', { type: 'warning' });
@@ -270,7 +339,9 @@ const CreateJiraTicketDialog = ({
         assignee: selectedAssignee ? selectedAssignee.emailAddress || selectedAssignee.name : '',
         project: selectedProject,
         issueType: selectedIssueType,
-        priority: item.priority || 'Medium'
+        priority: item.priority || 'Medium',
+        status: selectedStatus || undefined,  // Optional status
+        parent: selectedEpic?.key || undefined  // Optional parent epic key
       };
 
       const response = await fetch(`${API_BASE_URL}/api/jira/tickets`, {
@@ -373,6 +444,54 @@ const CreateJiraTicketDialog = ({
               </Box>
             )}
           </FormControl>
+
+          <FormControl fullWidth disabled={!selectedProject || loadingStatuses}>
+            <InputLabel>Status (Optional)</InputLabel>
+            <Select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value as string)}
+            >
+              <MenuItem value="">
+                <em>None (use default)</em>
+              </MenuItem>
+              {statuses.map((status) => (
+                <MenuItem key={status.id} value={status.name}>
+                  {status.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {loadingStatuses && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+                <CircularProgress size={20} />
+              </Box>
+            )}
+          </FormControl>
+
+          <Autocomplete
+            options={epics}
+            getOptionLabel={(option) => `${option.key} - ${option.summary}`}
+            value={selectedEpic}
+            onChange={(event, newValue) => setSelectedEpic(newValue)}
+            disabled={!selectedProject || loadingEpics}
+            renderInput={(params) => (
+              <MuiTextField {...params} label="Parent Epic (Optional)" placeholder="Search for epic..." />
+            )}
+            renderOption={(props, option) => (
+              <Box component="li" {...props}>
+                <Box>
+                  <Typography variant="body2">{option.key} - {option.summary}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Status: {option.status || 'Unknown'}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+          />
+          {loadingEpics && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1 }}>
+              <CircularProgress size={20} />
+            </Box>
+          )}
         </Box>
       </DialogContent>
       <DialogActions>
@@ -1058,29 +1177,28 @@ const AnalysisShowErrorFallback = ({ error }: { error: any }) => {
   );
 };
 
-const AnalysisShowTitle = () => {
+const AnalysisShowTitle = React.memo(() => {
   const record = useRecordContext();
-  console.log('[AnalysisShowTitle] record:', record);
-  if (!record) return <>Meeting Analysis</>;
+
+  if (!record) return <span>Meeting Analysis</span>;
+
   const title = record.meeting_title || 'Untitled Meeting';
-  console.log('[AnalysisShowTitle] title:', title, 'date:', record.date);
-  if (record.date) {
-    const date = new Date(record.date);
-    const estDate = date.toLocaleString('en-US', {
-      timeZone: 'America/New_York',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-    const result = `${title} - ${estDate} EST`;
-    console.log('[AnalysisShowTitle] returning:', result);
-    return <>{result}</>;
-  }
-  return <>{title}</>;
-};
+
+  if (!record.date) return <span>{title}</span>;
+
+  const date = new Date(record.date);
+  const estDate = date.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  return <span>{`${title} - ${estDate} EST`}</span>;
+});
 
 export const AnalysisShow = () => {
   const [error, setError] = React.useState<any>(null);

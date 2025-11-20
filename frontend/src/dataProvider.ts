@@ -213,20 +213,18 @@ export const dataProvider: DataProvider = {
                     const meetingId = meeting.meeting_id || meeting.id;
                     return {
                         id: meetingId,
+                        meeting_id: meetingId,
                         meeting_title: meeting.title || 'Untitled Meeting',
-                        analyzed_at: meeting.analyzed_at || meeting.date,
+                        date: meeting.date,
+                        analyzed_at: meeting.analyzed_at,
                         action_items: meeting.action_items || [],
                         key_decisions: meeting.key_decisions || [],
                         blockers: meeting.blockers || [],
                         follow_ups: meeting.follow_ups || [],
                         summary: meeting.summary || (meeting.action_items && meeting.action_items.length > 0 ? 'Meeting analysis completed' : 'Not analyzed yet'),
-                        meeting_id: meetingId,
-                        title: meeting.title,
-                        date: meeting.date,
                         confidence: meeting.confidence,
                         relevance_score: meeting.relevance_score,
-                        action_items_count: meeting.action_items_count || 0,
-                        ...meeting
+                        action_items_count: meeting.action_items_count || 0
                     };
                 });
             }
@@ -282,21 +280,31 @@ export const dataProvider: DataProvider = {
                 return {
                     data: {
                         id: meetingId,
+                        meeting_id: meetingId,
                         meeting_title: json.title || 'Untitled Meeting',
-                        analyzed_at: json.analyzed_at || json.date,
+                        date: json.date,
+                        analyzed_at: json.analyzed_at,
                         action_items: json.action_items || [],
                         key_decisions: json.key_decisions || [],
                         blockers: json.blockers || [],
                         follow_ups: json.follow_ups || [],
                         summary: json.summary || (json.action_items && json.action_items.length > 0 ? 'Meeting analysis completed' : 'Not analyzed yet'),
-                        // Include all original meeting fields
-                        meeting_id: meetingId,
-                        title: json.title,
-                        date: json.date,
                         confidence: json.confidence,
                         relevance_score: json.relevance_score,
                         action_items_count: json.action_items_count || 0,
-                        ...json
+                        // Include all other fields from API response
+                        topics: json.topics || [],
+                        executive_summary: json.executive_summary,
+                        outcomes: json.outcomes || [],
+                        blockers_and_constraints: json.blockers_and_constraints || [],
+                        timeline_and_milestones: json.timeline_and_milestones || [],
+                        key_discussions: json.key_discussions || [],
+                        tickets_created: json.tickets_created || [],
+                        todos_created: json.todos_created || [],
+                        ai_provider: json.ai_provider,
+                        ai_model: json.ai_model,
+                        processed_at: json.processed_at,
+                        success: json.success
                     }
                 };
             }
