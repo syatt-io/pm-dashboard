@@ -1095,6 +1095,11 @@ class ProjectActivityAggregator:
                     days_back=days_back,
                 )
 
+            # Filter ethel PRs to only include those matching this project
+            if github_repos and "ethel" in github_repos:
+                logger.info("Filtering ethel PRs by project keywords")
+                pr_data = self._filter_ethel_prs(pr_data, activity.project_key)
+
             # Store PR data in activity
             activity.github_prs_merged = pr_data.get("merged", [])
             activity.github_prs_in_review = pr_data.get("in_review", [])
@@ -1111,6 +1116,85 @@ class ProjectActivityAggregator:
             activity.github_prs_merged = []
             activity.github_prs_in_review = []
             activity.github_prs_open = []
+
+    def _filter_ethel_prs(
+        self, pr_data: Dict[str, List[Dict]], project_key: str
+    ) -> Dict[str, List[Dict]]:
+        """Filter ethel PRs to only include those matching the project's keywords.
+
+        Args:
+            pr_data: Dictionary with 'merged', 'in_review', 'open' PR lists
+            project_key: Project key to filter by
+
+        Returns:
+            Filtered PR data with only matching ethel PRs
+        """
+        import re
+        from sqlalchemy import text
+
+        # Get project keywords from database
+        try:
+            self.session.rollback()  # Ensure clean state
+            result = self.session.execute(
+                text("SELECT keyword FROM project_keywords WHERE project_key = :key"),
+                {"key": project_key},
+            ).fetchall()
+            keywords = [row[0].lower() for row in result]
+            logger.info(f"Project {project_key} keywords: {keywords}")
+        except Exception as e:
+            logger.warning(f"Could not load keywords for {project_key}: {e}")
+            keywords = [project_key.lower()]
+
+        # Add project key itself as a keyword pattern
+        patterns = keywords + [project_key.lower(), f"{project_key.lower()}-\\d+"]
+
+        def matches_project(pr: Dict) -> bool:
+            """Check if a PR matches this project based on title/description."""
+            # Only filter ethel repo PRs
+            if pr.get("repo", {}).get("name") != "ethel":
+                return True  # Keep all non-ethel PRs
+
+            title = pr.get("title", "").lower()
+            body = pr.get("body", "").lower()
+            combined = f"{title} {body}"
+
+            # Check each pattern
+            for pattern in patterns:
+                # Exact match or regex match
+                if pattern in combined or re.search(pattern, combined, re.IGNORECASE):
+                    logger.debug(
+                        f"ethel PR #{pr.get('number')} matches pattern '{pattern}': {title}"
+                    )
+                    return True
+
+            logger.debug(
+                f"ethel PR #{pr.get('number')} does NOT match {project_key}: {title}"
+            )
+            return False
+
+        # Filter each PR list
+        filtered = {
+            "merged": [pr for pr in pr_data.get("merged", []) if matches_project(pr)],
+            "in_review": [
+                pr for pr in pr_data.get("in_review", []) if matches_project(pr)
+            ],
+            "open": [pr for pr in pr_data.get("open", []) if matches_project(pr)],
+        }
+
+        # Log filtering results
+        original_counts = {
+            k: len(pr_data.get(k, [])) for k in ["merged", "in_review", "open"]
+        }
+        filtered_counts = {k: len(v) for k, v in filtered.items()}
+
+        logger.info(
+            f"ethel PR filtering for {project_key}: "
+            f"merged {original_counts['merged']}->{filtered_counts['merged']}, "
+            f"in_review {original_counts['in_review']}->{filtered_counts['in_review']}, "
+            f"open {original_counts['open']}->{filtered_counts['open']}"
+        )
+
+        return filtered
 
     async def _collect_historical_context(
         self, activity: ProjectActivity, days_back: int
