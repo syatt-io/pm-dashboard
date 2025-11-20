@@ -1373,27 +1373,60 @@ export const AnalysisShow = () => {
                   )}
                 />
               </Box>
-              <TextField source="meeting_title" label="Title" />
-              <FunctionField
-                label="Meeting Date"
-                render={(record: any) => formatESTDateTime(record.date)}
-              />
-              <FunctionField
-                label="Analyzed At"
-                render={(record: any) => formatESTDateTime(record.analyzed_at)}
-              />
-              <FunctionField
-                label="AI Model"
-                render={(record: any) => {
-                  const provider = record.ai_provider || 'unknown';
-                  const model = record.ai_model || 'unknown';
-                  return (
-                    <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                      {provider}/{model}
-                    </Typography>
-                  );
-                }}
-              />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Title
+                  </Typography>
+                  <FunctionField
+                    render={(record: any) => (
+                      <Typography variant="body1">
+                        {record.meeting_title || 'Untitled Meeting'}
+                      </Typography>
+                    )}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Meeting Date
+                  </Typography>
+                  <FunctionField
+                    render={(record: any) => (
+                      <Typography variant="body1">
+                        {formatESTDateTime(record.date)}
+                      </Typography>
+                    )}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Analyzed At
+                  </Typography>
+                  <FunctionField
+                    render={(record: any) => (
+                      <Typography variant="body1">
+                        {formatESTDateTime(record.analyzed_at)}
+                      </Typography>
+                    )}
+                  />
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    AI Model
+                  </Typography>
+                  <FunctionField
+                    render={(record: any) => {
+                      const provider = record.ai_provider || 'unknown';
+                      const model = record.ai_model || 'unknown';
+                      return (
+                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                          {provider}/{model}
+                        </Typography>
+                      );
+                    }}
+                  />
+                </Box>
+              </Box>
             </CardContent>
           </Card>
 

@@ -426,6 +426,38 @@ def get_jira_priorities():
         return error_response(str(e), status_code=500)
 
 
+@jira_bp.route("/statuses", methods=["GET"])
+def get_jira_statuses():
+    """Get Jira statuses, optionally filtered by project and issue type.
+
+    Query parameters:
+        project (optional): Project key to get project-specific statuses
+        issueType (optional): Issue type name to filter statuses by workflow
+
+    Returns:
+        List of status objects with id, name, and statusCategory
+    """
+    try:
+        project_key = request.args.get("project")
+        issue_type = request.args.get("issueType")
+
+        async def fetch_statuses():
+            async with JiraMCPClient(
+                jira_url=settings.jira.url,
+                username=settings.jira.username,
+                api_token=settings.jira.api_token,
+            ) as jira_client:
+                return await jira_client.get_statuses(
+                    project_key=project_key, issue_type=issue_type
+                )
+
+        statuses = asyncio.run(fetch_statuses())
+        return success_response(data={"statuses": statuses})
+    except Exception as e:
+        logger.error(f"Error fetching Jira statuses: {e}")
+        return error_response(str(e), status_code=500)
+
+
 @jira_bp.route("/metadata/<project_key>", methods=["GET"])
 def get_jira_metadata(project_key):
     """Get comprehensive Jira metadata for a project."""
@@ -1187,7 +1219,9 @@ def create_jira_ticket():
         "project": "PROJECT_KEY",
         "issueType": "Task",
         "priority": "Medium",
-        "assignee": "user@example.com" (optional)
+        "assignee": "user@example.com" (optional),
+        "status": "In Progress" (optional),
+        "parent": "EPIC-123" (optional)
     }
     """
     try:
@@ -1211,6 +1245,8 @@ def create_jira_ticket():
             issue_type=data["issueType"],
             priority=data.get("priority", "Medium"),
             assignee=data.get("assignee"),
+            status=data.get("status"),  # Optional status
+            parent_epic_key=data.get("parent"),  # Optional parent epic
         )
 
         # Initialize Jira client and create the ticket

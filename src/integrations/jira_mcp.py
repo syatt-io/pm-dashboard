@@ -122,6 +122,8 @@ class JiraTicket:
     labels: Optional[List[str]] = None
     components: Optional[List[str]] = None
     story_points: Optional[int] = None
+    status: Optional[str] = None
+    parent_epic_key: Optional[str] = None
 
 
 class JiraMCPClient:
@@ -149,42 +151,190 @@ class JiraMCPClient:
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def create_ticket(self, ticket: JiraTicket) -> Dict[str, Any]:
-        """Create a new Jira ticket via MCP."""
+        """Create a new Jira ticket.
+
+        Uses direct Jira API if credentials are available (supports status and parent fields),
+        otherwise falls back to MCP (limited field support).
+        """
         try:
-            # MCP request format
-            mcp_request = {
-                "method": "jira/createIssue",
-                "params": {
-                    "project": ticket.project_key,
-                    "summary": ticket.summary,
-                    "description": ticket.description,
-                    "issueType": ticket.issue_type,
-                    "priority": ticket.priority,
-                    "assignee": ticket.assignee,
-                    "dueDate": ticket.due_date,
-                    "labels": ticket.labels or [],
-                    "components": ticket.components or [],
-                },
-            }
+            # Use direct Jira API if credentials available
+            if self.jira_url and self.username and self.api_token:
+                import base64
 
-            response = await self.client.post(
-                f"{self.mcp_server_url}/mcp",
-                json=mcp_request,
-                headers={"Content-Type": "application/json"},
-            )
-            response.raise_for_status()
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
 
-            result = response.json()
-            if result.get("success"):
-                logger.info(f"Created Jira ticket: {result.get('key')}")
-                return result
+                # Build issue creation payload
+                payload = {
+                    "fields": {
+                        "project": {"key": ticket.project_key},
+                        "summary": ticket.summary,
+                        "description": convert_jira_wiki_to_adf(
+                            ticket.description or ""
+                        ),
+                        "issuetype": {"name": ticket.issue_type},
+                    }
+                }
+
+                # Add optional fields
+                if ticket.priority:
+                    payload["fields"]["priority"] = {"name": ticket.priority}
+
+                if ticket.assignee:
+                    # Try to find user by email or accountId
+                    payload["fields"]["assignee"] = {"emailAddress": ticket.assignee}
+
+                if ticket.due_date:
+                    payload["fields"]["duedate"] = ticket.due_date
+
+                if ticket.labels:
+                    payload["fields"]["labels"] = ticket.labels
+
+                if ticket.story_points:
+                    payload["fields"][
+                        "customfield_10016"
+                    ] = ticket.story_points  # Story points field
+
+                # Add parent epic if provided
+                if ticket.parent_epic_key:
+                    payload["fields"]["parent"] = {"key": ticket.parent_epic_key}
+
+                # Create the issue
+                response = await self.client.post(
+                    f"{self.jira_url}/rest/api/3/issue",
+                    json=payload,
+                    headers={
+                        "Authorization": f"Basic {auth_string}",
+                        "Accept": "application/json",
+                        "Content-Type": "application/json",
+                    },
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                issue_key = result.get("key")
+                issue_id = result.get("id")
+
+                # If status is provided, transition the issue to that status
+                if ticket.status:
+                    try:
+                        await self._transition_issue_to_status(issue_key, ticket.status)
+                    except Exception as status_error:
+                        logger.warning(
+                            f"Failed to set status to '{ticket.status}': {status_error}"
+                        )
+
+                logger.info(f"Created Jira ticket: {issue_key} (ID: {issue_id})")
+
+                return {
+                    "success": True,
+                    "key": issue_key,
+                    "id": issue_id,
+                    "self": result.get("self"),
+                }
+
+            # Fallback to MCP (doesn't support status or parent fields)
             else:
-                logger.error(f"Failed to create ticket: {result.get('error')}")
-                return {"success": False, "error": result.get("error")}
+                mcp_request = {
+                    "method": "jira/createIssue",
+                    "params": {
+                        "project": ticket.project_key,
+                        "summary": ticket.summary,
+                        "description": ticket.description,
+                        "issueType": ticket.issue_type,
+                        "priority": ticket.priority,
+                        "assignee": ticket.assignee,
+                        "dueDate": ticket.due_date,
+                        "labels": ticket.labels or [],
+                        "components": ticket.components or [],
+                    },
+                }
+
+                response = await self.client.post(
+                    f"{self.mcp_server_url}/mcp",
+                    json=mcp_request,
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+
+                result = response.json()
+                if result.get("success"):
+                    logger.info(f"Created Jira ticket: {result.get('key')}")
+                    return result
+                else:
+                    logger.error(f"Failed to create ticket: {result.get('error')}")
+                    return {"success": False, "error": result.get("error")}
 
         except Exception as e:
             logger.error(f"Error creating Jira ticket: {e}")
+            import traceback
+
+            traceback.print_exc()
             return {"success": False, "error": str(e)}
+
+    async def _transition_issue_to_status(
+        self, issue_key: str, status_name: str
+    ) -> None:
+        """Transition an issue to a specific status.
+
+        Args:
+            issue_key: The issue key (e.g., "SUBS-123")
+            status_name: The target status name (e.g., "In Progress")
+
+        Raises:
+            Exception if transition fails
+        """
+        if not self.jira_url or not self.username or not self.api_token:
+            raise Exception("Jira credentials not configured")
+
+        import base64
+
+        auth_string = base64.b64encode(
+            f"{self.username}:{self.api_token}".encode()
+        ).decode()
+
+        # Get available transitions for the issue
+        response = await self.client.get(
+            f"{self.jira_url}/rest/api/3/issue/{issue_key}/transitions",
+            headers={
+                "Authorization": f"Basic {auth_string}",
+                "Accept": "application/json",
+            },
+        )
+        response.raise_for_status()
+        transitions_data = response.json()
+
+        # Find transition ID for the target status
+        transition_id = None
+        for transition in transitions_data.get("transitions", []):
+            if transition.get("to", {}).get("name", "").lower() == status_name.lower():
+                transition_id = transition.get("id")
+                break
+
+        if not transition_id:
+            available_statuses = [
+                t.get("to", {}).get("name")
+                for t in transitions_data.get("transitions", [])
+            ]
+            raise Exception(
+                f"Cannot transition to status '{status_name}'. "
+                f"Available transitions: {', '.join(available_statuses)}"
+            )
+
+        # Perform the transition
+        response = await self.client.post(
+            f"{self.jira_url}/rest/api/3/issue/{issue_key}/transitions",
+            json={"transition": {"id": transition_id}},
+            headers={
+                "Authorization": f"Basic {auth_string}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+        )
+        response.raise_for_status()
+
+        logger.info(f"Transitioned {issue_key} to status '{status_name}'")
 
     async def create_epic(
         self,
@@ -975,6 +1125,99 @@ class JiraMCPClient:
 
         except Exception as e:
             logger.error(f"Error fetching priorities: {e}")
+            return []
+
+    async def get_statuses(
+        self, project_key: Optional[str] = None, issue_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Get available statuses for a project, optionally filtered by issue type.
+
+        Args:
+            project_key: Optional project key to get statuses for. If not provided,
+                        returns all global statuses.
+            issue_type: Optional issue type name to filter statuses for specific workflow.
+
+        Returns:
+            List of status dictionaries with id, name, and statusCategory
+        """
+        try:
+            # Use direct Jira API call
+            if self.jira_url and self.username and self.api_token:
+                import base64
+
+                auth_string = base64.b64encode(
+                    f"{self.username}:{self.api_token}".encode()
+                ).decode()
+
+                # If project key provided, get project-specific statuses
+                if project_key:
+                    endpoint = (
+                        f"{self.jira_url}/rest/api/3/project/{project_key}/statuses"
+                    )
+                else:
+                    # Get all global statuses
+                    endpoint = f"{self.jira_url}/rest/api/3/status"
+
+                response = await self.client.get(
+                    endpoint,
+                    headers={
+                        "Authorization": f"Basic {auth_string}",
+                        "Accept": "application/json",
+                    },
+                )
+                response.raise_for_status()
+
+                statuses_data = response.json()
+
+                # Format the response
+                statuses = []
+                if project_key:
+                    # Project statuses endpoint returns array of issue type objects
+                    # Each contains a 'statuses' array
+                    for issue_type_obj in statuses_data:
+                        # If issue_type is specified, only include statuses for that type
+                        if issue_type and issue_type_obj.get("name") != issue_type:
+                            continue
+
+                        for status in issue_type_obj.get("statuses", []):
+                            # Avoid duplicates
+                            if not any(
+                                s.get("id") == status.get("id") for s in statuses
+                            ):
+                                statuses.append(
+                                    {
+                                        "id": status.get("id"),
+                                        "name": status.get("name"),
+                                        "statusCategory": status.get(
+                                            "statusCategory", {}
+                                        ).get("name"),
+                                    }
+                                )
+                else:
+                    # Global statuses endpoint returns array of status objects
+                    statuses = [
+                        {
+                            "id": status.get("id"),
+                            "name": status.get("name"),
+                            "statusCategory": status.get("statusCategory", {}).get(
+                                "name"
+                            ),
+                        }
+                        for status in statuses_data
+                    ]
+
+                logger.info(
+                    f"Retrieved {len(statuses)} statuses via direct API"
+                    + (f" for issue type '{issue_type}'" if issue_type else "")
+                )
+                return statuses
+
+            else:
+                logger.warning("Jira credentials not available for get_statuses")
+                return []
+
+        except Exception as e:
+            logger.error(f"Error fetching statuses: {e}")
             return []
 
     async def get_project_metadata(self, project_key: str) -> Dict[str, Any]:
