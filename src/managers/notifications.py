@@ -513,12 +513,14 @@ class NotificationManager:
                         h1 {{ color: #554DFF; }}
                         h2 {{ color: #666; border-bottom: 2px solid #554DFF; padding-bottom: 5px; }}
                         h3 {{ color: #777; margin-top: 15px; margin-bottom: 10px; font-size: 1.1em; }}
-                        .section {{ margin: 20px 0; }}
-                        .topic-section {{ margin: 15px 0; padding: 15px; background-color: #f8f9fa; border-left: 4px solid #00FFCE; }}
-                        .action-item {{ background-color: #f8f9fa; padding: 10px; margin: 10px 0; border-left: 4px solid #554DFF; }}
+                        .section {{ margin: 16px 0; }}
+                        .topic-section {{ margin: 12px 0; padding: 20px; border-radius: 8px; border-left: 4px solid #00FFCE; }}
+                        .topic-section-purple {{ background-color: rgba(139, 92, 246, 0.03); }}
+                        .topic-section-mint {{ background-color: rgba(0, 255, 206, 0.03); }}
+                        .action-item {{ background-color: #f8f9fa; padding: 15px; margin: 8px 0; border-radius: 8px; border-left: 4px solid #554DFF; }}
                         .action-title {{ font-weight: bold; color: #554DFF; }}
                         ul {{ list-style-type: none; padding-left: 0; }}
-                        li {{ padding: 5px 0; padding-left: 20px; }}
+                        li {{ padding: 3px 0; padding-left: 20px; }}
                         li:before {{ content: "▸ "; color: #554DFF; font-weight: bold; margin-left: -20px; }}
                         .sub-item {{ padding-left: 40px; }}
                         .sub-item:before {{ content: "• "; color: #00FFCE; font-weight: bold; margin-left: -20px; }}
@@ -540,12 +542,19 @@ class NotificationManager:
 
             # Add topics sections
             if topics:
-                for topic in topics:
+                for topic_index, topic in enumerate(topics):
                     topic_title = topic.get("title", "Untitled Topic")
                     content_items = topic.get("content_items", [])
 
+                    # Alternate between subtle purple and mint backgrounds
+                    bg_class = (
+                        "topic-section-purple"
+                        if topic_index % 2 == 0
+                        else "topic-section-mint"
+                    )
+
                     html_body += f"""
-                        <div class="topic-section">
+                        <div class="topic-section {bg_class}">
                             <h3>{topic_title}</h3>
                             <ul>
                     """
