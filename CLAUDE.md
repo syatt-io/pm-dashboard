@@ -1,5 +1,17 @@
 # Autonomous PM Agent - Project Documentation
 
+## 🔗 Quick Reference - Production Database
+```
+Host: app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am-do-u.e.db.ondigitalocean.com
+User: doadmin
+Database: agentpm-db (NOT defaultdb!)
+Port: 25060
+Cluster ID: 20a13178-0acf-4a40-87fa-745341377265
+```
+⚠️ **Note**: DO admin shows `defaultdb` - this is WRONG! Use `agentpm-db`. See [Database Connection](#🗄️-production-database-connection) section below for details.
+
+---
+
 ## ⚠️ CRITICAL PRODUCTION WARNING ⚠️
 
 **NEVER override production environment variables with placeholder values (YOUR_API_KEY, etc.) without explicit permission!**
@@ -36,19 +48,35 @@ doctl apps create-deployment a2255a3b-23cc-4fd0-baa8-91d622bb912a
 
 ## 🗄️ Production Database Connection
 
-**IMPORTANT**: The production database has TWO databases on the same cluster - make sure you use the correct one!
+**⚠️ CRITICAL**: DigitalOcean admin shows the WRONG connection string! Use the values below instead.
 
-**Correct Database for agent-pm:**
+### ✅ CORRECT Connection String (Use This!)
+```
+postgresql://doadmin:PASSWORD@app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am-do-u.e.db.ondigitalocean.com:25060/agentpm-db?sslmode=require
+```
+
+**Breakdown:**
 - **Host**: `app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am-do-u.e.db.ondigitalocean.com`
-- **Database**: `agentpm-db` ⚠️ NOT `defaultdb` (that's a different app!)
-- **Username**: `doadmin` ⚠️ CRITICAL - For restored backups, always use `doadmin` not `agentpm-db`!
-- **Port**: 25060
-- **Password**: Stored in DigitalOcean App Platform environment variables as `DATABASE_URL`
+- **Username**: `doadmin`
+- **Database**: `agentpm-db` ⚠️ **NOT** `defaultdb`!
+- **Port**: `25060`
+- **Password**: Get from DigitalOcean App Platform env vars or: `doctl databases connection 20a13178-0acf-4a40-87fa-745341377265`
 
-**Connection String Format:**
+### ❌ What DigitalOcean Admin Shows (WRONG!)
 ```
-postgresql://doadmin:PASSWORD@HOST:25060/agentpm-db?sslmode=require
+postgresql://doadmin:PASSWORD@...same-host.../defaultdb?sslmode=require
+                                                        ^^^^^^^^^ WRONG DATABASE!
 ```
+
+**Why the discrepancy?**
+- DO admin shows `defaultdb` (the default database created with the cluster)
+- But our app data is in `agentpm-db` (created after cluster setup)
+- The backup cluster has BOTH databases, but only `agentpm-db` has our tables
+
+**Database Cluster Info:**
+- **Cluster ID**: `20a13178-0acf-4a40-87fa-745341377265`
+- **Cluster Name**: `app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am`
+- **Type**: Restored from 1am backup on Nov 20, 2025
 
 **Common Mistakes to Avoid:**
 - ❌ Using `defaultdb` - This is a completely different application with tables like `sites`, `accounts`, `performance_metrics`
