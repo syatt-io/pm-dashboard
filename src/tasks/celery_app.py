@@ -226,6 +226,12 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.notification_tasks.sync_tempo_hours",
         "schedule": crontab(hour=8, minute=0),
     },
+    # Meeting analysis sync at 7 AM UTC (3 AM EST)
+    # Analyzes meetings from active projects and sends notifications
+    "meeting-analysis-sync": {
+        "task": "src.tasks.notification_tasks.analyze_meetings",
+        "schedule": crontab(hour=7, minute=0),
+    },
     # ========== Proactive Agent Tasks (Migrated from Python Scheduler) ==========
     # Meeting prep digests - 9 AM EST (13:00 UTC)
     # Sends project digests to users watching projects with meetings today
