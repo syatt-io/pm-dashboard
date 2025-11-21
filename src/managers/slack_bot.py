@@ -746,6 +746,9 @@ class SlackTodoBot:
             """Handle /my-jira-tickets slash command."""
             ack()
 
+            # Show immediate feedback to user
+            respond("🎯 Fetching your Jira tickets...\n_This may take a moment_")
+
             try:
                 slack_user_id = command.get("user_id")
 
