@@ -111,7 +111,7 @@ class JiraUserTicketsService:
                 JiraTicket.from_jira_issue(issue, self.jira_url) for issue in issues
             ]
 
-            # Sort by priority (HIGH -> MEDIUM -> LOW) then by creation date (newest first)
+            # Sort by creation date (newest first)
             tickets = self._sort_tickets(tickets)
 
             # Limit to top 20 after sorting
@@ -138,29 +138,21 @@ class JiraUserTicketsService:
 
     def _sort_tickets(self, tickets: List[JiraTicket]) -> List[JiraTicket]:
         """
-        Sort tickets by priority (HIGH -> MEDIUM -> LOW) then by creation date (newest first).
+        Sort tickets by creation date (newest first).
+
+        Note: Sorting purely by date to show most recent activity.
+        Old high-priority tickets from inactive projects are less useful.
 
         Args:
             tickets: List of JiraTicket objects
 
         Returns:
-            Sorted list of tickets
+            Sorted list of tickets (newest first)
         """
-        priority_order = {
-            "Highest": 0,
-            "High": 1,
-            "Medium": 2,
-            "Low": 3,
-            "Lowest": 4,
-        }
-
-        # Sort by priority (ascending order value) then by created (descending)
+        # Sort by creation date only (newest first)
         return sorted(
             tickets,
-            key=lambda t: (
-                priority_order.get(t.priority, 5),  # Unknown priorities go last
-                -t.created.timestamp(),  # Negative for descending (newest first)
-            ),
+            key=lambda t: -t.created.timestamp(),  # Negative for descending
         )
 
     def format_tickets_for_slack(self, tickets: List[JiraTicket]) -> str:
