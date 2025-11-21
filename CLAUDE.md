@@ -110,6 +110,80 @@ psql -h <HOST> -U doadmin -d agentpm-db -p 25060 -c "SELECT COUNT(*) as total, C
 - ✅ If migrations fail with "permission denied" or ownership errors
 - ✅ Before any deployment that includes Alembic migrations
 
+### 🔗 DATABASE_URL: Direct Connection vs Component Reference
+
+**⚠️ CRITICAL (Discovered Nov 21, 2025)**: Database component references (`${agentpm-db.DATABASE_URL}`) may NOT resolve to the correct cluster after a database restore!
+
+**The Problem:**
+When you restore a database from backup, updating the app spec's database component `cluster_name` field doesn't actually change which cluster the app connects to. The database component maintains an internal binding to the original cluster ID, even though the spec shows the new cluster name.
+
+**Symptoms:**
+- App logs show `column X does not exist` errors for columns that DO exist in the backup database
+- `doctl apps spec get` shows correct `cluster_name` in database component
+- But app still connects to old cluster without the columns
+- Force rebuilds don't fix the issue
+
+**The Fix:**
+Replace database component references with direct DATABASE_URL values in all service/worker/job environment variables.
+
+```bash
+# 1. Get the correct DATABASE_URL from backup cluster
+doctl databases connection 20a13178-0acf-4a40-87fa-745341377265 --format URI
+# Returns: postgresql://doadmin:PASSWORD@HOST:25060/defaultdb?sslmode=require
+
+# 2. Update to use agentpm-db database (NOT defaultdb!)
+# Correct URL format:
+postgresql://doadmin:PASSWORD@app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am-do-user-18735596-0.h.db.ondigitalocean.com:25060/agentpm-db?sslmode=require
+
+# 3. Update app spec to use direct URL instead of component reference
+# BEFORE (doesn't work after restore):
+envs:
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: ${agentpm-db.DATABASE_URL}
+
+# AFTER (works reliably):
+envs:
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+    value: postgresql://doadmin:PASSWORD@HOST:25060/agentpm-db?sslmode=require
+
+# 4. Apply updated spec
+doctl apps update a2255a3b-23cc-4fd0-baa8-91d622bb912a --spec app-spec.json
+doctl apps create-deployment a2255a3b-23cc-4fd0-baa8-91d622bb912a
+```
+
+**When to Use Direct DATABASE_URL:**
+- ✅ Always after restoring from backup
+- ✅ If app connects to wrong cluster despite correct component configuration
+- ✅ When you need guaranteed control over which cluster the app uses
+- ✅ For production deployments where database location must be explicit
+
+**Script to Update All Components:**
+```python
+import json
+
+# Read current app spec
+with open('app-spec.json', 'r') as f:
+    spec = json.load(f)
+
+# Direct DATABASE_URL for backup-1am cluster
+direct_url = "postgresql://doadmin:PASSWORD@app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am-do-user-18735596-0.h.db.ondigitalocean.com:25060/agentpm-db?sslmode=require"
+
+# Update all services, workers, and jobs
+for component_list in [spec.get('services', []), spec.get('workers', []), spec.get('jobs', [])]:
+    for component in component_list:
+        for env in component.get('envs', []):
+            if env.get('key') == 'DATABASE_URL':
+                env['value'] = direct_url
+                env['type'] = 'SECRET'
+
+# Save updated spec
+with open('app-spec-updated.json', 'w') as f:
+    json.dump(spec, f, indent=2)
+```
+
 ---
 
 ## 🛡️ CSRF Protection

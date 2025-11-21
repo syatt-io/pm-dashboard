@@ -574,12 +574,13 @@ class JiraMCPClient:
                 # Build params for /search/jql endpoint
                 # NOTE: POST /search endpoints return 410 Gone, must use GET /search/jql
                 # CRITICAL BUG FIX: /search/jql ignores startAt parameter and always returns first page!
-                # WORKAROUND: Always fetch from startAt=0 and use maxResults=1000 (Jira max)
+                # WORKAROUND: Always fetch from startAt=0 and use maxResults parameter
                 # Then skip already-returned results on subsequent calls
-                # For now, just increase maxResults to get all results in one call
+                # Respect max_results parameter (default 50, max 1000)
+                actual_max_results = min(max_results, 1000)  # Jira's max allowed value
                 params = {
                     "jql": jql,
-                    "maxResults": 1000,  # Jira's max allowed value
+                    "maxResults": actual_max_results,
                     "startAt": 0,  # Always 0 since pagination doesn't work
                 }
 

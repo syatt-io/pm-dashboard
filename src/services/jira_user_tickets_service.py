@@ -92,14 +92,15 @@ class JiraUserTicketsService:
         logger.info(f"Fetching tickets from Jira for user {jira_account_id}")
 
         try:
-            # JQL query: assignee = currentUser() AND resolution = Unresolved
-            # But we need to use accountId filter since we're querying on behalf of service account
-            jql = f'assignee = "{jira_account_id}" ORDER BY priority DESC, created DESC'
+            # JQL query: fetch all tickets for user (no ORDER BY since we sort in Python)
+            # Note: We fetch ALL tickets (up to 1000) then sort/limit in Python to ensure correct ordering
+            jql = f'assignee = "{jira_account_id}"'
 
-            # Fetch tickets (limit to 20 as per requirement)
+            # Fetch ALL tickets (up to Jira's max of 1000)
+            # We need all tickets to properly sort before limiting to top 20
             result = await self.jira_client.search_issues(
                 jql=jql,
-                max_results=20,
+                max_results=1000,  # Get all tickets (Jira max)
                 expand_comments=False,
             )
 
@@ -113,11 +114,14 @@ class JiraUserTicketsService:
             # Sort by priority (HIGH -> MEDIUM -> LOW) then by creation date (newest first)
             tickets = self._sort_tickets(tickets)
 
+            # Limit to top 20 after sorting
+            tickets = tickets[:20]
+
             # Update cache
             self._cache[jira_account_id] = (tickets, datetime.now())
 
             logger.info(
-                f"Fetched {len(tickets)} tickets for user {jira_account_id} from Jira"
+                f"Fetched {len(issues)} total tickets, returning top {len(tickets)} for user {jira_account_id}"
             )
             return tickets
 
