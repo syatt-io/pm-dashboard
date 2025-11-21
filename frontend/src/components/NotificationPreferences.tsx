@@ -127,7 +127,17 @@ export const NotificationPreferences: React.FC<NotificationPreferencesProps> = (
       return pmNotifications.includes(notificationType);
     }
 
-    // Members should not use this component (they see basic toggles in MyProfile)
+    if (userRole === 'MEMBER') {
+      // Members see only: TODO Reminders, Meeting Analysis, and Meeting Prep
+      const memberNotifications = [
+        'todo_reminders',
+        'meeting_analysis',
+        'meeting_prep'
+      ];
+      return memberNotifications.includes(notificationType);
+    }
+
+    // Default: no access
     return false;
   };
 
