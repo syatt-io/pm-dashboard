@@ -19,6 +19,7 @@ from src.managers.todo_manager import TodoManager
 from src.managers.learning_manager import LearningManager
 from src.managers.notifications import NotificationContent
 from src.utils.db_session import get_db_session_manager
+from src.services.jira_user_tickets_service import JiraUserTicketsService
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class SlackTodoBot:
         self.client = WebClient(token=bot_token)
         self.todo_manager = TodoManager()
         self.learning_manager = LearningManager()
+        self.jira_tickets_service = JiraUserTicketsService()
         self.handler = SlackRequestHandler(self.app)
 
         # Initialize database session manager for interactive buttons
@@ -738,6 +740,64 @@ class SlackTodoBot:
             except Exception as e:
                 logger.error(f"Error expanding search: {e}")
                 say(f"❌ Error: {str(e)}")
+
+        @self.app.command("/my-jira-tickets")
+        def handle_my_jira_tickets_command(ack, respond, command):
+            """Handle /my-jira-tickets slash command."""
+            ack()
+
+            try:
+                slack_user_id = command.get("user_id")
+
+                # Get user from database by Slack user ID
+                from src.models.user import User
+                from src.utils.database import session_scope
+
+                with session_scope() as session:
+                    user = (
+                        session.query(User)
+                        .filter(User.slack_user_id == slack_user_id)
+                        .first()
+                    )
+
+                    if not user:
+                        respond(
+                            "❌ Your Slack account is not linked to a Jira account.\n\n"
+                            "Please contact your admin to set up the mapping in the PM Agent settings."
+                        )
+                        return
+
+                    if not user.jira_account_id:
+                        respond(
+                            f"❌ Hi {user.name}! Your account exists but doesn't have a Jira account ID mapped.\n\n"
+                            "Please contact your admin to add your Jira account ID in the PM Agent settings."
+                        )
+                        return
+
+                    # Fetch tickets asynchronously
+                    logger.info(
+                        f"Fetching Jira tickets for user {user.name} (Jira ID: {user.jira_account_id})"
+                    )
+
+                    # Run async function in sync context
+                    tickets = asyncio.run(
+                        self.jira_tickets_service.get_user_tickets(user.jira_account_id)
+                    )
+
+                    # Format and send response
+                    message = self.jira_tickets_service.format_tickets_for_slack(
+                        tickets
+                    )
+                    respond(message)
+
+            except Exception as e:
+                logger.error(
+                    f"Error handling /my-jira-tickets command: {e}", exc_info=True
+                )
+                respond(
+                    f"❌ Error fetching your Jira tickets: {str(e)}\n\n"
+                    "Please try again or contact your admin if the problem persists."
+                )
 
     def _register_listeners(self):
         """Register message listeners."""
