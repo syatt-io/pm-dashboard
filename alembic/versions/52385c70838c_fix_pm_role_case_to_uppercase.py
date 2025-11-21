@@ -24,13 +24,22 @@ def upgrade() -> None:
     # Fix PM role to uppercase to match existing enum pattern
     # PostgreSQL doesn't support renaming enum values, so we need to:
     # 1. Create a new enum type with correct values
-    # 2. Alter the column to use the new type
-    # 3. Drop the old type
+    # 2. Drop the default constraint (can't auto-cast during type change)
+    # 3. Alter the column to use the new type
+    # 4. Re-add the default constraint
+    # 5. Drop the old type
 
     # Create new enum type with correct values
     op.execute(
         """
         CREATE TYPE userrole_new AS ENUM ('NO_ACCESS', 'MEMBER', 'PM', 'ADMIN');
+    """
+    )
+
+    # Drop the default constraint temporarily (can't auto-cast)
+    op.execute(
+        """
+        ALTER TABLE users ALTER COLUMN role DROP DEFAULT;
     """
     )
 
@@ -45,6 +54,13 @@ def upgrade() -> None:
                 ELSE role::text::userrole_new
             END
         );
+    """
+    )
+
+    # Re-add the default constraint with the new type
+    op.execute(
+        """
+        ALTER TABLE users ALTER COLUMN role SET DEFAULT 'MEMBER'::userrole_new;
     """
     )
 
