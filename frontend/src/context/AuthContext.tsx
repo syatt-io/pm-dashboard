@@ -5,7 +5,7 @@ interface User {
   id: number;
   email: string;
   name: string;
-  role: 'ADMIN' | 'PM' | 'MEMBER' | 'NO_ACCESS';
+  role: 'admin' | 'pm' | 'member' | 'no_access';
   created_at: string;
   last_login: string;
   is_active: boolean;
@@ -159,8 +159,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const isAdmin = user?.role === 'ADMIN';
-  const canAccess = user?.role !== 'NO_ACCESS' && user?.is_active === true;
+  const isAdmin = user?.role === 'admin';
+  const canAccess = user?.role !== 'no_access' && user?.is_active === true;
 
   return (
     <AuthContext.Provider value={{

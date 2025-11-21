@@ -294,7 +294,7 @@ export const Settings = () => {
 
   // Load AI settings and models if user is admin
   useEffect(() => {
-    if (settings?.user?.role === 'ADMIN') {
+    if (settings?.user?.role === 'admin') {
       loadAISettings();
       loadAvailableModels();
     }
@@ -1593,7 +1593,7 @@ export const Settings = () => {
                     label="Show Dismissed"
                   />
                 </Grid>
-                {settings.user.role === 'ADMIN' && (
+                {settings.user.role === 'admin' && (
                   <Grid item xs={12} sm={6} md={3}>
                     <FormControlLabel
                       control={
