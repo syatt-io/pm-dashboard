@@ -65,6 +65,23 @@ DigitalOcean managed databases only expose the `doadmin` user's password. When y
 psql -h <HOST> -U doadmin -d agentpm-db -p 25060 -c "\dt"
 ```
 
+**Database Ownership After Restore:**
+After restoring a backup, ALL database objects (tables, sequences, types) will be owned by `agentpm-db` user. This causes migration failures because `doadmin` (the user the app connects as) can't ALTER enum types that have dependent tables owned by another user.
+
+**Fix ownership issues with:**
+```bash
+# Transfer all object ownership to doadmin
+psql -h <HOST> -U doadmin -d agentpm-db -p 25060 -c 'REASSIGN OWNED BY "agentpm-db" TO doadmin;'
+
+# Verify all tables are owned by doadmin
+psql -h <HOST> -U doadmin -d agentpm-db -p 25060 -c "SELECT COUNT(*) as total, COUNT(CASE WHEN tableowner = 'doadmin' THEN 1 END) as doadmin_owned FROM pg_tables WHERE schemaname = 'public';"
+```
+
+**When to run this:**
+- ✅ Immediately after restoring from backup
+- ✅ If migrations fail with "permission denied" or ownership errors
+- ✅ Before any deployment that includes Alembic migrations
+
 ---
 
 ## 🛡️ CSRF Protection
