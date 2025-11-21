@@ -90,16 +90,16 @@ interface ForecastResult {
 
 const ProjectForecastTab: React.FC = () => {
   // Form state
-  const [totalHours, setTotalHours] = useState<number>(1500);
-  const [estimatedMonths, setEstimatedMonths] = useState<number>(8);
+  const [totalHours, setTotalHours] = useState<number>(750);
+  const [estimatedMonths, setEstimatedMonths] = useState<number>(5);
   const [startDate, setStartDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
 
   // Project characteristics (1-5 sliders)
   const [beIntegrations, setBeIntegrations] = useState<number>(1);
-  const [customTheme, setCustomTheme] = useState<number>(1);
-  const [customDesigns, setCustomDesigns] = useState<number>(1);
+  const [customTheme, setCustomTheme] = useState<number>(3);
+  const [customDesigns, setCustomDesigns] = useState<number>(3);
   const [uxResearch, setUxResearch] = useState<number>(1);
   const [extensiveCustomizations, setExtensiveCustomizations] = useState<number>(1);
   const [projectOversight, setProjectOversight] = useState<number>(3); // Default to 3 (typical)
@@ -109,6 +109,8 @@ const ProjectForecastTab: React.FC = () => {
   const [teamsSelected, setTeamsSelected] = useState<string[]>([
     'BE Devs',
     'FE Devs',
+    'Design',
+    'UX',
     'PMs',
   ]);
 

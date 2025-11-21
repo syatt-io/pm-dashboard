@@ -27,17 +27,10 @@ import {
   Assessment as AnalyticsIcon,
   TrendingUp as ForecastIcon,
   Warning as WarningIcon,
-  Lock as LockIcon,
-  CalendarMonth as ScheduleIcon,
-  Download as DownloadIcon,
-  Group as TeamIcon,
-  Refresh as RefreshIcon,
-  Upload as UploadIcon,
 } from '@mui/icons-material';
 import { usePermissions } from 'react-admin';
 import axios from 'axios';
 import ProjectForecastTab from './ProjectForecastTab';
-import HistoricalDataImportTab from './HistoricalDataImportTab';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
 
 interface EpicBaseline {
@@ -145,18 +138,14 @@ export const AnalyticsList = () => {
   const [error, setError] = useState<string | null>(null);
   const [sortField, setSortField] = useState<'epic_category' | 'median_hours' | 'project_count'>('epic_category');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [rebuildLoading, setRebuildLoading] = useState(false);
-  const [rebuildResult, setRebuildResult] = useState<any>(null);
 
   useEffect(() => {
-    // Only fetch data if user is admin
-    if (!permissionsLoading && permissions === 'admin') {
+    // Fetch data for all logged-in users
+    if (!permissionsLoading) {
       fetchBaselines();
       fetchHighRiskEpics();
-    } else if (!permissionsLoading) {
-      setLoading(false);
     }
-  }, [permissions, permissionsLoading]);
+  }, [permissionsLoading]);
 
   const fetchBaselines = async () => {
     try {
@@ -178,32 +167,6 @@ export const AnalyticsList = () => {
     }
   };
 
-  const handleRebuildModels = async () => {
-    if (!window.confirm('This will rebuild all forecasting models and may take several minutes. Continue?')) {
-      return;
-    }
-
-    setRebuildLoading(true);
-    setRebuildResult(null);
-    setError(null);
-
-    try {
-      const response = await axios.post('/api/analytics/rebuild-models');
-      setRebuildResult(response.data);
-
-      if (response.data.success) {
-        // Refresh baselines after successful rebuild
-        await fetchBaselines();
-        await fetchHighRiskEpics();
-      }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to rebuild models';
-      setError(errorMessage);
-      setRebuildResult(err.response?.data);
-    } finally {
-      setRebuildLoading(false);
-    }
-  };
 
   const handleForecast = async () => {
     if (!epicInput.trim()) {
@@ -257,40 +220,7 @@ export const AnalyticsList = () => {
     }
   });
 
-  // Show loading while checking permissions
-  if (permissionsLoading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  // Show access denied for non-admins
-  if (permissions !== 'admin') {
-    return (
-      <Box p={3}>
-        <Card>
-          <CardContent>
-            <Box display="flex" flexDirection="column" alignItems="center" gap={2} py={4}>
-              <LockIcon sx={{ fontSize: 64, color: 'text.secondary' }} />
-              <Typography variant="h5" color="text.primary">
-                Access Denied
-              </Typography>
-              <Typography variant="body1" color="text.secondary" textAlign="center">
-                The Analytics & Forecasting feature is currently restricted to administrators only.
-              </Typography>
-              <Typography variant="body2" color="text.secondary" textAlign="center">
-                Please contact your administrator if you need access to this feature.
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
-      </Box>
-    );
-  }
-
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
@@ -300,58 +230,20 @@ export const AnalyticsList = () => {
 
   return (
     <Box p={3}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Box>
-          <Typography variant="h4" gutterBottom>
-            Analytics & Forecasting
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Historical baseline estimates and project forecasting tools
-          </Typography>
-        </Box>
-        <MuiButton
-          variant="outlined"
-          color="primary"
-          startIcon={rebuildLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
-          onClick={handleRebuildModels}
-          disabled={rebuildLoading}
-        >
-          {rebuildLoading ? 'Rebuilding...' : 'Rebuild Models'}
-        </MuiButton>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h4" gutterBottom>
+          Analytics & Forecasting
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Historical baseline estimates and project forecasting tools
+        </Typography>
       </Box>
-
-      {rebuildResult && (
-        <Alert
-          severity={rebuildResult.success ? 'success' : 'error'}
-          onClose={() => setRebuildResult(null)}
-          sx={{ mb: 2 }}
-        >
-          <Typography variant="body2" fontWeight="bold">
-            {rebuildResult.message}
-          </Typography>
-          {rebuildResult.total_duration_seconds && (
-            <Typography variant="caption" display="block">
-              Completed in {rebuildResult.total_duration_seconds}s
-            </Typography>
-          )}
-          {rebuildResult.results && (
-            <Box sx={{ mt: 1 }}>
-              {Object.entries(rebuildResult.results).map(([script, result]: [string, any]) => (
-                <Typography key={script} variant="caption" display="block">
-                  {script}: {result.success ? '✓' : '✗'} {result.error && `(${result.error})`}
-                </Typography>
-              ))}
-            </Box>
-          )}
-        </Alert>
-      )}
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 3, mb: 3 }}>
         <Tabs value={tabValue} onChange={handleTabChange}>
           <Tab icon={<ForecastIcon />} label="Project Forecast" />
           <Tab icon={<AnalyticsIcon />} label="Epic Baselines" />
           <Tab icon={<WarningIcon />} label="High-Risk Epics" />
-          <Tab icon={<UploadIcon />} label="Import Historical Data" />
         </Tabs>
       </Box>
 
@@ -486,9 +378,6 @@ export const AnalyticsList = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Tab 3: Import Historical Data */}
-      {tabValue === 3 && <HistoricalDataImportTab />}
     </Box>
   );
 };

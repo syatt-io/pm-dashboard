@@ -254,9 +254,10 @@ const UserList = () => {
                             disabled={user.email === 'mike.samimi@syatt.io'}
                             sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}
                           >
-                            <MenuItem value="no_access">No Access</MenuItem>
-                            <MenuItem value="member">Member</MenuItem>
-                            <MenuItem value="admin">Admin</MenuItem>
+                            <MenuItem value="NO_ACCESS">No Access</MenuItem>
+                            <MenuItem value="MEMBER">Member</MenuItem>
+                            <MenuItem value="PM">PM</MenuItem>
+                            <MenuItem value="ADMIN">Admin</MenuItem>
                           </Select>
                         </TableCell>
                         <TableCell sx={{ p: { xs: 1, sm: 1.5 } }}>
@@ -446,9 +447,10 @@ const UserList = () => {
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                 fullWidth
               >
-                <MenuItem value="no_access">No Access</MenuItem>
-                <MenuItem value="member">Member</MenuItem>
-                <MenuItem value="admin">Admin</MenuItem>
+                <MenuItem value="NO_ACCESS">No Access</MenuItem>
+                <MenuItem value="MEMBER">Member</MenuItem>
+                <MenuItem value="PM">PM</MenuItem>
+                <MenuItem value="ADMIN">Admin</MenuItem>
               </Select>
               <Select
                 label="Discipline"

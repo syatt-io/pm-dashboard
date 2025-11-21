@@ -60,7 +60,7 @@ const menuItems: MenuItem[] = [
   { title: "My TODOs", url: "/todos", icon: CheckSquare },
   { title: "My Feedback", url: "/feedback", icon: MessageSquare },
   { title: "Team Learnings", url: "/learnings", icon: Lightbulb },
-  { title: "Forecasting", url: "/forecasting", icon: TrendingUp, adminOnly: true },
+  { title: "Forecasting", url: "/forecasting", icon: TrendingUp },
   {
     title: "Settings",
     url: "/settings",
@@ -73,6 +73,7 @@ const menuItems: MenuItem[] = [
       { title: "User Management", url: "/settings", tabParam: "3", adminOnly: true },  // Tab index 3 (was 5)
       { title: "Epic Categories", url: "/settings", tabParam: "4", adminOnly: true },  // Tab index 4 (was 6)
       { title: "Jira Templates", url: "/settings", tabParam: "5", adminOnly: true },  // Tab index 5 (was 7)
+      { title: "Data Management", url: "/settings", tabParam: "6", adminOnly: true },  // Tab index 6
     ],
   },
 ];

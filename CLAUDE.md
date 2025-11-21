@@ -41,23 +41,28 @@ doctl apps create-deployment a2255a3b-23cc-4fd0-baa8-91d622bb912a
 **Correct Database for agent-pm:**
 - **Host**: `app-3e774e03-7ffb-4138-a401-13c2fd3f09b4-nov-20-backup-1am-do-u.e.db.ondigitalocean.com`
 - **Database**: `agentpm-db` ⚠️ NOT `defaultdb` (that's a different app!)
-- **Username**: `agentpm-db` (same as database name)
+- **Username**: `doadmin` ⚠️ CRITICAL - For restored backups, always use `doadmin` not `agentpm-db`!
 - **Port**: 25060
 - **Password**: Stored in DigitalOcean App Platform environment variables as `DATABASE_URL`
 
 **Connection String Format:**
 ```
-postgresql://agentpm-db:PASSWORD@HOST:25060/agentpm-db?sslmode=require
+postgresql://doadmin:PASSWORD@HOST:25060/agentpm-db?sslmode=require
 ```
 
-**Common Mistake to Avoid:**
+**Common Mistakes to Avoid:**
 - ❌ Using `defaultdb` - This is a completely different application with tables like `sites`, `accounts`, `performance_metrics`
-- ✅ Always use `agentpm-db` - This has the correct tables: `projects`, `users`, `todo_items`, etc.
+- ✅ Always use `agentpm-db` database - This has the correct tables: `projects`, `users`, `todo_items`, etc.
+- ❌ Using username `agentpm-db` - This user exists but can't authenticate on restored backups
+- ✅ Always use username `doadmin` - Only user with accessible password on DigitalOcean managed databases
+
+**Why `doadmin` and not `agentpm-db`?**
+DigitalOcean managed databases only expose the `doadmin` user's password. When you restore a backup, the `agentpm-db` user is copied to the new cluster, but you can only authenticate with `doadmin`. The `agentpm-db` database is accessible once connected.
 
 **Verification Command:**
 ```bash
 # Should show projects, users, todo_items, etc.
-psql -h <HOST> -U agentpm-db -d agentpm-db -p 25060 -c "\dt"
+psql -h <HOST> -U doadmin -d agentpm-db -p 25060 -c "\dt"
 ```
 
 ---

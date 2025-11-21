@@ -28,6 +28,7 @@ class UserRole(enum.Enum):
 
     NO_ACCESS = "no_access"
     MEMBER = "member"
+    PM = "pm"
     ADMIN = "admin"
 
 
@@ -127,6 +128,11 @@ class User(Base):
         """Check if user is admin."""
         current_role = self._get_role()
         return current_role == UserRole.ADMIN
+
+    def is_pm(self):
+        """Check if user is PM."""
+        current_role = self._get_role()
+        return current_role == UserRole.PM
 
     def can_access(self):
         """Check if user can access the system."""

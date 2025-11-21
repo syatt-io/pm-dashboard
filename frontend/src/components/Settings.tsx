@@ -63,8 +63,11 @@ import UserManagement from './UserManagement';
 import EpicCategoriesManagement from './EpicCategoriesManagement';
 import EpicMappingsManagement from './EpicMappingsManagement';
 import JiraTemplatesManagement from './JiraTemplatesManagement';
+import HistoricalDataImportTab from './HistoricalDataImportTab';
 import { NotificationPreferences } from './NotificationPreferences';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
+import axios from 'axios';
+import { Refresh as RefreshIcon, Upload as UploadIcon } from '@mui/icons-material';
 
 interface Project {
   key: string;
@@ -279,6 +282,10 @@ export const Settings = () => {
     dismissed: false
   });
 
+  // Data Management state (Rebuild Models)
+  const [rebuildLoading, setRebuildLoading] = useState(false);
+  const [rebuildResult, setRebuildResult] = useState<any>(null);
+
   // Load user settings on component mount
   useEffect(() => {
     loadSettings();
@@ -287,7 +294,7 @@ export const Settings = () => {
 
   // Load AI settings and models if user is admin
   useEffect(() => {
-    if (settings?.user?.role === 'admin') {
+    if (settings?.user?.role === 'ADMIN') {
       loadAISettings();
       loadAvailableModels();
     }
@@ -830,6 +837,25 @@ export const Settings = () => {
     setTabValue(newValue);
   };
 
+  const handleRebuildModels = async () => {
+    if (!window.confirm('This will rebuild all forecasting models and may take several minutes. Continue?')) {
+      return;
+    }
+
+    setRebuildLoading(true);
+    setRebuildResult(null);
+
+    try {
+      const response = await axios.post(`${getApiUrl()}/api/analytics/rebuild-models`);
+      setRebuildResult(response.data);
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.error || err.message || 'Failed to rebuild models';
+      setRebuildResult({ success: false, message: errorMessage });
+    } finally {
+      setRebuildLoading(false);
+    }
+  };
+
   const validateApiKey = async (keyToValidate?: string) => {
     const keyValue = keyToValidate || apiKey;
     if (!keyValue.trim()) {
@@ -1178,10 +1204,11 @@ export const Settings = () => {
         >
           <Tab label="Project Settings" />
           <Tab label="Insights & Escalation" />
-          {settings.user.role === 'admin' && <Tab label="AI Configuration" />}
-          {settings.user.role === 'admin' && <Tab label="User Management" />}
-          {settings.user.role === 'admin' && <Tab label="Epic Categories" />}
-          {settings.user.role === 'admin' && <Tab label="Jira Templates" />}
+          <Tab label="AI Configuration" />
+          <Tab label="User Management" />
+          <Tab label="Epic Categories" />
+          <Tab label="Jira Templates" />
+          <Tab label="Data Management" />
         </PillTabs>
       </Box>
 
@@ -1566,7 +1593,7 @@ export const Settings = () => {
                     label="Show Dismissed"
                   />
                 </Grid>
-                {settings.user.role === 'admin' && (
+                {settings.user.role === 'ADMIN' && (
                   <Grid item xs={12} sm={6} md={3}>
                     <FormControlLabel
                       control={
@@ -1716,8 +1743,7 @@ export const Settings = () => {
       </TabPanel>
 
       {/* Tab 3: AI Configuration (Admin Only, was Tab 5) */}
-      {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={2}>
+      <TabPanel value={tabValue} index={2}>
           {loadingAI ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
               <CircularProgress />
@@ -1965,41 +1991,108 @@ export const Settings = () => {
           ) : (
             <Alert severity="info">No AI settings configured yet.</Alert>
           )}
-        </TabPanel>
-      )}
+      </TabPanel>
 
       {/* Tab 4: User Management (Admin Only, was Tab 6) */}
-      {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={3}>
-          <UserManagement />
-        </TabPanel>
-      )}
+      <TabPanel value={tabValue} index={3}>
+        <UserManagement />
+      </TabPanel>
 
       {/* Tab 5: Epic Categories (Admin Only, was Tab 7) */}
-      {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={4}>
-          <Box sx={{ mb: 3 }}>
-            <PillTabs
-              value={epicSubTab}
-              onChange={(e, newValue) => setEpicSubTab(newValue)}
-              aria-label="epic categories sub-tabs"
-            >
-              <Tab label="Manage Categories" />
-              <Tab label="Epic Mappings" />
-            </PillTabs>
-          </Box>
+      <TabPanel value={tabValue} index={4}>
+        <Box sx={{ mb: 3 }}>
+          <PillTabs
+            value={epicSubTab}
+            onChange={(e, newValue) => setEpicSubTab(newValue)}
+            aria-label="epic categories sub-tabs"
+          >
+            <Tab label="Manage Categories" />
+            <Tab label="Epic Mappings" />
+          </PillTabs>
+        </Box>
 
-          {epicSubTab === 0 && <EpicCategoriesManagement />}
-          {epicSubTab === 1 && <EpicMappingsManagement />}
-        </TabPanel>
-      )}
+        {epicSubTab === 0 && <EpicCategoriesManagement />}
+        {epicSubTab === 1 && <EpicMappingsManagement />}
+      </TabPanel>
 
       {/* Tab 6: Jira Templates (Admin Only, was Tab 8) */}
-      {settings.user.role === 'admin' && (
-        <TabPanel value={tabValue} index={5}>
-          <JiraTemplatesManagement />
-        </TabPanel>
-      )}
+      <TabPanel value={tabValue} index={5}>
+        <JiraTemplatesManagement />
+      </TabPanel>
+
+      {/* Tab 7: Data Management (Admin Only) */}
+      <TabPanel value={tabValue} index={6}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Historical Data Management
+              </Typography>
+              <Typography variant="body2" color="textSecondary" paragraph>
+                Manage historical data imports and rebuild forecasting models
+              </Typography>
+
+              {/* Rebuild Models Section */}
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  Rebuild Forecasting Models
+                </Typography>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Rebuild all forecasting models using the latest historical data. This process may take several minutes.
+                </Typography>
+
+                <Button
+                  variant="outlined"
+                  color="primary"
+                  startIcon={rebuildLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
+                  onClick={handleRebuildModels}
+                  disabled={rebuildLoading}
+                >
+                  {rebuildLoading ? 'Rebuilding...' : 'Rebuild Models'}
+                </Button>
+
+                {rebuildResult && (
+                  <Alert
+                    severity={rebuildResult.success ? 'success' : 'error'}
+                    onClose={() => setRebuildResult(null)}
+                    sx={{ mt: 2 }}
+                  >
+                    <Typography variant="body2" fontWeight="bold">
+                      {rebuildResult.message}
+                    </Typography>
+                    {rebuildResult.total_duration_seconds && (
+                      <Typography variant="caption" display="block">
+                        Completed in {rebuildResult.total_duration_seconds}s
+                      </Typography>
+                    )}
+                    {rebuildResult.results && (
+                      <Box sx={{ mt: 1 }}>
+                        {Object.entries(rebuildResult.results).map(([script, result]: [string, any]) => (
+                          <Typography key={script} variant="caption" display="block">
+                            {script}: {result.success ? '✓' : '✗'} {result.error && `(${result.error})`}
+                          </Typography>
+                        ))}
+                      </Box>
+                    )}
+                  </Alert>
+                )}
+              </Box>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Historical Data Import Section */}
+              <Box>
+                <Typography variant="subtitle1" fontWeight={600} gutterBottom>
+                  Import Historical Data
+                </Typography>
+                <Typography variant="body2" color="textSecondary" paragraph>
+                  Import historical project data from Jira and Tempo to train forecasting models
+                </Typography>
+
+                <HistoricalDataImportTab />
+              </Box>
+            </CardContent>
+          </Card>
+      </TabPanel>
 
       {/* Delete Confirmation Dialogs */}
       <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
