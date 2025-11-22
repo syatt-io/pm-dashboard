@@ -619,11 +619,11 @@ def error_response(error, status_code=500, details=None):
 def serve_react(path):
     """Serve React application in production."""
     try:
-        print(f"=== SERVE_REACT CALLED: path='{path}' ===", flush=True)
+        logger.info(f"=== SERVE_REACT CALLED: path='{path}' ===", flush=True)
 
         # Skip API and Slack routes
         if path.startswith("api/") or path.startswith("slack/"):
-            print(f"Skipping API/Slack route: {path}", flush=True)
+            logger.info(f"Skipping API/Slack route: {path}", flush=True)
             return jsonify({"error": "Not found"}), 404
 
         # Try multiple possible build directory paths
@@ -638,11 +638,11 @@ def serve_react(path):
             "frontend/build",  # Relative path
         ]
 
-        print(f"Checking build directories...", flush=True)
+        logger.info(f"Checking build directories...", flush=True)
         react_build_dir = None
         for build_dir in possible_build_dirs:
             exists = os.path.exists(build_dir)
-            print(f"  {build_dir}: exists={exists}", flush=True)
+            logger.info(f"  {build_dir}: exists={exists}", flush=True)
             if exists:
                 react_build_dir = build_dir
                 print(f"✓ Found React build directory: {build_dir}", flush=True)
@@ -652,7 +652,7 @@ def serve_react(path):
         if react_build_dir:
             index_path = os.path.join(react_build_dir, "index.html")
             index_exists = os.path.exists(index_path)
-            print(f"index.html exists: {index_exists}", flush=True)
+            logger.info(f"index.html exists: {index_exists}", flush=True)
 
             # Try to serve the requested file
             if path != "" and os.path.exists(os.path.join(react_build_dir, path)):
@@ -670,11 +670,11 @@ def serve_react(path):
                 "checked_paths": possible_build_dirs,
                 "exists_checks": [os.path.exists(p) for p in possible_build_dirs],
             }
-            print(f"❌ ERROR: React build not found! {debug_info}", flush=True)
+            logger.info(f"❌ ERROR: React build not found! {debug_info}", flush=True)
             return jsonify(debug_info), 404
 
     except Exception as e:
-        print(f"❌ EXCEPTION in serve_react: {e}", flush=True)
+        logger.info(f"❌ EXCEPTION in serve_react: {e}", flush=True)
         import traceback
 
         traceback.print_exc()
@@ -693,7 +693,7 @@ def not_found(e):
         return jsonify({"error": "Not found"}), 404
 
     # For all other routes, serve React app (let React Admin handle routing)
-    print(f"=== 404 HANDLER: serving React for path '{path}' ===", flush=True)
+    logger.info(f"=== 404 HANDLER: serving React for path '{path}' ===", flush=True)
     return serve_react(path.lstrip("/"))
 
 

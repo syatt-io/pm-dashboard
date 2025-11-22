@@ -7,8 +7,11 @@ This file defines metadata for all scheduled jobs to enable:
 - Priority-based alert routing
 """
 
+import logging
 from typing import Dict, Any
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -438,29 +441,29 @@ def get_job_stats() -> Dict[str, Any]:
 if __name__ == "__main__":
     import json
 
-    print("\n" + "=" * 70)
-    print("JOB MONITORING CONFIGURATION SUMMARY")
-    print("=" * 70 + "\n")
+    logger.info("\n" + "=" * 70)
+    logger.info("JOB MONITORING CONFIGURATION SUMMARY")
+    logger.info("=" * 70 + "\n")
 
     stats = get_job_stats()
-    print(f"Total Configured Jobs: {stats['total_jobs']}")
-    print(f"\nBy Category:")
+    logger.info(f"Total Configured Jobs: {stats['total_jobs']}")
+    logger.info(f"\nBy Category:")
     for category, count in sorted(stats["by_category"].items()):
-        print(f"  {category}: {count}")
+        logger.info(f"  {category}: {count}")
 
-    print(f"\nBy Priority:")
+    logger.info(f"\nBy Priority:")
     for priority, count in sorted(stats["by_priority"].items()):
-        print(f"  {priority}: {count}")
+        logger.info(f"  {priority}: {count}")
 
-    print(f"\nImmediate Alerts Enabled: {stats['immediate_alerts_enabled']} jobs")
+    logger.info(f"\nImmediate Alerts Enabled: {stats['immediate_alerts_enabled']} jobs")
 
-    print("\n" + "=" * 70)
-    print("CRITICAL JOBS (Immediate Alerts)")
-    print("=" * 70 + "\n")
+    logger.info("\n" + "=" * 70)
+    logger.info("CRITICAL JOBS (Immediate Alerts)")
+    logger.info("=" * 70 + "\n")
 
     for name, config in get_critical_jobs().items():
-        print(f"  • {name}")
-        print(f"    Category: {config.category}")
-        print(f"    Max Duration: {config.expected_duration_seconds}s")
-        print(f"    Description: {config.description}")
-        print()
+        logger.info(f"  • {name}")
+        logger.info(f"    Category: {config.category}")
+        logger.info(f"    Max Duration: {config.expected_duration_seconds}s")
+        logger.info(f"    Description: {config.description}")
+        logger.info()

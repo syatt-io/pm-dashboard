@@ -127,3 +127,11 @@ app-spec.yaml# Trigger deployment to apply topics column migration
 # Epic Analysis Outputs (generated reports, not source code)
 epic_analysis_results.txt
 epic_matches_*.csv
+recategorization_preview_*.csv
+recategorization_preview_*.numbers
+*.numbers
+analysis_results/
+
+# User data CSV files (one-time imports, not source code)
+slack-syatt-members-filled.csv
+user_teams_template.csv

@@ -4,9 +4,13 @@ import os
 import json
 import tempfile
 import atexit
+import logging
 from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -38,9 +42,9 @@ if gcp_creds_json:
             pass  # Silently fail on cleanup errors
 
     atexit.register(cleanup_gcp_credentials)
-    print("✓ GCP credentials configured from environment (secure tempfile)")
+    logger.info("✓ GCP credentials configured from environment (secure tempfile)")
 else:
-    print("⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
+    logger.warning("⚠️  GOOGLE_APPLICATION_CREDENTIALS_JSON not set")
 
 # GCP Pub/Sub broker configuration
 # Format: gcpubsub://projects/PROJECT_ID
@@ -50,12 +54,12 @@ gcp_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 # Fall back to Redis for local development if GCP credentials not available
 if gcp_creds:
     broker_url = f"gcpubsub://projects/{gcp_project_id}"
-    print(f"Celery broker: GCP Pub/Sub (project: {gcp_project_id})")
+    logger.info(f"Celery broker: GCP Pub/Sub (project: {gcp_project_id})")
 else:
     # Use Redis for local development
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/1")
     broker_url = redis_url
-    print(f"Celery broker: Redis (local development) - {redis_url}")
+    logger.info(f"Celery broker: Redis (local development) - {redis_url}")
 
 # Use PostgreSQL for result backend (storing task results)
 # Default to pm_agent_local for local development to match Flask app
@@ -72,7 +76,7 @@ backend_display = (
     if "@" in result_backend_url
     else result_backend_url
 )
-print(f"Celery result backend: {backend_display}")
+logger.info(f"Celery result backend: {backend_display}")
 
 # Create Celery app WITHOUT broker/backend parameters to avoid import-time evaluation
 # The broker will be set in conf.update() below
@@ -308,9 +312,9 @@ try:
 
     # Connect the signal handler
     worker_ready.connect(on_worker_ready)
-    print("✓ Worker startup checks registered")
+    logger.info("✓ Worker startup checks registered")
 except Exception as e:
-    print(f"⚠️  Could not register worker startup checks: {e}")
+    logger.warning(f"⚠️  Could not register worker startup checks: {e}")
 
 # ========== Celery Monitoring & Alerting ==========
 # Import monitoring module to register signal handlers for task failures, retries, etc.
@@ -318,10 +322,12 @@ except Exception as e:
 try:
     import src.tasks.celery_monitoring
 
-    print("✓ Celery monitoring and alerting enabled")
-    print(f"  Alert channel: {src.tasks.celery_monitoring.monitor.alert_channel}")
-    print(f"  Alerts enabled: {src.tasks.celery_monitoring.monitor.enable_alerts}")
+    logger.info("✓ Celery monitoring and alerting enabled")
+    logger.info(f"  Alert channel: {src.tasks.celery_monitoring.monitor.alert_channel}")
+    logger.info(
+        f"  Alerts enabled: {src.tasks.celery_monitoring.monitor.enable_alerts}"
+    )
 except Exception as e:
-    print(f"⚠️  Could not enable Celery monitoring: {e}")
+    logger.warning(f"⚠️  Could not enable Celery monitoring: {e}")
 
 __all__ = ["celery_app"]
