@@ -433,7 +433,7 @@ class ProjectActivityAggregator:
                                     meeting_date = datetime.fromisoformat(
                                         meeting_date.replace("Z", "+00:00")
                                     ).replace(tzinfo=None)
-                                except:
+                                except (ValueError, AttributeError):
                                     continue
 
                             if start_date <= meeting_date <= end_date:
@@ -771,7 +771,7 @@ class ProjectActivityAggregator:
                 import os
 
                 tempo_token = os.getenv("TEMPO_API_TOKEN") or tempo_token
-            except:
+            except Exception:
                 pass
 
             # Helper function to get issue key and summary from Jira using issue ID

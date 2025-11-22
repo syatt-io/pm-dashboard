@@ -774,7 +774,7 @@ IMPORTANT:
                             try:
                                 ai_forecast = json.loads(json_match.group(0))
                                 logger.warning("Recovered partial JSON with regex")
-                            except:
+                            except json.JSONDecodeError:
                                 raise e  # Give up, re-raise original error
                         else:
                             raise e

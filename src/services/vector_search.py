@@ -155,7 +155,7 @@ class VectorSearchService:
                     result_date = (
                         datetime.fromisoformat(date_str) if date_str else datetime.now()
                     )
-                except:
+                except (ValueError, AttributeError):
                     result_date = datetime.now()
 
                 # Get base relevance score
@@ -870,7 +870,7 @@ class VectorSearchService:
                         if updated_str
                         else datetime.now()
                     )
-                except:
+                except (ValueError, AttributeError):
                     created_date = updated_date = datetime.now()
 
                 # Apply hierarchical boost (30% boost for being related to a high-scoring result)

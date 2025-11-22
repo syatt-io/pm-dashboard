@@ -707,7 +707,7 @@ class VectorIngestService:
                         page_date = datetime.fromisoformat(
                             last_edited_time.replace("Z", "+00:00")
                         )
-                    except:
+                    except (ValueError, AttributeError):
                         pass
 
                 # Extract parent information for hierarchical filtering
@@ -953,7 +953,7 @@ class VectorIngestService:
                             created_at.replace("Z", "+00:00")
                         )
                         timestamp_epoch = int(pr_date.timestamp())
-                    except:
+                    except (ValueError, AttributeError):
                         pass
 
                 # Extract linked Jira tickets from title and body
