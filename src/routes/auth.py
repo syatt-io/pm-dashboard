@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify, make_response, redirect, session
 from src.services.auth import AuthService, auth_required, admin_required
 from src.models.user import UserRole
+from src.utils.log_sanitizer import sanitize_for_logging
 from sqlalchemy.orm import Session
 import logging
 import os
@@ -75,7 +76,9 @@ def create_auth_blueprint(db_session_factory, limiter=None):
                 "token": jwt_token,
                 "user": user.to_dict(),
             }
-            logger.info(f"Sending successful response: {response_data}")
+            logger.info(
+                f"Sending successful response: {sanitize_for_logging(response_data)}"
+            )
             response = make_response(jsonify(response_data))
 
             # Set secure cookie
