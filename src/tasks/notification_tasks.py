@@ -218,7 +218,7 @@ def sync_tempo_hours(self):
     Sync Tempo hours to database (Celery task wrapper).
     Scheduled to run at 4 AM EST (8:00 UTC).
 
-    Deduplication: Only runs once per 23-hour window, even if triggered multiple times
+    Deduplication: Only runs once per 2-hour window, even if triggered multiple times
     by celery-beat restarts during deployments.
 
     Resilience features:
@@ -245,16 +245,26 @@ def sync_tempo_hours(self):
 
     try:
         # === DEDUPLICATION CHECK ===
-        # Check if job ran successfully in last 23 hours
-        cutoff_time = start_time - timedelta(hours=23)
+        # Check if job ran successfully in last 2 hours
+        # For a daily job, 2 hours is enough to catch deployment-triggered duplicates
+        # while still allowing manual re-runs if needed
+        cutoff_time = start_time - timedelta(hours=2)
 
+        # Use SELECT FOR UPDATE to prevent race conditions when reading lock state
+        # This ensures Worker B sees Worker A's updated last_run_at after commit
+        logger.debug(f"🔍 Acquiring row-level lock for job_name={job_name}")
         lock = (
             db.query(ScheduledJobLock)
             .filter(ScheduledJobLock.job_name == job_name)
+            .with_for_update()  # PostgreSQL row-level lock
             .first()
         )
 
         if lock:
+            logger.debug(
+                f"📋 Lock state: is_locked={lock.is_locked}, last_run_at={lock.last_run_at}, "
+                f"locked_by={lock.locked_by}"
+            )
             # Check if already locked by another worker
             if lock.is_locked:
                 # STALE LOCK DETECTION: Check if lock is stale (held for >1 hour = worker likely crashed)
@@ -280,39 +290,31 @@ def sync_tempo_hours(self):
                             f"⚠️  Tempo sync already running (locked by {lock.locked_by} at {lock.locked_at} - {lock_age_hours:.1f}h ago). "
                             "Skipping this execution."
                         )
-                        # Create job_execution record for skipped run
-                        tracker = track_celery_task(self, db, "tempo-sync-daily")
-                        with tracker:
-                            result = {
-                                "success": False,
-                                "skipped": True,
-                                "reason": "already_locked",
-                                "locked_by": lock.locked_by,
-                                "lock_age_hours": lock_age_hours,
-                            }
-                            tracker.set_result(result)
-                            return result
+                        # Don't create job_execution for skipped runs (avoids false failure reports)
+                        return {
+                            "success": True,
+                            "skipped": True,
+                            "reason": "already_locked",
+                            "locked_by": lock.locked_by,
+                            "lock_age_hours": lock_age_hours,
+                        }
 
-            # Check if ran recently (within 23 hours)
+            # Check if ran recently (within 2 hours)
             if lock.last_run_at and lock.last_run_at > cutoff_time:
                 time_since_last_run = start_time - lock.last_run_at
                 hours_since = time_since_last_run.total_seconds() / 3600
                 logger.warning(
                     f"⚠️  Tempo sync already ran {hours_since:.1f} hours ago (at {lock.last_run_at}). "
-                    "Skipping duplicate execution. Next run allowed after 23 hours."
+                    "Skipping duplicate execution. Next run allowed after 2 hours."
                 )
-                # Create job_execution record for skipped run
-                tracker = track_celery_task(self, db, "tempo-sync-daily")
-                with tracker:
-                    result = {
-                        "success": False,
-                        "skipped": True,
-                        "reason": "ran_recently",
-                        "last_run_at": lock.last_run_at.isoformat(),
-                        "hours_since_last_run": hours_since,
-                    }
-                    tracker.set_result(result)
-                    return result
+                # Don't create job_execution for skipped runs (avoids false failure reports)
+                return {
+                    "success": True,
+                    "skipped": True,
+                    "reason": "ran_recently",
+                    "last_run_at": lock.last_run_at.isoformat(),
+                    "hours_since_last_run": hours_since,
+                }
         else:
             # Create lock record if doesn't exist
             lock = ScheduledJobLock(job_name=job_name)
