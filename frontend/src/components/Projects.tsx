@@ -3048,42 +3048,92 @@ const ProjectShowContent = () => {
       {/* Tab Panel 1: Budget & Actuals */}
       {record.project_work_type === 'project-based' && (
         <TabPanel value={tabValue} index={1}>
-          {/* Project Dates Section */}
-          <Card sx={{ mb: 3, backgroundColor: 'rgba(139, 92, 246, 0.05)' }}>
-            <CardContent sx={{ p: 1 }}>
-              <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
-                Project Timeline
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={4}>
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                    Start Date
+          {/* Timeline & Rate Configuration Section */}
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            {/* Project Timeline Card */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%', backgroundColor: 'rgba(139, 92, 246, 0.05)' }}>
+                <CardContent sx={{ p: 1 }}>
+                  <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
+                    Project Timeline
                   </Typography>
-                  <MuiTextField
-                    type="date"
-                    size="small"
-                    fullWidth
-                    value={record.start_date || ''}
-                    onChange={(e) => handleFieldUpdate('start_date', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                    Launch Date
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                        Start Date
+                      </Typography>
+                      <MuiTextField
+                        type="date"
+                        size="small"
+                        fullWidth
+                        value={record.start_date || ''}
+                        onChange={(e) => handleFieldUpdate('start_date', e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                        Launch Date
+                      </Typography>
+                      <MuiTextField
+                        type="date"
+                        size="small"
+                        fullWidth
+                        value={record.launch_date || ''}
+                        onChange={(e) => handleFieldUpdate('launch_date', e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                      />
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+
+            {/* Rate Configuration Card */}
+            <Grid item xs={12} md={6}>
+              <Card sx={{ height: '100%', backgroundColor: 'rgba(139, 92, 246, 0.05)' }}>
+                <CardContent sx={{ p: 1 }}>
+                  <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
+                    Rate Configuration
                   </Typography>
-                  <MuiTextField
-                    type="date"
-                    size="small"
-                    fullWidth
-                    value={record.launch_date || ''}
-                    onChange={(e) => handleFieldUpdate('launch_date', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                  />
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                        Hourly Rate
+                      </Typography>
+                      <MuiTextField
+                        type="number"
+                        size="small"
+                        fullWidth
+                        value={record.hourly_rate || ''}
+                        onChange={(e) => handleFieldUpdate('hourly_rate', e.target.value ? parseFloat(e.target.value) : null)}
+                        placeholder="Enter hourly rate"
+                        inputProps={{ min: 0, step: 0.01 }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                        Currency
+                      </Typography>
+                      <Select
+                        size="small"
+                        fullWidth
+                        value={record.currency || ''}
+                        onChange={(e) => handleFieldUpdate('currency', e.target.value)}
+                        displayEmpty
+                      >
+                        <MenuItem value="">
+                          <em>Select currency</em>
+                        </MenuItem>
+                        <MenuItem value="CAD">CAD</MenuItem>
+                        <MenuItem value="USD">USD</MenuItem>
+                      </Select>
+                    </Grid>
+                  </Grid>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
 
           {/* Budget Tracking Section Header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, mt: 4 }}>

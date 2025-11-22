@@ -67,6 +67,10 @@ class Project(Base):
     start_date = Column(Date)  # Project start date
     launch_date = Column(Date)  # Expected/actual launch date
 
+    # Billing configuration
+    hourly_rate = Column(Float, nullable=True)  # Hourly billing rate
+    currency = Column(String(3), nullable=True)  # Currency code (CAD, USD)
+
     # Timestamps
     created_at = Column(
         DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
@@ -104,6 +108,8 @@ class Project(Base):
             "send_meeting_emails": self.send_meeting_emails,
             "start_date": self.start_date.isoformat() if self.start_date else None,
             "launch_date": self.launch_date.isoformat() if self.launch_date else None,
+            "hourly_rate": self.hourly_rate,
+            "currency": self.currency,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "characteristics": (

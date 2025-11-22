@@ -557,6 +557,14 @@ def update_project(project_key):
                     update_fields.append("launch_date = :launch_date")
                     update_params["launch_date"] = data["launch_date"]
 
+                if "hourly_rate" in data:
+                    update_fields.append("hourly_rate = :hourly_rate")
+                    update_params["hourly_rate"] = data["hourly_rate"]
+
+                if "currency" in data:
+                    update_fields.append("currency = :currency")
+                    update_params["currency"] = data["currency"]
+
                 # Always update the timestamp
                 if update_fields:
                     update_fields.append("updated_at = CURRENT_TIMESTAMP")
