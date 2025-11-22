@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import { useTabWithUrl } from '../hooks/useTabWithUrl';
@@ -2151,6 +2151,9 @@ const ProjectShowContent = () => {
   const [update] = useUpdate();
   const { permissions } = usePermissions();
 
+  // Debounce timeout ref for auto-save
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Tab state with URL persistence
   const [tabValue, setTabValue] = useTabWithUrl('project-show-tab', 0);
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -2240,31 +2243,39 @@ const ProjectShowContent = () => {
     }
   };
 
-  const handleFieldUpdate = async (field: string, value: any) => {
-    try {
-      await update(
-        'projects',
-        {
-          id: record.key,
-          data: { [field]: value },
-          previousData: record
-        },
-        {
-          onSuccess: (data) => {
-            notify('Project updated successfully', { type: 'success' });
-            refresh();
-          },
-          onError: (error) => {
-            console.error('[Projects] Update error:', error);
-            notify('Error updating project', { type: 'error' });
-          }
-        }
-      );
-    } catch (error) {
-      console.error('[Projects] Update exception:', error);
-      notify('Error updating project', { type: 'error' });
-      throw error;
+  const handleFieldUpdate = (field: string, value: any) => {
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
+
+    // Set new timeout for debounced save (1000ms delay)
+    debounceTimeoutRef.current = setTimeout(async () => {
+      try {
+        await update(
+          'projects',
+          {
+            id: record.key,
+            data: { [field]: value },
+            previousData: record
+          },
+          {
+            onSuccess: (data) => {
+              notify('Project updated successfully', { type: 'success' });
+              refresh();
+            },
+            onError: (error) => {
+              console.error('[Projects] Update error:', error);
+              notify('Error updating project', { type: 'error' });
+            }
+          }
+        );
+      } catch (error) {
+        console.error('[Projects] Update exception:', error);
+        notify('Error updating project', { type: 'error' });
+        throw error;
+      }
+    }, 1000);
   };
 
   const handleResourceMappingChange = async (
