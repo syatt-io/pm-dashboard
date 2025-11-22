@@ -262,6 +262,8 @@ def get_jira_project(project_key):
                         p.send_meeting_emails,
                         p.start_date,
                         p.launch_date,
+                        p.hourly_rate,
+                        p.currency,
                         pmf.forecasted_hours,
                         pmf.actual_monthly_hours
                     FROM projects p
@@ -299,16 +301,22 @@ def get_jira_project(project_key):
                     enhanced_project["launch_date"] = (
                         result[9].isoformat() if result[9] else None
                     )
+                    enhanced_project["hourly_rate"] = (
+                        float(result[10]) if result[10] else None
+                    )
+                    enhanced_project["currency"] = result[11]
                     enhanced_project["forecasted_hours_month"] = (
-                        float(result[10]) if result[10] else 0
+                        float(result[12]) if result[12] else 0
                     )
                     enhanced_project["current_month_hours"] = (
-                        float(result[11]) if result[11] else 0
+                        float(result[13]) if result[13] else 0
                     )
                 else:
                     # No database record - use defaults
                     enhanced_project["is_active"] = True
                     enhanced_project["cumulative_hours"] = 0
+                    enhanced_project["hourly_rate"] = None
+                    enhanced_project["currency"] = None
                     enhanced_project["forecasted_hours_month"] = 0
                     enhanced_project["current_month_hours"] = 0
         except Exception as e:
@@ -324,6 +332,8 @@ def get_jira_project(project_key):
             enhanced_project["send_meeting_emails"] = False
             enhanced_project["start_date"] = None
             enhanced_project["launch_date"] = None
+            enhanced_project["hourly_rate"] = None
+            enhanced_project["currency"] = None
             enhanced_project["forecasted_hours_month"] = 0
             enhanced_project["current_month_hours"] = 0
 
