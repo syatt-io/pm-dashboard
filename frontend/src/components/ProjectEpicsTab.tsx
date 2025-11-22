@@ -125,10 +125,18 @@ export const ProjectEpicsTab: React.FC<ProjectEpicsTabProps> = ({ projectKey }) 
 
       const data = await response.json();
 
-      notify(
-        `Import complete: ${data.created} new budgets created, ${data.updated} already existed`,
-        { type: 'success' }
-      );
+      // Build success message with categorization info
+      let message = `Import complete: ${data.created} new budgets created, ${data.updated} already existed`;
+
+      if (data.categorization) {
+        const { created: catCreated, updated: catUpdated } = data.categorization;
+        const totalCategorized = catCreated + catUpdated;
+        if (totalCategorized > 0) {
+          message += `. ${totalCategorized} epic(s) auto-categorized by AI`;
+        }
+      }
+
+      notify(message, { type: 'success' });
 
       // Clear selection and collapse section
       setSelectedEpics(new Set());

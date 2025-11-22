@@ -4,6 +4,10 @@ import json
 import logging
 from typing import Dict, List, Any, Union
 from config.settings import settings
+from src.utils.database import get_session
+from src.models.epic_category import EpicCategory
+from src.models.epic_category_mapping import EpicCategoryMapping
+from src.models.epic_hours import EpicHours
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +53,8 @@ class EpicMappingService:
         project_characteristics: Dict[str, int] = None,
     ) -> Dict[str, Any]:
         """
-        Use Claude AI to intelligently map forecasted epics to existing project epics.
+        Use Claude AI to intelligently map forecasted epics to existing project epics
+        and suggest categories for each epic.
 
         Args:
             project_key: Project key (e.g., "SUBS")
@@ -72,14 +77,19 @@ class EpicMappingService:
                                 "epic_summary": "Frontend Product Pages",
                                 "allocated_hours": 150,
                                 "reasoning": "Primary UI work for product pages",
-                                "confidence": 0.85
+                                "confidence": 0.85,
+                                "category": "FE Dev"
                             }
                         ]
                     }
                 ],
                 "unmapped_forecasts": ["Search Functionality"],
                 "unmatched_existing": ["SUBS-125"],
-                "overall_confidence": 0.82
+                "overall_confidence": 0.82,
+                "categories": {
+                    "SUBS-123": "FE Dev",
+                    "SUBS-124": "Backend"
+                }
             }
         """
         logger.info(
@@ -87,13 +97,20 @@ class EpicMappingService:
             f"to {len(existing_epics)} existing epics in project {project_key}"
         )
 
-        # Build AI prompt
+        # Fetch categories and training examples for categorization
+        session = get_session()
+        available_categories = self._get_available_categories(session)
+        training_examples = self._get_training_examples(session)
+
+        # Build AI prompt (now includes categorization)
         prompt = self._build_mapping_prompt(
             project_key,
             project_name,
             forecast_epics,
             existing_epics,
             project_characteristics,
+            available_categories,
+            training_examples,
         )
 
         try:
@@ -168,8 +185,10 @@ class EpicMappingService:
         forecast_epics: List[Dict],
         existing_epics: List[Dict],
         project_characteristics: Dict = None,
+        available_categories: List[Dict] = None,
+        training_examples: List[Dict] = None,
     ) -> str:
-        """Build the AI prompt for epic mapping."""
+        """Build the AI prompt for epic mapping with categorization."""
 
         characteristics_text = ""
         if project_characteristics:
@@ -195,10 +214,25 @@ class EpicMappingService:
                 f"({estimated}h estimated{status})\n"
             )
 
+        # Add categorization section
+        categorization_text = ""
+        if available_categories:
+            categorization_text = "\n\nAVAILABLE EPIC CATEGORIES:\n"
+            for cat in available_categories:
+                categorization_text += f'- "{cat["name"]}"\n'
+
+            if training_examples:
+                categorization_text += "\n\nCATEGORIZATION EXAMPLES:\n"
+                for ex in training_examples[:15]:  # Limit to 15 examples
+                    categorization_text += (
+                        f'- "{ex["epic_summary"]}" → "{ex["category"]}"\n'
+                    )
+
         prompt = f"""You are mapping AI-forecasted epic allocations to existing Jira epics for project "{project_name}" ({project_key}).
 {characteristics_text}
 {forecast_text}
 {existing_text}
+{categorization_text}
 
 TASK:
 Map each forecasted epic to the most appropriate existing epic(s). Consider:
@@ -211,7 +245,19 @@ Map each forecasted epic to the most appropriate existing epic(s). Consider:
 For each mapping, provide:
 - Allocated hours per epic (must sum to forecast total)
 - Reasoning for the match (1-2 sentences)
-- Confidence score (0.0-1.0, where 1.0 = perfect match)
+- Confidence score (0.0-1.0, where 1.0 = perfect match)"""
+
+        if available_categories:
+            prompt += """
+- Category from the available categories list (optional, use null if no good fit)
+
+CATEGORIZATION RULES:
+- Assign each epic to ONE category from the available categories list
+- Use the categorization examples to understand the pattern
+- If no category is a good fit, use null
+- Category must exactly match one of the available categories (case-sensitive)"""
+
+        prompt += """
 
 Return ONLY valid JSON (no additional text) in this exact format:
 {{
@@ -225,7 +271,33 @@ Return ONLY valid JSON (no additional text) in this exact format:
           "epic_summary": "Frontend Product Pages",
           "allocated_hours": 150,
           "reasoning": "Primary UI work matches product page requirements",
-          "confidence": 0.85
+          "confidence": 0.85"""
+
+        if available_categories:
+            prompt += """,
+          "category": "FE Dev"
+        }},
+        {{
+          "epic_key": "SUBS-124",
+          "epic_summary": "Shopping Cart UI",
+          "allocated_hours": 95,
+          "reasoning": "Cart interface is secondary UI component",
+          "confidence": 0.75,
+          "category": "FE Dev"
+        }}
+      ]
+    }}
+  ],
+  "unmapped_forecasts": ["Search Functionality"],
+  "unmatched_existing": ["SUBS-130"],
+  "overall_confidence": 0.78,
+  "categories": {{
+    "SUBS-123": "FE Dev",
+    "SUBS-124": "FE Dev"
+  }}
+}}"""
+        else:
+            prompt += """
         }},
         {{
           "epic_key": "SUBS-124",
@@ -240,13 +312,20 @@ Return ONLY valid JSON (no additional text) in this exact format:
   "unmapped_forecasts": ["Search Functionality"],
   "unmatched_existing": ["SUBS-130"],
   "overall_confidence": 0.78
-}}
+}}"""
+
+        prompt += """
 
 IMPORTANT:
 - Ensure allocated_hours sum to forecast_hours for each mapping
 - Be conservative with confidence scores (0.6-0.8 is normal, 0.9+ is exceptional match)
 - Focus on semantic meaning, not just keyword matching
 - Consider project characteristics when evaluating matches"""
+
+        if available_categories:
+            prompt += """
+- Include a "categories" object mapping epic_key to category name for ALL matched epics
+- Categories must exactly match the available categories list"""
 
         return prompt
 
@@ -323,3 +402,55 @@ IMPORTANT:
                     )
 
         return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
+
+    def _get_available_categories(self, session) -> List[Dict[str, str]]:
+        """Fetch available epic categories from database."""
+        try:
+            categories = (
+                session.query(EpicCategory).order_by(EpicCategory.display_order).all()
+            )
+            return [{"name": cat.name} for cat in categories]
+        except Exception as e:
+            logger.warning(f"Failed to fetch epic categories: {e}")
+            return []
+
+    def _get_training_examples(self, session, limit: int = 50) -> List[Dict[str, str]]:
+        """
+        Fetch existing epic categorizations to use as training examples.
+
+        Joins with epic_hours table to get epic summaries.
+        Returns most recent mappings to reflect current categorization patterns.
+        """
+        try:
+            # Join mappings with epic_hours to get summaries
+            examples = (
+                session.query(
+                    EpicCategoryMapping.epic_key,
+                    EpicCategoryMapping.category,
+                    EpicHours.epic_summary,
+                )
+                .join(
+                    EpicHours,
+                    EpicCategoryMapping.epic_key == EpicHours.epic_key,
+                )
+                .distinct(EpicCategoryMapping.epic_key)
+                .order_by(
+                    EpicCategoryMapping.epic_key,
+                    EpicCategoryMapping.updated_at.desc(),
+                )
+                .limit(limit)
+                .all()
+            )
+
+            return [
+                {
+                    "epic_key": epic_key,
+                    "epic_summary": epic_summary or "No summary",
+                    "category": category,
+                }
+                for epic_key, category, epic_summary in examples
+                if epic_summary  # Only include examples with summaries
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to fetch categorization training examples: {e}")
+            return []

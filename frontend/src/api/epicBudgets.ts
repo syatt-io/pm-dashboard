@@ -16,6 +16,7 @@ export interface MatchedEpic {
   allocated_hours: number;
   reasoning: string;
   confidence: number;
+  category?: string | null;
 }
 
 export interface EpicMapping {
@@ -33,6 +34,7 @@ export interface PreviewImportResponse {
   will_skip: number;
   will_create_placeholders: number;
   existing_epics_count: number;
+  categories?: Record<string, string | null>; // { "SUBS-123": "FE Dev", "SUBS-124": null }
   error?: string;
 }
 
@@ -51,6 +53,7 @@ export interface ImportFromForecastRequest {
   project_key: string;
   mappings: ImportMapping[];
   create_placeholders: CreatePlaceholder[];
+  categories?: Record<string, string | null>;
 }
 
 export interface ImportDetail {

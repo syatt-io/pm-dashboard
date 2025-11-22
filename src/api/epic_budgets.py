@@ -4,6 +4,7 @@ API endpoints for epic budget management.
 
 from flask import Blueprint, request, jsonify
 from src.models import EpicBudget, EpicHours, Project
+from src.models.epic_category_mapping import EpicCategoryMapping
 from src.utils.database import get_session
 from src.services.epic_mapping_service import EpicMappingService
 from sqlalchemy import func
@@ -259,7 +260,7 @@ def delete_budget(budget_id):
 @epic_budgets_bp.route("/bulk", methods=["POST"])
 def bulk_create_budgets():
     """
-    Bulk create or update epic budgets.
+    Bulk create or update epic budgets with automatic AI categorization.
 
     Request body:
     {
@@ -282,6 +283,7 @@ def bulk_create_budgets():
         session = get_session()
         created_count = 0
         updated_count = 0
+        epic_keys_imported = []
 
         for budget_data in budgets_data:
             epic_key = budget_data.get("epic_key")
@@ -313,7 +315,49 @@ def bulk_create_budgets():
                 session.add(new_budget)
                 created_count += 1
 
+            epic_keys_imported.append(epic_key)
+
         session.commit()
+
+        # Automatically categorize imported epics using AI
+        categorization_stats = {"created": 0, "updated": 0, "skipped": 0}
+        if epic_keys_imported:
+            try:
+                from src.services.epic_categorization_service import (
+                    EpicCategorizationService,
+                )
+
+                # Prepare epics for categorization
+                epics_to_categorize = [
+                    {
+                        "epic_key": budget_data.get("epic_key"),
+                        "epic_summary": budget_data.get("epic_summary", ""),
+                    }
+                    for budget_data in budgets_data
+                    if budget_data.get("epic_key") in epic_keys_imported
+                ]
+
+                # Call AI categorization service
+                categorization_service = EpicCategorizationService()
+                categories = categorization_service.categorize_epics(
+                    epics_to_categorize, project_key
+                )
+
+                # Bulk upsert category mappings
+                if categories:
+                    categorization_stats = EpicCategoryMapping.bulk_upsert(
+                        session, categories
+                    )
+                    logger.info(
+                        f"Auto-categorized {categorization_stats['created'] + categorization_stats['updated']} "
+                        f"of {len(epic_keys_imported)} imported Jira epics"
+                    )
+
+            except Exception as e:
+                # Don't fail the import if categorization fails
+                logger.warning(
+                    f"Failed to auto-categorize imported epics: {e}", exc_info=True
+                )
 
         return (
             jsonify(
@@ -321,6 +365,7 @@ def bulk_create_budgets():
                     "message": "Bulk operation completed",
                     "created": created_count,
                     "updated": updated_count,
+                    "categorization": categorization_stats,
                 }
             ),
             200,
@@ -459,7 +504,11 @@ def import_from_forecast():
                 "forecast_epic": "Search Functionality",
                 "hours": 80
             }
-        ]
+        ],
+        "categories": {
+            "SUBS-123": "FE Dev",
+            "SUBS-124": "Backend"
+        }
     }
 
     Returns summary of created/updated epic budgets.
@@ -469,6 +518,7 @@ def import_from_forecast():
         project_key = data.get("project_key")
         mappings = data.get("mappings", [])
         create_placeholders = data.get("create_placeholders", [])
+        categories = data.get("categories", {})
 
         if not project_key:
             return jsonify({"error": "project_key required"}), 400
@@ -480,6 +530,9 @@ def import_from_forecast():
         created_count = 0
         details = []
         warnings = []
+        epic_keys_processed = (
+            []
+        )  # Track which epics were created/updated for categorization
 
         # Process mappings (update existing epics)
         for mapping in mappings:
@@ -524,6 +577,7 @@ def import_from_forecast():
                     budget.import_source = "ai_forecast"
                     budget.updated_at = datetime.now(timezone.utc)
                     updated_count += 1
+                    epic_keys_processed.append(epic_key)  # Track for categorization
                     details.append(
                         {
                             "epic_key": epic_key,
@@ -578,6 +632,7 @@ def import_from_forecast():
             )
             session.add(new_budget)
             created_count += 1
+            epic_keys_processed.append(placeholder_key)  # Track for categorization
             details.append(
                 {
                     "epic_key": placeholder_key,
@@ -589,6 +644,25 @@ def import_from_forecast():
             )
 
         session.commit()
+
+        # Store category mappings for imported epics
+        categorization_stats = {"created": 0, "updated": 0, "skipped": 0}
+        if categories and epic_keys_processed:
+            # Filter categories to only those epics we actually processed
+            epics_to_categorize = {
+                epic_key: category
+                for epic_key, category in categories.items()
+                if epic_key in epic_keys_processed
+            }
+
+            if epics_to_categorize:
+                categorization_stats = EpicCategoryMapping.bulk_upsert(
+                    session, epics_to_categorize
+                )
+                logger.info(
+                    f"Categorized {categorization_stats['created'] + categorization_stats['updated']} "
+                    f"of {len(epic_keys_processed)} imported epics"
+                )
 
         total_hours_imported = sum(
             d.get("hours", 0)
@@ -605,6 +679,7 @@ def import_from_forecast():
                         "skipped": skipped_count,
                         "created_placeholders": created_count,
                         "total_hours_imported": total_hours_imported,
+                        "categorization": categorization_stats,
                     },
                     "details": details,
                     "warnings": warnings,

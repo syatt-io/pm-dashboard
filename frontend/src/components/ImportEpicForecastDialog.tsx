@@ -219,6 +219,7 @@ const ImportEpicForecastDialog: React.FC<ImportEpicForecastDialogProps> = ({
         project_key: selectedProject.key,
         mappings,
         create_placeholders: createPlaceholders,
+        categories: previewData.categories, // Include AI-suggested categories
       });
 
       if (result.error) {
@@ -337,6 +338,7 @@ const ImportEpicForecastDialog: React.FC<ImportEpicForecastDialogProps> = ({
                       <TableCell>Hours</TableCell>
                       <TableCell>Confidence</TableCell>
                       <TableCell>Existing Epic</TableCell>
+                      <TableCell>Category</TableCell>
                       <TableCell>Import Hours</TableCell>
                     </TableRow>
                   </TableHead>
@@ -396,6 +398,20 @@ const ImportEpicForecastDialog: React.FC<ImportEpicForecastDialogProps> = ({
                               >
                                 {epic.reasoning}
                               </Typography>
+                            </TableCell>
+                            <TableCell>
+                              {epic.category ? (
+                                <Chip
+                                  label={epic.category}
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                />
+                              ) : (
+                                <Typography variant="caption" color="text.secondary">
+                                  Uncategorized
+                                </Typography>
+                              )}
                             </TableCell>
                             <TableCell>
                               <TextField
