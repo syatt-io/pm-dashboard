@@ -32,6 +32,8 @@ ENV/
 .env.production
 .env.staging
 .env.bak*
+.env.*.backup        # Explicit pattern for .env.local.backup, etc.
+.env*.backup         # Cover .env.production.backup, etc.
 
 # Database
 pm_agent.db

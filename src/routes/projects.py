@@ -118,7 +118,7 @@ def unwatch_project(user, project_key):
 def get_user_my_projects_settings(email):
     """Get user settings by email."""
     try:
-        from main import UserPreference
+        from src.models import UserPreference
 
         with session_scope() as db_session:
             user_pref = db_session.query(UserPreference).filter_by(email=email).first()
@@ -157,7 +157,7 @@ def save_user_settings():
         if not email:
             return jsonify({"success": False, "error": "Email is required"}), 400
 
-        from main import UserPreference
+        from src.models import UserPreference
         import uuid
         from sqlalchemy import text
 

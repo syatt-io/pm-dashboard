@@ -4,7 +4,7 @@
 from .base import Base
 
 # Import all model classes for easy access
-from .user import User, UserRole, UserWatchedProject
+from .user import User, UserRole, UserWatchedProject, UserPreference
 from .learning import Learning
 from .backfill_progress import BackfillProgress
 from .system_settings import SystemSettings
@@ -22,7 +22,7 @@ from .tempo_worklog import TempoWorklog
 from .forecast import EpicForecast
 from .time_tracking_compliance import TimeTrackingCompliance
 from .monthly_reconciliation import MonthlyReconciliationReport
-from .project import Project, ProjectCharacteristics
+from .project import Project, ProjectCharacteristics, ProjectChange
 from .project_keyword import ProjectKeyword
 from .project_resource_mapping import ProjectResourceMapping
 from .project_monthly_forecast import ProjectMonthlyForecast
@@ -35,6 +35,7 @@ from .template_epic import TemplateEpic
 from .template_ticket import TemplateTicket
 from .scheduled_job_lock import ScheduledJobLock
 from .slack_installation import SlackInstallation
+from .meeting_connection import MeetingProjectConnection
 
 # TODO models - create simple Todo models for basic functionality
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean

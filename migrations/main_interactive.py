@@ -16,7 +16,7 @@ from src.integrations.jira_mcp import JiraMCPClient, JiraTicket
 from src.processors.transcript_analyzer import TranscriptAnalyzer
 from src.processors.interactive_processor import InteractiveProcessor, ReviewedItem
 from src.managers.notifications import NotificationManager, NotificationContent
-from main import ProcessedMeeting, TodoItem, Base
+from src.models import ProcessedMeeting, TodoItem, Base
 
 
 logging.basicConfig(

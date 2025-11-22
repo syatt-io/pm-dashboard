@@ -373,7 +373,7 @@ class ProjectMonitor:
             return
 
         try:
-            from main import ProjectChange
+            from src.models import ProjectChange
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
 
@@ -425,7 +425,7 @@ class ProjectMonitor:
     ) -> List[Dict[str, Any]]:
         """Get project changes for a specific user's selected projects."""
         try:
-            from main import UserPreference, ProjectChange
+            from src.models import UserPreference, ProjectChange
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
 
@@ -487,7 +487,7 @@ class ProjectMonitor:
     async def run_daily_poll(self):
         """Run daily polling for all user-selected projects."""
         try:
-            from main import UserPreference
+            from src.models import UserPreference
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
 

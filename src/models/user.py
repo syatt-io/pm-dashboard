@@ -556,3 +556,22 @@ class UserWatchedProject(Base):
             "project_key": self.project_key,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class UserPreference(Base):
+    """User notification preferences - migrated from main.py."""
+
+    __tablename__ = "user_preferences"
+
+    id = Column(String(36), primary_key=True)
+    email = Column(String(255), unique=True, nullable=False)
+    slack_username = Column(String(255))
+    notification_cadence = Column(String(50), default="daily")
+    selected_projects = Column(Text)  # JSON string - list of project keys
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+    # NOTE: last_notification_sent field removed (never used in codebase)

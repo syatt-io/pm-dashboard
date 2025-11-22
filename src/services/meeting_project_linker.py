@@ -48,7 +48,7 @@ class MeetingProjectLinker:
     ) -> None:
         """Save meeting-project connections to database."""
         try:
-            from main import MeetingProjectConnection
+            from src.models import MeetingProjectConnection
 
             session = self.Session()
 
@@ -320,7 +320,7 @@ class MeetingProjectLinker:
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Get meetings that are relevant to specific projects."""
         try:
-            from main import MeetingProjectConnection
+            from src.models import MeetingProjectConnection
             from datetime import datetime, timedelta
 
             # First, try to get cached connections from database

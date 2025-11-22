@@ -6,7 +6,7 @@ import logging
 
 from src.services.auth import auth_required
 from src.utils.database import session_scope, get_engine
-from main import TodoItem
+from src.models import TodoItem
 
 logger = logging.getLogger(__name__)
 

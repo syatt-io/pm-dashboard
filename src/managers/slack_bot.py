@@ -1228,7 +1228,7 @@ class SlackTodoBot:
     def _create_todo_quick(self, user_id: str, title: str) -> Dict[str, Any]:
         """Create TODO quickly with minimal info."""
         try:
-            from main import TodoItem
+            from src.models import TodoItem
             import uuid
 
             assignee = self._get_user_display_name(user_id)
@@ -1304,7 +1304,7 @@ class SlackTodoBot:
         """Complete a TODO item."""
         try:
             # Find TODO by partial ID
-            from main import TodoItem
+            from src.models import TodoItem
 
             todo = (
                 self.todo_manager.session.query(TodoItem)
@@ -1335,7 +1335,7 @@ class SlackTodoBot:
     def _snooze_todo(self, user_id: str, todo_id: str, days: int = 1) -> Dict[str, Any]:
         """Snooze a TODO item."""
         try:
-            from main import TodoItem
+            from src.models import TodoItem
 
             todo = (
                 self.todo_manager.session.query(TodoItem)

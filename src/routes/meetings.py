@@ -815,7 +815,7 @@ def meeting_project_dashboard():
             # If no projects specified, try to get from user's email
             email = request.args.get("email")
             if email:
-                from main import UserPreference
+                from src.models import UserPreference
 
                 with session_scope() as db_session:
                     user_pref = (

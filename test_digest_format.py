@@ -8,7 +8,7 @@ from datetime import datetime
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from main import TodoItem
+from src.models import TodoItem
 
 # Mock some TODOs for testing
 mock_todos = [

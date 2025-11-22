@@ -528,7 +528,7 @@ class TodoScheduler:
             week_start = now - timedelta(days=7)
 
             # Get completed items from last week
-            from main import TodoItem
+            from src.models import TodoItem
 
             completed_last_week = (
                 self.todo_manager.session.query(TodoItem)

@@ -8,7 +8,7 @@ import uuid
 from config.settings import settings
 from src.services.auth import auth_required
 from src.utils.database import session_scope
-from main import TodoItem
+from src.models import TodoItem
 from src.managers.todo_manager import TodoManager
 
 logger = logging.getLogger(__name__)

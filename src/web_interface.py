@@ -41,7 +41,7 @@ from src.services.auth import AuthService, auth_required, admin_required
 from src.routes.auth import create_auth_blueprint
 from src.models.user import UserWatchedProject
 from sqlalchemy import text
-from main import TodoItem
+from src.models import TodoItem
 from src.utils.database import (
     get_engine,
     get_session_factory,
@@ -609,112 +609,9 @@ def error_response(error, status_code=500, details=None):
     return jsonify(response), status_code
 
 
-def run_database_migrations():
-    """Run any necessary database migrations."""
-    try:
-        # Run Alembic migrations first
-        import subprocess
-        import os
-
-        logger.info("Running Alembic migrations...")
-        try:
-            # Get the project root directory
-            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            result = subprocess.run(
-                ["alembic", "upgrade", "head"],
-                cwd=project_root,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            logger.info(f"Alembic migrations completed: {result.stdout}")
-        except subprocess.CalledProcessError as e:
-            logger.warning(f"Alembic migration failed: {e.stderr}")
-        except Exception as e:
-            logger.warning(f"Alembic migration error: {e}")
-
-        from sqlalchemy.orm import sessionmaker
-
-        engine = get_engine()
-
-        with engine.connect() as conn:
-            # Check if we need to migrate slack_user_id to slack_username
-            try:
-                # Try to query the old column
-                conn.execute(text("SELECT slack_user_id FROM user_preferences LIMIT 1"))
-
-                # If we get here, the old column exists, so we need to migrate
-                logger.info("Migrating slack_user_id to slack_username...")
-
-                # Add new column if it doesn't exist
-                try:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE user_preferences ADD COLUMN slack_username TEXT"
-                        )
-                    )
-                    conn.commit()
-                    logger.info("Added slack_username column")
-                except Exception:
-                    # Column might already exist
-                    pass
-
-                # Copy data from old column to new column
-                try:
-                    conn.execute(
-                        text(
-                            "UPDATE user_preferences SET slack_username = slack_user_id WHERE slack_user_id IS NOT NULL AND slack_username IS NULL"
-                        )
-                    )
-                    conn.commit()
-                    logger.info("Copied data from slack_user_id to slack_username")
-                except Exception as e:
-                    logger.warning(f"Data copy failed: {e}")
-
-                logger.info("Migration completed successfully")
-
-            except Exception:
-                # Old column doesn't exist, so no migration needed
-                logger.info(
-                    "No migration needed - slack_username column already exists"
-                )
-
-            # Add new columns to processed_meetings table
-            columns_to_add = [
-                ("key_decisions", "TEXT"),
-                ("blockers", "TEXT"),
-                ("analyzed_at", "TIMESTAMP"),
-                ("processed_at", "TIMESTAMP"),
-                ("tickets_created", "TEXT"),
-                ("todos_created", "TEXT"),
-                ("success", "BOOLEAN DEFAULT true"),
-            ]
-
-            for column_name, column_type in columns_to_add:
-                try:
-                    conn.execute(
-                        text(
-                            f"ALTER TABLE processed_meetings ADD COLUMN {column_name} {column_type}"
-                        )
-                    )
-                    conn.commit()
-                    logger.info(f"Added {column_name} column to processed_meetings")
-                except Exception as e:
-                    # Column might already exist
-                    if (
-                        "already exists" not in str(e).lower()
-                        and "duplicate" not in str(e).lower()
-                    ):
-                        logger.debug(f"Column {column_name} migration note: {e}")
-
-    except Exception as e:
-        logger.warning(f"Migration failed: {e}")
-
-
-# Run migrations on startup
-# TEMPORARILY DISABLED: Causing health check failures due to blocking each gunicorn worker
-# TODO: Move migrations to a separate pre-deployment step or run only in master process
-# run_database_migrations()
+# NOTE: run_database_migrations() function removed (dead code)
+# Migrations should be run via deployment pipeline: `alembic upgrade head`
+# See docs/README_MIGRATIONS.md for migration guidelines
 
 
 @app.route("/", defaults={"path": ""})

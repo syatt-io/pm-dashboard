@@ -25,7 +25,7 @@ class ProjectNotificationService:
     async def send_user_notifications(self, email: str, force: bool = False) -> bool:
         """Send notifications to a specific user based on their cadence."""
         try:
-            from main import UserPreference
+            from src.models import UserPreference
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
 
@@ -285,7 +285,7 @@ class ProjectNotificationService:
     async def send_daily_notifications(self):
         """Send notifications to all users who are due for daily notifications."""
         try:
-            from main import UserPreference
+            from src.models import UserPreference
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
 
@@ -319,7 +319,7 @@ class ProjectNotificationService:
     async def send_weekly_notifications(self):
         """Send notifications to all users who are due for weekly notifications."""
         try:
-            from main import UserPreference
+            from src.models import UserPreference
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
 
@@ -353,7 +353,7 @@ class ProjectNotificationService:
     async def send_monthly_notifications(self):
         """Send notifications to all users who are due for monthly notifications."""
         try:
-            from main import UserPreference
+            from src.models import UserPreference
             from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
 

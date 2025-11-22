@@ -10,6 +10,7 @@ from sqlalchemy import (
     Float,
     Text,
     Date,
+    JSON,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
@@ -180,3 +181,26 @@ class ProjectCharacteristics(Base):
         Returns: 0.0 (no integration) to 1.0 (full integration)
         """
         return (self.be_integrations - 1) / 4.0
+
+
+class ProjectChange(Base):
+    """Jira project change tracking - migrated from main.py."""
+
+    __tablename__ = "project_changes"
+
+    id = Column(String(36), primary_key=True)
+    project_key = Column(String(50), nullable=False, index=True)
+    change_type = Column(String(100), nullable=False)
+    ticket_key = Column(String(50), nullable=False)
+    ticket_title = Column(String(500))
+    old_value = Column(String(500))
+    new_value = Column(String(500))
+    assignee = Column(String(255))
+    reporter = Column(String(255))
+    priority = Column(String(50))
+    status = Column(String(100))
+    change_timestamp = Column(DateTime, nullable=False, index=True)
+    detected_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    change_details = Column(JSON)  # Additional metadata as JSON
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # NOTE: Uses JSON type instead of Text for proper JSON handling
