@@ -92,15 +92,15 @@ class JiraUserTicketsService:
         logger.info(f"Fetching tickets from Jira for user {jira_account_id}")
 
         try:
-            # JQL query: fetch all tickets for user (no ORDER BY since we sort in Python)
-            # Note: We fetch ALL tickets (up to 1000) then sort/limit in Python to ensure correct ordering
-            jql = f'assignee = "{jira_account_id}"'
+            # JQL query: Let Jira do the sorting server-side for performance
+            # ORDER BY created DESC ensures newest tickets first
+            jql = f'assignee = "{jira_account_id}" ORDER BY created DESC'
 
-            # Fetch ALL tickets (up to Jira's max of 1000)
-            # We need all tickets to properly sort before limiting to top 20
+            # Fetch only 20 tickets (Jira sorts them for us)
+            # This is 50x faster than fetching 1000 and sorting in Python
             result = await self.jira_client.search_issues(
                 jql=jql,
-                max_results=1000,  # Get all tickets (Jira max)
+                max_results=20,  # Only fetch what we need
                 expand_comments=False,
             )
 
@@ -111,11 +111,8 @@ class JiraUserTicketsService:
                 JiraTicket.from_jira_issue(issue, self.jira_url) for issue in issues
             ]
 
-            # Sort by creation date (newest first)
-            tickets = self._sort_tickets(tickets)
-
-            # Limit to top 20 after sorting
-            tickets = tickets[:20]
+            # No need to sort - Jira already sorted by created DESC
+            # tickets = self._sort_tickets(tickets)  # REMOVED - Jira handles this
 
             # Update cache
             self._cache[jira_account_id] = (tickets, datetime.now())
