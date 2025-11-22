@@ -99,12 +99,29 @@ class EpicCategorizationService:
                 )
                 response_text = response.content[0].text.strip()
             elif self.provider == "openai":
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    max_tokens=2000,
-                    temperature=0.2,
-                    messages=[{"role": "user", "content": prompt}],
-                )
+                # Build request parameters
+                params = {
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                }
+
+                # Only add temperature for non-reasoning models (gpt-4, gpt-3.5, etc.)
+                # Reasoning models (o1, o3, gpt-5) don't support temperature
+                if not self.model.startswith(("o1", "o3", "gpt-5")):
+                    params["temperature"] = 0.2
+
+                # Use max_completion_tokens (newer models) or fallback to max_tokens
+                try:
+                    params["max_completion_tokens"] = 2000
+                    response = self.client.chat.completions.create(**params)
+                except Exception as e:
+                    if "max_completion_tokens" in str(e):
+                        # Older models use max_tokens
+                        del params["max_completion_tokens"]
+                        params["max_tokens"] = 2000
+                        response = self.client.chat.completions.create(**params)
+                    else:
+                        raise
                 response_text = response.choices[0].message.content.strip()
             else:
                 raise ValueError(f"Unsupported provider: {self.provider}")
