@@ -780,3 +780,92 @@ def link_placeholder_to_jira(epic_budget_id):
         return jsonify({"error": str(e)}), 500
     finally:
         session.close()
+
+
+@epic_budgets_bp.route("/recategorize/<project_key>", methods=["POST"])
+def recategorize_project_epics(project_key):
+    """
+    Manually trigger AI recategorization of all epics in a project.
+
+    Useful for re-running categorization after:
+    - Creating new epic categories
+    - Adding better training data
+    - Fixing categorization mistakes
+
+    Returns:
+    {
+        "success": true,
+        "stats": {
+            "created": 5,
+            "updated": 3,
+            "skipped": 2,
+            "total_epics": 10
+        },
+        "categories": {
+            "SUBS-123": "FE Dev",
+            "SUBS-124": null
+        }
+    }
+    """
+    try:
+        session = get_session()
+
+        # Get all epic budgets for this project
+        budgets = session.query(EpicBudget).filter_by(project_key=project_key).all()
+
+        if not budgets:
+            return jsonify({"error": f"No epics found for project {project_key}"}), 404
+
+        # Prepare epics for categorization
+        epics_to_categorize = [
+            {
+                "epic_key": budget.epic_key,
+                "epic_summary": budget.epic_summary or budget.epic_key,
+            }
+            for budget in budgets
+        ]
+
+        logger.info(
+            f"Recategorizing {len(epics_to_categorize)} epics for project {project_key}"
+        )
+
+        # Call AI categorization service
+        from src.services.epic_categorization_service import (
+            EpicCategorizationService,
+        )
+
+        categorization_service = EpicCategorizationService()
+        categories = categorization_service.categorize_epics(
+            epics_to_categorize, project_key
+        )
+
+        # Bulk upsert category mappings
+        stats = {"created": 0, "updated": 0, "skipped": 0}
+        if categories:
+            stats = EpicCategoryMapping.bulk_upsert(session, categories)
+            logger.info(
+                f"Recategorization complete: {stats['created']} created, "
+                f"{stats['updated']} updated, {stats['skipped']} unchanged"
+            )
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "stats": {
+                        **stats,
+                        "total_epics": len(epics_to_categorize),
+                    },
+                    "categories": categories,
+                }
+            ),
+            200,
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error recategorizing epics for project {project_key}: {e}", exc_info=True
+        )
+        return jsonify({"error": str(e)}), 500
+    finally:
+        session.close()

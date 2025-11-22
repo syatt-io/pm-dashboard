@@ -41,6 +41,7 @@ import {
   Info as InfoIcon,
   TrendingUp as TrendingUpIcon,
   Link as LinkIcon,
+  AutoAwesome as AutoAwesomeIcon,
 } from '@mui/icons-material';
 import axios from 'axios';
 import { epicBudgetsApi } from '../api/epicBudgets';
@@ -75,6 +76,7 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
   const [budgets, setBudgets] = useState<EpicBudget[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [recategorizing, setRecategorizing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<{current: number; total: number; percent: number; message: string} | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -484,6 +486,35 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
     }
   };
 
+  const handleRecategorize = async () => {
+    try {
+      setRecategorizing(true);
+      setError(null);
+
+      const response = await axios.post(
+        `${API_BASE_URL}/api/epic-budgets/recategorize/${projectKey}`
+      );
+
+      if (response.data.success) {
+        const { stats, categories } = response.data;
+        const totalCategorized = stats.created + stats.updated;
+
+        setSuccessSnackbar({
+          open: true,
+          message: `AI categorization complete: ${totalCategorized} epics categorized (${stats.created} new, ${stats.updated} updated, ${stats.skipped} unchanged)`
+        });
+
+        // Refresh budgets to show updated categories
+        await loadBudgets();
+      }
+    } catch (err: any) {
+      console.error('Error recategorizing epics:', err);
+      setError(err.response?.data?.error || 'Failed to recategorize epics');
+    } finally {
+      setRecategorizing(false);
+    }
+  };
+
   const handleToggleCategory = (category: string) => {
     setExpandedCategories((prev) => ({
       ...prev,
@@ -616,17 +647,31 @@ const ProjectBudgetActuals: React.FC<ProjectBudgetActualsProps> = ({ projectKey 
           <Typography variant="h6">
             Epic Budget vs Actuals
           </Typography>
-          <Tooltip title="Sync epic hours from Tempo to populate monthly breakdown">
-            <Button
-              variant="outlined"
-              startIcon={syncing ? <CircularProgress size={20} /> : <SyncIcon />}
-              onClick={handleSyncHours}
-              disabled={syncing}
-              size="small"
-            >
-              {syncing ? 'Syncing...' : 'Sync Hours from Tempo'}
-            </Button>
-          </Tooltip>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Use AI to automatically categorize all epics based on their summaries">
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={recategorizing ? <CircularProgress size={20} /> : <AutoAwesomeIcon />}
+                onClick={handleRecategorize}
+                disabled={recategorizing || syncing || budgets.length === 0}
+                size="small"
+              >
+                {recategorizing ? 'Categorizing...' : 'AI Categorize'}
+              </Button>
+            </Tooltip>
+            <Tooltip title="Sync epic hours from Tempo to populate monthly breakdown">
+              <Button
+                variant="outlined"
+                startIcon={syncing ? <CircularProgress size={20} /> : <SyncIcon />}
+                onClick={handleSyncHours}
+                disabled={syncing || recategorizing}
+                size="small"
+              >
+                {syncing ? 'Syncing...' : 'Sync Hours from Tempo'}
+              </Button>
+            </Tooltip>
+          </Box>
         </Box>
 
         {/* Budget Summary Card */}

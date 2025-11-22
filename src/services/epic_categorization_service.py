@@ -179,17 +179,29 @@ class EpicCategorizationService:
         """
         Fetch existing epic categorizations to use as training examples.
 
-        Joins with epic_hours table to get epic summaries.
+        Joins with epic_budgets (preferred) or epic_hours to get epic summaries.
+        epic_budgets is preferred because it's populated immediately on import,
+        while epic_hours only exists when Tempo hours are tracked.
         Returns most recent mappings to reflect current categorization patterns.
         """
-        # Join mappings with epic_hours to get summaries
+        from src.models.epic_budget import EpicBudget
+        from sqlalchemy import func
+
+        # Try to get summaries from epic_budgets first (populated on import),
+        # fall back to epic_hours if needed (only exists with Tempo tracking)
         examples = (
             session.query(
                 EpicCategoryMapping.epic_key,
                 EpicCategoryMapping.category,
-                EpicHours.epic_summary,
+                func.coalesce(EpicBudget.epic_summary, EpicHours.epic_summary).label(
+                    "epic_summary"
+                ),
             )
-            .join(
+            .outerjoin(
+                EpicBudget,
+                EpicCategoryMapping.epic_key == EpicBudget.epic_key,
+            )
+            .outerjoin(
                 EpicHours,
                 EpicCategoryMapping.epic_key == EpicHours.epic_key,
             )
