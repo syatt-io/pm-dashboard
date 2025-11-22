@@ -29,8 +29,8 @@ def get_dashboard_stats(user):
             # Count todos by status with visibility rules
             if user.role.value != "admin":
                 # Non-admin users see:
-                # 1. Their own Slack-created TODOs
-                # 2. Meeting-created TODOs for projects they're following
+                # 1. Their own TODOs (assigned to them)
+                # 2. TODOs for projects they're watching
                 from src.models.user import UserWatchedProject
 
                 watched_project_keys = [
@@ -41,14 +41,11 @@ def get_dashboard_stats(user):
                 ]
 
                 visibility_filter = or_(
-                    and_(TodoItem.source == "slack", TodoItem.user_id == user.id),
-                    and_(
-                        TodoItem.source == "meeting_analysis",
-                        (
-                            TodoItem.project_key.in_(watched_project_keys)
-                            if watched_project_keys
-                            else False
-                        ),
+                    TodoItem.user_id == user.id,
+                    (
+                        TodoItem.project_key.in_(watched_project_keys)
+                        if watched_project_keys
+                        else False
                     ),
                 )
 
