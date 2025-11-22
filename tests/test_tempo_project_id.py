@@ -8,6 +8,7 @@ successfully filters worklogs to only the specified project.
 import os
 import sys
 import base64
+import pytest
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -20,6 +21,23 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 PROJECT_KEY = "RNWL"
+
+
+@pytest.fixture
+def project_key():
+    """Provide test project key."""
+    return PROJECT_KEY
+
+
+@pytest.fixture
+def project_id(project_key):
+    """Get numeric project ID from Jira API."""
+    # Skip if required env vars are not present
+    required_vars = ["JIRA_URL", "JIRA_USERNAME", "JIRA_API_TOKEN"]
+    missing = [var for var in required_vars if not os.getenv(var)]
+    if missing:
+        pytest.skip(f"Missing required env vars: {', '.join(missing)}")
+    return get_project_id_from_jira(project_key)
 
 
 def get_project_id_from_jira(project_key: str) -> str:
@@ -59,12 +77,12 @@ def get_project_id_from_jira(project_key: str) -> str:
         raise
 
 
-def test_tempo_with_project_id(project_key: str, project_id: str):
+def test_tempo_with_project_id(project_key, project_id):
     """Test Tempo API v4 worklogs endpoint with numeric project ID."""
     tempo_token = os.getenv("TEMPO_API_TOKEN")
 
     if not tempo_token:
-        raise ValueError("TEMPO_API_TOKEN environment variable is required")
+        pytest.skip("TEMPO_API_TOKEN environment variable is required")
 
     tempo_base_url = "https://api.tempo.io/4"
     tempo_headers = {

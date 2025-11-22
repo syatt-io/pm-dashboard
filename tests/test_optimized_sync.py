@@ -5,6 +5,7 @@ Test optimized epic hours sync with description extraction
 import os
 import sys
 import re
+import pytest
 from pathlib import Path
 from datetime import datetime, date
 from collections import defaultdict
@@ -23,6 +24,10 @@ PROJECT_KEY = "RNWL"
 
 def test_optimized_sync():
     """Test optimized sync with description extraction."""
+    # Skip if TEMPO_API_TOKEN is not available
+    if not os.getenv("TEMPO_API_TOKEN"):
+        pytest.skip("TEMPO_API_TOKEN environment variable is required")
+
     print(f"\n{'=' * 80}")
     print(f"Testing Optimized Epic Hours Sync for {PROJECT_KEY}")
     print(f"{'=' * 80}\n")

@@ -3,6 +3,7 @@
 
 import asyncio
 import sys
+import pytest
 from src.services.jira_user_tickets_service import JiraUserTicketsService
 from src.models.user import User
 from src.utils.database import session_scope
@@ -78,6 +79,7 @@ def test_parameter_parsing():
     return all_passed
 
 
+@pytest.mark.asyncio
 async def test_service_with_params():
     """Test the service with different parameter combinations."""
     print("🧪 Testing JiraUserTicketsService with parameters\n")

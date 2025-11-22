@@ -7,21 +7,22 @@ from src.routes.dashboard import dashboard_bp
 
 
 @pytest.fixture
+def mock_user():
+    """Create mock user."""
+    mock_user = MagicMock()
+    mock_user.id = 123
+    mock_user.email = "test@example.com"
+    mock_user.role.value = "member"
+    return mock_user
+
+
+@pytest.fixture
 def app():
     """Create test Flask app."""
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "test-secret-key"
     app.register_blueprint(dashboard_bp)
     app.config["TESTING"] = True
-
-    # Mock auth service
-    mock_auth_service = MagicMock()
-    mock_user = MagicMock()
-    mock_user.id = 123
-    mock_user.email = "test@example.com"
-    mock_user.role.value = "member"
-    mock_auth_service.get_current_user.return_value = mock_user
-    app.auth_service = mock_auth_service
 
     return app
 
@@ -41,9 +42,22 @@ def auth_headers():
 class TestDashboardStats:
     """Test dashboard statistics route."""
 
+    @patch("src.routes.dashboard.auth_required")
     @patch("src.routes.dashboard.session_scope")
-    def test_get_stats_success(self, mock_session, client, auth_headers):
+    def test_get_stats_success(
+        self, mock_session, mock_auth_required, client, auth_headers, mock_user
+    ):
         """Test getting dashboard stats."""
+
+        # Mock auth decorator to pass through and inject user
+        def auth_decorator(func):
+            def wrapper(*args, **kwargs):
+                return func(mock_user, *args, **kwargs)
+
+            return wrapper
+
+        mock_auth_required.side_effect = auth_decorator
+
         mock_db = MagicMock()
         mock_session.return_value.__enter__.return_value = mock_db
 
@@ -60,12 +74,23 @@ class TestDashboardStats:
         assert "total_meetings" in data["data"]
         assert "total_todos" in data["data"]
 
+    @patch("src.routes.dashboard.auth_required")
     @patch("src.routes.dashboard.session_scope")
-    def test_get_stats_admin_user(self, mock_session, client, app, auth_headers):
+    def test_get_stats_admin_user(
+        self, mock_session, mock_auth_required, client, auth_headers, mock_user
+    ):
         """Test stats for admin user (sees all todos)."""
         # Update mock user to admin
-        mock_user = app.auth_service.get_current_user.return_value
         mock_user.role.value = "admin"
+
+        # Mock auth decorator to pass through and inject admin user
+        def auth_decorator(func):
+            def wrapper(*args, **kwargs):
+                return func(mock_user, *args, **kwargs)
+
+            return wrapper
+
+        mock_auth_required.side_effect = auth_decorator
 
         mock_db = MagicMock()
         mock_session.return_value.__enter__.return_value = mock_db
@@ -96,9 +121,22 @@ class TestDashboardStats:
         assert data["success"] is True
         assert data["data"]["total_todos"] == 15
 
+    @patch("src.routes.dashboard.auth_required")
     @patch("src.routes.dashboard.session_scope")
-    def test_get_stats_error(self, mock_session, client, auth_headers):
+    def test_get_stats_error(
+        self, mock_session, mock_auth_required, client, auth_headers, mock_user
+    ):
         """Test stats error handling."""
+
+        # Mock auth decorator to pass through and inject user
+        def auth_decorator(func):
+            def wrapper(*args, **kwargs):
+                return func(mock_user, *args, **kwargs)
+
+            return wrapper
+
+        mock_auth_required.side_effect = auth_decorator
+
         mock_session.side_effect = Exception("Database error")
 
         response = client.get("/api/dashboard/stats", headers=auth_headers)

@@ -2,10 +2,12 @@
 """Debug script to test ticket sorting."""
 
 import asyncio
+import pytest
 from datetime import datetime
 from src.services.jira_user_tickets_service import JiraUserTicketsService, JiraTicket
 
 
+@pytest.mark.asyncio
 async def test_sorting():
     """Test the sorting logic."""
     # Create some test tickets with different priorities and dates

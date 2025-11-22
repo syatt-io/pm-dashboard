@@ -6,12 +6,24 @@ This script tests the Phase 2 daily digest implementation:
 - Email and Slack formatting
 """
 
+import pytest
 import logging
 from src.utils.database import get_db
 from src.services.job_monitoring_digest import JobMonitoringDigestService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@pytest.fixture
+def digest():
+    """Generate a sample digest for testing formatting."""
+    db = next(get_db())
+    try:
+        digest_service = JobMonitoringDigestService(db)
+        return digest_service.generate_daily_digest(hours_back=24)
+    finally:
+        db.close()
 
 
 def test_digest_generation():

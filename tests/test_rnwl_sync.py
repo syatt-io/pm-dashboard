@@ -3,6 +3,7 @@
 Test epic hours sync for RNWL project only (using proven backfill approach)
 """
 import os
+import pytest
 import sys
 from pathlib import Path
 from datetime import datetime, date
@@ -15,6 +16,12 @@ from src.integrations.tempo import TempoAPIClient
 
 # Just test RNWL
 PROJECT_KEY = "RNWL"
+
+
+@pytest.fixture
+def tempo():
+    """Create TempoAPIClient instance for testing."""
+    return TempoAPIClient()
 
 
 def test_rnwl_sync(tempo):
