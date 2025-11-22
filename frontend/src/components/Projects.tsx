@@ -84,6 +84,7 @@ import {
   CheckBox,
   CheckBoxOutlineBlank,
   RadioButtonUnchecked,
+  Save as SaveIcon,
 } from '@mui/icons-material';
 import { ResourceMappingCell } from './ResourceMappingCell';
 import WeeklyRecapComparison from './WeeklyRecapComparison';
@@ -2154,6 +2155,28 @@ const ProjectShowContent = () => {
   // Debounce timeout ref for auto-save
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Billing fields local state (manual save pattern)
+  const [billingState, setBillingState] = useState({
+    hourly_rate: null as number | null,
+    currency: '' as string
+  });
+  const [savingBilling, setSavingBilling] = useState(false);
+
+  // Track if billing values have changed from saved state
+  const billingHasChanged =
+    billingState.hourly_rate !== (record?.hourly_rate || null) ||
+    billingState.currency !== (record?.currency || '');
+
+  // Initialize billing state from record
+  useEffect(() => {
+    if (record) {
+      setBillingState({
+        hourly_rate: record.hourly_rate || null,
+        currency: record.currency || ''
+      });
+    }
+  }, [record?.hourly_rate, record?.currency]);
+
   // Tab state with URL persistence
   const [tabValue, setTabValue] = useTabWithUrl('project-show-tab', 0);
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -2276,6 +2299,38 @@ const ProjectShowContent = () => {
         throw error;
       }
     }, 1000);
+  };
+
+  const handleBillingSave = async () => {
+    setSavingBilling(true);
+    try {
+      await update(
+        'projects',
+        {
+          id: record.key,
+          data: {
+            hourly_rate: billingState.hourly_rate,
+            currency: billingState.currency
+          },
+          previousData: record
+        },
+        {
+          onSuccess: (data) => {
+            notify('Billing configuration saved', { type: 'success' });
+            refresh();
+          },
+          onError: (error) => {
+            console.error('[Projects] Billing update error:', error);
+            notify('Error saving billing configuration', { type: 'error' });
+          }
+        }
+      );
+    } catch (error) {
+      console.error('[Projects] Billing update exception:', error);
+      notify('Error saving billing configuration', { type: 'error' });
+    } finally {
+      setSavingBilling(false);
+    }
   };
 
   const handleResourceMappingChange = async (
@@ -3104,9 +3159,31 @@ const ProjectShowContent = () => {
             <Grid item xs={12} md={6}>
               <Card sx={{ height: '100%', backgroundColor: 'rgba(139, 92, 246, 0.05)' }}>
                 <CardContent sx={{ p: 1 }}>
-                  <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
-                    Rate Configuration
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="h6">
+                      Rate Configuration
+                    </Typography>
+                    {billingHasChanged && (
+                      <IconButton
+                        size="small"
+                        onClick={handleBillingSave}
+                        disabled={savingBilling}
+                        sx={{
+                          backgroundColor: 'rgba(0, 255, 206, 0.1)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(0, 255, 206, 0.2)',
+                          }
+                        }}
+                        title="Save billing configuration"
+                      >
+                        {savingBilling ? (
+                          <CircularProgress size={20} sx={{ color: '#00FFCE' }} />
+                        ) : (
+                          <SaveIcon sx={{ fontSize: 20, color: '#00FFCE' }} />
+                        )}
+                      </IconButton>
+                    )}
+                  </Box>
                   <Grid container spacing={2}>
                     <Grid item xs={12}>
                       <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
@@ -3116,8 +3193,11 @@ const ProjectShowContent = () => {
                         type="number"
                         size="small"
                         fullWidth
-                        value={record.hourly_rate || ''}
-                        onChange={(e) => handleFieldUpdate('hourly_rate', e.target.value ? parseFloat(e.target.value) : null)}
+                        value={billingState.hourly_rate || ''}
+                        onChange={(e) => setBillingState({
+                          ...billingState,
+                          hourly_rate: e.target.value ? parseFloat(e.target.value) : null
+                        })}
                         placeholder="Enter hourly rate"
                         inputProps={{ min: 0, step: 0.01 }}
                       />
@@ -3129,8 +3209,11 @@ const ProjectShowContent = () => {
                       <Select
                         size="small"
                         fullWidth
-                        value={record.currency || ''}
-                        onChange={(e) => handleFieldUpdate('currency', e.target.value)}
+                        value={billingState.currency || ''}
+                        onChange={(e) => setBillingState({
+                          ...billingState,
+                          currency: e.target.value
+                        })}
                         displayEmpty
                       >
                         <MenuItem value="">
