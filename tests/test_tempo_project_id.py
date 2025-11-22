@@ -72,6 +72,11 @@ def get_project_id_from_jira(project_key: str) -> str:
 
         return project_id
 
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            pytest.skip(f"Project {project_key} not found in Jira instance (404)")
+        print(f"❌ Error getting project ID: {e}")
+        raise
     except Exception as e:
         print(f"❌ Error getting project ID: {e}")
         raise

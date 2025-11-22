@@ -87,102 +87,104 @@ async def test_service_with_params():
     service = JiraUserTicketsService()
 
     # Get a test user from database
-    with session_scope() as session:
-        user = (
-            session.query(User)
-            .filter(User.slack_user_id.isnot(None), User.jira_account_id.isnot(None))
-            .first()
-        )
-
-        if not user:
-            print("❌ No user found with both Slack and Jira mapping")
-            return False
-
-        print(f"✅ Found test user: {user.name} (Jira ID: {user.jira_account_id})\n")
-
-        # Test 1: Default parameters
-        print("Test 1: Default parameters (20 tickets, no project filter)")
-        tickets = await service.get_user_tickets(
-            jira_account_id=user.jira_account_id,
-        )
-        print(f"  ✅ Fetched {len(tickets)} tickets")
-        print()
-
-        # Test 2: Custom max_results
-        print("Test 2: Custom max_results (5 tickets)")
-        tickets = await service.get_user_tickets(
-            jira_account_id=user.jira_account_id,
-            max_results=5,
-        )
-        print(f"  ✅ Fetched {len(tickets)} tickets (should be ≤5)")
-        if len(tickets) > 5:
-            print(f"  ❌ FAIL: Expected ≤5 tickets, got {len(tickets)}")
-            return False
-        print()
-
-        # Test 3: Project filter (use first ticket's project if available)
-        if tickets:
-            project_key = tickets[0].project_key
-            print(f"Test 3: Project filter (project={project_key})")
-            tickets = await service.get_user_tickets(
-                jira_account_id=user.jira_account_id,
-                project_key=project_key,
-            )
-            print(f"  ✅ Fetched {len(tickets)} tickets from project {project_key}")
-
-            # Verify all tickets are from the specified project
-            wrong_project = [t for t in tickets if t.project_key != project_key]
-            if wrong_project:
-                print(
-                    f"  ❌ FAIL: Found {len(wrong_project)} tickets from wrong project!"
+    try:
+        with session_scope() as session:
+            user = (
+                session.query(User)
+                .filter(
+                    User.slack_user_id.isnot(None), User.jira_account_id.isnot(None)
                 )
-                return False
-            print()
-
-        # Test 4: Both parameters
-        print("Test 4: Both parameters (project + max_results)")
-        if tickets:
-            project_key = tickets[0].project_key
-            tickets = await service.get_user_tickets(
-                jira_account_id=user.jira_account_id,
-                project_key=project_key,
-                max_results=3,
+                .first()
             )
-            print(
-                f"  ✅ Fetched {len(tickets)} tickets from {project_key} (should be ≤3)"
-            )
-            if len(tickets) > 3:
-                print(f"  ❌ FAIL: Expected ≤3 tickets, got {len(tickets)}")
-                return False
-            print()
 
-        # Test 5: Cache key uniqueness
-        print("Test 5: Cache key uniqueness (different params = different cache)")
+            if not user:
+                print("❌ No user found with both Slack and Jira mapping")
+                pytest.skip("No test user available in database")
+    except Exception as e:
+        print(f"❌ Database error: {e}")
+        pytest.skip(f"Database not available: {e}")
 
-        # Clear cache first
-        service.clear_cache(user.jira_account_id)
+    print(f"✅ Found test user: {user.name} (Jira ID: {user.jira_account_id})\n")
 
-        # Fetch with different parameters - should create 2 cache entries
-        await service.get_user_tickets(
+    # Test 1: Default parameters
+    print("Test 1: Default parameters (20 tickets, no project filter)")
+    tickets = await service.get_user_tickets(
+        jira_account_id=user.jira_account_id,
+    )
+    print(f"  ✅ Fetched {len(tickets)} tickets")
+    print()
+
+    # Test 2: Custom max_results
+    print("Test 2: Custom max_results (5 tickets)")
+    tickets = await service.get_user_tickets(
+        jira_account_id=user.jira_account_id,
+        max_results=5,
+    )
+    print(f"  ✅ Fetched {len(tickets)} tickets (should be ≤5)")
+    if len(tickets) > 5:
+        print(f"  ❌ FAIL: Expected ≤5 tickets, got {len(tickets)}")
+        return False
+    print()
+
+    # Test 3: Project filter (use first ticket's project if available)
+    if tickets:
+        project_key = tickets[0].project_key
+        print(f"Test 3: Project filter (project={project_key})")
+        tickets = await service.get_user_tickets(
             jira_account_id=user.jira_account_id,
-            max_results=10,
+            project_key=project_key,
         )
-        await service.get_user_tickets(
-            jira_account_id=user.jira_account_id,
-            max_results=20,
-        )
+        print(f"  ✅ Fetched {len(tickets)} tickets from project {project_key}")
 
-        # Check cache has 2 entries
-        cache_entries = [
-            k for k in service._cache.keys() if k.startswith(f"{user.jira_account_id}:")
-        ]
-        print(f"  ✅ Created {len(cache_entries)} cache entries (expected 2)")
-        if len(cache_entries) != 2:
-            print(f"  ❌ FAIL: Expected 2 cache entries, got {len(cache_entries)}")
+        # Verify all tickets are from the specified project
+        wrong_project = [t for t in tickets if t.project_key != project_key]
+        if wrong_project:
+            print(f"  ❌ FAIL: Found {len(wrong_project)} tickets from wrong project!")
             return False
-
-        print(f"  Cache keys: {cache_entries}")
         print()
+
+    # Test 4: Both parameters
+    print("Test 4: Both parameters (project + max_results)")
+    if tickets:
+        project_key = tickets[0].project_key
+        tickets = await service.get_user_tickets(
+            jira_account_id=user.jira_account_id,
+            project_key=project_key,
+            max_results=3,
+        )
+        print(f"  ✅ Fetched {len(tickets)} tickets from {project_key} (should be ≤3)")
+        if len(tickets) > 3:
+            print(f"  ❌ FAIL: Expected ≤3 tickets, got {len(tickets)}")
+            return False
+        print()
+
+    # Test 5: Cache key uniqueness
+    print("Test 5: Cache key uniqueness (different params = different cache)")
+
+    # Clear cache first
+    service.clear_cache(user.jira_account_id)
+
+    # Fetch with different parameters - should create 2 cache entries
+    await service.get_user_tickets(
+        jira_account_id=user.jira_account_id,
+        max_results=10,
+    )
+    await service.get_user_tickets(
+        jira_account_id=user.jira_account_id,
+        max_results=20,
+    )
+
+    # Check cache has 2 entries
+    cache_entries = [
+        k for k in service._cache.keys() if k.startswith(f"{user.jira_account_id}:")
+    ]
+    print(f"  ✅ Created {len(cache_entries)} cache entries (expected 2)")
+    if len(cache_entries) != 2:
+        print(f"  ❌ FAIL: Expected 2 cache entries, got {len(cache_entries)}")
+        return False
+
+    print(f"  Cache keys: {cache_entries}")
+    print()
 
     print("✨ All service tests passed!")
     return True

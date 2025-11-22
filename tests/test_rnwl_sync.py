@@ -21,7 +21,12 @@ PROJECT_KEY = "RNWL"
 @pytest.fixture
 def tempo():
     """Create TempoAPIClient instance for testing."""
-    return TempoAPIClient()
+    if not os.getenv("TEMPO_API_TOKEN"):
+        pytest.skip("TEMPO_API_TOKEN environment variable is required")
+    try:
+        return TempoAPIClient()
+    except Exception as e:
+        pytest.skip(f"Failed to initialize TempoAPIClient: {e}")
 
 
 def test_rnwl_sync(tempo):
