@@ -67,7 +67,11 @@ class JiraUserTicketsService:
         self.jira_url = settings.jira.url
 
     async def get_user_tickets(
-        self, jira_account_id: str, use_cache: bool = True
+        self,
+        jira_account_id: str,
+        use_cache: bool = True,
+        max_results: int = 20,
+        project_key: Optional[str] = None,
     ) -> List[JiraTicket]:
         """
         Fetch tickets assigned to a specific Jira user.
@@ -75,32 +79,44 @@ class JiraUserTicketsService:
         Args:
             jira_account_id: Jira account ID (e.g., from User.jira_account_id)
             use_cache: Whether to use cached results (default: True)
+            max_results: Maximum number of tickets to return (default: 20, range: 1-100)
+            project_key: Optional Jira project key to filter by (e.g., "SUBS", "SATG")
 
         Returns:
-            List of JiraTicket objects sorted by priority then creation date
+            List of JiraTicket objects sorted by creation date (newest first)
         """
+        # Build cache key including filter parameters
+        cache_key = f"{jira_account_id}:{project_key or 'all'}:{max_results}"
+
         # Check cache first
-        if use_cache and jira_account_id in self._cache:
-            tickets, cached_at = self._cache[jira_account_id]
+        if use_cache and cache_key in self._cache:
+            tickets, cached_at = self._cache[cache_key]
             if datetime.now() - cached_at < self._cache_ttl:
                 logger.info(
-                    f"Cache hit for user {jira_account_id} (cached {(datetime.now() - cached_at).seconds}s ago)"
+                    f"Cache hit for {cache_key} (cached {(datetime.now() - cached_at).seconds}s ago)"
                 )
                 return tickets
 
         # Cache miss or expired - fetch from Jira
-        logger.info(f"Fetching tickets from Jira for user {jira_account_id}")
+        logger.info(
+            f"Fetching tickets from Jira for {cache_key} (project={project_key}, max={max_results})"
+        )
 
         try:
-            # JQL query: Let Jira do the sorting server-side for performance
-            # ORDER BY created DESC ensures newest tickets first
-            jql = f'assignee = "{jira_account_id}" ORDER BY created DESC'
+            # Build JQL query with optional project filter
+            jql_parts = [f'assignee = "{jira_account_id}"']
+            if project_key:
+                jql_parts.append(f'project = "{project_key}"')
 
-            # Fetch only 20 tickets (Jira sorts them for us)
+            # Let Jira do the sorting server-side for performance
+            # ORDER BY created DESC ensures newest tickets first
+            jql = " AND ".join(jql_parts) + " ORDER BY created DESC"
+
+            # Fetch only requested number of tickets (Jira sorts them for us)
             # This is 50x faster than fetching 1000 and sorting in Python
             result = await self.jira_client.search_issues(
                 jql=jql,
-                max_results=20,  # Only fetch what we need
+                max_results=max_results,
                 expand_comments=False,
             )
 
@@ -115,21 +131,17 @@ class JiraUserTicketsService:
             # tickets = self._sort_tickets(tickets)  # REMOVED - Jira handles this
 
             # Update cache
-            self._cache[jira_account_id] = (tickets, datetime.now())
+            self._cache[cache_key] = (tickets, datetime.now())
 
-            logger.info(
-                f"Fetched {len(issues)} total tickets, returning top {len(tickets)} for user {jira_account_id}"
-            )
+            logger.info(f"Fetched {len(issues)} tickets for {cache_key}")
             return tickets
 
         except Exception as e:
-            logger.error(f"Error fetching tickets for user {jira_account_id}: {e}")
+            logger.error(f"Error fetching tickets for {cache_key}: {e}")
             # If we have stale cache, return it as fallback
-            if jira_account_id in self._cache:
-                logger.warning(
-                    f"Returning stale cache for user {jira_account_id} due to error"
-                )
-                tickets, _ = self._cache[jira_account_id]
+            if cache_key in self._cache:
+                logger.warning(f"Returning stale cache for {cache_key} due to error")
+                tickets, _ = self._cache[cache_key]
                 return tickets
             return []
 
@@ -192,12 +204,21 @@ class JiraUserTicketsService:
         Clear cache for a specific user or all users.
 
         Args:
-            jira_account_id: If provided, clear cache for this user only.
+            jira_account_id: If provided, clear cache for this user only (all variants).
                            If None, clear all cache.
         """
         if jira_account_id:
-            self._cache.pop(jira_account_id, None)
-            logger.info(f"Cleared cache for user {jira_account_id}")
+            # Clear all cache entries for this user (different project/limit combinations)
+            keys_to_remove = [
+                key
+                for key in self._cache.keys()
+                if key.startswith(f"{jira_account_id}:")
+            ]
+            for key in keys_to_remove:
+                self._cache.pop(key, None)
+            logger.info(
+                f"Cleared {len(keys_to_remove)} cache entries for user {jira_account_id}"
+            )
         else:
             self._cache.clear()
             logger.info("Cleared all ticket cache")

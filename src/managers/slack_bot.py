@@ -743,14 +743,84 @@ class SlackTodoBot:
 
         @self.app.command("/my-jira-tickets")
         def handle_my_jira_tickets_command(ack, respond, command):
-            """Handle /my-jira-tickets slash command."""
-            ack()
+            """Handle /my-jira-tickets slash command.
 
-            # Show immediate feedback to user
-            respond("🎯 Fetching your Jira tickets...\n_This may take a moment_")
+            Usage: /my-jira-tickets [--project PROJECT_KEY] [--num-results N]
+            Examples:
+                /my-jira-tickets
+                /my-jira-tickets --project SUBS
+                /my-jira-tickets --num-results 50
+                /my-jira-tickets --project SUBS --num-results 10
+            """
+            ack()
 
             try:
                 slack_user_id = command.get("user_id")
+                text = command.get("text", "").strip()
+
+                # Parse optional parameters
+                project_key = None
+                max_results = 20  # Default
+
+                if text:
+                    # Parse command: /my-jira-tickets [--project PROJ] [--num-results N]
+                    args = text.split()
+                    i = 0
+                    while i < len(args):
+                        # Handle --project PROJ or --project=PROJ
+                        if args[i] == "--project" and i + 1 < len(args):
+                            project_key = args[i + 1].upper()
+                            i += 2
+                            continue
+                        elif args[i].startswith("--project="):
+                            project_key = args[i].split("=", 1)[1].upper()
+                            i += 1
+                            continue
+                        # Handle --num-results N or --num-results=N
+                        elif args[i] == "--num-results" and i + 1 < len(args):
+                            try:
+                                max_results = int(args[i + 1])
+                                if max_results < 1 or max_results > 100:
+                                    respond(
+                                        "❌ Number of results must be between 1 and 100"
+                                    )
+                                    return
+                                i += 2
+                                continue
+                            except ValueError:
+                                respond(
+                                    "❌ Invalid num-results value. Must be a number."
+                                )
+                                return
+                        elif args[i].startswith("--num-results="):
+                            try:
+                                max_results = int(args[i].split("=", 1)[1])
+                                if max_results < 1 or max_results > 100:
+                                    respond(
+                                        "❌ Number of results must be between 1 and 100"
+                                    )
+                                    return
+                                i += 1
+                                continue
+                            except (ValueError, IndexError):
+                                respond(
+                                    "❌ Invalid num-results value. Must be a number."
+                                )
+                                return
+                        else:
+                            # Unknown argument
+                            respond(
+                                f"❌ Unknown argument: `{args[i]}`\n\n"
+                                "Usage: `/my-jira-tickets [--project PROJECT_KEY] [--num-results N]`\n"
+                                "Example: `/my-jira-tickets --project SUBS --num-results 50`"
+                            )
+                            return
+
+                # Show immediate feedback to user with parameters
+                project_msg = f" for project *{project_key}*" if project_key else ""
+                respond(
+                    f"🎯 Fetching your top {max_results} Jira tickets{project_msg}...\n_This may take a moment_"
+                )
 
                 # Get user from database by Slack user ID
                 from src.models.user import User
@@ -777,14 +847,19 @@ class SlackTodoBot:
                         )
                         return
 
-                    # Fetch tickets asynchronously
+                    # Fetch tickets asynchronously with optional filters
                     logger.info(
-                        f"Fetching Jira tickets for user {user.name} (Jira ID: {user.jira_account_id})"
+                        f"Fetching Jira tickets for user {user.name} (Jira ID: {user.jira_account_id}, "
+                        f"project={project_key}, max={max_results})"
                     )
 
                     # Run async function in sync context
                     tickets = asyncio.run(
-                        self.jira_tickets_service.get_user_tickets(user.jira_account_id)
+                        self.jira_tickets_service.get_user_tickets(
+                            jira_account_id=user.jira_account_id,
+                            max_results=max_results,
+                            project_key=project_key,
+                        )
                     )
 
                     # Format and send response
