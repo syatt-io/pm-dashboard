@@ -52,6 +52,13 @@ from src.utils.database import (
 )
 
 
+# Configure application logging to ensure INFO logs appear in production
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,  # Override any existing configuration
+)
+
 logger = logging.getLogger(__name__)
 
 
