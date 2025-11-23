@@ -519,11 +519,9 @@ class NotificationManager:
                         .topic-section-mint {{ background-color: rgba(0, 255, 206, 0.03); }}
                         .action-item {{ background-color: #f8f9fa; padding: 15px; margin: 8px 0; border-radius: 8px; border-left: 4px solid #554DFF; }}
                         .action-title {{ font-weight: bold; color: #554DFF; }}
-                        ul {{ list-style-type: none; padding-left: 0; }}
-                        li {{ padding: 3px 0; padding-left: 20px; }}
-                        li:before {{ content: "▸ "; color: #554DFF; font-weight: bold; margin-left: -20px; }}
-                        .sub-item {{ padding-left: 40px; }}
-                        .sub-item:before {{ content: "• "; color: #00FFCE; font-weight: bold; margin-left: -20px; }}
+                        ul {{ list-style-type: none; padding-left: 20px; }}
+                        li {{ padding: 3px 0; }}
+                        .sub-item {{ padding-left: 20px; }}
                         .footer {{ margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #666; }}
                     </style>
                 </head>
@@ -562,11 +560,11 @@ class NotificationManager:
                     for item in content_items:
                         # Check if this is a sub-item (starts with "  * ")
                         if item.startswith("  * "):
-                            # Sub-bullet point
-                            html_body += f'<li class="sub-item">{item[4:]}</li>'
+                            # Sub-bullet point with inline bullet character
+                            html_body += f'<li class="sub-item"><span style="color: #00FFCE; font-weight: bold;">• </span>{item[4:]}</li>'
                         else:
-                            # Main bullet point
-                            html_body += f"<li>{item}</li>"
+                            # Main bullet point with inline bullet character
+                            html_body += f'<li><span style="color: #554DFF; font-weight: bold;">▸ </span>{item}</li>'
 
                     html_body += """
                             </ul>
