@@ -21,6 +21,27 @@ loglevel = "info"
 accesslog = "-"
 errorlog = "-"
 
+# Configure application logging to match Gunicorn's log level
+# This ensures INFO logs from Flask app code appear in production
+logconfig_dict = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        }
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "formatter": "default",
+            "stream": "ext://sys.stdout",
+        }
+    },
+    "root": {"level": "INFO", "handlers": ["console"]},
+}
+
 
 def post_worker_init(worker):
     """
