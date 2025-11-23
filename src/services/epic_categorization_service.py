@@ -30,6 +30,11 @@ class EpicCategorizationService:
         self.model = settings.ai.model
         self.api_key = settings.ai.api_key
 
+        # Log initialization for debugging
+        logger.info(
+            f"Initialized EpicCategorizationService with provider={self.provider}, model={self.model}"
+        )
+
         # Initialize provider-specific client
         if self.provider == "anthropic":
             from anthropic import Anthropic
@@ -97,7 +102,31 @@ class EpicCategorizationService:
                     temperature=0.2,  # Low temperature for consistent categorization
                     messages=[{"role": "user", "content": prompt}],
                 )
-                response_text = response.content[0].text.strip()
+
+                # Log API call results
+                logger.info(
+                    f"Anthropic API call completed. Model: {self.model}, "
+                    f"Response ID: {response.id}, "
+                    f"Stop reason: {response.stop_reason}"
+                )
+
+                # Validate response is not empty
+                response_text = (
+                    response.content[0].text.strip()
+                    if response.content and response.content[0].text
+                    else ""
+                )
+
+                if not response_text:
+                    logger.error(
+                        f"Anthropic returned empty response. "
+                        f"Model: {self.model}, "
+                        f"Stop reason: {response.stop_reason}, "
+                        f"Prompt length: {len(prompt)} chars, "
+                        f"Epics count: {len(epics)}, "
+                        f"Training examples: {len(training_examples)}"
+                    )
+                    return {epic["epic_key"]: None for epic in epics}
             elif self.provider == "openai":
                 # Build request parameters
                 params = {
@@ -111,18 +140,43 @@ class EpicCategorizationService:
                     params["temperature"] = 0.2
 
                 # Use max_completion_tokens (newer models) or fallback to max_tokens
+                # Reasoning models need more tokens for both reasoning + output
                 try:
-                    params["max_completion_tokens"] = 2000
+                    params["max_completion_tokens"] = 4000  # Increased from 2000
                     response = self.client.chat.completions.create(**params)
                 except Exception as e:
                     if "max_completion_tokens" in str(e):
                         # Older models use max_tokens
                         del params["max_completion_tokens"]
-                        params["max_tokens"] = 2000
+                        params["max_tokens"] = 4000  # Increased from 2000
                         response = self.client.chat.completions.create(**params)
                     else:
                         raise
-                response_text = response.choices[0].message.content.strip()
+
+                # Log API call results
+                logger.info(
+                    f"OpenAI API call completed. Model: {self.model}, "
+                    f"Response ID: {response.id}, "
+                    f"Finish reason: {response.choices[0].finish_reason if response.choices else 'No choices'}"
+                )
+
+                # Validate response is not empty
+                response_text = (
+                    response.choices[0].message.content.strip()
+                    if response.choices and response.choices[0].message.content
+                    else ""
+                )
+
+                if not response_text:
+                    logger.error(
+                        f"OpenAI returned empty response. "
+                        f"Model: {self.model}, "
+                        f"Finish reason: {response.choices[0].finish_reason if response.choices else 'No choices'}, "
+                        f"Prompt length: {len(prompt)} chars, "
+                        f"Epics count: {len(epics)}, "
+                        f"Training examples: {len(training_examples)}"
+                    )
+                    return {epic["epic_key"]: None for epic in epics}
             else:
                 raise ValueError(f"Unsupported provider: {self.provider}")
 
