@@ -90,7 +90,7 @@ class User(Base):
         role_value = getattr(self, "_role_value", None)
         if role_value is None:
             # Fallback to accessing the role relationship
-            role_value = self.role.value if self.role else "NO_ACCESS"
+            role_value = self.role.name if self.role else "NO_ACCESS"
 
         return {
             "id": self.id,
